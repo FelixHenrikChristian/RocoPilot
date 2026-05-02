@@ -1,4 +1,5 @@
 ﻿using System.Collections.Specialized;
+using System.Runtime.InteropServices;
 using System.Web;
 
 using Microsoft.Windows.AppNotifications;
@@ -11,6 +12,7 @@ namespace RocoPilot.Notifications;
 public class AppNotificationService : IAppNotificationService
 {
     private readonly INavigationService _navigationService;
+    private bool _isRegistered;
 
     public AppNotificationService(INavigationService navigationService)
     {
@@ -24,9 +26,22 @@ public class AppNotificationService : IAppNotificationService
 
     public void Initialize()
     {
-        AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
+        if (!IsNotificationApiSupported())
+        {
+            return;
+        }
 
-        AppNotificationManager.Default.Register();
+        try
+        {
+            AppNotificationManager.Default.NotificationInvoked += OnNotificationInvoked;
+            AppNotificationManager.Default.Register();
+            _isRegistered = true;
+        }
+        catch (COMException)
+        {
+            AppNotificationManager.Default.NotificationInvoked -= OnNotificationInvoked;
+            _isRegistered = false;
+        }
     }
 
     public void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
@@ -52,9 +67,21 @@ public class AppNotificationService : IAppNotificationService
 
     public bool Show(string payload)
     {
+        if (!_isRegistered)
+        {
+            return false;
+        }
+
         var appNotification = new AppNotification(payload);
 
-        AppNotificationManager.Default.Show(appNotification);
+        try
+        {
+            AppNotificationManager.Default.Show(appNotification);
+        }
+        catch (COMException)
+        {
+            return false;
+        }
 
         return appNotification.Id != 0;
     }
@@ -66,6 +93,33 @@ public class AppNotificationService : IAppNotificationService
 
     public void Unregister()
     {
-        AppNotificationManager.Default.Unregister();
+        if (!_isRegistered)
+        {
+            return;
+        }
+
+        try
+        {
+            AppNotificationManager.Default.Unregister();
+        }
+        catch (COMException)
+        {
+        }
+        finally
+        {
+            _isRegistered = false;
+        }
+    }
+
+    private static bool IsNotificationApiSupported()
+    {
+        try
+        {
+            return AppNotificationManager.IsSupported();
+        }
+        catch (COMException)
+        {
+            return false;
+        }
     }
 }

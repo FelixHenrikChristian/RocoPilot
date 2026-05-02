@@ -6,5 +6,36 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid />
+    <Grid
+        Padding="{StaticResource NavigationViewPageContentPadding}"
+        RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <SelectorBar
+            x:Name="TestSelectorBar"
+            Grid.Row="0"
+            SelectionChanged="TestSelectorBar_SelectionChanged">
+            <SelectorBarItem
+                x:Name="ScreenCaptureSelectorItem"
+                Icon="Camera"
+                Text="屏幕捕获"
+                IsSelected="True" />
+            <SelectorBarItem
+                x:Name="TextRecognitionSelectorItem"
+                Icon="Character"
+                Text="文字识别" />
+            <SelectorBarItem
+                x:Name="InputSimulationSelectorItem"
+                Icon="Keyboard"
+                Text="键鼠模拟" />
+        </SelectorBar>
+
+        <Frame
+            x:Name="TestContentFrame"
+            Grid.Row="1"
+            IsNavigationStackEnabled="False" />
+    </Grid>
 </Page>

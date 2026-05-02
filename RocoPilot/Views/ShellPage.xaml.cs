@@ -1,4 +1,5 @@
 ﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -34,6 +35,19 @@ public sealed partial class ShellPage : Page
         App.MainWindow.SetTitleBar(AppTitleBar);
         App.MainWindow.Activated += MainWindow_Activated;
         AppTitleBarText.Text = "AppDisplayName".GetLocalized();
+
+        NavigationViewControl.Loaded += NavigationViewControl_Loaded;
+    }
+
+    private void NavigationViewControl_Loaded(object sender, RoutedEventArgs e)
+    {
+        NavigationViewControl.Loaded -= NavigationViewControl_Loaded;
+
+        if (NavigationViewControl.SettingsItem is NavigationViewItem settingsItem)
+        {
+            settingsItem.Content = "设置";
+            AutomationProperties.SetName(settingsItem, "设置");
+        }
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

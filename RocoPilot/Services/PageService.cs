@@ -15,6 +15,10 @@ public class PageService : IPageService
     public PageService()
     {
         Configure<MainViewModel, MainPage>();
+        Configure<RealtimeViewModel, RealtimePage>();
+        Configure<StatisticsViewModel, StatisticsPage>();
+        Configure<LogViewModel, LogPage>();
+        Configure<TestViewModel, TestPage>();
         Configure<SettingsViewModel, SettingsPage>();
     }
 

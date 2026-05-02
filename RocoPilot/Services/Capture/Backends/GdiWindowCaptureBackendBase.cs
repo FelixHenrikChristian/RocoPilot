@@ -24,6 +24,10 @@ public abstract class GdiWindowCaptureBackendBase : ICaptureBackend
         return CaptureWindow(targetWindow.Hwnd, RenderWindow);
     }
 
+    public void Release(CaptureTargetWindow targetWindow)
+    {
+    }
+
     protected abstract bool RenderWindow(IntPtr hwnd, IntPtr memoryDc, int width, int height);
 
     protected static IntPtr GetTargetWindowDc(IntPtr hwnd) => GetWindowDC(hwnd);

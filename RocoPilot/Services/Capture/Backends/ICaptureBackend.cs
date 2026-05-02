@@ -10,4 +10,6 @@ public interface ICaptureBackend
     }
 
     CapturedFrame? Capture(CaptureTargetWindow targetWindow);
+
+    void Release(CaptureTargetWindow targetWindow);
 }

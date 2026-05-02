@@ -84,6 +84,7 @@ public partial class App : Application
             services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
             services.AddSingleton<ICaptureBackend, BitBltCaptureBackend>();
             services.AddSingleton<ICaptureBackend, PrintWindowCaptureBackend>();
+            services.AddSingleton<ICaptureBackend, WindowsGraphicsCaptureBackend>();
             services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
 
             // Core Services

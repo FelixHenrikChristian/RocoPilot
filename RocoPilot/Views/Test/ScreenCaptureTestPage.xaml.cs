@@ -25,7 +25,8 @@ public sealed partial class ScreenCaptureTestPage : Page
     } = new()
     {
         new(CaptureMethod.BitBlt, "BitBlt", "快速捕获前台可见内容"),
-        new(CaptureMethod.PrintWindow, "PrintWindow", "兼容部分后台或被遮挡窗口")
+        new(CaptureMethod.PrintWindow, "PrintWindow", "兼容部分后台或被遮挡窗口"),
+        new(CaptureMethod.WindowsGraphicsCapture, "Windows Graphics Capture", "GPU/DirectX 窗口捕获")
     };
 
     public ScreenCaptureTestPage()

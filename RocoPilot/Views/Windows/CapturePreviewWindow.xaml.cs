@@ -233,5 +233,6 @@ public sealed partial class CapturePreviewWindow : WindowEx
     {
         var cancellationTokenSource = Interlocked.Exchange(ref _captureCancellationTokenSource, null);
         cancellationTokenSource?.Cancel();
+        _captureService.Release(_targetWindow, _captureMethod.Method);
     }
 }

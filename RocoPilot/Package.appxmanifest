@@ -4,11 +4,12 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap6="http://schemas.microsoft.com/appx/manifest/uap/windows10/6"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:genTemplate="http://schemas.microsoft.com/appx/developer/templatestudio"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
-  IgnorableNamespaces="uap rescap genTemplate">
+  IgnorableNamespaces="uap uap6 rescap genTemplate">
 
   <Identity
     Name="88efb6ea-9b2d-4c5c-b075-fcd9ba681757"
@@ -62,6 +63,7 @@
   </Applications>
 
   <Capabilities>
+    <uap6:Capability Name="graphicsCapture" />
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
 

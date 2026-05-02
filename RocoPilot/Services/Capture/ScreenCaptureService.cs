@@ -22,4 +22,14 @@ public sealed class ScreenCaptureService : IScreenCaptureService
 
         return captureBackend.Capture(targetWindow);
     }
+
+    public void Release(CaptureTargetWindow targetWindow, CaptureMethod method)
+    {
+        if (targetWindow.Hwnd == IntPtr.Zero || !_captureBackends.TryGetValue(method, out var captureBackend))
+        {
+            return;
+        }
+
+        captureBackend.Release(targetWindow);
+    }
 }

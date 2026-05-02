@@ -4,7 +4,181 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:helpers="using:RocoPilot.Helpers"
+    xmlns:models="using:RocoPilot.Models"
     mc:Ignorable="d">
 
-    <Grid />
+    <Page.Resources>
+        <helpers:LogLevelToBrushConverter x:Key="LogLevelToBrushConverter" />
+    </Page.Resources>
+
+    <Grid RowSpacing="8" Padding="{StaticResource NavigationViewPageContentPadding}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+            <Grid ColumnSpacing="12" RowSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel
+                    Grid.Column="0"
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    VerticalAlignment="Center">
+                    <ToggleButton
+                        IsChecked="{x:Bind ViewModel.ShowDebug, Mode=TwoWay}"
+                        MinHeight="0"
+                        Padding="10,4"
+                        CornerRadius="14"
+                        ToolTipService.ToolTip="显示 Debug 日志">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="#9CA3AF" />
+                            <TextBlock Text="Debug" FontSize="12" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton
+                        IsChecked="{x:Bind ViewModel.ShowInformation, Mode=TwoWay}"
+                        MinHeight="0"
+                        Padding="10,4"
+                        CornerRadius="14"
+                        ToolTipService.ToolTip="显示 Information 日志">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="#60A5FA" />
+                            <TextBlock Text="Info" FontSize="12" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton
+                        IsChecked="{x:Bind ViewModel.ShowWarning, Mode=TwoWay}"
+                        MinHeight="0"
+                        Padding="10,4"
+                        CornerRadius="14"
+                        ToolTipService.ToolTip="显示 Warning 日志">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="#F59E0B" />
+                            <TextBlock Text="Warn" FontSize="12" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <ToggleButton
+                        IsChecked="{x:Bind ViewModel.ShowError, Mode=TwoWay}"
+                        MinHeight="0"
+                        Padding="10,4"
+                        CornerRadius="14"
+                        ToolTipService.ToolTip="显示 Error / Fatal 日志">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="8" Height="8" Fill="#EF4444" />
+                            <TextBlock Text="Error" FontSize="12" />
+                        </StackPanel>
+                    </ToggleButton>
+                    <Grid Width="160" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBox
+                            PlaceholderText="搜索"
+                            Padding="28,5,8,5"
+                            Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE721;"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Margin="8,0,0,0"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            IsHitTestVisible="False" />
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    VerticalAlignment="Center">
+                    <Button
+                        Command="{x:Bind ViewModel.ClearCommand}"
+                        ToolTipService.ToolTip="清空当前显示（文件日志不受影响）">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE74D;" />
+                    </Button>
+                    <Button
+                        Command="{x:Bind ViewModel.OpenLogFileCommand}"
+                        ToolTipService.ToolTip="用默认编辑器打开当天的日志文件">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE8A5;" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource CardStyle}" Padding="0" MinHeight="0">
+            <ListView
+                x:Name="LogListView"
+                ItemsSource="{x:Bind ViewModel.Entries, Mode=OneWay}"
+                SelectionMode="Extended"
+                IsItemClickEnabled="False"
+                ShowsScrollingPlaceholders="False">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Padding" Value="12,2" />
+                        <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="models:LogEntry">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                Grid.Column="0"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                Text="{x:Bind TimeText}" />
+                            <Border
+                                Grid.Column="1"
+                                MinWidth="38"
+                                Padding="6,1"
+                                VerticalAlignment="Top"
+                                Background="{x:Bind Level, Converter={StaticResource LogLevelToBrushConverter}}"
+                                CornerRadius="3">
+                                <TextBlock
+                                    FontFamily="Consolas"
+                                    FontSize="11"
+                                    FontWeight="SemiBold"
+                                    Foreground="White"
+                                    HorizontalAlignment="Center"
+                                    Text="{x:Bind LevelText}" />
+                            </Border>
+                            <TextBlock
+                                Grid.Column="2"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ShortSource}"
+                                TextTrimming="CharacterEllipsis"
+                                MaxWidth="180" />
+                            <TextBlock
+                                Grid.Column="3"
+                                FontFamily="Consolas"
+                                FontSize="12"
+                                Text="{x:Bind Message}"
+                                TextWrapping="Wrap"
+                                IsTextSelectionEnabled="True" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Border>
+    </Grid>
 </Page>

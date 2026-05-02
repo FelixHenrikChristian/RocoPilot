@@ -1,11 +1,15 @@
+using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Settings;
@@ -18,8 +22,10 @@ public partial class SettingsViewModel : ObservableRecipient
 {
     private readonly IThemeSelectorService _themeSelectorService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly ILogger<SettingsViewModel> _logger;
 
     private bool _suppressThemeChange;
+    private bool _suppressDiagnosticModePersist;
 
     public ThemeOption[] ThemeOptions { get; } =
     {
@@ -32,19 +38,35 @@ public partial class SettingsViewModel : ObservableRecipient
     private ThemeOption? _selectedThemeOption;
 
     [ObservableProperty]
+    private bool _diagnosticMode;
+
+    [ObservableProperty]
     private string _versionDescription;
 
     public SettingsViewModel(
         IThemeSelectorService themeSelectorService,
-        ILocalSettingsService localSettingsService)
+        ILocalSettingsService localSettingsService,
+        ILogger<SettingsViewModel> logger)
     {
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
+        _logger = logger;
         _versionDescription = GetVersionDescription();
     }
 
-    public Task LoadAsync()
+    public async Task LoadAsync()
     {
+        _suppressDiagnosticModePersist = true;
+        try
+        {
+            var savedDiag = await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.DiagnosticMode);
+            DiagnosticMode = savedDiag ?? false;
+        }
+        finally
+        {
+            _suppressDiagnosticModePersist = false;
+        }
+
         _suppressThemeChange = true;
         try
         {
@@ -55,8 +77,6 @@ public partial class SettingsViewModel : ObservableRecipient
         {
             _suppressThemeChange = false;
         }
-
-        return Task.CompletedTask;
     }
 
     partial void OnSelectedThemeOptionChanged(ThemeOption? value)
@@ -72,6 +92,36 @@ public partial class SettingsViewModel : ObservableRecipient
     private async Task ApplyThemeAsync(ThemeOption option)
     {
         await _themeSelectorService.SetThemeAsync(ElementThemeFromKey(option.ThemeKey));
+    }
+
+    partial void OnDiagnosticModeChanged(bool value)
+    {
+        LoggingHelper.SetDiagnosticMode(value);
+
+        if (_suppressDiagnosticModePersist)
+        {
+            return;
+        }
+
+        _ = _localSettingsService.SaveSettingAsync(SettingsKeys.DiagnosticMode, value);
+    }
+
+    [RelayCommand]
+    private void OpenLogFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(LoggingHelper.LogDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = LoggingHelper.LogDirectory,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "打开日志目录失败");
+        }
     }
 
     [RelayCommand]

@@ -1,0 +1,10 @@
+﻿{
+    "profiles": {
+      "RocoPilot (Package)": {
+        "commandName": "MsixPackage"
+      },
+      "RocoPilot (Unpackaged)": {
+        "commandName": "Project"
+      }
+    }
+}

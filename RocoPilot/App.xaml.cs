@@ -13,6 +13,7 @@ using RocoPilot.Models;
 using RocoPilot.Notifications;
 using RocoPilot.Services;
 using RocoPilot.Services.Capture;
+using RocoPilot.Services.Capture.Backends;
 using RocoPilot.ViewModels;
 using RocoPilot.Views;
 
@@ -81,6 +82,8 @@ public partial class App : Application
             services.AddSingleton<IPageService, PageService>();
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
+            services.AddSingleton<ICaptureBackend, BitBltCaptureBackend>();
+            services.AddSingleton<ICaptureBackend, PrintWindowCaptureBackend>();
             services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
 
             // Core Services

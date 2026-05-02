@@ -5,12 +5,14 @@ using Microsoft.UI.Xaml;
 
 using RocoPilot.Activation;
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Core.Contracts.Services;
 using RocoPilot.Core.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 using RocoPilot.Notifications;
 using RocoPilot.Services;
+using RocoPilot.Services.Capture;
 using RocoPilot.ViewModels;
 using RocoPilot.Views;
 
@@ -78,6 +80,8 @@ public partial class App : Application
             services.AddSingleton<IActivationService, ActivationService>();
             services.AddSingleton<IPageService, PageService>();
             services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
+            services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
 
             // Core Services
             services.AddSingleton<IFileService, FileService>();

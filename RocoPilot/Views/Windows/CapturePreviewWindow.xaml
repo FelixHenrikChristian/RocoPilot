@@ -1,0 +1,160 @@
+<windowex:WindowEx
+    x:Class="RocoPilot.Views.Windows.CapturePreviewWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:windowex="using:WinUIEx"
+    Width="920"
+    Height="640"
+    MinWidth="560"
+    MinHeight="420"
+    mc:Ignorable="d">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid
+        x:Name="ContentRoot"
+        Padding="16"
+        RowSpacing="12"
+        Loaded="ContentRoot_Loaded">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border
+            Grid.Row="0"
+            Style="{StaticResource CardStyle}">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel
+                    Grid.Column="0"
+                    Spacing="4">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE722;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="屏幕实时捕获" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="TargetText"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <Border
+                    Grid.Column="1"
+                    Padding="10,5"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <TextBlock
+                        x:Name="StatusText"
+                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Text="准备中" />
+                </Border>
+            </Grid>
+        </Border>
+
+        <Border
+            Grid.Row="1"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid>
+                <Image
+                    x:Name="PreviewImage"
+                    Stretch="Uniform" />
+                <StackPanel
+                    x:Name="EmptyState"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="10">
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="40"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Glyph="&#xE722;" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="等待第一帧" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border
+            Grid.Row="2"
+            Style="{StaticResource CardStyle}">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel
+                    Grid.Column="0"
+                    Orientation="Horizontal"
+                    Spacing="16">
+                    <TextBlock
+                        x:Name="MethodText"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        x:Name="FrameSizeText"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock
+                        x:Name="FpsText"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <StackPanel
+                    Grid.Column="1"
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <Button
+                        x:Name="PauseButton"
+                        Click="PauseButton_Click">
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="6">
+                            <FontIcon
+                                x:Name="PauseButtonIcon"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="14"
+                                Glyph="&#xE769;" />
+                            <TextBlock x:Name="PauseButtonText" Text="暂停" />
+                        </StackPanel>
+                    </Button>
+                    <Button
+                        Click="CloseButton_Click">
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="6">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="14"
+                                Glyph="&#xE8BB;" />
+                            <TextBlock Text="关闭" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</windowex:WindowEx>

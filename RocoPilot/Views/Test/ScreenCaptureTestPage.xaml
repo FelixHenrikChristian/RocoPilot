@@ -6,5 +6,196 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid x:Name="ContentArea" />
+    <ScrollViewer>
+        <Grid
+            Padding="0,4,0,0"
+            RowSpacing="14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border
+                Grid.Row="0"
+                Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE722;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="屏幕捕获" />
+                    </StackPanel>
+
+                    <Border
+                        Height="1"
+                        Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="选择目标窗口和捕获方式后打开独立预览窗口。" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Row="1"
+                Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="14">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE713;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="捕获配置" />
+                    </StackPanel>
+
+                    <Border
+                        Height="1"
+                        Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                    <Grid
+                        ColumnSpacing="12"
+                        RowSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Spacing="2">
+                            <TextBlock Text="截图方式" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="速度 / 兼容性取向" />
+                        </StackPanel>
+
+                        <ComboBox
+                            x:Name="CaptureMethodComboBox"
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Grid.ColumnSpan="2"
+                            HorizontalAlignment="Stretch"
+                            DisplayMemberPath="Name" />
+
+                        <Border
+                            Grid.Row="1"
+                            Grid.ColumnSpan="3"
+                            Height="1"
+                            Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <StackPanel
+                            Grid.Row="2"
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Spacing="2">
+                            <TextBlock Text="目标窗口" />
+                            <TextBlock
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="当前可见窗口" />
+                        </StackPanel>
+
+                        <ComboBox
+                            x:Name="WindowComboBox"
+                            Grid.Row="2"
+                            Grid.Column="1"
+                            HorizontalAlignment="Stretch"
+                            DisplayMemberPath="DisplayName"
+                            SelectionChanged="WindowComboBox_SelectionChanged" />
+
+                        <Button
+                            Grid.Row="2"
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Click="RefreshWindowListButton_Click"
+                            ToolTipService.ToolTip="刷新目标窗口">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Glyph="&#xE72C;" />
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Row="2"
+                Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="12">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE768;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="实时预览" />
+                    </StackPanel>
+
+                    <Border
+                        Height="1"
+                        Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            Spacing="4">
+                            <TextBlock
+                                x:Name="SelectedWindowText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextTrimming="CharacterEllipsis"
+                                Text="尚未选择窗口" />
+                        </StackPanel>
+
+                        <Button
+                            x:Name="StartPreviewButton"
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Click="StartPreviewButton_Click"
+                            Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE768;" />
+                                <TextBlock Text="开始预览" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </Page>

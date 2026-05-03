@@ -88,6 +88,7 @@ public partial class App : Application
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IGameWindowService, GameWindowService>();
             services.AddSingleton<IRuntimeTaskService, RuntimeTaskService>();
+            services.AddSingleton<IRecognitionOverlayService, RecognitionOverlayService>();
             services.AddSingleton<IRecognitionRegionConfigService, RecognitionRegionConfigService>();
             services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
             services.AddSingleton<ICaptureBackend, BitBltCaptureBackend>();

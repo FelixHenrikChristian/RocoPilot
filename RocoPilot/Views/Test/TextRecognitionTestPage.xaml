@@ -6,5 +6,234 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid x:Name="ContentArea" />
+    <ScrollViewer>
+        <Grid
+            Padding="0,4,0,0"
+            RowSpacing="14">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border
+                Grid.Row="0"
+                Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="14">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE8D4;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="文字识别输入" />
+                    </StackPanel>
+
+                    <Border
+                        Height="1"
+                        Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                    <Grid
+                        ColumnSpacing="12"
+                        RowSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Button
+                            Grid.Row="0"
+                            Grid.Column="0"
+                            HorizontalAlignment="Stretch"
+                            Click="ImportImageButton_Click">
+                            <StackPanel
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE8E5;" />
+                                <TextBlock Text="导入图像" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            HorizontalAlignment="Stretch"
+                            Click="OpenScreenClipButton_Click">
+                            <StackPanel
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE722;" />
+                                <TextBlock Text="调用截图工具" />
+                            </StackPanel>
+                        </Button>
+
+                        <Button
+                            Grid.Row="0"
+                            Grid.Column="2"
+                            HorizontalAlignment="Stretch"
+                            Click="ReadClipboardButton_Click">
+                            <StackPanel
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE77F;" />
+                                <TextBlock Text="读取剪贴板" />
+                            </StackPanel>
+                        </Button>
+
+                        <TextBlock
+                            x:Name="InputStatusText"
+                            Grid.Row="1"
+                            Grid.ColumnSpan="3"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="尚未选择图像"
+                            TextWrapping="WrapWholeWords" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Row="1"
+                Style="{StaticResource CardStyle}">
+                <StackPanel Spacing="14">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xEB9F;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="图像预览" />
+                    </StackPanel>
+
+                    <Border
+                        Height="1"
+                        Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                    <Grid
+                        MinHeight="280"
+                        Background="{ThemeResource LayerFillColorDefaultBrush}">
+                        <Border
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="6" />
+
+                        <Image
+                            x:Name="PreviewImage"
+                            Margin="12"
+                            MaxHeight="420"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Stretch="Uniform" />
+
+                        <StackPanel
+                            x:Name="PreviewEmptyState"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="28"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xEB9F;" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="图像会显示在这里" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border
+                Grid.Row="2"
+                Style="{StaticResource CardStyle}">
+                <Grid
+                    ColumnSpacing="14"
+                    RowSpacing="14">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="16"
+                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                            Glyph="&#xE8D2;" />
+                        <TextBlock
+                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Text="识别结果" />
+                    </StackPanel>
+
+                    <Button
+                        x:Name="RecognizeButton"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        VerticalAlignment="Center"
+                        Click="RecognizeButton_Click"
+                        IsEnabled="False"
+                        Style="{StaticResource AccentButtonStyle}">
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="14"
+                                Glyph="&#xE8D4;" />
+                            <TextBlock Text="开始识别" />
+                        </StackPanel>
+                    </Button>
+
+                    <Border
+                        Grid.Row="1"
+                        Grid.ColumnSpan="2"
+                        Height="1"
+                        Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                    <TextBox
+                        x:Name="ResultTextBox"
+                        Grid.Row="2"
+                        Grid.ColumnSpan="2"
+                        MinHeight="160"
+                        AcceptsReturn="True"
+                        IsReadOnly="True"
+                        PlaceholderText="识别结果会显示在这里"
+                        TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
 </Page>

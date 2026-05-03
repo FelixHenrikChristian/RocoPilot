@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Capture;
+using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.ViewModels;
 
@@ -13,7 +14,7 @@ public partial class MainViewModel : ObservableRecipient
 {
     private const int LaunchNotificationAutoCloseDelayMilliseconds = 4500;
 
-    private readonly IGameWindowService _gameWindowService;
+    private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly ILogger<MainViewModel> _logger;
     private CancellationTokenSource? _launchNotificationAutoCloseCts;
 
@@ -64,19 +65,22 @@ public partial class MainViewModel : ObservableRecipient
     public string StartStopButtonGlyph => IsRealtimeCaptureRunning ? "\uE71A" : "\uE768";
 
     public MainViewModel(
-        IGameWindowService gameWindowService,
+        IRuntimeTaskService runtimeTaskService,
         ILogger<MainViewModel> logger)
     {
-        _gameWindowService = gameWindowService;
+        _runtimeTaskService = runtimeTaskService;
         _logger = logger;
         SelectedCaptureMethod = CaptureMethods[0];
+        IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
+        TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
     }
 
     [RelayCommand]
-    private void ToggleRealtimeCapture()
+    private async Task ToggleRealtimeCaptureAsync()
     {
-        if (IsRealtimeCaptureRunning)
+        if (_runtimeTaskService.IsRunning)
         {
+            await _runtimeTaskService.StopAsync();
             IsRealtimeCaptureRunning = false;
             TargetGameWindow = null;
             _logger.LogInformation("实时任务已停止");
@@ -84,17 +88,36 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
-        var gameWindow = _gameWindowService.FindGameWindow();
-        if (gameWindow == null)
+        if (SelectedCaptureMethod is null)
         {
-            _logger.LogWarning("启动失败：未找到游戏窗口。目标进程：{TargetProcessName}", _gameWindowService.TargetProcessName);
             ShowLaunchNotification(
-                InfoBarSeverity.Error,
-                "启动失败",
-                "没有找到游戏窗口。请先启动游戏，并确认窗口未最小化。");
+                InfoBarSeverity.Warning,
+                "缺少配置",
+                "请先选择截图方式。");
             return;
         }
 
+        var result = await _runtimeTaskService.StartAsync(new RuntimeTaskStartOptions
+        {
+            CaptureMethod = SelectedCaptureMethod.Method,
+            RecognitionOverlayEnabled = IsMaskOverlayEnabled,
+            InfoOverlayEnabled = IsInfoOverlayEnabled,
+            InfoOverlayLocked = IsInfoOverlayLocked
+        });
+
+        if (!result.Success || result.State is null)
+        {
+            IsRealtimeCaptureRunning = false;
+            TargetGameWindow = null;
+            _logger.LogWarning("启动失败：{Message}", result.Message);
+            ShowLaunchNotification(
+                InfoBarSeverity.Error,
+                "启动失败",
+                result.Message);
+            return;
+        }
+
+        var gameWindow = result.State.TargetWindow;
         TargetGameWindow = gameWindow;
         IsRealtimeCaptureRunning = true;
         _logger.LogInformation(

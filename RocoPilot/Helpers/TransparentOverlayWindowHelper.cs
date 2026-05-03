@@ -30,6 +30,8 @@ internal static class TransparentOverlayWindowHelper
     private const uint SwpFrameChanged = 0x0020;
     private const uint SwpShowWindow = 0x0040;
 
+    private const int SwHide = 0;
+
     private const int WmEraseBackground = 0x0014;
     private const int WmNcHitTest = 0x0084;
     private const int WmDwmCompositionChanged = 0x031E;
@@ -93,6 +95,21 @@ internal static class TransparentOverlayWindowHelper
             clientRect.Width,
             clientRect.Height);
         return true;
+    }
+
+    public static bool IsForegroundWindow(IntPtr hwnd)
+    {
+        return hwnd != IntPtr.Zero && GetForegroundWindow() == hwnd;
+    }
+
+    public static void HideWindow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero)
+        {
+            return;
+        }
+
+        _ = ShowWindow(hwnd, SwHide);
     }
 
     public static void MoveTopMostNoActivate(IntPtr hwnd, RectInt32 bounds)
@@ -298,6 +315,13 @@ internal static class TransparentOverlayWindowHelper
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsIconic(IntPtr hwnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr hwnd, int command);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

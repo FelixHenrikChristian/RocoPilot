@@ -7,6 +7,8 @@ using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
 using Windows.Graphics.Imaging;
+using Windows.Foundation.Metadata;
+using Windows.Security.Authorization.AppCapabilityAccess;
 
 namespace RocoPilot.Services.Capture.Backends;
 
@@ -85,6 +87,8 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
     private sealed class CaptureSessionState : IDisposable
     {
         private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromMilliseconds(800);
+        private static readonly object BorderlessAccessLock = new();
+        private static AppCapabilityAccessStatus? _borderlessAccessStatus;
 
         private readonly IntPtr _hwnd;
         private readonly Action<IntPtr, CaptureSessionState> _removeSession;
@@ -117,6 +121,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             _item.Closed += Item_Closed;
 
             _session = _framePool.CreateCaptureSession(_item);
+            TryDisableCaptureBorder(_session);
             _session.StartCapture();
         }
 
@@ -253,6 +258,56 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             for (var i = 3; i < pixels.Length; i += 4)
             {
                 pixels[i] = 255;
+            }
+        }
+
+        private static void TryDisableCaptureBorder(GraphicsCaptureSession session)
+        {
+            try
+            {
+                if (!IsBorderlessCaptureApiPresent())
+                {
+                    return;
+                }
+
+                var accessStatus = GetBorderlessAccessStatus();
+                if (accessStatus == AppCapabilityAccessStatus.Allowed)
+                {
+                    session.IsBorderRequired = false;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private static bool IsBorderlessCaptureApiPresent()
+        {
+            return ApiInformation.IsTypePresent("Windows.Graphics.Capture.GraphicsCaptureAccess")
+                && ApiInformation.IsEnumNamedValuePresent(
+                    "Windows.Graphics.Capture.GraphicsCaptureAccessKind",
+                    nameof(GraphicsCaptureAccessKind.Borderless))
+                && ApiInformation.IsPropertyPresent(
+                    "Windows.Graphics.Capture.GraphicsCaptureSession",
+                    nameof(GraphicsCaptureSession.IsBorderRequired));
+        }
+
+        private static AppCapabilityAccessStatus GetBorderlessAccessStatus()
+        {
+            lock (BorderlessAccessLock)
+            {
+                if (_borderlessAccessStatus.HasValue)
+                {
+                    return _borderlessAccessStatus.Value;
+                }
+
+                _borderlessAccessStatus = GraphicsCaptureAccess
+                    .RequestAccessAsync(GraphicsCaptureAccessKind.Borderless)
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult();
+
+                return _borderlessAccessStatus.Value;
             }
         }
     }

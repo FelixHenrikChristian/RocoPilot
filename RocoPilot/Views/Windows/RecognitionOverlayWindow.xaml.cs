@@ -25,8 +25,10 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private readonly IDisposable _messageHook;
 
     private RectInt32 _currentClientBounds;
+    private bool _hasActivated;
     private bool _isLoaded;
     private bool _isClosed;
+    private bool _isOverlayVisible;
 
     public RecognitionOverlayWindow(CaptureTargetWindow targetWindow, RecognitionRegionConfig regionConfig)
     {
@@ -60,11 +62,8 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
             return;
         }
 
-        MoveToTargetClientArea();
+        UpdateOverlayState();
         TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
-        Activate();
-        TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
-        MoveToTargetClientArea();
         _followTimer.Start();
         DrawRegions();
     }
@@ -87,7 +86,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private void OverlayRoot_Loaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = true;
-        MoveToTargetClientArea();
+        UpdateOverlayState();
         DrawRegions();
     }
 
@@ -98,17 +97,27 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
 
     private void FollowTimer_Tick(DispatcherQueueTimer sender, object args)
     {
-        MoveToTargetClientArea();
+        UpdateOverlayState();
     }
 
-    private void MoveToTargetClientArea()
+    private void UpdateOverlayState()
     {
         if (_isClosed
+            || !TransparentOverlayWindowHelper.IsForegroundWindow(_targetWindow.Hwnd)
             || !TransparentOverlayWindowHelper.TryGetClientScreenBounds(_targetWindow.Hwnd, out var bounds)
             || bounds.Width <= 0
             || bounds.Height <= 0)
         {
+            HideOverlay();
             return;
+        }
+
+        if (!_hasActivated)
+        {
+            AppWindow.MoveAndResize(bounds);
+            Activate();
+            _hasActivated = true;
+            TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
         }
 
         if (!SameBounds(_currentClientBounds, bounds))
@@ -119,6 +128,18 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         }
 
         TransparentOverlayWindowHelper.MoveTopMostNoActivate(_hwnd, bounds);
+        _isOverlayVisible = true;
+    }
+
+    private void HideOverlay()
+    {
+        if (!_isOverlayVisible)
+        {
+            return;
+        }
+
+        TransparentOverlayWindowHelper.HideWindow(_hwnd);
+        _isOverlayVisible = false;
     }
 
     private void DrawRegions()

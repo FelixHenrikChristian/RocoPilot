@@ -84,6 +84,7 @@ public partial class App : Application
             services.AddSingleton<IActivationService, ActivationService>();
             services.AddSingleton<IPageService, PageService>();
             services.AddSingleton<INavigationService, NavigationService>();
+            services.AddSingleton<IGameWindowService, GameWindowService>();
             services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
             services.AddSingleton<ICaptureBackend, BitBltCaptureBackend>();
             services.AddSingleton<ICaptureBackend, PrintWindowCaptureBackend>();
@@ -98,7 +99,7 @@ public partial class App : Application
             // Views and ViewModels
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<SettingsPage>();
-            services.AddTransient<MainViewModel>();
+            services.AddSingleton<MainViewModel>();
             services.AddTransient<MainPage>();
             services.AddTransient<RealtimeViewModel>();
             services.AddTransient<RealtimePage>();

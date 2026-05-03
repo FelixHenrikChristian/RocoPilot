@@ -6,7 +6,8 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
         <StackPanel
             x:Name="ContentArea"
             Padding="{StaticResource NavigationViewPageContentPadding}"
@@ -296,5 +297,16 @@
                 </StackPanel>
             </Expander>
         </StackPanel>
-    </ScrollViewer>
+        </ScrollViewer>
+
+        <InfoBar
+            Margin="{StaticResource NavigationViewPageContentPadding}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            IsClosable="False"
+            IsOpen="{x:Bind ViewModel.IsLaunchNotificationOpen, Mode=TwoWay}"
+            Message="{x:Bind ViewModel.LaunchNotificationMessage, Mode=OneWay}"
+            Severity="{x:Bind ViewModel.LaunchNotificationSeverity, Mode=OneWay}"
+            Title="{x:Bind ViewModel.LaunchNotificationTitle, Mode=OneWay}" />
+    </Grid>
 </Page>

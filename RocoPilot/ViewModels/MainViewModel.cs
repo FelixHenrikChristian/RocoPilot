@@ -121,17 +121,19 @@ public partial class MainViewModel : ObservableRecipient
         TargetGameWindow = gameWindow;
         IsRealtimeCaptureRunning = true;
         _logger.LogInformation(
-            "启动成功：已找到游戏窗口。标题：{WindowTitle}  进程：{ProcessName}  PID：{ProcessId}  HWND：{WindowHandle}  尺寸：{WindowWidth}x{WindowHeight}",
+            "启动成功：已找到游戏窗口。标题：{WindowTitle}  进程：{ProcessName}  PID：{ProcessId}  HWND：{WindowHandle}  窗口尺寸：{WindowWidth}x{WindowHeight}  客户区：{ClientWidth}x{ClientHeight}",
             gameWindow.Title,
             gameWindow.ProcessName,
             gameWindow.ProcessId,
             gameWindow.HandleText,
             gameWindow.Width,
-            gameWindow.Height);
+            gameWindow.Height,
+            gameWindow.ClientWidth,
+            gameWindow.ClientHeight);
         ShowLaunchNotification(
             InfoBarSeverity.Success,
             "启动成功",
-            "实时任务已启动。");
+            result.Message);
     }
 
     [RelayCommand]

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Contracts.Services.Recognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
 
@@ -15,6 +16,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
     private readonly IGameWindowService _gameWindowService;
     private readonly IScreenCaptureService _screenCaptureService;
+    private readonly IRecognitionRegionConfigService _recognitionRegionConfigService;
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
 
@@ -32,10 +34,12 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     public RuntimeTaskService(
         IGameWindowService gameWindowService,
         IScreenCaptureService screenCaptureService,
+        IRecognitionRegionConfigService recognitionRegionConfigService,
         ILogger<RuntimeTaskService> logger)
     {
         _gameWindowService = gameWindowService;
         _screenCaptureService = screenCaptureService;
+        _recognitionRegionConfigService = recognitionRegionConfigService;
         _logger = logger;
     }
 
@@ -54,21 +58,34 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             var targetWindow = _gameWindowService.FindGameWindow();
             if (targetWindow is null)
             {
-                var message = $"未找到目标游戏窗口：{_gameWindowService.TargetProcessName}";
-                _logger.LogWarning("{Message}", message);
-                return RuntimeTaskStartResult.Failed(message);
+                var missingWindowMessage = $"未找到目标游戏窗口：{_gameWindowService.TargetProcessName}";
+                _logger.LogWarning("{Message}", missingWindowMessage);
+                return RuntimeTaskStartResult.Failed(missingWindowMessage);
             }
 
             var firstFrame = await CaptureFrameAsync(targetWindow, options.CaptureMethod, cancellationToken);
             if (firstFrame is null)
             {
                 _screenCaptureService.Release(targetWindow, options.CaptureMethod);
-                var message = $"找到窗口，但未能获取画面：{targetWindow.DisplayName}";
-                _logger.LogWarning("{Message}", message);
-                return RuntimeTaskStartResult.Failed(message);
+                var captureFailedMessage = $"找到窗口，但未能获取画面：{targetWindow.DisplayName}";
+                _logger.LogWarning("{Message}", captureFailedMessage);
+                return RuntimeTaskStartResult.Failed(captureFailedMessage);
             }
 
-            var state = new RuntimeTaskState(targetWindow, options, DateTimeOffset.Now);
+            var configResolutionWidth = targetWindow.HasClientArea
+                ? targetWindow.ClientWidth
+                : firstFrame.Width;
+            var configResolutionHeight = targetWindow.HasClientArea
+                ? targetWindow.ClientHeight
+                : firstFrame.Height;
+            var recognitionRegionConfig = _recognitionRegionConfigService.LoadForResolution(
+                configResolutionWidth,
+                configResolutionHeight);
+            var state = new RuntimeTaskState(
+                targetWindow,
+                recognitionRegionConfig,
+                options,
+                DateTimeOffset.Now);
             var cancellationTokenSource = new CancellationTokenSource();
             _captureCancellationTokenSource = cancellationTokenSource;
             CurrentState = state;
@@ -77,11 +94,25 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 cancellationTokenSource.Token);
 
             _logger.LogInformation(
-                "运行任务已启动，窗口: {Window}, 截图方式: {CaptureMethod}",
+                "运行任务已启动，窗口: {Window}, 客户区: {ClientWidth}x{ClientHeight}, 首帧: {FrameWidth}x{FrameHeight}, 截图方式: {CaptureMethod}, 区域配置: {ConfigPath}",
                 targetWindow.DisplayName,
-                options.CaptureMethod);
+                configResolutionWidth,
+                configResolutionHeight,
+                firstFrame.Width,
+                firstFrame.Height,
+                options.CaptureMethod,
+                recognitionRegionConfig.SourcePath);
 
-            return RuntimeTaskStartResult.Started(state);
+            _logger.LogInformation(
+                "识别区域配置状态：Loaded={Loaded}, EnabledRegions={EnabledRegionCount}, Resolution={ResolutionWidth}x{ResolutionHeight}",
+                recognitionRegionConfig.LoadedFromFile,
+                recognitionRegionConfig.Regions.Count(region => region.Enabled),
+                configResolutionWidth,
+                configResolutionHeight);
+
+            var message = "实时任务已启动。";
+
+            return RuntimeTaskStartResult.Started(state, message);
         }
         catch (OperationCanceledException)
         {

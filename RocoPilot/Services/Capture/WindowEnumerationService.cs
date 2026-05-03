@@ -9,6 +9,7 @@ namespace RocoPilot.Services.Capture;
 
 public sealed class WindowEnumerationService : IWindowEnumerationService
 {
+    private const int DwmwaExtendedFrameBounds = 9;
     private const int DwmwaCloaked = 14;
 
     public IReadOnlyList<CaptureTargetWindow> GetVisibleWindows()
@@ -53,6 +54,8 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
 
         _ = GetWindowThreadProcessId(hwnd, out var processId);
 
+        var clientInfo = GetClientAreaInfo(hwnd, rect);
+
         window = new CaptureTargetWindow
         {
             Hwnd = hwnd,
@@ -60,7 +63,11 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
             ProcessId = (int)processId,
             ProcessName = GetProcessName(processId),
             Width = rect.Width,
-            Height = rect.Height
+            Height = rect.Height,
+            ClientWidth = clientInfo.Width,
+            ClientHeight = clientInfo.Height,
+            ClientOffsetX = clientInfo.OffsetX,
+            ClientOffsetY = clientInfo.OffsetY
         };
 
         return true;
@@ -109,6 +116,56 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
         }
     }
 
+    private static ClientAreaInfo GetClientAreaInfo(IntPtr hwnd, WindowRect windowRect)
+    {
+        if (!GetClientRect(hwnd, out var clientRect)
+            || clientRect.Width <= 0
+            || clientRect.Height <= 0)
+        {
+            return new ClientAreaInfo();
+        }
+
+        var clientTopLeft = new WindowPoint();
+        if (!ClientToScreen(hwnd, ref clientTopLeft))
+        {
+            return new ClientAreaInfo(clientRect.Width, clientRect.Height, 0, 0);
+        }
+
+        var captureBounds = TryGetExtendedFrameBounds(hwnd, out var extendedFrameBounds)
+            ? extendedFrameBounds
+            : windowRect;
+
+        return new ClientAreaInfo(
+            clientRect.Width,
+            clientRect.Height,
+            clientTopLeft.X - captureBounds.Left,
+            clientTopLeft.Y - captureBounds.Top);
+    }
+
+    private static bool TryGetExtendedFrameBounds(IntPtr hwnd, out WindowRect bounds)
+    {
+        try
+        {
+            var result = DwmGetWindowAttributeRect(
+                hwnd,
+                DwmwaExtendedFrameBounds,
+                out bounds,
+                Marshal.SizeOf<WindowRect>());
+
+            return result == 0 && bounds.Width > 0 && bounds.Height > 0;
+        }
+        catch (DllNotFoundException)
+        {
+            bounds = default;
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            bounds = default;
+            return false;
+        }
+    }
+
     private delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
 
     [DllImport("user32.dll")]
@@ -130,10 +187,57 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
     private static extern bool GetWindowRect(IntPtr hwnd, out WindowRect rect);
 
     [DllImport("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hwnd, out WindowRect rect);
+
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(IntPtr hwnd, ref WindowPoint point);
+
+    [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint processId);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmGetWindowAttribute(IntPtr hwnd, int attribute, out int value, int size);
+
+    [DllImport("dwmapi.dll", EntryPoint = "DwmGetWindowAttribute")]
+    private static extern int DwmGetWindowAttributeRect(IntPtr hwnd, int attribute, out WindowRect value, int size);
+
+    private readonly struct ClientAreaInfo
+    {
+        public ClientAreaInfo(int width, int height, int offsetX, int offsetY)
+        {
+            Width = width;
+            Height = height;
+            OffsetX = offsetX;
+            OffsetY = offsetY;
+        }
+
+        public int Width
+        {
+            get;
+        }
+
+        public int Height
+        {
+            get;
+        }
+
+        public int OffsetX
+        {
+            get;
+        }
+
+        public int OffsetY
+        {
+            get;
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowPoint
+    {
+        public int X;
+        public int Y;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private readonly struct WindowRect

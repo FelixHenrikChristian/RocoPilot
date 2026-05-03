@@ -1,0 +1,48 @@
+{
+  "resolutionWidth": 2048,
+  "resolutionHeight": 1152,
+  "regions": [
+    {
+      "id": "game-state-text",
+      "name": "Game State",
+      "purpose": "TextRecognition",
+      "shape": "Rectangle",
+      "bounds": {
+        "x": 1643,
+        "y": 43,
+        "width": 277,
+        "height": 75
+      },
+      "enabled": true,
+      "description": "Text area for states such as battle or world."
+    },
+    {
+      "id": "pollution-count-text",
+      "name": "Pollution Count",
+      "purpose": "TextRecognition",
+      "shape": "Rectangle",
+      "bounds": {
+        "x": 1611,
+        "y": 124,
+        "width": 320,
+        "height": 77
+      },
+      "enabled": true,
+      "description": "Text area for pollution counter statistics."
+    },
+    {
+      "id": "target-icon-match",
+      "name": "Target Icon",
+      "purpose": "ImageMatching",
+      "shape": "Rectangle",
+      "bounds": {
+        "x": 1771,
+        "y": 949,
+        "width": 128,
+        "height": 128
+      },
+      "enabled": true,
+      "description": "Image matching area for a fixed UI icon."
+    }
+  ]
+}

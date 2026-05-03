@@ -24,9 +24,9 @@ public sealed class RuntimeTaskStartResult
         get;
     }
 
-    public static RuntimeTaskStartResult Started(RuntimeTaskState state)
+    public static RuntimeTaskStartResult Started(RuntimeTaskState state, string? message = null)
     {
-        return new RuntimeTaskStartResult(true, "任务已启动。", state);
+        return new RuntimeTaskStartResult(true, message ?? "任务已启动。", state);
     }
 
     public static RuntimeTaskStartResult Failed(string message)

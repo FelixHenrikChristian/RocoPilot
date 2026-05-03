@@ -38,6 +38,32 @@ public sealed class CaptureTargetWindow
         set;
     }
 
+    public int ClientWidth
+    {
+        get;
+        set;
+    }
+
+    public int ClientHeight
+    {
+        get;
+        set;
+    }
+
+    public int ClientOffsetX
+    {
+        get;
+        set;
+    }
+
+    public int ClientOffsetY
+    {
+        get;
+        set;
+    }
+
+    public bool HasClientArea => ClientWidth > 0 && ClientHeight > 0;
+
     public string DisplayName => string.IsNullOrWhiteSpace(ProcessName)
         ? $"{Title} ({Width} x {Height})"
         : $"{Title} - {ProcessName} ({Width} x {Height})";

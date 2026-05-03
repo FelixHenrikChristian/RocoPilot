@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using RocoPilot.Activation;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Core.Contracts.Services;
 using RocoPilot.Core.Services;
 using RocoPilot.Helpers;
@@ -14,6 +15,8 @@ using RocoPilot.Notifications;
 using RocoPilot.Services;
 using RocoPilot.Services.Capture;
 using RocoPilot.Services.Capture.Backends;
+using RocoPilot.Services.TextRecognition;
+using RocoPilot.Services.TextRecognition.Backends;
 using RocoPilot.ViewModels;
 using RocoPilot.Views;
 
@@ -86,6 +89,8 @@ public partial class App : Application
             services.AddSingleton<ICaptureBackend, PrintWindowCaptureBackend>();
             services.AddSingleton<ICaptureBackend, WindowsGraphicsCaptureBackend>();
             services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
+            services.AddSingleton<ITextRecognitionBackend, WindowsOcrTextRecognitionBackend>();
+            services.AddSingleton<ITextRecognitionService, TextRecognitionService>();
 
             // Core Services
             services.AddSingleton<IFileService, FileService>();

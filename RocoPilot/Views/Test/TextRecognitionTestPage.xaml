@@ -51,6 +51,7 @@
                         </Grid.RowDefinitions>
 
                         <Button
+                            x:Name="ImportImageButton"
                             Grid.Row="0"
                             Grid.Column="0"
                             HorizontalAlignment="Stretch"
@@ -68,6 +69,7 @@
                         </Button>
 
                         <Button
+                            x:Name="OpenScreenClipButton"
                             Grid.Row="0"
                             Grid.Column="1"
                             HorizontalAlignment="Stretch"
@@ -85,6 +87,7 @@
                         </Button>
 
                         <Button
+                            x:Name="ReadClipboardButton"
                             Grid.Row="0"
                             Grid.Column="2"
                             HorizontalAlignment="Stretch"
@@ -181,27 +184,37 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <StackPanel
                         Grid.Row="0"
                         Grid.Column="0"
-                        Orientation="Horizontal"
-                        Spacing="8">
-                        <FontIcon
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="16"
-                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                            Glyph="&#xE8D2;" />
+                        Spacing="4">
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE8D2;" />
+                            <TextBlock
+                                Style="{StaticResource BodyStrongTextBlockStyle}"
+                                Text="识别结果" />
+                        </StackPanel>
                         <TextBlock
-                            Style="{StaticResource BodyStrongTextBlockStyle}"
-                            Text="识别结果" />
+                            x:Name="ResultStatusText"
+                            Style="{StaticResource CaptionTextBlockStyle}"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="导入图像后可开始识别"
+                            TextWrapping="WrapWholeWords" />
                     </StackPanel>
 
                     <Button
                         x:Name="RecognizeButton"
                         Grid.Row="0"
-                        Grid.Column="1"
+                        Grid.Column="2"
                         VerticalAlignment="Center"
                         Click="RecognizeButton_Click"
                         IsEnabled="False"
@@ -217,16 +230,25 @@
                         </StackPanel>
                     </Button>
 
+                    <ComboBox
+                        x:Name="RecognitionMethodComboBox"
+                        Grid.Row="0"
+                        Grid.Column="1"
+                        MinWidth="180"
+                        VerticalAlignment="Center"
+                        DisplayMemberPath="Name"
+                        SelectionChanged="RecognitionMethodComboBox_SelectionChanged" />
+
                     <Border
                         Grid.Row="1"
-                        Grid.ColumnSpan="2"
+                        Grid.ColumnSpan="3"
                         Height="1"
                         Background="{ThemeResource CardStrokeColorDefaultBrush}" />
 
                     <TextBox
                         x:Name="ResultTextBox"
                         Grid.Row="2"
-                        Grid.ColumnSpan="2"
+                        Grid.ColumnSpan="3"
                         MinHeight="160"
                         AcceptsReturn="True"
                         IsReadOnly="True"

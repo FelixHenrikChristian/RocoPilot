@@ -8,39 +8,33 @@ public sealed class RecognitionRegion
         set;
     } = string.Empty;
 
-    public string Name
-    {
-        get;
-        set;
-    } = string.Empty;
-
-    public RecognitionRegionPurpose Purpose
+    public int X
     {
         get;
         set;
     }
 
-    public RecognitionRegionShape Shape
+    public int Y
     {
         get;
         set;
-    } = RecognitionRegionShape.Rectangle;
+    }
 
-    public RecognitionRegionBounds Bounds
+    public int Width
     {
         get;
         set;
-    } = new();
+    }
+
+    public int Height
+    {
+        get;
+        set;
+    }
 
     public bool Enabled
     {
         get;
         set;
     } = true;
-
-    public string? Description
-    {
-        get;
-        set;
-    }
 }

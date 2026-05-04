@@ -31,6 +31,10 @@
                 x:Name="InputSimulationSelectorItem"
                 Icon="Keyboard"
                 Text="键鼠模拟" />
+            <SelectorBarItem
+                x:Name="RegionEditorSelectorItem"
+                Icon="Edit"
+                Text="检测区域" />
         </SelectorBar>
 
         <Frame

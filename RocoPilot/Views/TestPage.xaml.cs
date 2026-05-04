@@ -37,6 +37,7 @@ public sealed partial class TestPage : Page
     {
         var pageType = selectedItem switch
         {
+            _ when selectedItem == RegionEditorSelectorItem => typeof(RegionEditorPage),
             _ when selectedItem == TextRecognitionSelectorItem => typeof(TextRecognitionTestPage),
             _ when selectedItem == InputSimulationSelectorItem => typeof(InputSimulationTestPage),
             _ => typeof(ScreenCaptureTestPage)

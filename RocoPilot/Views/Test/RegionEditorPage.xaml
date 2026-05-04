@@ -1,0 +1,362 @@
+<Page
+    x:Class="RocoPilot.Views.Test.RegionEditorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+            <StackPanel
+                Padding="0,4,0,0"
+                Spacing="14">
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid RowSpacing="16">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE8B7;" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontWeight="SemiBold"
+                                Text="检测区域配置" />
+                        </StackPanel>
+
+                        <Border
+                            Grid.Row="1"
+                            Height="1"
+                            Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid
+                            Grid.Row="2"
+                            ColumnSpacing="16"
+                            RowSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Spacing="2">
+                                <TextBlock Text="配置文件" />
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="JSON" />
+                            </StackPanel>
+
+                            <Border
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                MinHeight="34"
+                                Padding="10,6"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6">
+                                <TextBlock
+                                    x:Name="SelectedConfigFileText"
+                                    VerticalAlignment="Center"
+                                    Style="{ThemeResource BodyTextBlockStyle}"
+                                    Text="未选择"
+                                    TextTrimming="CharacterEllipsis" />
+                            </Border>
+
+                            <Button
+                                Grid.Row="0"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Click="BrowseConfigButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE8E5;" />
+                                    <TextBlock Text="选择" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
+                                Grid.Row="0"
+                                Grid.Column="3"
+                                VerticalAlignment="Center"
+                                Click="SaveConfigButton_Click"
+                                Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE74E;" />
+                                    <TextBlock Text="保存" />
+                                </StackPanel>
+                            </Button>
+
+                            <StackPanel
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Spacing="2">
+                                <TextBlock Text="截图方式" />
+                                <TextBlock
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="捕获后端" />
+                            </StackPanel>
+
+                            <ComboBox
+                                x:Name="CaptureMethodComboBox"
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Grid.ColumnSpan="3"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Center"
+                                DisplayMemberPath="Name" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid RowSpacing="14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE8A5;" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontWeight="SemiBold"
+                                Text="配置内容" />
+                        </StackPanel>
+
+                        <Grid
+                            Grid.Row="1"
+                            ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox
+                                x:Name="ResolutionWidthTextBox"
+                                Grid.Column="0"
+                                Width="110"
+                                Header="宽"
+                                InputScope="Number"
+                                TextAlignment="Center" />
+                            <TextBox
+                                x:Name="ResolutionHeightTextBox"
+                                Grid.Column="1"
+                                Width="110"
+                                Header="高"
+                                InputScope="Number"
+                                TextAlignment="Center" />
+
+                            <Button
+                                x:Name="CaptureAddRegionButton"
+                                Grid.Column="3"
+                                VerticalAlignment="Bottom"
+                                Click="CaptureAddRegionButton_Click"
+                                Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE722;" />
+                                    <TextBlock Text="截图画框" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <Border
+                            Grid.Row="2"
+                            Height="1"
+                            Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid
+                            Grid.Row="3"
+                            RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <Grid
+                                Padding="0,0,0,2"
+                                ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="4*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="84" />
+                                    <ColumnDefinition Width="48" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock
+                                    Grid.Column="0"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="ID" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="X" />
+                                <TextBlock
+                                    Grid.Column="2"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="Y" />
+                                <TextBlock
+                                    Grid.Column="3"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="宽" />
+                                <TextBlock
+                                    Grid.Column="4"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="高" />
+                                <TextBlock
+                                    Grid.Column="5"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="启用" />
+                                <TextBlock
+                                    Grid.Column="6"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="删除" />
+                            </Grid>
+
+                            <ListView
+                                x:Name="RegionsListView"
+                                Grid.Row="1"
+                                MinHeight="280"
+                                Padding="0"
+                                SelectionMode="None">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="MinHeight" Value="0" />
+                                        <Setter Property="Padding" Value="0" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid
+                                            Padding="0,6"
+                                            ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="4*" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="84" />
+                                                <ColumnDefinition Width="48" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <TextBox
+                                                Grid.Column="0"
+                                                PlaceholderText="region-id"
+                                                Text="{Binding Id, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox
+                                                Grid.Column="1"
+                                                InputScope="Number"
+                                                Text="{Binding X, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                TextAlignment="Center" />
+                                            <TextBox
+                                                Grid.Column="2"
+                                                InputScope="Number"
+                                                Text="{Binding Y, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                TextAlignment="Center" />
+                                            <TextBox
+                                                Grid.Column="3"
+                                                InputScope="Number"
+                                                Text="{Binding Width, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                TextAlignment="Center" />
+                                            <TextBox
+                                                Grid.Column="4"
+                                                InputScope="Number"
+                                                Text="{Binding Height, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                TextAlignment="Center" />
+                                            <ToggleSwitch
+                                                Grid.Column="5"
+                                                MinWidth="0"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                IsOn="{Binding Enabled, Mode=TwoWay}"
+                                                OffContent=""
+                                                OnContent="" />
+                                            <Button
+                                                Grid.Column="6"
+                                                Width="34"
+                                                Height="32"
+                                                MinWidth="0"
+                                                Padding="0"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Background="#33D83B3B"
+                                                BorderBrush="#55D83B3B"
+                                                Click="DeleteRegionButton_Click"
+                                                Foreground="#FFE81123"
+                                                ToolTipService.ToolTip="删除区域">
+                                                <FontIcon
+                                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                                    FontSize="14"
+                                                    Glyph="&#xE74D;" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <InfoBar
+            x:Name="EditorInfoBar"
+            Margin="0,0,0,8"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            IsClosable="True"
+            IsOpen="False" />
+    </Grid>
+</Page>

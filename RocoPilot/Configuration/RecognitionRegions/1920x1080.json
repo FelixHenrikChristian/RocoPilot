@@ -4,45 +4,27 @@
   "regions": [
     {
       "id": "game-state-text",
-      "name": "Game State",
-      "purpose": "TextRecognition",
-      "shape": "Rectangle",
-      "bounds": {
-        "x": 1540,
-        "y": 40,
-        "width": 260,
-        "height": 70
-      },
-      "enabled": true,
-      "description": "Text area for states such as battle or world."
+      "x": 1540,
+      "y": 40,
+      "width": 260,
+      "height": 70,
+      "enabled": true
     },
     {
       "id": "pollution-count-text",
-      "name": "Pollution Count",
-      "purpose": "TextRecognition",
-      "shape": "Rectangle",
-      "bounds": {
-        "x": 1510,
-        "y": 116,
-        "width": 300,
-        "height": 72
-      },
-      "enabled": true,
-      "description": "Text area for pollution counter statistics."
+      "x": 1510,
+      "y": 116,
+      "width": 300,
+      "height": 72,
+      "enabled": true
     },
     {
       "id": "target-icon-match",
-      "name": "Target Icon",
-      "purpose": "ImageMatching",
-      "shape": "Rectangle",
-      "bounds": {
-        "x": 1660,
-        "y": 890,
-        "width": 120,
-        "height": 120
-      },
-      "enabled": true,
-      "description": "Image matching area for a fixed UI icon."
+      "x": 1660,
+      "y": 890,
+      "width": 120,
+      "height": 120,
+      "enabled": true
     }
   ]
 }

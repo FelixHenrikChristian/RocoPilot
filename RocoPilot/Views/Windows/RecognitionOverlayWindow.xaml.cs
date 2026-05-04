@@ -184,23 +184,20 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         double canvasWidth,
         double canvasHeight)
     {
-        var bounds = region.Bounds;
-        var x = bounds.X * widthScale;
-        var y = bounds.Y * heightScale;
-        var width = bounds.Width * widthScale;
-        var height = bounds.Height * heightScale;
+        var x = region.X * widthScale;
+        var y = region.Y * heightScale;
+        var width = region.Width * widthScale;
+        var height = region.Height * heightScale;
 
         if (width <= 0 || height <= 0)
         {
             return;
         }
 
-        var color = GetRegionColor(region.Purpose);
+        var color = Color.FromArgb(0xFF, 0x2F, 0xD7, 0xFF);
         var strokeBrush = new SolidColorBrush(color);
         var fillBrush = new SolidColorBrush(Color.FromArgb(0x18, color.R, color.G, color.B));
-        Shape outline = region.Shape == RecognitionRegionShape.Circle
-            ? new Ellipse()
-            : new Rectangle();
+        var outline = new Rectangle();
 
         outline.Width = width;
         outline.Height = height;
@@ -212,10 +209,9 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         Canvas.SetTop(outline, y);
         RegionCanvas.Children.Add(outline);
 
-        var label = string.IsNullOrWhiteSpace(region.Name) ? region.Id : region.Name;
-        if (!string.IsNullOrWhiteSpace(label))
+        if (!string.IsNullOrWhiteSpace(region.Id))
         {
-            AddLabel(label, strokeBrush, x, y, width, canvasWidth, canvasHeight);
+            AddLabel(region.Id, strokeBrush, x, y, width, canvasWidth, canvasHeight);
         }
     }
 
@@ -262,8 +258,8 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private static bool IsDrawableRegion(RecognitionRegion region)
     {
         return region.Enabled
-            && region.Bounds.Width > 0
-            && region.Bounds.Height > 0;
+            && region.Width > 0
+            && region.Height > 0;
     }
 
     private static bool SameBounds(RectInt32 left, RectInt32 right)
@@ -274,12 +270,4 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
             && left.Height == right.Height;
     }
 
-    private static Color GetRegionColor(RecognitionRegionPurpose purpose)
-    {
-        return purpose switch
-        {
-            RecognitionRegionPurpose.ImageMatching => Color.FromArgb(0xFF, 0xFF, 0xC8, 0x57),
-            _ => Color.FromArgb(0xFF, 0x2F, 0xD7, 0xFF)
-        };
-    }
 }

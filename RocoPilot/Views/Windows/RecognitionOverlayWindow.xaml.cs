@@ -117,8 +117,8 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
 
         if (!_hasActivated)
         {
-            AppWindow.MoveAndResize(bounds);
-            Activate();
+            _currentClientBounds = bounds;
+            TransparentOverlayWindowHelper.MoveTopMostNoActivate(_hwnd, bounds);
             _hasActivated = true;
             TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
         }

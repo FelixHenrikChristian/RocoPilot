@@ -21,6 +21,7 @@ internal static class TransparentOverlayWindowHelper
 
     private const long WsExToolWindow = 0x00000080L;
     private const long WsExTransparent = 0x00000020L;
+    private const long WsExLayered = 0x00080000L;
     private const long WsExNoActivate = 0x08000000L;
 
     private const uint SwpNoSize = 0x0001;
@@ -178,11 +179,11 @@ internal static class TransparentOverlayWindowHelper
 
         if (passThrough)
         {
-            updatedStyle |= WsExTransparent;
+            updatedStyle |= WsExTransparent | WsExLayered;
         }
         else
         {
-            updatedStyle &= ~WsExTransparent;
+            updatedStyle &= ~(WsExTransparent | WsExLayered);
         }
 
         _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(updatedStyle));

@@ -39,6 +39,9 @@
     <Content Include="Configuration\RecognitionRegions\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Configuration\RecognitionAssets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Update="Assets\LaunchPageCover.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

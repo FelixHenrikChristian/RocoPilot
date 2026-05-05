@@ -19,8 +19,8 @@
             x:Name="InfoPanel"
             Margin="0"
             Padding="12"
-            Background="#EAF8FAFD"
-            BorderBrush="#B8FFFFFF"
+            Background="#A8F8FAFD"
+            BorderBrush="#66FFFFFF"
             BorderThickness="1"
             CornerRadius="18">
             <Grid RowSpacing="10">
@@ -31,7 +31,7 @@
 
                 <Border
                     Padding="12,10"
-                    Background="#F6FFFFFF"
+                    Background="#C0FFFFFF"
                     BorderBrush="#45D8DEE8"
                     BorderThickness="1"
                     CornerRadius="14">
@@ -118,7 +118,7 @@
                 <Border
                     Grid.Row="1"
                     Padding="12,10"
-                    Background="#F6FFFFFF"
+                    Background="#C0FFFFFF"
                     BorderBrush="#45D8DEE8"
                     BorderThickness="1"
                     CornerRadius="14">

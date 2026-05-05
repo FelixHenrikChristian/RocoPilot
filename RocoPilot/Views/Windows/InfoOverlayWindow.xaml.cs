@@ -344,7 +344,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
         var row = new Border
         {
             Padding = new Thickness(9, 5, 9, 5),
-            Background = new SolidColorBrush(Color.FromArgb(0xD9, 0xFF, 0xFF, 0xFF)),
+            Background = new SolidColorBrush(Color.FromArgb(0xB8, 0xFF, 0xFF, 0xFF)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(0x45, 0xD8, 0xDE, 0xE8)),
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(10),

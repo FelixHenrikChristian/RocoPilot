@@ -11,19 +11,43 @@
       "enabled": true
     },
     {
-      "id": "backpack",
-      "x": 1761,
-      "y": 41,
-      "width": 58,
-      "height": 58,
-      "enabled": true
-    },
-    {
       "id": "enemy-name",
       "x": 1786,
       "y": 43,
       "width": 159,
       "height": 33,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-chat",
+      "x": 1918,
+      "y": 728,
+      "width": 105,
+      "height": 105,
+      "enabled": true
+    },
+    {
+      "id": "battle-magic",
+      "x": 122,
+      "y": 982,
+      "width": 149,
+      "height": 44,
+      "enabled": true
+    },
+    {
+      "id": "battle-space",
+      "x": 1267,
+      "y": 858,
+      "width": 80,
+      "height": 34,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-energe",
+      "x": 797,
+      "y": 155,
+      "width": 456,
+      "height": 48,
       "enabled": true
     }
   ]

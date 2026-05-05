@@ -19,8 +19,9 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private const int TargetFrameIntervalMs = 33;
     private const int MagicPointSlotCount = 6;
     private const string MagicPointTemplateName = "magic-point.png";
+    private const string BattleChatTemplateName = "battle-chat.png";
 
-    private static readonly TimeSpan MagicPointScanInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
     private static readonly string[] MagicPointRegionIds =
     [
         "magic-point",
@@ -28,7 +29,21 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         "magic",
         "magic-value"
     ];
+    private static readonly string[] BattleChatRegionIds =
+    [
+        "battle-button-chat"
+    ];
+    private static readonly string[] BattleMagicRegionIds =
+    [
+        "battle-magic"
+    ];
     private static readonly ImageMatchOptions MagicPointMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions BattleChatMatchOptions = new()
     {
         MinimumScore = 0.88,
         AlphaThreshold = 16,
@@ -214,7 +229,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
     private async Task CaptureLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
-        var nextMagicPointScanAt = DateTimeOffset.MinValue;
+        var nextGameStateScanAt = DateTimeOffset.MinValue;
 
         try
         {
@@ -236,17 +251,17 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 if (frame is not null && state.Options.InfoOverlayEnabled)
                 {
                     var now = DateTimeOffset.Now;
-                    if (now >= nextMagicPointScanAt)
+                    if (now >= nextGameStateScanAt)
                     {
-                        nextMagicPointScanAt = now + MagicPointScanInterval;
+                        nextGameStateScanAt = now + GameStateScanInterval;
 
                         try
                         {
-                            await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
+                            await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
                         }
                         catch (Exception ex) when (ex is not OperationCanceledException)
                         {
-                            _logger.LogWarning(ex, "魔力值图像匹配失败");
+                            _logger.LogWarning(ex, "状态图像匹配失败");
                         }
                     }
                 }
@@ -262,12 +277,98 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         }
     }
 
+    private async Task UpdateGameStateSnapshotAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (await IsBattlePetSwitchingAsync(state, frame, cancellationToken))
+        {
+            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+                "战斗中 - 切换精灵",
+                Array.Empty<InfoOverlayCounter>(),
+                DateTimeOffset.Now));
+            return;
+        }
+
+        if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
+        {
+            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+                "战斗中",
+                Array.Empty<InfoOverlayCounter>(),
+                DateTimeOffset.Now));
+            return;
+        }
+
+        await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
+    }
+
+    private async Task<bool> IsBattlePetSwitchingAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleMagicRegion = FindRegion(state.RecognitionRegionConfig, BattleMagicRegionIds);
+        if (battleMagicRegion is null || !TemplateExists(MagicPointTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleMagicRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            MagicPointTemplateName,
+            MagicPointMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private async Task<bool> IsBattleChatVisibleAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleChatRegion = FindRegion(state.RecognitionRegionConfig, BattleChatRegionIds);
+        if (battleChatRegion is null || !TemplateExists(BattleChatTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleChatRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            BattleChatTemplateName,
+            BattleChatMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
     private async Task UpdateMagicPointSnapshotAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        var magicPointRegion = state.RecognitionRegionConfig.Regions.FirstOrDefault(IsMagicPointRegion);
+        var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
         if (magicPointRegion is null)
         {
             _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
@@ -277,8 +378,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             return;
         }
 
-        var templatePath = Path.Combine(_imageMatchingService.TemplateDirectory, MagicPointTemplateName);
-        if (!File.Exists(templatePath))
+        if (!TemplateExists(MagicPointTemplateName))
         {
             _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
                 "未找到 magic-point.png",
@@ -329,7 +429,19 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             MagicPointSlotCount));
     }
 
-    private static bool IsMagicPointRegion(RecognitionRegion region)
+    private bool TemplateExists(string templateName)
+    {
+        return File.Exists(Path.Combine(_imageMatchingService.TemplateDirectory, templateName));
+    }
+
+    private static RecognitionRegion? FindRegion(
+        RecognitionRegionConfig config,
+        IReadOnlyList<string> aliases)
+    {
+        return config.Regions.FirstOrDefault(region => IsRegionMatch(region, aliases));
+    }
+
+    private static bool IsRegionMatch(RecognitionRegion region, IReadOnlyList<string> aliases)
     {
         if (!region.Enabled || string.IsNullOrWhiteSpace(region.Id))
         {
@@ -337,7 +449,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         }
 
         var id = region.Id.Trim();
-        return MagicPointRegionIds.Any(alias =>
+        return aliases.Any(alias =>
             string.Equals(id, alias, StringComparison.OrdinalIgnoreCase)
             || id.StartsWith($"{alias}-", StringComparison.OrdinalIgnoreCase));
     }

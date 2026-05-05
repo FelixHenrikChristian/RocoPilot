@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -12,12 +13,21 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Views.Windows;
 
+using Windows.Graphics.Imaging;
+using Windows.Storage;
 using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
+using Windows.System;
 
 namespace RocoPilot.Views.Test;
 
 public sealed partial class RegionEditorPage : Page
 {
+    private static readonly string RegionScreenshotDirectory = Path.Combine(
+        AppContext.BaseDirectory,
+        "Screenshots",
+        "RecognitionRegions");
+
     private readonly IRecognitionRegionConfigService _configService;
     private readonly IGameWindowService _gameWindowService;
     private readonly IScreenCaptureService _captureService;
@@ -64,6 +74,27 @@ public sealed partial class RegionEditorPage : Page
         if (!string.IsNullOrWhiteSpace(firstConfigPath))
         {
             LoadConfig(firstConfigPath);
+        }
+    }
+
+    private async void OpenRegionScreenshotFolderButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(RegionScreenshotDirectory);
+            var folder = await StorageFolder.GetFolderFromPathAsync(RegionScreenshotDirectory);
+            var opened = await Launcher.LaunchFolderAsync(folder);
+            if (!opened)
+            {
+                ShowMessage($"无法打开截图文件夹：{RegionScreenshotDirectory}", InfoBarSeverity.Warning);
+                return;
+            }
+
+            HideMessage();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"打开截图文件夹失败：{ex.Message}", InfoBarSeverity.Error);
         }
     }
 
@@ -143,16 +174,8 @@ public sealed partial class RegionEditorPage : Page
             return;
         }
 
-        if (CaptureMethodComboBox.SelectedItem is not CaptureMethodOption selectedMethod)
+        if (!TryGetCaptureRequest(out var targetWindow, out var selectedMethod))
         {
-            ShowMessage("请先选择截图方式", InfoBarSeverity.Warning);
-            return;
-        }
-
-        var targetWindow = _gameWindowService.FindGameWindow();
-        if (targetWindow is null)
-        {
-            ShowMessage($"未找到目标游戏窗口：{_gameWindowService.TargetProcessName}", InfoBarSeverity.Warning);
             return;
         }
 
@@ -161,7 +184,7 @@ public sealed partial class RegionEditorPage : Page
         CapturedFrame? frame = null;
         try
         {
-            frame = await Task.Run(() => _captureService.Capture(targetWindow, selectedMethod.Method));
+            frame = await CaptureFrameAsync(targetWindow, selectedMethod.Method);
         }
         catch (Exception ex)
         {
@@ -170,7 +193,6 @@ public sealed partial class RegionEditorPage : Page
         }
         finally
         {
-            _captureService.Release(targetWindow, selectedMethod.Method);
             CaptureAddRegionButton.IsEnabled = true;
         }
 
@@ -206,6 +228,73 @@ public sealed partial class RegionEditorPage : Page
         HideMessage();
     }
 
+    private async void CaptureRegionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button captureButton
+            || captureButton.DataContext is not EditableRecognitionRegion editableRegion)
+        {
+            return;
+        }
+
+        if (_currentConfig is null)
+        {
+            ShowMessage("请先选择一个配置文件", InfoBarSeverity.Warning);
+            return;
+        }
+
+        if (!editableRegion.TryToModel(out var region, out var error))
+        {
+            ShowMessage($"区域无效：{error}", InfoBarSeverity.Warning);
+            return;
+        }
+
+        if (!TryGetCaptureRequest(out var targetWindow, out var selectedMethod))
+        {
+            return;
+        }
+
+        captureButton.IsEnabled = false;
+
+        try
+        {
+            var frame = await CaptureFrameAsync(targetWindow, selectedMethod.Method);
+            if (frame is null)
+            {
+                ShowMessage("未获取到游戏画面", InfoBarSeverity.Warning);
+                return;
+            }
+
+            if (!TryReadResolution(out var configWidth, out var configHeight))
+            {
+                return;
+            }
+
+            if (!TryCreateFrameRegion(
+                region,
+                frame,
+                targetWindow,
+                configWidth,
+                configHeight,
+                out var frameRegion,
+                out var regionError))
+            {
+                ShowMessage(regionError, InfoBarSeverity.Warning);
+                return;
+            }
+
+            var savedPath = await SaveRegionScreenshotAsync(frame, region, frameRegion);
+            ShowMessage($"区域截图已保存：{savedPath}", InfoBarSeverity.Success);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"截图保存失败：{ex.Message}", InfoBarSeverity.Error);
+        }
+        finally
+        {
+            captureButton.IsEnabled = true;
+        }
+    }
+
     private void DeleteRegionButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: EditableRecognitionRegion region })
@@ -214,6 +303,45 @@ public sealed partial class RegionEditorPage : Page
         }
 
         Regions.Remove(region);
+    }
+
+    private bool TryGetCaptureRequest(
+        out CaptureTargetWindow targetWindow,
+        out CaptureMethodOption selectedMethod)
+    {
+        targetWindow = null!;
+        selectedMethod = null!;
+
+        if (CaptureMethodComboBox.SelectedItem is not CaptureMethodOption captureMethod)
+        {
+            ShowMessage("请先选择截图方式", InfoBarSeverity.Warning);
+            return false;
+        }
+
+        var window = _gameWindowService.FindGameWindow();
+        if (window is null)
+        {
+            ShowMessage($"未找到目标游戏窗口：{_gameWindowService.TargetProcessName}", InfoBarSeverity.Warning);
+            return false;
+        }
+
+        targetWindow = window;
+        selectedMethod = captureMethod;
+        return true;
+    }
+
+    private async Task<CapturedFrame?> CaptureFrameAsync(
+        CaptureTargetWindow targetWindow,
+        CaptureMethod captureMethod)
+    {
+        try
+        {
+            return await Task.Run(() => _captureService.Capture(targetWindow, captureMethod));
+        }
+        finally
+        {
+            _captureService.Release(targetWindow, captureMethod);
+        }
     }
 
     private void LoadConfig(string path)
@@ -331,6 +459,126 @@ public sealed partial class RegionEditorPage : Page
         }
 
         return (int)Math.Round(value * (double)targetSize / sourceSize);
+    }
+
+    private static bool TryCreateFrameRegion(
+        RecognitionRegion region,
+        CapturedFrame frame,
+        CaptureTargetWindow targetWindow,
+        int configWidth,
+        int configHeight,
+        out RecognitionRegion frameRegion,
+        out string error)
+    {
+        frameRegion = new RecognitionRegion();
+        error = string.Empty;
+
+        _ = TryGetClientAreaInCapturedFrame(
+            frame,
+            targetWindow,
+            out var clientX,
+            out var clientY,
+            out var sourceWidth,
+            out var sourceHeight);
+
+        var sourceRegion = ScaleRegion(region, configWidth, configHeight, sourceWidth, sourceHeight);
+        var x = clientX + sourceRegion.X;
+        var y = clientY + sourceRegion.Y;
+        var right = clientX + sourceRegion.X + sourceRegion.Width;
+        var bottom = clientY + sourceRegion.Y + sourceRegion.Height;
+
+        var clampedX = ClampToRange(x, 0, frame.Width);
+        var clampedY = ClampToRange(y, 0, frame.Height);
+        var clampedRight = ClampToRange(right, 0, frame.Width);
+        var clampedBottom = ClampToRange(bottom, 0, frame.Height);
+        if (clampedRight <= clampedX || clampedBottom <= clampedY)
+        {
+            error = $"区域 {region.Id} 不在当前游戏画面内";
+            return false;
+        }
+
+        frameRegion = new RecognitionRegion
+        {
+            Id = region.Id,
+            X = clampedX,
+            Y = clampedY,
+            Width = clampedRight - clampedX,
+            Height = clampedBottom - clampedY,
+            Enabled = region.Enabled
+        };
+        return true;
+    }
+
+    private static async Task<string> SaveRegionScreenshotAsync(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        RecognitionRegion frameRegion)
+    {
+        Directory.CreateDirectory(RegionScreenshotDirectory);
+
+        var fileName = $"{SanitizeFileName(region.Id)}_{frame.CapturedAt:yyyyMMdd_HHmmss_fff}.png";
+        var filePath = Path.Combine(RegionScreenshotDirectory, fileName);
+        var pixels = CropFrame(frame, frameRegion);
+
+        await SavePngAsync(filePath, frameRegion.Width, frameRegion.Height, pixels);
+        return filePath;
+    }
+
+    private static byte[] CropFrame(CapturedFrame frame, RecognitionRegion region)
+    {
+        var expectedLength = checked(frame.Width * frame.Height * 4);
+        if (frame.Pixels.Length < expectedLength)
+        {
+            throw new InvalidDataException("捕获帧像素数据不完整");
+        }
+
+        var rowLength = region.Width * 4;
+        var croppedPixels = new byte[region.Height * rowLength];
+        for (var row = 0; row < region.Height; row++)
+        {
+            var sourceOffset = ((region.Y + row) * frame.Width + region.X) * 4;
+            var targetOffset = row * rowLength;
+            System.Buffer.BlockCopy(frame.Pixels, sourceOffset, croppedPixels, targetOffset, rowLength);
+        }
+
+        return croppedPixels;
+    }
+
+    private static async Task SavePngAsync(string path, int width, int height, byte[] pixels)
+    {
+        using var stream = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+        encoder.SetPixelData(
+            BitmapPixelFormat.Bgra8,
+            BitmapAlphaMode.Ignore,
+            (uint)width,
+            (uint)height,
+            96,
+            96,
+            pixels);
+        await encoder.FlushAsync();
+
+        stream.Seek(0);
+        var encodedLength = checked((int)stream.Size);
+        using var reader = new DataReader(stream.GetInputStreamAt(0));
+        _ = await reader.LoadAsync((uint)encodedLength);
+
+        var encodedBytes = new byte[encodedLength];
+        reader.ReadBytes(encodedBytes);
+        await File.WriteAllBytesAsync(path, encodedBytes);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalidCharacters = Path.GetInvalidFileNameChars().ToHashSet();
+        var builder = new StringBuilder(value.Trim().Length);
+        foreach (var character in value.Trim())
+        {
+            builder.Append(invalidCharacters.Contains(character) ? '_' : character);
+        }
+
+        var fileName = builder.ToString().Trim(' ', '_');
+        return string.IsNullOrWhiteSpace(fileName) ? "region" : fileName;
     }
 
     private static RecognitionRegion NormalizeRegionToClientArea(

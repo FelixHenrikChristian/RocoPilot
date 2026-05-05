@@ -185,8 +185,29 @@
                                 TextAlignment="Center" />
 
                             <Button
+                                Grid.Column="2"
+                                Height="32"
+                                MinWidth="0"
+                                Padding="12,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Bottom"
+                                Click="OpenRegionScreenshotFolderButton_Click"
+                                ToolTipService.ToolTip="打开区域截图文件夹">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE8E5;" />
+                                    <TextBlock Text="截图文件夹" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
                                 x:Name="CaptureAddRegionButton"
                                 Grid.Column="3"
+                                Height="32"
+                                MinWidth="0"
+                                Padding="12,0"
                                 VerticalAlignment="Bottom"
                                 Click="CaptureAddRegionButton_Click"
                                 Style="{StaticResource AccentButtonStyle}">
@@ -224,6 +245,7 @@
                                     <ColumnDefinition Width="2*" />
                                     <ColumnDefinition Width="84" />
                                     <ColumnDefinition Width="48" />
+                                    <ColumnDefinition Width="48" />
                                 </Grid.ColumnDefinitions>
 
                                 <TextBlock
@@ -260,6 +282,11 @@
                                     Grid.Column="6"
                                     HorizontalAlignment="Center"
                                     Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="截图" />
+                                <TextBlock
+                                    Grid.Column="7"
+                                    HorizontalAlignment="Center"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
                                     Text="删除" />
                             </Grid>
 
@@ -288,6 +315,7 @@
                                                 <ColumnDefinition Width="2*" />
                                                 <ColumnDefinition Width="2*" />
                                                 <ColumnDefinition Width="84" />
+                                                <ColumnDefinition Width="48" />
                                                 <ColumnDefinition Width="48" />
                                             </Grid.ColumnDefinitions>
 
@@ -325,6 +353,21 @@
                                                 OnContent="" />
                                             <Button
                                                 Grid.Column="6"
+                                                Width="34"
+                                                Height="32"
+                                                MinWidth="0"
+                                                Padding="0"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Click="CaptureRegionButton_Click"
+                                                ToolTipService.ToolTip="截图区域">
+                                                <FontIcon
+                                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                                    FontSize="14"
+                                                    Glyph="&#xE722;" />
+                                            </Button>
+                                            <Button
+                                                Grid.Column="7"
                                                 Width="34"
                                                 Height="32"
                                                 MinWidth="0"

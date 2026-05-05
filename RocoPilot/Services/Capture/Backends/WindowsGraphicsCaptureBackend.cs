@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.InteropServices.WindowsRuntime;
 
 using RocoPilot.Models.Capture;
@@ -87,6 +88,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
     private sealed class CaptureSessionState : IDisposable
     {
         private static readonly TimeSpan FirstFrameTimeout = TimeSpan.FromMilliseconds(800);
+        private static readonly TimeSpan MinimumFrameConversionInterval = TimeSpan.FromMilliseconds(100);
         private static readonly object BorderlessAccessLock = new();
         private static AppCapabilityAccessStatus? _borderlessAccessStatus;
 
@@ -100,6 +102,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
 
         private CapturedFrame? _latestFrame;
         private int _conversionPending;
+        private long _lastFrameConversionTimestamp;
         private bool _disposed;
 
         public CaptureSessionState(
@@ -136,7 +139,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             {
                 if (_latestFrame is not null)
                 {
-                    return _latestFrame;
+                    return _latestFrame.AddReference();
                 }
             }
 
@@ -151,7 +154,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
 
             lock (_frameLock)
             {
-                return _latestFrame;
+                return _latestFrame?.AddReference();
             }
         }
 
@@ -169,6 +172,15 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             _session.Dispose();
             _framePool.Dispose();
             _firstFrameReady.Dispose();
+
+            CapturedFrame? latestFrame;
+            lock (_frameLock)
+            {
+                latestFrame = _latestFrame;
+                _latestFrame = null;
+            }
+
+            latestFrame?.Dispose();
         }
 
         private void Item_Closed(GraphicsCaptureItem sender, object args)
@@ -200,14 +212,42 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
                     return;
                 }
 
+                if (!ShouldConvertFrame())
+                {
+                    return;
+                }
+
                 var capturedFrame = await CreateCapturedFrameAsync(frame).ConfigureAwait(false);
+                CapturedFrame? previousFrame = null;
+                var disposeCapturedFrame = false;
 
                 lock (_frameLock)
                 {
-                    _latestFrame = capturedFrame;
+                    if (_disposed)
+                    {
+                        disposeCapturedFrame = true;
+                    }
+                    else
+                    {
+                        previousFrame = _latestFrame;
+                        _latestFrame = capturedFrame;
+                    }
                 }
 
-                _firstFrameReady.Set();
+                previousFrame?.Dispose();
+                if (disposeCapturedFrame)
+                {
+                    capturedFrame.Dispose();
+                    return;
+                }
+
+                try
+                {
+                    _firstFrameReady.Set();
+                }
+                catch (ObjectDisposedException)
+                {
+                }
             }
             catch
             {
@@ -222,6 +262,29 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
                     _ = Interlocked.Exchange(ref _conversionPending, 0);
                 }
             }
+        }
+
+        private bool ShouldConvertFrame()
+        {
+            lock (_frameLock)
+            {
+                if (_latestFrame is null)
+                {
+                    _lastFrameConversionTimestamp = Stopwatch.GetTimestamp();
+                    return true;
+                }
+            }
+
+            var now = Stopwatch.GetTimestamp();
+            var lastFrameConversionTimestamp = Volatile.Read(ref _lastFrameConversionTimestamp);
+            if (lastFrameConversionTimestamp != 0
+                && Stopwatch.GetElapsedTime(lastFrameConversionTimestamp, now) < MinimumFrameConversionInterval)
+            {
+                return false;
+            }
+
+            Volatile.Write(ref _lastFrameConversionTimestamp, now);
+            return true;
         }
 
         private static async Task<CapturedFrame> CreateCapturedFrameAsync(Direct3D11CaptureFrame frame)
@@ -242,10 +305,10 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
                     bitmap = convertedBitmap;
                 }
 
-                var pixels = new byte[bitmap.PixelWidth * bitmap.PixelHeight * 4];
-                bitmap.CopyToBuffer(pixels.AsBuffer());
-                ForceOpaqueAlpha(pixels);
-                return new CapturedFrame(bitmap.PixelWidth, bitmap.PixelHeight, pixels);
+                var capturedFrame = CapturedFrame.RentBgra32(bitmap.PixelWidth, bitmap.PixelHeight);
+                bitmap.CopyToBuffer(capturedFrame.Pixels.AsBuffer(0, capturedFrame.PixelByteLength));
+                ForceOpaqueAlpha(capturedFrame.Pixels, capturedFrame.PixelByteLength);
+                return capturedFrame;
             }
             finally
             {
@@ -253,9 +316,9 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             }
         }
 
-        private static void ForceOpaqueAlpha(byte[] pixels)
+        private static void ForceOpaqueAlpha(byte[] pixels, int pixelByteLength)
         {
-            for (var i = 3; i < pixels.Length; i += 4)
+            for (var i = 3; i < pixelByteLength; i += 4)
             {
                 pixels[i] = 255;
             }

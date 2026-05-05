@@ -108,7 +108,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 return RuntimeTaskStartResult.Failed(missingWindowMessage);
             }
 
-            var firstFrame = await CaptureFrameAsync(targetWindow, options.CaptureMethod, cancellationToken);
+            using var firstFrame = await CaptureFrameAsync(targetWindow, options.CaptureMethod, cancellationToken);
             if (firstFrame is null)
             {
                 _screenCaptureService.Release(targetWindow, options.CaptureMethod);
@@ -248,22 +248,29 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                     await DelayAsync(500, cancellationToken);
                 }
 
-                if (frame is not null && state.Options.InfoOverlayEnabled)
+                try
                 {
-                    var now = DateTimeOffset.Now;
-                    if (now >= nextGameStateScanAt)
+                    if (frame is not null && state.Options.InfoOverlayEnabled)
                     {
-                        nextGameStateScanAt = now + GameStateScanInterval;
+                        var now = DateTimeOffset.Now;
+                        if (now >= nextGameStateScanAt)
+                        {
+                            nextGameStateScanAt = now + GameStateScanInterval;
 
-                        try
-                        {
-                            await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
-                        }
-                        catch (Exception ex) when (ex is not OperationCanceledException)
-                        {
-                            _logger.LogWarning(ex, "状态图像匹配失败");
+                            try
+                            {
+                                await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
+                            }
+                            catch (Exception ex) when (ex is not OperationCanceledException)
+                            {
+                                _logger.LogWarning(ex, "状态图像匹配失败");
+                            }
                         }
                     }
+                }
+                finally
+                {
+                    frame?.Dispose();
                 }
 
                 var elapsedMilliseconds = Stopwatch.GetElapsedTime(frameStart).TotalMilliseconds;

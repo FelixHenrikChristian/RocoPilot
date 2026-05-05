@@ -74,7 +74,7 @@ public sealed partial class RegionSelectionWindow : WindowEx
         using (var stream = bitmap.PixelBuffer.AsStream())
         {
             stream.Seek(0, SeekOrigin.Begin);
-            stream.Write(_frame.Pixels, 0, _frame.Pixels.Length);
+            stream.Write(_frame.Pixels, 0, _frame.PixelByteLength);
         }
 
         bitmap.Invalidate();

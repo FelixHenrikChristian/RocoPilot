@@ -202,30 +202,37 @@ public sealed partial class RegionEditorPage : Page
             return;
         }
 
-        var selectionWindow = new RegionSelectionWindow(frame, targetWindow.DisplayName);
-        var selectedRegion = await selectionWindow.SelectAsync();
-        if (selectedRegion is null)
+        try
         {
-            return;
+            var selectionWindow = new RegionSelectionWindow(frame, targetWindow.DisplayName);
+            var selectedRegion = await selectionWindow.SelectAsync();
+            if (selectedRegion is null)
+            {
+                return;
+            }
+
+            selectedRegion = NormalizeRegionToClientArea(
+                selectedRegion,
+                frame,
+                targetWindow,
+                out var sourceWidth,
+                out var sourceHeight);
+
+            EnsureResolutionFromSource(sourceWidth, sourceHeight);
+            if (!TryReadResolution(out var configWidth, out var configHeight))
+            {
+                return;
+            }
+
+            selectedRegion = ScaleRegion(selectedRegion, sourceWidth, sourceHeight, configWidth, configHeight);
+            selectedRegion.Id = GenerateUniqueId("region");
+            Regions.Add(EditableRecognitionRegion.FromModel(selectedRegion));
+            HideMessage();
         }
-
-        selectedRegion = NormalizeRegionToClientArea(
-            selectedRegion,
-            frame,
-            targetWindow,
-            out var sourceWidth,
-            out var sourceHeight);
-
-        EnsureResolutionFromSource(sourceWidth, sourceHeight);
-        if (!TryReadResolution(out var configWidth, out var configHeight))
+        finally
         {
-            return;
+            frame.Dispose();
         }
-
-        selectedRegion = ScaleRegion(selectedRegion, sourceWidth, sourceHeight, configWidth, configHeight);
-        selectedRegion.Id = GenerateUniqueId("region");
-        Regions.Add(EditableRecognitionRegion.FromModel(selectedRegion));
-        HideMessage();
     }
 
     private async void CaptureRegionButton_Click(object sender, RoutedEventArgs e)
@@ -255,9 +262,10 @@ public sealed partial class RegionEditorPage : Page
 
         captureButton.IsEnabled = false;
 
+        CapturedFrame? frame = null;
         try
         {
-            var frame = await CaptureFrameAsync(targetWindow, selectedMethod.Method);
+            frame = await CaptureFrameAsync(targetWindow, selectedMethod.Method);
             if (frame is null)
             {
                 ShowMessage("未获取到游戏画面", InfoBarSeverity.Warning);
@@ -291,6 +299,7 @@ public sealed partial class RegionEditorPage : Page
         }
         finally
         {
+            frame?.Dispose();
             captureButton.IsEnabled = true;
         }
     }
@@ -527,7 +536,7 @@ public sealed partial class RegionEditorPage : Page
     private static byte[] CropFrame(CapturedFrame frame, RecognitionRegion region)
     {
         var expectedLength = checked(frame.Width * frame.Height * 4);
-        if (frame.Pixels.Length < expectedLength)
+        if (frame.PixelByteLength < expectedLength)
         {
             throw new InvalidDataException("捕获帧像素数据不完整");
         }

@@ -275,7 +275,7 @@ public sealed class ImageMatchingService : IImageMatchingService
         }
 
         var expectedLength = frame.Width * frame.Height * 4;
-        if (frame.Pixels.Length < expectedLength)
+        if (frame.PixelByteLength < expectedLength)
         {
             throw new ArgumentException("Captured frame pixels must be BGRA32 data.", nameof(frame));
         }

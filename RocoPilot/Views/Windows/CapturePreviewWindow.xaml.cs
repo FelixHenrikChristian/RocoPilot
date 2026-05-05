@@ -155,6 +155,7 @@ public sealed partial class CapturePreviewWindow : WindowEx
     {
         if (Interlocked.Exchange(ref _frameUpdatePending, 1) == 1)
         {
+            frame.Dispose();
             return;
         }
 
@@ -166,10 +167,12 @@ public sealed partial class CapturePreviewWindow : WindowEx
             }
             finally
             {
+                frame.Dispose();
                 _ = Interlocked.Exchange(ref _frameUpdatePending, 0);
             }
         }))
         {
+            frame.Dispose();
             _ = Interlocked.Exchange(ref _frameUpdatePending, 0);
         }
     }
@@ -188,7 +191,7 @@ public sealed partial class CapturePreviewWindow : WindowEx
         using (var stream = _previewBitmap.PixelBuffer.AsStream())
         {
             stream.Seek(0, SeekOrigin.Begin);
-            stream.Write(frame.Pixels, 0, frame.Pixels.Length);
+            stream.Write(frame.Pixels, 0, frame.PixelByteLength);
         }
 
         _previewBitmap.Invalidate();

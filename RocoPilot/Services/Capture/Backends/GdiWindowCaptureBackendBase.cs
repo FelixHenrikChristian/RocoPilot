@@ -74,7 +74,7 @@ public abstract class GdiWindowCaptureBackendBase : ICaptureBackend
                 return null;
             }
 
-            var pixels = new byte[width * height * 4];
+            CapturedFrame? capturedFrame = null;
             var bitmapInfo = new BitmapInfo
             {
                 Header = new BitmapInfoHeader
@@ -88,14 +88,23 @@ public abstract class GdiWindowCaptureBackendBase : ICaptureBackend
                 }
             };
 
-            var scanLines = GetDIBits(memoryDc, bitmap, 0, (uint)height, pixels, ref bitmapInfo, DibRgbColors);
+            capturedFrame = CapturedFrame.RentBgra32(width, height);
+            var scanLines = GetDIBits(
+                memoryDc,
+                bitmap,
+                0,
+                (uint)height,
+                capturedFrame.Pixels,
+                ref bitmapInfo,
+                DibRgbColors);
             if (scanLines == 0)
             {
+                capturedFrame.Dispose();
                 return null;
             }
 
-            ForceOpaqueAlpha(pixels);
-            return new CapturedFrame(width, height, pixels);
+            ForceOpaqueAlpha(capturedFrame.Pixels, capturedFrame.PixelByteLength);
+            return capturedFrame;
         }
         finally
         {
@@ -118,9 +127,9 @@ public abstract class GdiWindowCaptureBackendBase : ICaptureBackend
         }
     }
 
-    private static void ForceOpaqueAlpha(byte[] pixels)
+    private static void ForceOpaqueAlpha(byte[] pixels, int pixelByteLength)
     {
-        for (var i = 3; i < pixels.Length; i += 4)
+        for (var i = 3; i < pixelByteLength; i += 4)
         {
             pixels[i] = 255;
         }

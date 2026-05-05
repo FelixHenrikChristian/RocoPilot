@@ -49,6 +49,14 @@
       "width": 456,
       "height": 48,
       "enabled": true
+    },
+    {
+      "id": "battle-button-skill",
+      "x": 1903,
+      "y": 1004,
+      "width": 99,
+      "height": 121,
+      "enabled": true
     }
   ]
 }

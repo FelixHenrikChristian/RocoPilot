@@ -20,18 +20,20 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private const int MagicPointSlotCount = 6;
     private const string MagicPointTemplateName = "magic-point.png";
     private const string BattleChatTemplateName = "battle-chat.png";
+    private const string BattleSkillTemplateName = "battle-button-skill.png";
 
     private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
     private static readonly string[] MagicPointRegionIds =
     [
-        "magic-point",
-        "magic-points",
-        "magic",
-        "magic-value"
+        "magic-point"
     ];
     private static readonly string[] BattleChatRegionIds =
     [
         "battle-button-chat"
+    ];
+    private static readonly string[] BattleSkillRegionIds =
+    [
+        "battle-button-skill"
     ];
     private static readonly string[] BattleMagicRegionIds =
     [
@@ -44,6 +46,12 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         SearchStep = 1
     };
     private static readonly ImageMatchOptions BattleChatMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions BattleSkillMatchOptions = new()
     {
         MinimumScore = 0.88,
         AlphaThreshold = 16,
@@ -298,6 +306,15 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             return;
         }
 
+        if (await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken))
+        {
+            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+                "战斗中 - 技能选择",
+                Array.Empty<InfoOverlayCounter>(),
+                DateTimeOffset.Now));
+            return;
+        }
+
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
             _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
@@ -336,6 +353,36 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             frameRegion,
             MagicPointTemplateName,
             MagicPointMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private async Task<bool> IsBattleSkillSelectionVisibleAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleSkillRegion = FindRegion(state.RecognitionRegionConfig, BattleSkillRegionIds);
+        if (battleSkillRegion is null || !TemplateExists(BattleSkillTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleSkillRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            BattleSkillTemplateName,
+            BattleSkillMatchOptions,
             cancellationToken);
         return result.IsMatch;
     }

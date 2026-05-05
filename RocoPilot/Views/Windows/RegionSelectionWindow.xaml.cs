@@ -17,12 +17,20 @@ namespace RocoPilot.Views.Windows;
 
 public sealed partial class RegionSelectionWindow : WindowEx
 {
+    private const int PreferredWindowWidth = 1680;
+    private const int PreferredWindowHeight = 920;
+    private const int MinimumWindowWidth = 900;
+    private const int MinimumWindowHeight = 560;
+    private const int DisplayHorizontalMargin = 120;
+    private const int DisplayVerticalMargin = 100;
+
     private readonly CapturedFrame _frame;
     private readonly TaskCompletionSource<RecognitionRegion?> _selectionCompletion = new();
     private readonly IThemeSelectorService _themeSelectorService;
 
     private Rect _imageBounds;
     private Point _selectionStart;
+    private RecognitionRegion? _selectedRegion;
     private bool _isDragging;
     private bool _hasImageBounds;
     private bool _hasCompleted;
@@ -39,8 +47,8 @@ public sealed partial class RegionSelectionWindow : WindowEx
         Title = "框选检测区域";
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
-        HideNativeTitleBar();
-        AppWindow.Resize(new SizeInt32(1000, 700));
+        AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
+        ResizeToDisplayWorkArea();
 
         SourceText.Text = sourceName;
         FrameSizeText.Text = $"{_frame.Width} x {_frame.Height}";
@@ -52,19 +60,6 @@ public sealed partial class RegionSelectionWindow : WindowEx
     {
         Activate();
         return _selectionCompletion.Task;
-    }
-
-    private void HideNativeTitleBar()
-    {
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.SetBorderAndTitleBar(true, false);
-            return;
-        }
-
-        var overlappedPresenter = OverlappedPresenter.Create();
-        overlappedPresenter.SetBorderAndTitleBar(true, false);
-        AppWindow.SetPresenter(overlappedPresenter);
     }
 
     private void ContentRoot_Loaded(object sender, RoutedEventArgs e)
@@ -90,7 +85,7 @@ public sealed partial class RegionSelectionWindow : WindowEx
     {
         _isDragging = false;
         UpdateImageBounds();
-        HideSelection();
+        ShowSelectedRegion();
     }
 
     private void ImageHost_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -102,6 +97,7 @@ public sealed partial class RegionSelectionWindow : WindowEx
             return;
         }
 
+        ClearSelection();
         _selectionStart = ClampToImage(point);
         _isDragging = true;
         ImageHost.CapturePointer(e.Pointer);
@@ -140,21 +136,21 @@ public sealed partial class RegionSelectionWindow : WindowEx
             return;
         }
 
-        var region = CreateRegionFromDisplayRect(selectedRect);
-        CompleteSelection(region);
-        Close();
+        _selectedRegion = CreateRegionFromDisplayRect(selectedRect);
+        ConfirmButton.IsEnabled = true;
+        StatusText.Text = FormatSelectionStatus(_selectedRegion);
     }
 
     private void ImageHost_PointerCanceled(object sender, PointerRoutedEventArgs e)
     {
         _isDragging = false;
-        HideSelection();
+        ClearSelection();
     }
 
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
         _isDragging = false;
-        HideSelection();
+        ClearSelection();
         StatusText.Text = "在截图上拖拽一个矩形区域";
     }
 
@@ -162,6 +158,40 @@ public sealed partial class RegionSelectionWindow : WindowEx
     {
         CompleteSelection(null);
         Close();
+    }
+
+    private void ConfirmButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedRegion is null)
+        {
+            ConfirmButton.IsEnabled = false;
+            StatusText.Text = "请先在截图上框选一个矩形区域";
+            return;
+        }
+
+        CompleteSelection(_selectedRegion);
+        Close();
+    }
+
+    private void ResizeToDisplayWorkArea()
+    {
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+        var maxWidth = Math.Max(1, workArea.Width - DisplayHorizontalMargin);
+        var maxHeight = Math.Max(1, workArea.Height - DisplayVerticalMargin);
+
+        var width = Math.Min(PreferredWindowWidth, maxWidth);
+        var height = Math.Min(PreferredWindowHeight, maxHeight);
+
+        width = width < MinimumWindowWidth
+            ? Math.Min(MinimumWindowWidth, workArea.Width)
+            : width;
+        height = height < MinimumWindowHeight
+            ? Math.Min(MinimumWindowHeight, workArea.Height)
+            : height;
+
+        var x = workArea.X + Math.Max(0, (workArea.Width - width) / 2);
+        var y = workArea.Y + Math.Max(0, (workArea.Height - height) / 2);
+        AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
     }
 
     private void UpdateImageBounds()
@@ -189,7 +219,11 @@ public sealed partial class RegionSelectionWindow : WindowEx
 
     private void SetSelectionRect(Point start, Point end)
     {
-        var rect = GetRect(start, end);
+        SetSelectionRect(GetRect(start, end));
+    }
+
+    private void SetSelectionRect(Rect rect)
+    {
         SelectionRectangle.Visibility = Visibility.Visible;
         SelectionRectangle.Width = rect.Width;
         SelectionRectangle.Height = rect.Height;
@@ -202,6 +236,28 @@ public sealed partial class RegionSelectionWindow : WindowEx
         SelectionRectangle.Visibility = Visibility.Collapsed;
         SelectionRectangle.Width = 0;
         SelectionRectangle.Height = 0;
+    }
+
+    private void ClearSelection()
+    {
+        _selectedRegion = null;
+        ConfirmButton.IsEnabled = false;
+        HideSelection();
+    }
+
+    private void ShowSelectedRegion()
+    {
+        if (_selectedRegion is null || !_hasImageBounds || _frame.Width <= 0 || _frame.Height <= 0)
+        {
+            HideSelection();
+            return;
+        }
+
+        var x = _imageBounds.X + (_selectedRegion.X * _imageBounds.Width / _frame.Width);
+        var y = _imageBounds.Y + (_selectedRegion.Y * _imageBounds.Height / _frame.Height);
+        var width = _selectedRegion.Width * _imageBounds.Width / _frame.Width;
+        var height = _selectedRegion.Height * _imageBounds.Height / _frame.Height;
+        SetSelectionRect(new Rect(x, y, width, height));
     }
 
     private RecognitionRegion CreateRegionFromDisplayRect(Rect displayRect)
@@ -224,6 +280,11 @@ public sealed partial class RegionSelectionWindow : WindowEx
             Height = regionBottom - y,
             Enabled = true
         };
+    }
+
+    private static string FormatSelectionStatus(RecognitionRegion region)
+    {
+        return $"已选择区域：X={region.X}, Y={region.Y}, 宽={region.Width}, 高={region.Height}，点击确认添加";
     }
 
     private Point ClampToImage(Point point)

@@ -1,30 +1,5 @@
 {
   "resolutionWidth": 1920,
   "resolutionHeight": 1080,
-  "regions": [
-    {
-      "id": "game-state-text",
-      "x": 1540,
-      "y": 40,
-      "width": 260,
-      "height": 70,
-      "enabled": true
-    },
-    {
-      "id": "pollution-count-text",
-      "x": 1510,
-      "y": 116,
-      "width": 300,
-      "height": 72,
-      "enabled": true
-    },
-    {
-      "id": "target-icon-match",
-      "x": 1660,
-      "y": 890,
-      "width": 120,
-      "height": 120,
-      "enabled": true
-    }
-  ]
+  "regions": []
 }

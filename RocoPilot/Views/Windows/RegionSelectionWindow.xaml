@@ -5,10 +5,10 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    Width="1000"
-    Height="700"
-    MinWidth="640"
-    MinHeight="480"
+    Width="1680"
+    Height="920"
+    MinWidth="900"
+    MinHeight="560"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -108,6 +108,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock
@@ -143,6 +144,23 @@
                             FontSize="14"
                             Glyph="&#xE711;" />
                         <TextBlock Text="取消" />
+                    </StackPanel>
+                </Button>
+
+                <Button
+                    x:Name="ConfirmButton"
+                    Grid.Column="3"
+                    Click="ConfirmButton_Click"
+                    IsEnabled="False"
+                    Style="{StaticResource AccentButtonStyle}">
+                    <StackPanel
+                        Orientation="Horizontal"
+                        Spacing="6">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE73E;" />
+                        <TextBlock Text="确认" />
                     </StackPanel>
                 </Button>
             </Grid>

@@ -115,9 +115,17 @@ public sealed partial class InfoOverlayWindow : WindowEx
 
     public void UpdateSnapshot(InfoOverlaySnapshot snapshot)
     {
-        StatusText.Text = string.IsNullOrWhiteSpace(snapshot.StatusText)
+        var statusText = string.IsNullOrWhiteSpace(snapshot.StatusText)
             ? "状态待识别"
             : snapshot.StatusText;
+        if (snapshot.MagicPointCount.HasValue)
+        {
+            var magicPointMaximum = Math.Max(1, snapshot.MagicPointMaximum);
+            var magicPointCount = Math.Clamp(snapshot.MagicPointCount.Value, 0, magicPointMaximum);
+            statusText = $"{statusText} · 魔力值 {magicPointCount}/{magicPointMaximum}";
+        }
+
+        StatusText.Text = statusText;
         UpdatedAtText.Text = snapshot.UpdatedAt.ToLocalTime().ToString("HH:mm:ss");
 
         var visibleCounters = snapshot.Counters

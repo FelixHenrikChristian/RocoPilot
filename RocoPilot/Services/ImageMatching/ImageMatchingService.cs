@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices.WindowsRuntime;
 
 using Microsoft.Extensions.Logging;
@@ -26,6 +27,7 @@ public sealed class ImageMatchingService : IImageMatchingService
     ];
 
     private readonly ILogger<ImageMatchingService> _logger;
+    private readonly ConcurrentDictionary<TemplateCacheKey, Lazy<Task<ImageTemplate>>> _templateCache = new();
 
     public ImageMatchingService(ILogger<ImageMatchingService> logger)
     {
@@ -69,7 +71,7 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         var resolvedTemplatePath = ResolveTemplatePath(templatePath);
         var normalizedOptions = NormalizeOptions(options);
-        var template = await LoadTemplateAsync(
+        var template = await GetTemplateAsync(
             resolvedTemplatePath,
             normalizedOptions.AlphaThreshold,
             cancellationToken);
@@ -81,10 +83,10 @@ public sealed class ImageMatchingService : IImageMatchingService
     {
         if (Path.IsPathRooted(templatePath))
         {
-            return templatePath;
+            return Path.GetFullPath(templatePath);
         }
 
-        return Path.Combine(TemplateDirectory, templatePath);
+        return Path.GetFullPath(Path.Combine(TemplateDirectory, templatePath));
     }
 
     private static ImageMatchOptions NormalizeOptions(ImageMatchOptions? options)
@@ -135,6 +137,44 @@ public sealed class ImageMatchingService : IImageMatchingService
             template.ActivePixels.Count);
 
         return template;
+    }
+
+    private async Task<ImageTemplate> GetTemplateAsync(
+        string templatePath,
+        byte alphaThreshold,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(templatePath))
+        {
+            throw new FileNotFoundException("Image matching template was not found.", templatePath);
+        }
+
+        var lastWriteTimeUtc = File.GetLastWriteTimeUtc(templatePath);
+        var cacheKey = new TemplateCacheKey(templatePath, alphaThreshold, lastWriteTimeUtc);
+        var lazyTemplate = _templateCache.GetOrAdd(
+            cacheKey,
+            key => new Lazy<Task<ImageTemplate>>(
+                () => LoadTemplateAsync(key.TemplatePath, key.AlphaThreshold, CancellationToken.None),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+
+        var template = await lazyTemplate.Value.WaitAsync(cancellationToken);
+        RemoveOutdatedTemplates(cacheKey);
+        return template;
+    }
+
+    private void RemoveOutdatedTemplates(TemplateCacheKey currentKey)
+    {
+        foreach (var key in _templateCache.Keys)
+        {
+            if (!string.Equals(key.TemplatePath, currentKey.TemplatePath, StringComparison.OrdinalIgnoreCase)
+                || key.AlphaThreshold != currentKey.AlphaThreshold
+                || key.LastWriteTimeUtc == currentKey.LastWriteTimeUtc)
+            {
+                continue;
+            }
+
+            _ = _templateCache.TryRemove(key, out _);
+        }
     }
 
     private static async Task<InMemoryRandomAccessStream> CreateImageStreamAsync(
@@ -381,4 +421,9 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         public int Bottom => Y + Height;
     }
+
+    private readonly record struct TemplateCacheKey(
+        string TemplatePath,
+        byte AlphaThreshold,
+        DateTime LastWriteTimeUtc);
 }

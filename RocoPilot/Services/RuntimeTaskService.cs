@@ -4,8 +4,12 @@ using Microsoft.Extensions.Logging;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Recognition;
 using RocoPilot.Models.Capture;
+using RocoPilot.Models.ImageMatching;
+using RocoPilot.Models.Overlay;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Services;
@@ -13,10 +17,28 @@ namespace RocoPilot.Services;
 public sealed class RuntimeTaskService : IRuntimeTaskService
 {
     private const int TargetFrameIntervalMs = 33;
+    private const int MagicPointSlotCount = 6;
+    private const string MagicPointTemplateName = "magic-point.png";
+
+    private static readonly TimeSpan MagicPointScanInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly string[] MagicPointRegionIds =
+    [
+        "magic-point",
+        "magic-points",
+        "magic",
+        "magic-value"
+    ];
+    private static readonly ImageMatchOptions MagicPointMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
 
     private readonly IGameWindowService _gameWindowService;
     private readonly IScreenCaptureService _screenCaptureService;
     private readonly IRecognitionRegionConfigService _recognitionRegionConfigService;
+    private readonly IImageMatchingService _imageMatchingService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ILogger<RuntimeTaskService> _logger;
@@ -37,6 +59,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         IGameWindowService gameWindowService,
         IScreenCaptureService screenCaptureService,
         IRecognitionRegionConfigService recognitionRegionConfigService,
+        IImageMatchingService imageMatchingService,
         IRecognitionOverlayService recognitionOverlayService,
         IInfoOverlayService infoOverlayService,
         ILogger<RuntimeTaskService> logger)
@@ -44,6 +67,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         _gameWindowService = gameWindowService;
         _screenCaptureService = screenCaptureService;
         _recognitionRegionConfigService = recognitionRegionConfigService;
+        _imageMatchingService = imageMatchingService;
         _recognitionOverlayService = recognitionOverlayService;
         _infoOverlayService = infoOverlayService;
         _logger = logger;
@@ -190,20 +214,41 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
     private async Task CaptureLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
+        var nextMagicPointScanAt = DateTimeOffset.MinValue;
+
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 var frameStart = Stopwatch.GetTimestamp();
+                CapturedFrame? frame = null;
 
                 try
                 {
-                    _ = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
+                    frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogWarning(ex, "捕获画面失败");
                     await DelayAsync(500, cancellationToken);
+                }
+
+                if (frame is not null && state.Options.InfoOverlayEnabled)
+                {
+                    var now = DateTimeOffset.Now;
+                    if (now >= nextMagicPointScanAt)
+                    {
+                        nextMagicPointScanAt = now + MagicPointScanInterval;
+
+                        try
+                        {
+                            await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            _logger.LogWarning(ex, "魔力值图像匹配失败");
+                        }
+                    }
                 }
 
                 var elapsedMilliseconds = Stopwatch.GetElapsedTime(frameStart).TotalMilliseconds;
@@ -215,6 +260,222 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         {
             _screenCaptureService.Release(state.TargetWindow, state.Options.CaptureMethod);
         }
+    }
+
+    private async Task UpdateMagicPointSnapshotAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var magicPointRegion = state.RecognitionRegionConfig.Regions.FirstOrDefault(IsMagicPointRegion);
+        if (magicPointRegion is null)
+        {
+            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+                "等待 magic-point 区域",
+                Array.Empty<InfoOverlayCounter>(),
+                DateTimeOffset.Now));
+            return;
+        }
+
+        var templatePath = Path.Combine(_imageMatchingService.TemplateDirectory, MagicPointTemplateName);
+        if (!File.Exists(templatePath))
+        {
+            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+                "未找到 magic-point.png",
+                Array.Empty<InfoOverlayCounter>(),
+                DateTimeOffset.Now));
+            return;
+        }
+
+        var frameRegion = ToFrameRegion(
+            magicPointRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+                "魔力区域不在截图内",
+                Array.Empty<InfoOverlayCounter>(),
+                DateTimeOffset.Now,
+                0,
+                MagicPointSlotCount));
+            return;
+        }
+
+        var magicPointCount = 0;
+        foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
+        {
+            var result = await _imageMatchingService.MatchAsync(
+                frame,
+                slotRegion,
+                MagicPointTemplateName,
+                MagicPointMatchOptions,
+                cancellationToken);
+            if (result.IsMatch)
+            {
+                magicPointCount++;
+            }
+        }
+
+        var statusText = magicPointCount > 0
+            ? "大世界"
+            : "未检测到大世界";
+        _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            statusText,
+            Array.Empty<InfoOverlayCounter>(),
+            DateTimeOffset.Now,
+            magicPointCount,
+            MagicPointSlotCount));
+    }
+
+    private static bool IsMagicPointRegion(RecognitionRegion region)
+    {
+        if (!region.Enabled || string.IsNullOrWhiteSpace(region.Id))
+        {
+            return false;
+        }
+
+        var id = region.Id.Trim();
+        return MagicPointRegionIds.Any(alias =>
+            string.Equals(id, alias, StringComparison.OrdinalIgnoreCase)
+            || id.StartsWith($"{alias}-", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static IEnumerable<RecognitionRegion> SplitMagicPointSlots(RecognitionRegion region)
+    {
+        for (var index = 0; index < MagicPointSlotCount; index++)
+        {
+            var left = (int)Math.Round(region.Width * (double)index / MagicPointSlotCount);
+            var right = (int)Math.Round(region.Width * (double)(index + 1) / MagicPointSlotCount);
+            yield return new RecognitionRegion
+            {
+                Id = $"{region.Id}-{index + 1}",
+                X = region.X + left,
+                Y = region.Y,
+                Width = Math.Max(1, right - left),
+                Height = region.Height,
+                Enabled = region.Enabled
+            };
+        }
+    }
+
+    private static RecognitionRegion ToFrameRegion(
+        RecognitionRegion region,
+        CapturedFrame frame,
+        CaptureTargetWindow targetWindow,
+        RecognitionRegionConfig config)
+    {
+        var configWidth = config.ResolutionWidth > 0
+            ? config.ResolutionWidth
+            : targetWindow.HasClientArea ? targetWindow.ClientWidth : frame.Width;
+        var configHeight = config.ResolutionHeight > 0
+            ? config.ResolutionHeight
+            : targetWindow.HasClientArea ? targetWindow.ClientHeight : frame.Height;
+
+        if (configWidth <= 0 || configHeight <= 0)
+        {
+            return new RecognitionRegion();
+        }
+
+        _ = TryGetClientAreaInCapturedFrame(
+            frame,
+            targetWindow,
+            out var clientX,
+            out var clientY,
+            out var sourceWidth,
+            out var sourceHeight);
+
+        var sourceRegion = new RecognitionRegion
+        {
+            Id = region.Id,
+            X = ScaleValue(region.X, configWidth, sourceWidth),
+            Y = ScaleValue(region.Y, configHeight, sourceHeight),
+            Width = Math.Max(1, ScaleValue(region.Width, configWidth, sourceWidth)),
+            Height = Math.Max(1, ScaleValue(region.Height, configHeight, sourceHeight)),
+            Enabled = region.Enabled
+        };
+
+        var x = clientX + sourceRegion.X;
+        var y = clientY + sourceRegion.Y;
+        var right = clientX + sourceRegion.X + sourceRegion.Width;
+        var bottom = clientY + sourceRegion.Y + sourceRegion.Height;
+        var clampedX = ClampToRange(x, 0, frame.Width);
+        var clampedY = ClampToRange(y, 0, frame.Height);
+        var clampedRight = ClampToRange(right, 0, frame.Width);
+        var clampedBottom = ClampToRange(bottom, 0, frame.Height);
+
+        return clampedRight <= clampedX || clampedBottom <= clampedY
+            ? new RecognitionRegion()
+            : new RecognitionRegion
+            {
+                Id = region.Id,
+                X = clampedX,
+                Y = clampedY,
+                Width = clampedRight - clampedX,
+                Height = clampedBottom - clampedY,
+                Enabled = region.Enabled
+            };
+    }
+
+    private static bool TryGetClientAreaInCapturedFrame(
+        CapturedFrame frame,
+        CaptureTargetWindow targetWindow,
+        out int clientX,
+        out int clientY,
+        out int clientWidth,
+        out int clientHeight)
+    {
+        clientX = 0;
+        clientY = 0;
+        clientWidth = frame.Width;
+        clientHeight = frame.Height;
+
+        if (!targetWindow.HasClientArea
+            || frame.Width <= 0
+            || frame.Height <= 0
+            || (frame.Width == targetWindow.ClientWidth && frame.Height == targetWindow.ClientHeight))
+        {
+            return false;
+        }
+
+        clientX = Math.Max(0, targetWindow.ClientOffsetX);
+        clientY = Math.Max(0, targetWindow.ClientOffsetY);
+
+        if (clientX >= frame.Width || clientY >= frame.Height)
+        {
+            return false;
+        }
+
+        clientWidth = Math.Min(targetWindow.ClientWidth, frame.Width - clientX);
+        clientHeight = Math.Min(targetWindow.ClientHeight, frame.Height - clientY);
+
+        return clientWidth > 0
+            && clientHeight > 0
+            && (clientX != 0
+                || clientY != 0
+                || clientWidth != frame.Width
+                || clientHeight != frame.Height);
+    }
+
+    private static int ScaleValue(int value, int sourceSize, int targetSize)
+    {
+        if (sourceSize <= 0 || targetSize <= 0)
+        {
+            return value;
+        }
+
+        return (int)Math.Round(value * (double)targetSize / sourceSize);
+    }
+
+    private static int ClampToRange(int value, int min, int max)
+    {
+        if (value < min)
+        {
+            return min;
+        }
+
+        return value > max ? max : value;
     }
 
     private Task<CapturedFrame?> CaptureFrameAsync(

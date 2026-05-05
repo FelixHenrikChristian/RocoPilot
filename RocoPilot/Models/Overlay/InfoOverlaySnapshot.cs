@@ -3,7 +3,9 @@ namespace RocoPilot.Models.Overlay;
 public sealed record InfoOverlaySnapshot(
     string StatusText,
     IReadOnlyList<InfoOverlayCounter> Counters,
-    DateTimeOffset UpdatedAt)
+    DateTimeOffset UpdatedAt,
+    int? MagicPointCount = null,
+    int MagicPointMaximum = 6)
 {
     public static InfoOverlaySnapshot CreateInitial(DateTimeOffset startedAt)
     {

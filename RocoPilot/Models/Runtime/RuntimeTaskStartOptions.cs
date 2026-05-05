@@ -27,4 +27,16 @@ public sealed class RuntimeTaskStartOptions
         get;
         init;
     }
+
+    public bool PollutionCounterEnabled
+    {
+        get;
+        init;
+    } = true;
+
+    public bool AutoBattleEnabled
+    {
+        get;
+        init;
+    }
 }

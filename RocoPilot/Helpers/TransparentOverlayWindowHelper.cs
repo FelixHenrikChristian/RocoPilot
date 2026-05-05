@@ -42,7 +42,7 @@ internal static class TransparentOverlayWindowHelper
     private const uint DwmwcpDoNotRound = 1;
     private const uint DwmwaColorNone = 0xFFFFFFFE;
 
-    public static void ApplyTransparentOverlayStyles(IntPtr hwnd, bool topMost, bool passThrough)
+    public static void ApplyTransparentOverlayStyles(IntPtr hwnd, bool topMost, bool passThrough, bool show = true)
     {
         if (hwnd == IntPtr.Zero)
         {
@@ -51,12 +51,12 @@ internal static class TransparentOverlayWindowHelper
 
         RemoveStandardWindowFrame(hwnd);
         ApplyOverlayExtendedStyle(hwnd, passThrough);
-        RefreshWindowFrame(hwnd);
+        RefreshWindowFrame(hwnd, show);
         TryDisableDwmFrame(hwnd);
 
         if (topMost)
         {
-            SetTopMost(hwnd);
+            SetTopMost(hwnd, show);
         }
     }
 
@@ -129,8 +129,31 @@ internal static class TransparentOverlayWindowHelper
             SwpNoActivate | SwpShowWindow);
     }
 
-    public static void SetTopMost(IntPtr hwnd)
+    public static void MoveNoActivate(IntPtr hwnd, RectInt32 bounds)
     {
+        if (hwnd == IntPtr.Zero || bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+
+        _ = SetWindowPos(
+            hwnd,
+            IntPtr.Zero,
+            bounds.X,
+            bounds.Y,
+            bounds.Width,
+            bounds.Height,
+            SwpNoZOrder | SwpNoActivate | SwpShowWindow);
+    }
+
+    public static void SetTopMost(IntPtr hwnd, bool show = true)
+    {
+        var flags = SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged;
+        if (show)
+        {
+            flags |= SwpShowWindow;
+        }
+
         _ = SetWindowPos(
             hwnd,
             HwndTopMost,
@@ -138,7 +161,7 @@ internal static class TransparentOverlayWindowHelper
             0,
             0,
             0,
-            SwpNoMove | SwpNoSize | SwpNoActivate | SwpFrameChanged | SwpShowWindow);
+            flags);
     }
 
     private static void RemoveStandardWindowFrame(IntPtr hwnd)
@@ -165,8 +188,14 @@ internal static class TransparentOverlayWindowHelper
         _ = SetWindowLongPtr(hwnd, GwlExStyle, new IntPtr(updatedStyle));
     }
 
-    private static void RefreshWindowFrame(IntPtr hwnd)
+    private static void RefreshWindowFrame(IntPtr hwnd, bool show)
     {
+        var flags = SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged;
+        if (show)
+        {
+            flags |= SwpShowWindow;
+        }
+
         _ = SetWindowPos(
             hwnd,
             IntPtr.Zero,
@@ -174,7 +203,7 @@ internal static class TransparentOverlayWindowHelper
             0,
             0,
             0,
-            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged | SwpShowWindow);
+            flags);
     }
 
     private static void TryDisableDwmFrame(IntPtr hwnd)

@@ -18,6 +18,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private readonly IScreenCaptureService _screenCaptureService;
     private readonly IRecognitionRegionConfigService _recognitionRegionConfigService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
+    private readonly IInfoOverlayService _infoOverlayService;
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
 
@@ -37,12 +38,14 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         IScreenCaptureService screenCaptureService,
         IRecognitionRegionConfigService recognitionRegionConfigService,
         IRecognitionOverlayService recognitionOverlayService,
+        IInfoOverlayService infoOverlayService,
         ILogger<RuntimeTaskService> logger)
     {
         _gameWindowService = gameWindowService;
         _screenCaptureService = screenCaptureService;
         _recognitionRegionConfigService = recognitionRegionConfigService;
         _recognitionOverlayService = recognitionOverlayService;
+        _infoOverlayService = infoOverlayService;
         _logger = logger;
     }
 
@@ -93,6 +96,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             _captureCancellationTokenSource = cancellationTokenSource;
             CurrentState = state;
             _recognitionOverlayService.Show(state);
+            _infoOverlayService.Show(state);
             _captureTask = Task.Run(
                 () => CaptureLoopAsync(state, cancellationTokenSource.Token),
                 cancellationTokenSource.Token);
@@ -155,6 +159,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             CurrentState = null;
             cancellationTokenSource?.Cancel();
             _recognitionOverlayService.Hide();
+            _infoOverlayService.Hide();
         }
         finally
         {

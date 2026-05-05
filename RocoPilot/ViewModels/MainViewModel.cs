@@ -15,6 +15,7 @@ public partial class MainViewModel : ObservableRecipient
     private const int LaunchNotificationAutoCloseDelayMilliseconds = 4500;
 
     private readonly IRuntimeTaskService _runtimeTaskService;
+    private readonly IInfoOverlayService _infoOverlayService;
     private readonly ILogger<MainViewModel> _logger;
     private CancellationTokenSource? _launchNotificationAutoCloseCts;
 
@@ -66,9 +67,11 @@ public partial class MainViewModel : ObservableRecipient
 
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,
+        IInfoOverlayService infoOverlayService,
         ILogger<MainViewModel> logger)
     {
         _runtimeTaskService = runtimeTaskService;
+        _infoOverlayService = infoOverlayService;
         _logger = logger;
         SelectedCaptureMethod = CaptureMethods[0];
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
@@ -102,7 +105,9 @@ public partial class MainViewModel : ObservableRecipient
             CaptureMethod = SelectedCaptureMethod.Method,
             RecognitionOverlayEnabled = IsMaskOverlayEnabled,
             InfoOverlayEnabled = IsInfoOverlayEnabled,
-            InfoOverlayLocked = IsInfoOverlayLocked
+            InfoOverlayLocked = IsInfoOverlayLocked,
+            PollutionCounterEnabled = true,
+            AutoBattleEnabled = false
         });
 
         if (!result.Success || result.State is null)
@@ -139,6 +144,13 @@ public partial class MainViewModel : ObservableRecipient
     [RelayCommand]
     private void ResetInfoOverlayPosition()
     {
+        _infoOverlayService.ResetPosition();
+        ShowLaunchNotification(InfoBarSeverity.Informational, "位置已重置", "信息遮罩窗口将回到默认位置。");
+    }
+
+    partial void OnIsInfoOverlayLockedChanged(bool value)
+    {
+        _infoOverlayService.SetLocked(value);
     }
 
     private void ShowLaunchNotification(InfoBarSeverity severity, string title, string message)

@@ -44,7 +44,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
 
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         _messageHook = TransparentOverlayWindowHelper.InstallMessageHook(_hwnd);
-        TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
+        TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true, show: false);
 
         _followTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _followTimer.Interval = FollowInterval;
@@ -62,8 +62,11 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
             return;
         }
 
-        UpdateOverlayState();
-        TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
+        if (UpdateOverlayState())
+        {
+            TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true);
+        }
+
         _followTimer.Start();
         DrawRegions();
     }
@@ -86,7 +89,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private void OverlayRoot_Loaded(object sender, RoutedEventArgs e)
     {
         _isLoaded = true;
-        UpdateOverlayState();
+        _ = UpdateOverlayState();
         DrawRegions();
     }
 
@@ -97,10 +100,10 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
 
     private void FollowTimer_Tick(DispatcherQueueTimer sender, object args)
     {
-        UpdateOverlayState();
+        _ = UpdateOverlayState();
     }
 
-    private void UpdateOverlayState()
+    private bool UpdateOverlayState()
     {
         if (_isClosed
             || !TransparentOverlayWindowHelper.IsForegroundWindow(_targetWindow.Hwnd)
@@ -109,7 +112,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
             || bounds.Height <= 0)
         {
             HideOverlay();
-            return;
+            return false;
         }
 
         if (!_hasActivated)
@@ -123,12 +126,13 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         if (!SameBounds(_currentClientBounds, bounds))
         {
             _currentClientBounds = bounds;
-            AppWindow.MoveAndResize(bounds);
+            TransparentOverlayWindowHelper.MoveNoActivate(_hwnd, bounds);
             DrawRegions();
         }
 
-        TransparentOverlayWindowHelper.MoveTopMostNoActivate(_hwnd, bounds);
+        TransparentOverlayWindowHelper.MoveNoActivate(_hwnd, bounds);
         _isOverlayVisible = true;
+        return true;
     }
 
     private void HideOverlay()

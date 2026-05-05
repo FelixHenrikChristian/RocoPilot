@@ -1,0 +1,186 @@
+<windowex:WindowEx
+    x:Class="RocoPilot.Views.Windows.InfoOverlayWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:windowex="using:WinUIEx"
+    Width="320"
+    Height="288"
+    mc:Ignorable="d">
+
+    <Grid
+        x:Name="OverlayRoot"
+        Background="Transparent"
+        PointerMoved="OverlayRoot_PointerMoved"
+        PointerPressed="OverlayRoot_PointerPressed"
+        PointerReleased="OverlayRoot_PointerReleased">
+        <Border
+            x:Name="InfoPanel"
+            Margin="0"
+            Padding="12"
+            Background="#EAF8FAFD"
+            BorderBrush="#B8FFFFFF"
+            BorderThickness="1"
+            CornerRadius="18">
+            <Grid RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    Padding="12,10"
+                    Background="#F6FFFFFF"
+                    BorderBrush="#45D8DEE8"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Foreground="#475467"
+                                Text="状态信息" />
+
+                            <StackPanel
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="6">
+                                <Border
+                                    x:Name="PollutionCounterIndicator"
+                                    Width="26"
+                                    Height="26"
+                                    Background="#E0F7F2"
+                                    CornerRadius="13"
+                                    ToolTipService.ToolTip="污染计数">
+                                    <FontIcon
+                                        x:Name="PollutionCounterIcon"
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="12"
+                                        Foreground="#10B981"
+                                        Glyph="&#xE8EF;" />
+                                </Border>
+                                <Border
+                                    x:Name="AutoBattleIndicator"
+                                    Width="26"
+                                    Height="26"
+                                    Background="#EEF1F5"
+                                    CornerRadius="13"
+                                    Opacity="0.52"
+                                    ToolTipService.ToolTip="自动战斗">
+                                    <FontIcon
+                                        x:Name="AutoBattleIcon"
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="12"
+                                        Foreground="#8A95A3"
+                                        Glyph="&#xE7FC;" />
+                                </Border>
+                            </StackPanel>
+                        </Grid>
+
+                        <Grid Grid.Row="1" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock
+                                x:Name="StatusText"
+                                VerticalAlignment="Center"
+                                FontSize="14"
+                                FontWeight="SemiBold"
+                                Foreground="#1F2937"
+                                Text="状态待识别"
+                                TextTrimming="CharacterEllipsis" />
+                            <TextBlock
+                                x:Name="UpdatedAtText"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                FontSize="11"
+                                Foreground="#7A8796"
+                                Text="--:--:--" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border
+                    Grid.Row="1"
+                    Padding="12,10"
+                    Background="#F6FFFFFF"
+                    BorderBrush="#45D8DEE8"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Foreground="#475467"
+                            Text="污染计数" />
+
+                        <Grid Grid.Row="1" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock
+                                x:Name="LatestPollutionCountText"
+                                MinWidth="76"
+                                VerticalAlignment="Center"
+                                FontSize="42"
+                                FontWeight="SemiBold"
+                                Foreground="#0F766E"
+                                Text="0" />
+
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="2">
+                                <TextBlock
+                                    FontSize="11"
+                                    Foreground="#98A2B3"
+                                    Text="最近污染精灵" />
+                                <TextBlock
+                                    x:Name="LatestCreatureNameText"
+                                    FontSize="15"
+                                    FontWeight="SemiBold"
+                                    Foreground="#1F2937"
+                                    Text="待识别目标"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ScrollViewer
+                            Grid.Row="2"
+                            HorizontalScrollBarVisibility="Disabled"
+                            HorizontalScrollMode="Disabled"
+                            VerticalScrollBarVisibility="Hidden"
+                            VerticalScrollMode="Auto">
+                            <StackPanel
+                                x:Name="CounterList"
+                                Spacing="5" />
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</windowex:WindowEx>

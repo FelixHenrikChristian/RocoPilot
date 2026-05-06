@@ -151,7 +151,7 @@
                 Width="220"
                 HorizontalAlignment="Right"
                 DisplayMemberPath="DisplayName"
-                ItemsSource="{x:Bind ViewModel.Accounts}"
+                ItemsSource="{x:Bind ViewModel.Accounts, Mode=OneWay}"
                 SelectedItem="{x:Bind ViewModel.SelectedAccount, Mode=TwoWay}" />
 
             <Button
@@ -167,10 +167,10 @@
                 </StackPanel>
                 <Button.Flyout>
                     <MenuFlyout>
-                        <MenuFlyoutItem Text="导入配置" />
-                        <MenuFlyoutItem Text="导出配置" />
+                        <MenuFlyoutItem Click="ImportStatisticsMenuFlyoutItem_Click" Text="导入数据" />
+                        <MenuFlyoutItem Click="ExportStatisticsMenuFlyoutItem_Click" Text="导出数据" />
                         <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Text="清空记录" />
+                        <MenuFlyoutItem Click="ClearStatisticsMenuFlyoutItem_Click" Text="清空记录" />
                     </MenuFlyout>
                 </Button.Flyout>
             </Button>
@@ -246,7 +246,7 @@
                         Margin="0,4,0,0"
                         HorizontalAlignment="Center"
                         DisplayMemberPath="Name"
-                        ItemsSource="{x:Bind ViewModel.ShinyScopes}"
+                        ItemsSource="{x:Bind ViewModel.ShinyScopes, Mode=OneWay}"
                         SelectedIndex="{x:Bind ViewModel.SelectedShinyScopeIndex, Mode=TwoWay}" />
                 </Grid>
             </Border>
@@ -258,7 +258,7 @@
             <FlipView
                 Grid.Column="2"
                 Background="Transparent"
-                ItemsSource="{x:Bind ViewModel.Seasons}"
+                ItemsSource="{x:Bind ViewModel.Seasons, Mode=OneWay}"
                 SelectedIndex="{x:Bind ViewModel.SelectedSeasonIndex, Mode=TwoWay}">
                 <FlipView.ItemContainerStyle>
                     <Style TargetType="FlipViewItem">
@@ -329,5 +329,16 @@
                 </FlipView.ItemTemplate>
             </FlipView>
         </Grid>
+
+        <InfoBar
+            Grid.Row="0"
+            Grid.RowSpan="2"
+            Canvas.ZIndex="10"
+            VerticalAlignment="Bottom"
+            IsClosable="True"
+            IsOpen="{x:Bind ViewModel.IsNotificationOpen, Mode=TwoWay}"
+            Message="{x:Bind ViewModel.NotificationMessage, Mode=OneWay}"
+            Severity="{x:Bind ViewModel.NotificationSeverity, Mode=OneWay}"
+            Title="{x:Bind ViewModel.NotificationTitle, Mode=OneWay}" />
     </Grid>
 </Page>

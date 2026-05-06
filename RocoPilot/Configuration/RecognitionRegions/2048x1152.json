@@ -36,9 +36,9 @@
     },
     {
       "id": "battle-space",
-      "x": 1267,
-      "y": 858,
-      "width": 80,
+      "x": 1285,
+      "y": 913,
+      "width": 85,
       "height": 34,
       "enabled": true
     },
@@ -56,6 +56,22 @@
       "y": 1004,
       "width": 99,
       "height": 121,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-heterochromia",
+      "x": 1582,
+      "y": 158,
+      "width": 466,
+      "height": 58,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-relieve",
+      "x": 627,
+      "y": 152,
+      "width": 795,
+      "height": 50,
       "enabled": true
     }
   ]

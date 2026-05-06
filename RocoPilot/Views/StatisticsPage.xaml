@@ -6,5 +6,328 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid />
+    <Page.Resources>
+        <Style
+            x:Key="StatisticsCardStyle"
+            BasedOn="{StaticResource CardStyle}"
+            TargetType="Border">
+            <Setter Property="Padding" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+        </Style>
+
+        <DataTemplate x:Key="PollutionCountRowTemplate">
+            <Grid MinHeight="32" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="28" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="50" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    Width="28"
+                    Height="28"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="13"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Glyph="&#xE77B;" />
+                </Border>
+
+                <Grid
+                    Grid.Column="1"
+                    Height="24"
+                    VerticalAlignment="Center">
+                    <Border
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        CornerRadius="4" />
+                    <Border
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        CornerRadius="4"
+                        RenderTransformOrigin="0,0.5">
+                        <Border.RenderTransform>
+                            <ScaleTransform ScaleX="{Binding ProgressRatio}" />
+                        </Border.RenderTransform>
+                    </Border>
+                    <TextBlock
+                        Margin="8,0"
+                        VerticalAlignment="Center"
+                        FontSize="13"
+                        FontWeight="SemiBold"
+                        Text="{Binding Name}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                </Grid>
+
+                <TextBlock
+                    Grid.Column="2"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Text="{Binding Count}" />
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="ShinyCountRowTemplate">
+            <Grid MinHeight="32" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="28" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="50" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    Width="28"
+                    Height="28"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="13"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Glyph="&#xE77B;" />
+                </Border>
+
+                <TextBlock
+                    Grid.Column="1"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Text="{Binding Name}"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="NoWrap" />
+
+                <TextBlock
+                    Grid.Column="2"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Text="{Binding Count}" />
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid Padding="{StaticResource NavigationViewPageContentPadding}" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="10">
+                <FontIcon
+                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontSize="17"
+                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                    Glyph="&#xE9D2;" />
+                <TextBlock
+                    VerticalAlignment="Center"
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    Text="统计" />
+            </StackPanel>
+
+            <ComboBox
+                Grid.Column="1"
+                Width="220"
+                HorizontalAlignment="Right"
+                DisplayMemberPath="DisplayName"
+                ItemsSource="{x:Bind ViewModel.Accounts}"
+                SelectedItem="{x:Bind ViewModel.SelectedAccount, Mode=TwoWay}" />
+
+            <Button
+                Grid.Column="2"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="15"
+                        Glyph="&#xE713;" />
+                    <TextBlock Text="设置" />
+                </StackPanel>
+                <Button.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Text="导入配置" />
+                        <MenuFlyoutItem Text="导出配置" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Text="清空记录" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="14">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="1" />
+                <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource StatisticsCardStyle}">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Spacing="2">
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                Text="异色" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.SelectedShinyDateDisplay, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                        </StackPanel>
+
+                        <TextBlock
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            FontSize="18"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.TotalSelectedShiny, Mode=OneWay}" />
+                    </Grid>
+
+                    <Border
+                        Grid.Row="1"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <ScrollViewer
+                        Grid.Row="2"
+                        HorizontalScrollBarVisibility="Disabled"
+                        HorizontalScrollMode="Disabled"
+                        VerticalScrollBarVisibility="Hidden"
+                        ViewChanged="CardScrollViewer_ViewChanged"
+                        ViewChanging="CardScrollViewer_ViewChanging"
+                        VerticalScrollMode="Auto">
+                        <ItemsControl
+                            Margin="0,0,10,0"
+                            ItemTemplate="{StaticResource ShinyCountRowTemplate}"
+                            ItemsSource="{x:Bind ViewModel.SelectedShinyCounts, Mode=OneWay}" />
+                    </ScrollViewer>
+
+                    <ComboBox
+                        Grid.Row="3"
+                        Width="120"
+                        Margin="0,4,0,0"
+                        HorizontalAlignment="Center"
+                        DisplayMemberPath="Name"
+                        ItemsSource="{x:Bind ViewModel.ShinyScopes}"
+                        SelectedIndex="{x:Bind ViewModel.SelectedShinyScopeIndex, Mode=TwoWay}" />
+                </Grid>
+            </Border>
+
+            <Border
+                Grid.Column="1"
+                Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+            <FlipView
+                Grid.Column="2"
+                Background="Transparent"
+                ItemsSource="{x:Bind ViewModel.Seasons}"
+                SelectedIndex="{x:Bind ViewModel.SelectedSeasonIndex, Mode=TwoWay}">
+                <FlipView.ItemContainerStyle>
+                    <Style TargetType="FlipViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                    </Style>
+                </FlipView.ItemContainerStyle>
+                <FlipView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Style="{StaticResource StatisticsCardStyle}">
+                            <Grid RowSpacing="10">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Spacing="2">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="18"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding EncounterTitle}" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{Binding SeasonDateDisplay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="NoWrap" />
+                                    </StackPanel>
+
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        VerticalAlignment="Center"
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding PollutionTotal}" />
+                                </Grid>
+
+                                <Border
+                                    Grid.Row="1"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="0,1,0,0" />
+
+                                <ScrollViewer
+                                    Grid.Row="2"
+                                    HorizontalScrollBarVisibility="Disabled"
+                                    HorizontalScrollMode="Disabled"
+                                    VerticalScrollBarVisibility="Hidden"
+                                    ViewChanged="CardScrollViewer_ViewChanged"
+                                    ViewChanging="CardScrollViewer_ViewChanging"
+                                    VerticalScrollMode="Auto">
+                                    <ItemsControl
+                                        Margin="0,0,10,0"
+                                        ItemTemplate="{StaticResource PollutionCountRowTemplate}"
+                                        ItemsSource="{Binding PollutionCounts}" />
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </FlipView.ItemTemplate>
+            </FlipView>
+        </Grid>
+    </Grid>
 </Page>

@@ -127,6 +127,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel
@@ -146,16 +147,85 @@
                     Text="统计" />
             </StackPanel>
 
-            <ComboBox
-                Grid.Column="1"
-                Width="220"
-                HorizontalAlignment="Right"
-                DisplayMemberPath="DisplayName"
-                ItemsSource="{x:Bind ViewModel.Accounts, Mode=OneWay}"
-                SelectedItem="{x:Bind ViewModel.SelectedAccount, Mode=TwoWay}" />
-
             <Button
                 Grid.Column="2"
+                Width="220"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                HorizontalContentAlignment="Stretch">
+                <Button.Content>
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Text="{x:Bind ViewModel.SelectedAccountDisplayName, Mode=OneWay}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                        <FontIcon
+                            Grid.Column="1"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="12"
+                            Glyph="&#xE70D;" />
+                    </Grid>
+                </Button.Content>
+                <Button.Flyout>
+                    <Flyout x:Name="AccountSelectorFlyout" Placement="BottomEdgeAlignedRight">
+                        <StackPanel Width="220" Spacing="6">
+                            <ListView
+                                MaxHeight="260"
+                                IsItemClickEnabled="True"
+                                ItemClick="AccountListView_ItemClick"
+                                ItemsSource="{x:Bind ViewModel.Accounts, Mode=OneWay}"
+                                SelectionMode="None">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid
+                                            MinHeight="36"
+                                            Padding="10,0"
+                                            RightTapped="AccountItem_RightTapped">
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                Text="{Binding DisplayName}"
+                                                TextTrimming="CharacterEllipsis"
+                                                TextWrapping="NoWrap" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+
+                            <Border
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderThickness="0,1,0,0" />
+
+                            <Button
+                                HorizontalAlignment="Stretch"
+                                Click="AddAccountButton_Click">
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE710;" />
+                                    <TextBlock Text="添加账号" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
+
+            <Button
+                Grid.Column="3"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="8">

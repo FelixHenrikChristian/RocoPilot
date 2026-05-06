@@ -47,10 +47,13 @@ public partial class StatisticsViewModel : ObservableRecipient
         {
             if (SetProperty(ref _selectedAccount, value))
             {
+                OnPropertyChanged(nameof(SelectedAccountDisplayName));
                 RefreshSelectedAccount();
             }
         }
     }
+
+    public string SelectedAccountDisplayName => SelectedAccount?.DisplayName ?? "未选择账号";
 
     public IReadOnlyList<ShinyScopeOption> ShinyScopes
     {
@@ -207,6 +210,49 @@ public partial class StatisticsViewModel : ObservableRecipient
             $"已导入 {Accounts.Count} 个账号，{Seasons.Count} 个赛季。");
     }
 
+    public async Task<bool> AddAccountAsync(string uid)
+    {
+        uid = uid.Trim();
+        if (string.IsNullOrWhiteSpace(uid))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "添加失败", "UID 不能为空。");
+            return false;
+        }
+
+        if (_document.Accounts.Any(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase)))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "添加失败", $"账号 {uid} 已存在。");
+            return false;
+        }
+
+        _document.Accounts.Add(new AccountStatisticsData { Uid = uid });
+        ApplyDocument(_document, uid);
+        await PersistAsync();
+        ShowNotification(InfoBarSeverity.Success, "已添加账号", $"已添加账号 {uid}。");
+        return true;
+    }
+
+    public async Task DeleteAccountAsync(string uid)
+    {
+        var account = _document.Accounts.FirstOrDefault(account =>
+            string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase));
+        if (account is null)
+        {
+            return;
+        }
+
+        var deletedSelectedAccount = string.Equals(
+            SelectedAccount?.Uid,
+            account.Uid,
+            StringComparison.OrdinalIgnoreCase);
+        _document.Accounts.Remove(account);
+        ApplyDocument(
+            _document,
+            deletedSelectedAccount ? _document.Accounts.FirstOrDefault()?.Uid : SelectedAccount?.Uid);
+        await PersistAsync();
+        ShowNotification(InfoBarSeverity.Success, "已删除账号", $"已删除账号 {uid} 及其统计记录。");
+    }
+
     public async Task ClearAllAsync()
     {
         _document.Accounts.Clear();
@@ -231,11 +277,11 @@ public partial class StatisticsViewModel : ObservableRecipient
         await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, _document);
     }
 
-    private void ApplyDocument(StatisticsDocument document)
+    private void ApplyDocument(StatisticsDocument document, string? preferredUid = null)
     {
         _document = NormalizeDocument(document);
 
-        var previousUid = SelectedAccount?.Uid;
+        var previousUid = preferredUid ?? SelectedAccount?.Uid;
         Accounts = _document.Accounts
             .Select(account => new AccountStatisticsOption(account.Uid))
             .ToList();
@@ -245,6 +291,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
         _selectedAccount = nextSelectedAccount;
         OnPropertyChanged(nameof(SelectedAccount));
+        OnPropertyChanged(nameof(SelectedAccountDisplayName));
         RefreshSelectedAccount();
     }
 

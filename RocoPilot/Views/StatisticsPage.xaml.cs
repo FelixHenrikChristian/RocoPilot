@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 
 using RocoPilot.ViewModels;
 
@@ -30,6 +31,98 @@ public sealed partial class StatisticsPage : Page
     private async void StatisticsPage_Loaded(object sender, RoutedEventArgs e)
     {
         await ViewModel.LoadAsync();
+    }
+
+    private void AccountListView_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is not AccountStatisticsOption account)
+        {
+            return;
+        }
+
+        ViewModel.SelectedAccount = account;
+        AccountSelectorFlyout.Hide();
+    }
+
+    private async void AddAccountButton_Click(object sender, RoutedEventArgs e)
+    {
+        var xamlRoot = XamlRoot;
+        if (xamlRoot is null)
+        {
+            return;
+        }
+
+        var uidTextBox = new TextBox
+        {
+            Header = "UID",
+            MaxLength = 32,
+            PlaceholderText = "请输入 UID"
+        };
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = "添加账号",
+            Content = uidTextBox,
+            PrimaryButtonText = "添加",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return;
+        }
+
+        if (await ViewModel.AddAccountAsync(uidTextBox.Text))
+        {
+            AccountSelectorFlyout.Hide();
+        }
+    }
+
+    private void AccountItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement target
+            || target.DataContext is not AccountStatisticsOption account)
+        {
+            return;
+        }
+
+        var deleteItem = new MenuFlyoutItem
+        {
+            Text = "删除账号"
+        };
+        deleteItem.Click += async (_, _) => await ConfirmDeleteAccountAsync(account);
+
+        var flyout = new MenuFlyout();
+        flyout.Items.Add(deleteItem);
+        flyout.ShowAt(target);
+        e.Handled = true;
+    }
+
+    private async Task ConfirmDeleteAccountAsync(AccountStatisticsOption account)
+    {
+        var xamlRoot = XamlRoot;
+        if (xamlRoot is null)
+        {
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = "删除账号",
+            Content = $"将删除账号 {account.Uid} 及其所有统计记录。此操作不会删除导出的备份文件。",
+            PrimaryButtonText = "删除",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+        {
+            await ViewModel.DeleteAccountAsync(account.Uid);
+            AccountSelectorFlyout.Hide();
+        }
     }
 
     private async void ImportStatisticsMenuFlyoutItem_Click(object sender, RoutedEventArgs e)

@@ -1,0 +1,13 @@
+{
+  "currentSeasonId": "S1",
+  "seasons": [
+    {
+      "id": "S1",
+      "name": "S1赛季",
+      "dateRange": "2025/3/26-2025/5/21",
+      "encounterTypeName": "污染",
+      "tipText": "噩梦力量的保护解除，捕捉功能已恢复",
+      "matchThreshold": 0.78
+    }
+  ]
+}

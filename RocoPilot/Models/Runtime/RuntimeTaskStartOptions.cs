@@ -34,6 +34,12 @@ public sealed class RuntimeTaskStartOptions
         init;
     } = true;
 
+    public bool EncounterStatisticsEnabled
+    {
+        get;
+        init;
+    }
+
     public bool AutoBattleEnabled
     {
         get;

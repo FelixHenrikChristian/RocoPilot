@@ -1,16 +1,25 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices.WindowsRuntime;
 
 using Microsoft.Extensions.Logging;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Recognition;
+using RocoPilot.Contracts.Services.Statistics;
+using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.TextRecognition;
+
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 
 namespace RocoPilot.Services;
 
@@ -23,6 +32,8 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private const string BattleSkillTemplateName = "battle-button-skill.png";
 
     private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan EncounterScanInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(45);
     private static readonly string[] MagicPointRegionIds =
     [
         "magic-point"
@@ -38,6 +49,14 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private static readonly string[] BattleMagicRegionIds =
     [
         "battle-magic"
+    ];
+    private static readonly string[] BattleTipRelieveRegionIds =
+    [
+        "battle-tip-relieve"
+    ];
+    private static readonly string[] BattleEnemyNameRegionIds =
+    [
+        "battle-enemy-name"
     ];
     private static readonly ImageMatchOptions MagicPointMatchOptions = new()
     {
@@ -62,13 +81,21 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private readonly IScreenCaptureService _screenCaptureService;
     private readonly IRecognitionRegionConfigService _recognitionRegionConfigService;
     private readonly IImageMatchingService _imageMatchingService;
+    private readonly ITextRecognitionService _textRecognitionService;
+    private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
+    private readonly IStatisticsService _statisticsService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+    private readonly object _encounterRecordLock = new();
 
     private CancellationTokenSource? _captureCancellationTokenSource;
     private Task? _captureTask;
+    private volatile bool _encounterStatisticsEnabled;
+    private string? _lastRecordedEncounterSeasonId;
+    private string? _lastRecordedEncounterName;
+    private DateTimeOffset _lastRecordedEncounterAt;
 
     public RuntimeTaskState? CurrentState
     {
@@ -78,11 +105,16 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
     public bool IsRunning => CurrentState is not null;
 
+    public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
+
     public RuntimeTaskService(
         IGameWindowService gameWindowService,
         IScreenCaptureService screenCaptureService,
         IRecognitionRegionConfigService recognitionRegionConfigService,
         IImageMatchingService imageMatchingService,
+        ITextRecognitionService textRecognitionService,
+        IEncounterSeasonConfigService encounterSeasonConfigService,
+        IStatisticsService statisticsService,
         IRecognitionOverlayService recognitionOverlayService,
         IInfoOverlayService infoOverlayService,
         ILogger<RuntimeTaskService> logger)
@@ -91,6 +123,9 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         _screenCaptureService = screenCaptureService;
         _recognitionRegionConfigService = recognitionRegionConfigService;
         _imageMatchingService = imageMatchingService;
+        _textRecognitionService = textRecognitionService;
+        _encounterSeasonConfigService = encounterSeasonConfigService;
+        _statisticsService = statisticsService;
         _recognitionOverlayService = recognitionOverlayService;
         _infoOverlayService = infoOverlayService;
         _logger = logger;
@@ -142,6 +177,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             var cancellationTokenSource = new CancellationTokenSource();
             _captureCancellationTokenSource = cancellationTokenSource;
             CurrentState = state;
+            _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
             _recognitionOverlayService.Show(state);
             _infoOverlayService.Show(state);
             _captureTask = Task.Run(
@@ -182,6 +218,11 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         {
             _lifecycleLock.Release();
         }
+    }
+
+    public void SetEncounterStatisticsEnabled(bool isEnabled)
+    {
+        _encounterStatisticsEnabled = isEnabled;
     }
 
     public async Task StopAsync()
@@ -238,6 +279,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private async Task CaptureLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
         var nextGameStateScanAt = DateTimeOffset.MinValue;
+        var nextEncounterScanAt = DateTimeOffset.MinValue;
 
         try
         {
@@ -258,20 +300,37 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
                 try
                 {
-                    if (frame is not null && state.Options.InfoOverlayEnabled)
+                    if (frame is not null && (state.Options.InfoOverlayEnabled || EncounterStatisticsEnabled))
                     {
                         var now = DateTimeOffset.Now;
                         if (now >= nextGameStateScanAt)
                         {
                             nextGameStateScanAt = now + GameStateScanInterval;
 
+                            var isBattleState = false;
                             try
                             {
-                                await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
+                                isBattleState = await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
                                 _logger.LogWarning(ex, "状态图像匹配失败");
+                            }
+
+                            if (isBattleState
+                                && EncounterStatisticsEnabled
+                                && now >= nextEncounterScanAt)
+                            {
+                                nextEncounterScanAt = now + EncounterScanInterval;
+
+                                try
+                                {
+                                    await TryUpdateEncounterStatisticsAsync(state, frame, cancellationToken);
+                                }
+                                catch (Exception ex) when (ex is not OperationCanceledException)
+                                {
+                                    _logger.LogWarning(ex, "奇遇统计识别失败");
+                                }
                             }
                         }
                     }
@@ -292,7 +351,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         }
     }
 
-    private async Task UpdateGameStateSnapshotAsync(
+    private async Task<bool> UpdateGameStateSnapshotAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
@@ -303,7 +362,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 "战斗中 - 切换精灵",
                 Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
-            return;
+            return true;
         }
 
         if (await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken))
@@ -312,7 +371,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 "战斗中 - 技能选择",
                 Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
-            return;
+            return true;
         }
 
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
@@ -321,10 +380,11 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 "战斗中",
                 Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
-            return;
+            return true;
         }
 
         await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
+        return false;
     }
 
     private async Task<bool> IsBattlePetSwitchingAsync(
@@ -481,6 +541,169 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             DateTimeOffset.Now,
             magicPointCount,
             MagicPointSlotCount));
+    }
+
+    private async Task TryUpdateEncounterStatisticsAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        if (season is null || string.IsNullOrWhiteSpace(season.TipText))
+        {
+            return;
+        }
+
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipRelieveRegionIds,
+            cancellationToken);
+
+        if (!TextMatchingHelper.IsSimilar(
+                tipText,
+                season.TipText,
+                season.MatchThreshold,
+                out var similarity))
+        {
+            return;
+        }
+
+        var enemyNameText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleEnemyNameRegionIds,
+            cancellationToken);
+        var enemyName = TextMatchingHelper.CleanRecognizedText(enemyNameText);
+        if (string.IsNullOrWhiteSpace(enemyName))
+        {
+            _logger.LogDebug("已匹配奇遇提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}", similarity);
+            return;
+        }
+
+        if (!TryReserveEncounterRecord(season.Id, enemyName, DateTimeOffset.Now))
+        {
+            return;
+        }
+
+        await _statisticsService.RecordEncounterAsync(season, enemyName, DateTimeOffset.Now);
+        _logger.LogInformation(
+            "检测到赛季奇遇：Season={SeasonId}, Type={EncounterType}, Spirit={SpiritName}, TipSimilarity={Similarity:P1}",
+            season.Id,
+            season.EncounterTypeName,
+            enemyName,
+            similarity);
+    }
+
+    private async Task<string> RecognizeRegionTextAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        IReadOnlyList<string> regionAliases,
+        CancellationToken cancellationToken)
+    {
+        var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
+        if (region is null)
+        {
+            return string.Empty;
+        }
+
+        var frameRegion = ToFrameRegion(
+            region,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return string.Empty;
+        }
+
+        var recognitionMethod = _textRecognitionService
+            .GetMethods()
+            .FirstOrDefault(method => method.IsAvailable)
+            ?.Method;
+        if (recognitionMethod is null)
+        {
+            return string.Empty;
+        }
+
+        var imageBytes = await EncodeFrameRegionPngAsync(frame, frameRegion, cancellationToken);
+        var result = await _textRecognitionService.RecognizeAsync(
+            imageBytes,
+            recognitionMethod.Value,
+            cancellationToken);
+        return result.Text;
+    }
+
+    private bool TryReserveEncounterRecord(string seasonId, string spiritName, DateTimeOffset now)
+    {
+        lock (_encounterRecordLock)
+        {
+            if (string.Equals(_lastRecordedEncounterSeasonId, seasonId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(_lastRecordedEncounterName, spiritName, StringComparison.OrdinalIgnoreCase)
+                && now - _lastRecordedEncounterAt < EncounterDuplicateSuppressWindow)
+            {
+                return false;
+            }
+
+            _lastRecordedEncounterSeasonId = seasonId;
+            _lastRecordedEncounterName = spiritName;
+            _lastRecordedEncounterAt = now;
+            return true;
+        }
+    }
+
+    private static async Task<byte[]> EncodeFrameRegionPngAsync(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        CancellationToken cancellationToken)
+    {
+        var pixels = CropFrame(frame, region);
+
+        using var stream = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream)
+            .AsTask(cancellationToken);
+        encoder.SetPixelData(
+            BitmapPixelFormat.Bgra8,
+            BitmapAlphaMode.Ignore,
+            (uint)region.Width,
+            (uint)region.Height,
+            96,
+            96,
+            pixels);
+        await encoder.FlushAsync().AsTask(cancellationToken);
+
+        stream.Seek(0);
+        var encodedLength = checked((int)stream.Size);
+        using var reader = new DataReader(stream.GetInputStreamAt(0));
+        var loadedLength = await reader.LoadAsync((uint)encodedLength).AsTask(cancellationToken);
+        if (loadedLength != (uint)encodedLength)
+        {
+            throw new InvalidDataException("区域截图编码结果读取不完整。");
+        }
+
+        var encodedBytes = new byte[encodedLength];
+        reader.ReadBytes(encodedBytes);
+        return encodedBytes;
+    }
+
+    private static byte[] CropFrame(CapturedFrame frame, RecognitionRegion region)
+    {
+        var expectedLength = checked(frame.Width * frame.Height * 4);
+        if (frame.PixelByteLength < expectedLength)
+        {
+            throw new InvalidDataException("捕获帧像素数据不完整。");
+        }
+
+        var rowLength = region.Width * 4;
+        var croppedPixels = new byte[region.Height * rowLength];
+        for (var row = 0; row < region.Height; row++)
+        {
+            var sourceOffset = ((region.Y + row) * frame.Width + region.X) * 4;
+            var targetOffset = row * rowLength;
+            System.Buffer.BlockCopy(frame.Pixels, sourceOffset, croppedPixels, targetOffset, rowLength);
+        }
+
+        return croppedPixels;
     }
 
     private bool TemplateExists(string templateName)

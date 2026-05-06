@@ -14,9 +14,16 @@ public interface IRuntimeTaskService
         get;
     }
 
+    bool EncounterStatisticsEnabled
+    {
+        get;
+    }
+
     Task<RuntimeTaskStartResult> StartAsync(
         RuntimeTaskStartOptions options,
         CancellationToken cancellationToken = default);
+
+    void SetEncounterStatisticsEnabled(bool isEnabled);
 
     Task StopAsync();
 }

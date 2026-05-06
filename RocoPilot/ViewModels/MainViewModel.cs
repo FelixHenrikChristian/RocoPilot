@@ -107,6 +107,7 @@ public partial class MainViewModel : ObservableRecipient
             InfoOverlayEnabled = IsInfoOverlayEnabled,
             InfoOverlayLocked = IsInfoOverlayLocked,
             PollutionCounterEnabled = true,
+            EncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled,
             AutoBattleEnabled = false
         });
 

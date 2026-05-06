@@ -6,5 +6,299 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid x:Name="ContentArea" />
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+            <StackPanel
+                Padding="0,4,0,0"
+                Spacing="14">
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid RowSpacing="14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE765;" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontWeight="SemiBold"
+                                Text="键盘模拟" />
+                        </StackPanel>
+
+                        <Border
+                            Grid.Row="1"
+                            Height="1"
+                            Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid
+                            Grid.Row="2"
+                            ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Spacing="4">
+                                <TextBlock
+                                    x:Name="TargetWindowText"
+                                    Text="尚未定位游戏窗口"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    x:Name="TargetWindowHandleText"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="-" />
+                            </StackPanel>
+
+                            <Button
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Click="RefreshTargetWindowButton_Click"
+                                ToolTipService.ToolTip="刷新游戏窗口">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="16"
+                                    Glyph="&#xE72C;" />
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid RowSpacing="14">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE8B7;" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontWeight="SemiBold"
+                                Text="按键序列" />
+                        </StackPanel>
+
+                        <Border
+                            Grid.Row="1"
+                            Height="1"
+                            Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <Grid
+                            Grid.Row="2"
+                            ColumnSpacing="12"
+                            RowSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <ComboBox
+                                x:Name="PresetComboBox"
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                HorizontalAlignment="Stretch"
+                                Header="预设"
+                                DisplayMemberPath="Name"
+                                SelectionChanged="PresetComboBox_SelectionChanged" />
+
+                            <TextBox
+                                x:Name="HoldDurationTextBox"
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Header="按住时长 ms"
+                                InputScope="Number"
+                                Text="45"
+                                TextAlignment="Center" />
+
+                            <TextBox
+                                x:Name="KeyIntervalTextBox"
+                                Grid.Row="0"
+                                Grid.Column="2"
+                                Header="间隔 ms"
+                                InputScope="Number"
+                                Text="120"
+                                TextAlignment="Center" />
+
+                            <TextBlock
+                                x:Name="PresetDescriptionText"
+                                Grid.Row="1"
+                                Grid.ColumnSpan="3"
+                                Style="{StaticResource CaptionTextBlockStyle}"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </Grid>
+
+                        <TextBox
+                            x:Name="KeySequenceTextBox"
+                            Grid.Row="3"
+                            MinHeight="96"
+                            AcceptsReturn="True"
+                            Header="按键列表"
+                            PlaceholderText="W, A, S, D, Space, Enter"
+                            TextChanged="KeySequenceTextBox_TextChanged"
+                            TextWrapping="Wrap" />
+
+                        <Grid
+                            Grid.Row="4"
+                            ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock
+                                x:Name="ExecutionStatusText"
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="就绪"
+                                TextTrimming="CharacterEllipsis" />
+
+                            <Button
+                                x:Name="CancelSequenceButton"
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Click="CancelSequenceButton_Click"
+                                IsEnabled="False">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE711;" />
+                                    <TextBlock Text="取消" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button
+                                x:Name="RunSequenceButton"
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Click="RunSequenceButton_Click"
+                                Style="{StaticResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE768;" />
+                                    <TextBlock Text="执行" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Style="{StaticResource CardStyle}">
+                    <Grid RowSpacing="12">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Glyph="&#xE9D5;" />
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontWeight="SemiBold"
+                                Text="发送预览" />
+                        </StackPanel>
+
+                        <Border
+                            Grid.Row="1"
+                            Height="1"
+                            Background="{ThemeResource CardStrokeColorDefaultBrush}" />
+
+                        <ListView
+                            x:Name="PreviewListView"
+                            Grid.Row="2"
+                            MaxHeight="260"
+                            Padding="0"
+                            SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="MinHeight" Value="0" />
+                                    <Setter Property="Padding" Value="0" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid
+                                        MinHeight="36"
+                                        Padding="0,4"
+                                        ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="44" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock
+                                            Grid.Column="0"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{Binding Index}" />
+
+                                        <TextBlock
+                                            Grid.Column="1"
+                                            VerticalAlignment="Center"
+                                            FontWeight="SemiBold"
+                                            Text="{Binding DisplayText}"
+                                            TextTrimming="CharacterEllipsis" />
+
+                                        <TextBlock
+                                            Grid.Column="2"
+                                            VerticalAlignment="Center"
+                                            Style="{StaticResource CaptionTextBlockStyle}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{Binding VirtualKeyText}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <InfoBar
+            x:Name="InputSimulationInfoBar"
+            Margin="0,0,0,8"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            IsClosable="True"
+            IsOpen="False" />
+    </Grid>
 </Page>

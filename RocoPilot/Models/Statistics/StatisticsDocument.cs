@@ -40,6 +40,8 @@ public sealed class SeasonStatisticsData
 
     public string DateRange { get; set; } = string.Empty;
 
+    public string EncounterTypeName { get; set; } = string.Empty;
+
     public List<EncounterSpiritRecord> Encounters { get; set; } = [];
 
     public List<ShinySpiritCaptureRecord> ShinyCaptures { get; set; } = [];

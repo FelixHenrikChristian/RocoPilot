@@ -11,7 +11,7 @@
       "enabled": true
     },
     {
-      "id": "enemy-name",
+      "id": "battle-enemy-name",
       "x": 1786,
       "y": 43,
       "width": 159,

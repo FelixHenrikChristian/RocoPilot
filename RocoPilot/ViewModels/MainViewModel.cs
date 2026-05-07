@@ -133,6 +133,8 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
+        await _runtimeTaskService.LoadSettingsAsync();
+
         var result = await _runtimeTaskService.StartAsync(new RuntimeTaskStartOptions
         {
             CaptureMethod = SelectedCaptureMethod.Method,

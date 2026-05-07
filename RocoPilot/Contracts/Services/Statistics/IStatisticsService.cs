@@ -7,6 +7,8 @@ public interface IStatisticsService
 {
     event EventHandler<StatisticsDocumentChangedEventArgs>? DocumentChanged;
 
+    event EventHandler? SelectedAccountChanged;
+
     StatisticsDocument CurrentDocument { get; }
 
     Task<StatisticsDocument> LoadAsync();
@@ -23,6 +25,8 @@ public interface IStatisticsService
         EncounterSeasonDefinition season,
         string spiritName,
         DateTimeOffset capturedAt);
+
+    IReadOnlyList<EncounterSpiritRecord> GetSelectedAccountSeasonEncounters(string seasonId);
 
     void SetSelectedAccountUid(string? uid);
 }

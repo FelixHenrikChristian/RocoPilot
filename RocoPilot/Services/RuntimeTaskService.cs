@@ -3,6 +3,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 
 using Microsoft.Extensions.Logging;
 
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Encounters;
@@ -84,15 +85,19 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private readonly ITextRecognitionService _textRecognitionService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly IStatisticsService _statisticsService;
+    private readonly ILocalSettingsService _localSettingsService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
+    private readonly SemaphoreSlim _settingsLock = new(1, 1);
     private readonly object _encounterRecordLock = new();
 
     private CancellationTokenSource? _captureCancellationTokenSource;
     private Task? _captureTask;
-    private volatile bool _encounterStatisticsEnabled;
+    private volatile bool _encounterStatisticsEnabled = true;
+    private bool _settingsLoaded;
+    private bool _hasActiveEncounterRecord;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
     private DateTimeOffset _lastRecordedEncounterAt;
@@ -115,6 +120,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         ITextRecognitionService textRecognitionService,
         IEncounterSeasonConfigService encounterSeasonConfigService,
         IStatisticsService statisticsService,
+        ILocalSettingsService localSettingsService,
         IRecognitionOverlayService recognitionOverlayService,
         IInfoOverlayService infoOverlayService,
         ILogger<RuntimeTaskService> logger)
@@ -126,15 +132,45 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         _textRecognitionService = textRecognitionService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _statisticsService = statisticsService;
+        _localSettingsService = localSettingsService;
         _recognitionOverlayService = recognitionOverlayService;
         _infoOverlayService = infoOverlayService;
         _logger = logger;
+    }
+
+    public async Task LoadSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await _settingsLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (_settingsLoaded)
+            {
+                return;
+            }
+
+            var savedEncounterStatisticsEnabled =
+                await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.EncounterStatisticsEnabled);
+            _encounterStatisticsEnabled = savedEncounterStatisticsEnabled ?? true;
+            _settingsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            _settingsLoaded = true;
+            _logger.LogWarning(ex, "读取实时任务设置失败，已使用默认设置。");
+        }
+        finally
+        {
+            _settingsLock.Release();
+        }
     }
 
     public async Task<RuntimeTaskStartResult> StartAsync(
         RuntimeTaskStartOptions options,
         CancellationToken cancellationToken = default)
     {
+        await LoadSettingsAsync(cancellationToken);
+        await _statisticsService.LoadAsync();
+
         await _lifecycleLock.WaitAsync(cancellationToken);
         try
         {
@@ -224,6 +260,20 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
         _encounterStatisticsEnabled = isEnabled;
+        _settingsLoaded = true;
+        _ = SaveEncounterStatisticsEnabledAsync(isEnabled);
+    }
+
+    private async Task SaveEncounterStatisticsEnabledAsync(bool isEnabled)
+    {
+        try
+        {
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.EncounterStatisticsEnabled, isEnabled);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "保存奇遇统计开关状态失败。");
+        }
     }
 
     public async Task StopAsync()
@@ -333,6 +383,10 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                                     _logger.LogWarning(ex, "奇遇统计识别失败");
                                 }
                             }
+                            else if (!isBattleState)
+                            {
+                                ResetEncounterRecordSuppression();
+                            }
                         }
                     }
                 }
@@ -359,33 +413,61 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     {
         if (await IsBattlePetSwitchingAsync(state, frame, cancellationToken))
         {
-            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 切换精灵",
-                Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
             return true;
         }
 
         if (await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken))
         {
-            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 技能选择",
-                Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
             return true;
         }
 
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
-            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
                 "战斗中",
-                Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
             return true;
         }
 
         await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
         return false;
+    }
+
+    private InfoOverlaySnapshot CreateInfoOverlaySnapshot(
+        string statusText,
+        DateTimeOffset updatedAt,
+        int? magicPointCount = null,
+        int magicPointMaximum = MagicPointSlotCount)
+    {
+        return new InfoOverlaySnapshot(
+            statusText,
+            GetCurrentSeasonEncounterCounters(),
+            updatedAt,
+            magicPointCount,
+            magicPointMaximum);
+    }
+
+    private IReadOnlyList<InfoOverlayCounter> GetCurrentSeasonEncounterCounters()
+    {
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        if (season is null)
+        {
+            return [];
+        }
+
+        return _statisticsService.GetSelectedAccountSeasonEncounters(season.Id)
+            .Select(record => new InfoOverlayCounter(
+                record.Name,
+                record.Count,
+                0,
+                record.LastCapturedAt))
+            .ToList();
     }
 
     private async Task<bool> IsBattlePetSwitchingAsync(
@@ -486,18 +568,16 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
         if (magicPointRegion is null)
         {
-            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
                 "等待 magic-point 区域",
-                Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
             return;
         }
 
         if (!TemplateExists(MagicPointTemplateName))
         {
-            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
                 "未找到 magic-point.png",
-                Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now));
             return;
         }
@@ -509,9 +589,8 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
                 "魔力区域不在截图内",
-                Array.Empty<InfoOverlayCounter>(),
                 DateTimeOffset.Now,
                 0,
                 MagicPointSlotCount));
@@ -536,9 +615,8 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         var statusText = magicPointCount > 0
             ? "大世界"
             : "未检测到大世界";
-        _infoOverlayService.UpdateSnapshot(new InfoOverlaySnapshot(
+        _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
             statusText,
-            Array.Empty<InfoOverlayCounter>(),
             DateTimeOffset.Now,
             magicPointCount,
             MagicPointSlotCount));
@@ -639,16 +717,28 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         lock (_encounterRecordLock)
         {
             if (string.Equals(_lastRecordedEncounterSeasonId, seasonId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(_lastRecordedEncounterName, spiritName, StringComparison.OrdinalIgnoreCase)
-                && now - _lastRecordedEncounterAt < EncounterDuplicateSuppressWindow)
+                && (_hasActiveEncounterRecord || now - _lastRecordedEncounterAt < EncounterDuplicateSuppressWindow))
             {
+                _logger.LogDebug(
+                    "奇遇统计冷却中，本次识别已忽略。LastSpirit={LastSpiritName}, CurrentSpirit={CurrentSpiritName}",
+                    _lastRecordedEncounterName,
+                    spiritName);
                 return false;
             }
 
             _lastRecordedEncounterSeasonId = seasonId;
             _lastRecordedEncounterName = spiritName;
             _lastRecordedEncounterAt = now;
+            _hasActiveEncounterRecord = true;
             return true;
+        }
+    }
+
+    private void ResetEncounterRecordSuppression()
+    {
+        lock (_encounterRecordLock)
+        {
+            _hasActiveEncounterRecord = false;
         }
     }
 

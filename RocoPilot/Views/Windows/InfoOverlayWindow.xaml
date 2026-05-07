@@ -133,7 +133,7 @@
                             FontSize="12"
                             FontWeight="SemiBold"
                             Foreground="#475467"
-                            Text="污染计数" />
+                            Text="当前赛季奇遇" />
 
                         <Grid Grid.Row="1" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
@@ -157,7 +157,7 @@
                                 <TextBlock
                                     FontSize="11"
                                     Foreground="#98A2B3"
-                                    Text="最近污染精灵" />
+                                    Text="最近捕捉精灵" />
                                 <TextBlock
                                     x:Name="LatestCreatureNameText"
                                     FontSize="15"

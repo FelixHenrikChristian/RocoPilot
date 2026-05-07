@@ -10,7 +10,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
 
-    private bool _isEncounterStatisticsEnabled;
+    private bool _isEncounterStatisticsEnabled = true;
 
     public bool IsEncounterStatisticsEnabled
     {
@@ -57,5 +57,11 @@ public partial class RealtimeViewModel : ObservableRecipient
         _runtimeTaskService = runtimeTaskService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _isEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
+    }
+
+    public async Task LoadAsync()
+    {
+        await _runtimeTaskService.LoadSettingsAsync();
+        IsEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
     }
 }

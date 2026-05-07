@@ -137,7 +137,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
         if (latestCounter is null)
         {
             LatestPollutionCountText.Text = "0";
-            LatestCreatureNameText.Text = "暂无目标";
+            LatestCreatureNameText.Text = "暂无记录";
             RenderCounters([]);
             return;
         }
@@ -315,7 +315,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
         {
             CounterList.Children.Add(new TextBlock
             {
-                Text = "暂无其他污染目标",
+                Text = "暂无其他奇遇记录",
                 FontSize = 12,
                 Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x66, 0x70, 0x85))
             });

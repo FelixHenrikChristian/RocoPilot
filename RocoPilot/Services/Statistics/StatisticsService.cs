@@ -29,6 +29,8 @@ public sealed class StatisticsService : IStatisticsService
 
     public event EventHandler<StatisticsDocumentChangedEventArgs>? DocumentChanged;
 
+    public event EventHandler? SelectedAccountChanged;
+
     public StatisticsDocument CurrentDocument => CloneDocument(_document);
 
     public StatisticsService(
@@ -165,7 +167,43 @@ public sealed class StatisticsService : IStatisticsService
 
     public void SetSelectedAccountUid(string? uid)
     {
-        _selectedAccountUid = string.IsNullOrWhiteSpace(uid) ? null : uid.Trim();
+        var nextUid = string.IsNullOrWhiteSpace(uid) ? null : uid.Trim();
+        if (string.Equals(_selectedAccountUid, nextUid, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _selectedAccountUid = nextUid;
+        SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public IReadOnlyList<EncounterSpiritRecord> GetSelectedAccountSeasonEncounters(string seasonId)
+    {
+        if (string.IsNullOrWhiteSpace(seasonId))
+        {
+            return [];
+        }
+
+        var account = ResolveSelectedAccountForRead(_document);
+        var season = account?.Seasons.FirstOrDefault(item =>
+            string.Equals(item.Id, seasonId.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (season is null)
+        {
+            return [];
+        }
+
+        return season.Encounters
+            .Where(record => !string.IsNullOrWhiteSpace(record.Name) && record.Count > 0)
+            .Select(record => new EncounterSpiritRecord
+            {
+                Name = record.Name.Trim(),
+                Count = record.Count,
+                Season = string.IsNullOrWhiteSpace(record.Season) ? season.Id : record.Season.Trim(),
+                LastCapturedAt = record.LastCapturedAt
+            })
+            .OrderByDescending(record => record.LastCapturedAt)
+            .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private async Task<StatisticsDocument> UpdateAsync(Func<StatisticsDocument> update)
@@ -237,6 +275,21 @@ public sealed class StatisticsService : IStatisticsService
 
         _logger.LogWarning("没有可写入的统计账号，本次奇遇记录已跳过。");
         return null;
+    }
+
+    private AccountStatisticsData? ResolveSelectedAccountForRead(StatisticsDocument document)
+    {
+        if (!string.IsNullOrWhiteSpace(_selectedAccountUid))
+        {
+            var selectedAccount = document.Accounts.FirstOrDefault(account =>
+                string.Equals(account.Uid, _selectedAccountUid, StringComparison.OrdinalIgnoreCase));
+            if (selectedAccount is not null)
+            {
+                return selectedAccount;
+            }
+        }
+
+        return document.Accounts.FirstOrDefault();
     }
 
     private static SeasonStatisticsData ResolveSeason(

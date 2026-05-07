@@ -35,6 +35,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan EncounterScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan UnrecognizedStateConfirmDelay = TimeSpan.FromSeconds(2);
     private static readonly string[] MagicPointRegionIds =
     [
         "magic-point"
@@ -98,6 +99,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private volatile bool _encounterStatisticsEnabled = true;
     private bool _settingsLoaded;
     private bool _hasActiveEncounterRecord;
+    private DateTimeOffset? _unrecognizedStateDetectedAt;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
     private DateTimeOffset _lastRecordedEncounterAt;
@@ -358,17 +360,17 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                         {
                             nextGameStateScanAt = now + GameStateScanInterval;
 
-                            var isBattleState = false;
+                            var gameStateScanResult = GameStateScanResult.UnrecognizedPending;
                             try
                             {
-                                isBattleState = await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
+                                gameStateScanResult = await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
                                 _logger.LogWarning(ex, "状态图像匹配失败");
                             }
 
-                            if (isBattleState
+                            if (gameStateScanResult == GameStateScanResult.Battle
                                 && EncounterStatisticsEnabled
                                 && now >= nextEncounterScanAt)
                             {
@@ -383,7 +385,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                                     _logger.LogWarning(ex, "奇遇统计识别失败");
                                 }
                             }
-                            else if (!isBattleState)
+                            else if (gameStateScanResult == GameStateScanResult.NonBattle)
                             {
                                 ResetEncounterRecordSuppression();
                             }
@@ -406,37 +408,54 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         }
     }
 
-    private async Task<bool> UpdateGameStateSnapshotAsync(
+    private async Task<GameStateScanResult> UpdateGameStateSnapshotAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
         if (await IsBattlePetSwitchingAsync(state, frame, cancellationToken))
         {
-            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 切换精灵",
                 DateTimeOffset.Now));
-            return true;
+            return GameStateScanResult.Battle;
         }
 
         if (await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken))
         {
-            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 技能选择",
                 DateTimeOffset.Now));
-            return true;
+            return GameStateScanResult.Battle;
         }
 
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
-            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中",
                 DateTimeOffset.Now));
-            return true;
+            return GameStateScanResult.Battle;
         }
 
-        await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
-        return false;
+        return await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
+    }
+
+    private void UpdateRecognizedInfoOverlaySnapshot(InfoOverlaySnapshot snapshot)
+    {
+        _unrecognizedStateDetectedAt = null;
+        _infoOverlayService.UpdateSnapshot(snapshot);
+    }
+
+    private GameStateScanResult TryUpdateUnrecognizedInfoOverlaySnapshot(DateTimeOffset now)
+    {
+        _unrecognizedStateDetectedAt ??= now;
+        if (now - _unrecognizedStateDetectedAt.Value < UnrecognizedStateConfirmDelay)
+        {
+            return GameStateScanResult.UnrecognizedPending;
+        }
+
+        _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("未识别", now));
+        return GameStateScanResult.NonBattle;
     }
 
     private InfoOverlaySnapshot CreateInfoOverlaySnapshot(
@@ -560,7 +579,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         return result.IsMatch;
     }
 
-    private async Task UpdateMagicPointSnapshotAsync(
+    private async Task<GameStateScanResult> UpdateMagicPointSnapshotAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
@@ -568,18 +587,18 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
         if (magicPointRegion is null)
         {
-            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "等待 magic-point 区域",
                 DateTimeOffset.Now));
-            return;
+            return GameStateScanResult.NonBattle;
         }
 
         if (!TemplateExists(MagicPointTemplateName))
         {
-            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "未找到 magic-point.png",
                 DateTimeOffset.Now));
-            return;
+            return GameStateScanResult.NonBattle;
         }
 
         var frameRegion = ToFrameRegion(
@@ -589,12 +608,10 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "魔力区域不在截图内",
-                DateTimeOffset.Now,
-                0,
-                MagicPointSlotCount));
-            return;
+                DateTimeOffset.Now));
+            return GameStateScanResult.NonBattle;
         }
 
         var magicPointCount = 0;
@@ -612,14 +629,18 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             }
         }
 
-        var statusText = magicPointCount > 0
-            ? "大世界"
-            : "未检测到大世界";
-        _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(
-            statusText,
-            DateTimeOffset.Now,
+        var now = DateTimeOffset.Now;
+        if (magicPointCount <= 0)
+        {
+            return TryUpdateUnrecognizedInfoOverlaySnapshot(now);
+        }
+
+        UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+            "大世界",
+            now,
             magicPointCount,
             MagicPointSlotCount));
+        return GameStateScanResult.NonBattle;
     }
 
     private async Task TryUpdateEncounterStatisticsAsync(
@@ -974,5 +995,12 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private enum GameStateScanResult
+    {
+        Battle,
+        NonBattle,
+        UnrecognizedPending
     }
 }

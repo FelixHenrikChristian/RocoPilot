@@ -1,4 +1,5 @@
 using RocoPilot.Models.Capture;
+using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.Models.Runtime;
 
@@ -9,6 +10,12 @@ public sealed class RuntimeTaskStartOptions
         get;
         init;
     }
+
+    public TextRecognitionMethod TextRecognitionMethod
+    {
+        get;
+        init;
+    } = TextRecognitionMethod.PaddleOcrV5;
 
     public bool RecognitionOverlayEnabled
     {

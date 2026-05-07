@@ -148,6 +148,42 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8D4;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="OCR 识别方法" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="选择所有 OCR 任务使用的文字识别后端。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox
+                            Grid.Column="2"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Center"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{x:Bind ViewModel.TextRecognitionMethods}"
+                            SelectedItem="{x:Bind ViewModel.SelectedTextRecognitionMethod, Mode=TwoWay}"
+                            ToolTipService.ToolTip="PaddleOCR 效果最好，推荐使用。" />
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <FontIcon

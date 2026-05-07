@@ -185,13 +185,14 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 cancellationTokenSource.Token);
 
             _logger.LogInformation(
-                "运行任务已启动，窗口: {Window}, 客户区: {ClientWidth}x{ClientHeight}, 首帧: {FrameWidth}x{FrameHeight}, 截图方式: {CaptureMethod}, 区域配置: {ConfigPath}",
+                "运行任务已启动，窗口: {Window}, 客户区: {ClientWidth}x{ClientHeight}, 首帧: {FrameWidth}x{FrameHeight}, 截图方式: {CaptureMethod}, OCR: {TextRecognitionMethod}, 区域配置: {ConfigPath}",
                 targetWindow.DisplayName,
                 configResolutionWidth,
                 configResolutionHeight,
                 firstFrame.Width,
                 firstFrame.Height,
                 options.CaptureMethod,
+                options.TextRecognitionMethod,
                 recognitionRegionConfig.SourcePath);
 
             _logger.LogInformation(
@@ -619,8 +620,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
         var recognitionMethod = _textRecognitionService
             .GetMethods()
-            .FirstOrDefault(method => method.IsAvailable)
-            ?.Method;
+            .FirstOrDefault(method => method.Method == state.Options.TextRecognitionMethod && method.IsAvailable);
         if (recognitionMethod is null)
         {
             return string.Empty;
@@ -629,7 +629,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         var imageBytes = await EncodeFrameRegionPngAsync(frame, frameRegion, cancellationToken);
         var result = await _textRecognitionService.RecognizeAsync(
             imageBytes,
-            recognitionMethod.Value,
+            recognitionMethod.Method,
             cancellationToken);
         return result.Text;
     }

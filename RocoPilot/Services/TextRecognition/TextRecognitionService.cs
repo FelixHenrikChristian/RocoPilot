@@ -6,6 +6,13 @@ namespace RocoPilot.Services.TextRecognition;
 
 public sealed class TextRecognitionService : ITextRecognitionService
 {
+    private static readonly IReadOnlyDictionary<TextRecognitionMethod, int> MethodPriority = new Dictionary<TextRecognitionMethod, int>
+    {
+        [TextRecognitionMethod.PaddleOcrV5] = 0,
+        [TextRecognitionMethod.TesseractOcr] = 1,
+        [TextRecognitionMethod.WindowsOcr] = 2
+    };
+
     private readonly IReadOnlyDictionary<TextRecognitionMethod, ITextRecognitionBackend> _backends;
 
     public TextRecognitionService(IEnumerable<ITextRecognitionBackend> backends)
@@ -17,7 +24,15 @@ public sealed class TextRecognitionService : ITextRecognitionService
     {
         return _backends.Values
             .Select(backend => backend.GetOption())
+            .OrderBy(option => GetMethodPriority(option.Method))
             .ToList();
+    }
+
+    public TextRecognitionMethodOption? GetDefaultMethod()
+    {
+        var methods = GetMethods();
+        return methods.FirstOrDefault(method => method.IsAvailable)
+            ?? methods.FirstOrDefault();
     }
 
     public Task<TextRecognitionResult> RecognizeAsync(
@@ -37,5 +52,12 @@ public sealed class TextRecognitionService : ITextRecognitionService
         }
 
         return backend.RecognizeAsync(imageBytes, cancellationToken);
+    }
+
+    private static int GetMethodPriority(TextRecognitionMethod method)
+    {
+        return MethodPriority.TryGetValue(method, out var priority)
+            ? priority
+            : int.MaxValue;
     }
 }

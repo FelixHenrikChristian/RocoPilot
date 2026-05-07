@@ -5,8 +5,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.ViewModels;
 
@@ -16,6 +18,7 @@ public partial class MainViewModel : ObservableRecipient
 
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IInfoOverlayService _infoOverlayService;
+    private readonly ITextRecognitionService _textRecognitionService;
     private readonly ILogger<MainViewModel> _logger;
     private CancellationTokenSource? _launchNotificationAutoCloseCts;
 
@@ -29,8 +32,16 @@ public partial class MainViewModel : ObservableRecipient
         new(CaptureMethod.PrintWindow, "PrintWindow", "窗口后台截图尝试")
     ];
 
+    public IReadOnlyList<TextRecognitionMethodOption> TextRecognitionMethods
+    {
+        get;
+    }
+
     [ObservableProperty]
     private CaptureMethodOption? _selectedCaptureMethod;
+
+    [ObservableProperty]
+    private TextRecognitionMethodOption? _selectedTextRecognitionMethod;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StartStopButtonText))]
@@ -68,12 +79,16 @@ public partial class MainViewModel : ObservableRecipient
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,
         IInfoOverlayService infoOverlayService,
+        ITextRecognitionService textRecognitionService,
         ILogger<MainViewModel> logger)
     {
         _runtimeTaskService = runtimeTaskService;
         _infoOverlayService = infoOverlayService;
+        _textRecognitionService = textRecognitionService;
         _logger = logger;
+        TextRecognitionMethods = _textRecognitionService.GetMethods();
         SelectedCaptureMethod = CaptureMethods[0];
+        SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
     }
@@ -100,9 +115,28 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
+        if (SelectedTextRecognitionMethod is null)
+        {
+            ShowLaunchNotification(
+                InfoBarSeverity.Warning,
+                "缺少配置",
+                "请先选择 OCR 识别方法。");
+            return;
+        }
+
+        if (!SelectedTextRecognitionMethod.IsAvailable)
+        {
+            ShowLaunchNotification(
+                InfoBarSeverity.Warning,
+                "OCR 不可用",
+                SelectedTextRecognitionMethod.UnavailableReason ?? "当前 OCR 识别方法不可用。");
+            return;
+        }
+
         var result = await _runtimeTaskService.StartAsync(new RuntimeTaskStartOptions
         {
             CaptureMethod = SelectedCaptureMethod.Method,
+            TextRecognitionMethod = SelectedTextRecognitionMethod.Method,
             RecognitionOverlayEnabled = IsMaskOverlayEnabled,
             InfoOverlayEnabled = IsInfoOverlayEnabled,
             InfoOverlayLocked = IsInfoOverlayLocked,
@@ -167,6 +201,22 @@ public partial class MainViewModel : ObservableRecipient
         IsLaunchNotificationOpen = true;
 
         _ = AutoCloseLaunchNotificationAsync(_launchNotificationAutoCloseCts.Token);
+    }
+
+    private TextRecognitionMethodOption? GetInitialTextRecognitionMethod()
+    {
+        if (_runtimeTaskService.CurrentState is not null)
+        {
+            var runningMethod = TextRecognitionMethods.FirstOrDefault(
+                method => method.Method == _runtimeTaskService.CurrentState.Options.TextRecognitionMethod);
+            if (runningMethod is not null)
+            {
+                return runningMethod;
+            }
+        }
+
+        return TextRecognitionMethods.FirstOrDefault(method => method.IsAvailable)
+            ?? TextRecognitionMethods.FirstOrDefault();
     }
 
     private async Task AutoCloseLaunchNotificationAsync(CancellationToken cancellationToken)

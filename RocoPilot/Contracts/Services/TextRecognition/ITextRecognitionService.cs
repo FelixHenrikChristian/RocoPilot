@@ -6,6 +6,8 @@ public interface ITextRecognitionService
 {
     IReadOnlyList<TextRecognitionMethodOption> GetMethods();
 
+    TextRecognitionMethodOption? GetDefaultMethod();
+
     Task<TextRecognitionResult> RecognizeAsync(
         byte[] imageBytes,
         TextRecognitionMethod method,

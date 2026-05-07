@@ -93,6 +93,7 @@ public partial class App : Application
             services.AddSingleton<IPageService, PageService>();
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IGameWindowService, GameWindowService>();
+            services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
             services.AddSingleton<IRuntimeTaskService, RuntimeTaskService>();
             services.AddSingleton<IRecognitionOverlayService, RecognitionOverlayService>();
             services.AddSingleton<IInfoOverlayService, InfoOverlayService>();

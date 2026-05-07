@@ -116,6 +116,151 @@
                     </Grid>
                 </StackPanel>
             </Expander>
+
+            <Expander Style="{StaticResource CardExpanderStyle}">
+                <Expander.Header>
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="20"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            Glyph="&#xE768;" />
+
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="3">
+                            <TextBlock
+                                FontWeight="SemiBold"
+                                Text="自动战斗"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="进入战斗技能选择时，按配置自动释放技能。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ToggleSwitch
+                            Grid.Column="2"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            IsOn="{x:Bind ViewModel.IsAutoBattleEnabled, Mode=TwoWay}"
+                            OffContent=""
+                            OnContent="" />
+                    </Grid>
+                </Expander.Header>
+
+                <StackPanel Spacing="0">
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE7C3;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="当前状态" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="默认关闭；开关状态和按键配置会自动保存。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <TextBlock
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            FontWeight="SemiBold"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="{x:Bind ViewModel.AutoBattleStatus, Mode=OneWay}" />
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8AB;" />
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <TextBlock Text="回合顺序" TextWrapping="Wrap" />
+                            <TextBox
+                                Header="按键列表"
+                                PlaceholderText="1, 4, 3, X, 2"
+                                Text="{x:Bind ViewModel.AutoBattleRoundOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="只会读取 1、2、3、4、X；战斗开始后从第一个开始循环。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE7C1;" />
+                        <StackPanel
+                            Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <TextBlock Text="单回合执行序列" TextWrapping="Wrap" />
+                            <TextBox
+                                Header="按键序列"
+                                PlaceholderText="R, {skill}, Space"
+                                Text="{x:Bind ViewModel.AutoBattleTurnSequence, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{}{skill} 会替换为本回合顺序选中的按键；不填占位符时会按原序列执行。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Expander>
         </StackPanel>
     </ScrollViewer>
 </Page>

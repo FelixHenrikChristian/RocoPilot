@@ -19,6 +19,11 @@ public interface IRuntimeTaskService
         get;
     }
 
+    AutoBattleSettings AutoBattleSettings
+    {
+        get;
+    }
+
     Task<RuntimeTaskStartResult> StartAsync(
         RuntimeTaskStartOptions options,
         CancellationToken cancellationToken = default);
@@ -26,6 +31,8 @@ public interface IRuntimeTaskService
     Task LoadSettingsAsync(CancellationToken cancellationToken = default);
 
     void SetEncounterStatisticsEnabled(bool isEnabled);
+
+    void SetAutoBattleSettings(AutoBattleSettings settings);
 
     Task StopAsync();
 }

@@ -47,9 +47,9 @@ public sealed class RuntimeTaskStartOptions
         init;
     }
 
-    public bool AutoBattleEnabled
+    public AutoBattleSettings AutoBattleSettings
     {
         get;
         init;
-    }
+    } = AutoBattleSettings.CreateDefault();
 }

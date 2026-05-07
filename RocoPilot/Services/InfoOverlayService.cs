@@ -62,7 +62,7 @@ public sealed class InfoOverlayService : IInfoOverlayService
                 state.TargetWindow,
                 state.Options.InfoOverlayLocked,
                 state.Options.PollutionCounterEnabled,
-                state.Options.AutoBattleEnabled);
+                state.Options.AutoBattleSettings.IsEnabled);
             _overlayWindow.Closed += (_, _) => _overlayWindow = null;
             _overlayWindow.UpdateSnapshot(InfoOverlaySnapshot.CreateInitial(state.StartedAt));
             _overlayWindow.ShowOverlay();

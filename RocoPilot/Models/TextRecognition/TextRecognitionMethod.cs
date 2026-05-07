@@ -2,5 +2,7 @@ namespace RocoPilot.Models.TextRecognition;
 
 public enum TextRecognitionMethod
 {
-    WindowsOcr
+    WindowsOcr,
+    PaddleOcrV5,
+    TesseractOcr
 }

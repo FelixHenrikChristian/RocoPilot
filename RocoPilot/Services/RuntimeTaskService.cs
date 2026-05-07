@@ -33,7 +33,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
     private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan EncounterScanInterval = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(6);
     private static readonly string[] MagicPointRegionIds =
     [
         "magic-point"

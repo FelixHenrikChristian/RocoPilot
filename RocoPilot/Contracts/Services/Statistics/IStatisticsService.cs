@@ -26,6 +26,41 @@ public interface IStatisticsService
         string spiritName,
         DateTimeOffset capturedAt);
 
+    Task<StatisticsDocument> UpsertEncounterAsync(
+        string seasonId,
+        string spiritName,
+        int count,
+        DateTimeOffset countedAt);
+
+    Task<StatisticsDocument> EditEncounterAsync(
+        string seasonId,
+        string originalName,
+        string nextName,
+        int nextCount,
+        DateTimeOffset editedAt);
+
+    Task<StatisticsDocument> DeleteEncounterAsync(
+        string seasonId,
+        string spiritName);
+
+    Task<StatisticsDocument> AddShinyCapturesAsync(
+        string seasonId,
+        string spiritName,
+        int count,
+        DateTimeOffset capturedAt);
+
+    Task<StatisticsDocument> EditShinyCapturesAsync(
+        string? seasonId,
+        string originalName,
+        string nextName,
+        int nextCount,
+        string addSeasonId,
+        DateTimeOffset capturedAt);
+
+    Task<StatisticsDocument> DeleteShinyCapturesAsync(
+        string? seasonId,
+        string spiritName);
+
     IReadOnlyList<EncounterSpiritRecord> GetSelectedAccountSeasonEncounters(string seasonId);
 
     void SetSelectedAccountUid(string? uid);

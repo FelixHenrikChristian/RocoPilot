@@ -74,7 +74,7 @@ public partial class MainViewModel : ObservableRecipient
 
     public string StartStopButtonText => IsRealtimeCaptureRunning ? "停止" : "启动";
 
-    public string StartStopButtonGlyph => IsRealtimeCaptureRunning ? "\uE71A" : "\uE768";
+    public string StartStopButtonGlyph => IsRealtimeCaptureRunning ? "\uF2D9" : "\uE768";
 
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,

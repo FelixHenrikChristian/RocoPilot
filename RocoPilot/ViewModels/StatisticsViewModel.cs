@@ -8,6 +8,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services.Statistics;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.ViewModels;
@@ -71,7 +72,11 @@ public partial class StatisticsViewModel : ObservableRecipient
             var nextIndex = Seasons.Count == 0
                 ? 0
                 : Math.Clamp(value, 0, Seasons.Count - 1);
-            SetProperty(ref _selectedSeasonIndex, nextIndex);
+            if (SetProperty(ref _selectedSeasonIndex, nextIndex))
+            {
+                OnPropertyChanged(nameof(SelectedSeason));
+                OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
+            }
         }
     }
 
@@ -85,6 +90,8 @@ public partial class StatisticsViewModel : ObservableRecipient
                 : Math.Clamp(value, 0, ShinyScopes.Count - 1);
             if (SetProperty(ref _selectedShinyScopeIndex, nextIndex))
             {
+                OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
+                OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
                 NotifySelectedShinyChanged();
             }
         }
@@ -113,6 +120,16 @@ public partial class StatisticsViewModel : ObservableRecipient
         get => _seasons;
         private set => SetProperty(ref _seasons, value);
     }
+
+    public SeasonStatisticsGroup? SelectedSeason => Seasons.ElementAtOrDefault(SelectedSeasonIndex);
+
+    public string? SelectedShinyScopeSeasonId => SelectedShinyScopeIndex == 0
+        ? null
+        : Seasons.ElementAtOrDefault(SelectedShinyScopeIndex - 1)?.Id;
+
+    public string? DefaultShinyAddSeasonId => SelectedShinyScopeSeasonId
+        ?? SelectedSeason?.Id
+        ?? Seasons.FirstOrDefault()?.Id;
 
     private bool _isNotificationOpen;
     private InfoBarSeverity _notificationSeverity = InfoBarSeverity.Informational;
@@ -247,6 +264,85 @@ public partial class StatisticsViewModel : ObservableRecipient
         ShowNotification(InfoBarSeverity.Success, "已清空", "已清空所有账号和统计记录。");
     }
 
+    public async Task<bool> AddEncounterAsync(string seasonId, string name, int count)
+    {
+        name = CleanSpiritName(name);
+        if (!ValidateStatisticInput(seasonId, name, count))
+        {
+            return false;
+        }
+
+        ApplyDocument(await _statisticsService.UpsertEncounterAsync(seasonId, name, count, DateTimeOffset.Now));
+        ShowNotification(InfoBarSeverity.Success, "已添加奇遇", $"已添加 {name} x{count}。");
+        return true;
+    }
+
+    public async Task<bool> EditEncounterAsync(string seasonId, SpiritCountItem item, string nextName, int nextCount)
+    {
+        nextName = CleanSpiritName(nextName);
+        if (!ValidateStatisticInput(seasonId, nextName, nextCount))
+        {
+            return false;
+        }
+
+        ApplyDocument(await _statisticsService.EditEncounterAsync(
+            seasonId,
+            item.Name,
+            nextName,
+            nextCount,
+            DateTimeOffset.Now));
+        ShowNotification(InfoBarSeverity.Success, "已更新奇遇", $"已更新 {nextName}。");
+        return true;
+    }
+
+    public async Task DeleteEncounterAsync(string seasonId, SpiritCountItem item)
+    {
+        ApplyDocument(await _statisticsService.DeleteEncounterAsync(seasonId, item.Name));
+        ShowNotification(InfoBarSeverity.Success, "已删除奇遇", $"已删除 {item.Name}。");
+    }
+
+    public async Task<bool> AddShinyAsync(string? seasonId, string name, int count)
+    {
+        seasonId = string.IsNullOrWhiteSpace(seasonId) ? DefaultShinyAddSeasonId : seasonId.Trim();
+        name = CleanSpiritName(name);
+        if (!ValidateStatisticInput(seasonId, name, count))
+        {
+            return false;
+        }
+
+        ApplyDocument(await _statisticsService.AddShinyCapturesAsync(seasonId!, name, count, DateTimeOffset.Now));
+        ShowNotification(InfoBarSeverity.Success, "已添加异色", $"已添加 {name} x{count}。");
+        return true;
+    }
+
+    public async Task<bool> EditShinyAsync(SpiritCountItem item, string nextName, int nextCount)
+    {
+        var addSeasonId = string.IsNullOrWhiteSpace(item.Season)
+            ? DefaultShinyAddSeasonId
+            : item.Season;
+        nextName = CleanSpiritName(nextName);
+        if (!ValidateStatisticInput(addSeasonId, nextName, nextCount))
+        {
+            return false;
+        }
+
+        ApplyDocument(await _statisticsService.EditShinyCapturesAsync(
+            SelectedShinyScopeSeasonId,
+            item.Name,
+            nextName,
+            nextCount,
+            addSeasonId!,
+            DateTimeOffset.Now));
+        ShowNotification(InfoBarSeverity.Success, "已更新异色", $"已更新 {nextName}。");
+        return true;
+    }
+
+    public async Task DeleteShinyAsync(SpiritCountItem item)
+    {
+        ApplyDocument(await _statisticsService.DeleteShinyCapturesAsync(SelectedShinyScopeSeasonId, item.Name));
+        ShowNotification(InfoBarSeverity.Success, "已删除异色", $"已删除 {item.Name}。");
+    }
+
     public void ShowExported(string path)
     {
         ShowNotification(InfoBarSeverity.Success, "导出完成", path);
@@ -308,6 +404,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         SelectedSeasonIndex = Math.Min(SelectedSeasonIndex, Math.Max(0, Seasons.Count - 1));
         SelectedShinyScopeIndex = Math.Min(SelectedShinyScopeIndex, Math.Max(0, ShinyScopes.Count - 1));
 
+        OnPropertyChanged(nameof(SelectedSeason));
+        OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
+        OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
         OnPropertyChanged(nameof(TotalAllShiny));
         NotifySelectedShinyChanged();
     }
@@ -380,6 +479,40 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SelectedShinyCounts));
         OnPropertyChanged(nameof(TotalSelectedShiny));
         OnPropertyChanged(nameof(SelectedShinyDateDisplay));
+    }
+
+    private bool ValidateStatisticInput(string? seasonId, string name, int count)
+    {
+        if (SelectedAccount is null)
+        {
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先添加或选择账号。");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(seasonId))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先选择一个赛季。");
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空，且只能包含中文、英文和短横线。");
+            return false;
+        }
+
+        if (count <= 0)
+        {
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "计数必须大于 0。");
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string CleanSpiritName(string name)
+    {
+        return TextMatchingHelper.CleanSpiritName(name);
     }
 
     private void ShowNotification(InfoBarSeverity severity, string title, string message)

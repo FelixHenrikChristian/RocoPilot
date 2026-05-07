@@ -16,7 +16,10 @@
         </Style>
 
         <DataTemplate x:Key="PollutionCountRowTemplate">
-            <Grid MinHeight="32" ColumnSpacing="8">
+            <Grid
+                MinHeight="32"
+                ColumnSpacing="8"
+                RightTapped="PollutionCountItem_RightTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="28" />
                     <ColumnDefinition Width="*" />
@@ -74,7 +77,10 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ShinyCountRowTemplate">
-            <Grid MinHeight="32" ColumnSpacing="8">
+            <Grid
+                MinHeight="32"
+                ColumnSpacing="8"
+                RightTapped="ShinyCountItem_RightTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="28" />
                     <ColumnDefinition Width="*" />
@@ -300,6 +306,7 @@
                         Grid.Row="2"
                         HorizontalScrollBarVisibility="Disabled"
                         HorizontalScrollMode="Disabled"
+                        RightTapped="ShinyBlank_RightTapped"
                         VerticalScrollBarVisibility="Hidden"
                         ViewChanged="CardScrollViewer_ViewChanged"
                         ViewChanging="CardScrollViewer_ViewChanging"
@@ -384,6 +391,7 @@
                                     Grid.Row="2"
                                     HorizontalScrollBarVisibility="Disabled"
                                     HorizontalScrollMode="Disabled"
+                                    RightTapped="PollutionBlank_RightTapped"
                                     VerticalScrollBarVisibility="Hidden"
                                     ViewChanged="CardScrollViewer_ViewChanged"
                                     ViewChanging="CardScrollViewer_ViewChanging"

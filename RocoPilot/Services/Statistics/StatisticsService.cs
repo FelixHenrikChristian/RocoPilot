@@ -165,6 +165,290 @@ public sealed class StatisticsService : IStatisticsService
         return changedDocument;
     }
 
+    public async Task<StatisticsDocument> UpsertEncounterAsync(
+        string seasonId,
+        string spiritName,
+        int count,
+        DateTimeOffset countedAt)
+    {
+        seasonId = seasonId.Trim();
+        spiritName = spiritName.Trim();
+        count = Math.Max(0, count);
+        if (string.IsNullOrWhiteSpace(seasonId)
+            || string.IsNullOrWhiteSpace(spiritName)
+            || count <= 0)
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            var seasonData = ResolveSeason(account, seasonId);
+            var record = seasonData.Encounters.FirstOrDefault(item =>
+                string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            if (record is null)
+            {
+                seasonData.Encounters.Add(new EncounterSpiritRecord
+                {
+                    Name = spiritName,
+                    Count = count,
+                    Season = seasonId,
+                    LastCapturedAt = countedAt
+                });
+            }
+            else
+            {
+                record.Count += count;
+                record.Season = seasonId;
+                record.LastCapturedAt = Max(record.LastCapturedAt, countedAt);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> EditEncounterAsync(
+        string seasonId,
+        string originalName,
+        string nextName,
+        int nextCount,
+        DateTimeOffset editedAt)
+    {
+        seasonId = seasonId.Trim();
+        originalName = originalName.Trim();
+        nextName = nextName.Trim();
+        nextCount = Math.Max(0, nextCount);
+        if (string.IsNullOrWhiteSpace(seasonId)
+            || string.IsNullOrWhiteSpace(originalName)
+            || string.IsNullOrWhiteSpace(nextName)
+            || nextCount <= 0)
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            var seasonData = account?.Seasons.FirstOrDefault(item =>
+                string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
+            var originalRecord = seasonData?.Encounters.FirstOrDefault(item =>
+                string.Equals(item.Name, originalName, StringComparison.OrdinalIgnoreCase));
+            if (seasonData is null || originalRecord is null)
+            {
+                return _document;
+            }
+
+            var isRenamed = !string.Equals(originalName, nextName, StringComparison.OrdinalIgnoreCase);
+            var editedRecordTime = isRenamed ? editedAt : originalRecord.LastCapturedAt;
+            var targetRecord = seasonData.Encounters.FirstOrDefault(item =>
+                !ReferenceEquals(item, originalRecord)
+                && string.Equals(item.Name, nextName, StringComparison.OrdinalIgnoreCase));
+
+            if (targetRecord is null)
+            {
+                originalRecord.Name = nextName;
+                originalRecord.Count = nextCount;
+                originalRecord.Season = seasonId;
+                originalRecord.LastCapturedAt = editedRecordTime;
+            }
+            else
+            {
+                targetRecord.Count += nextCount;
+                targetRecord.Season = seasonId;
+                targetRecord.LastCapturedAt = Max(targetRecord.LastCapturedAt, editedRecordTime);
+                seasonData.Encounters.Remove(originalRecord);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> DeleteEncounterAsync(string seasonId, string spiritName)
+    {
+        seasonId = seasonId.Trim();
+        spiritName = spiritName.Trim();
+        if (string.IsNullOrWhiteSpace(seasonId) || string.IsNullOrWhiteSpace(spiritName))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            var seasonData = account?.Seasons.FirstOrDefault(item =>
+                string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
+            var record = seasonData?.Encounters.FirstOrDefault(item =>
+                string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            if (seasonData is not null && record is not null)
+            {
+                seasonData.Encounters.Remove(record);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> AddShinyCapturesAsync(
+        string seasonId,
+        string spiritName,
+        int count,
+        DateTimeOffset capturedAt)
+    {
+        seasonId = seasonId.Trim();
+        spiritName = spiritName.Trim();
+        count = Math.Max(0, count);
+        if (string.IsNullOrWhiteSpace(seasonId)
+            || string.IsNullOrWhiteSpace(spiritName)
+            || count <= 0)
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            var seasonData = ResolveSeason(account, seasonId);
+            for (var index = 0; index < count; index++)
+            {
+                seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
+                {
+                    Name = spiritName,
+                    Season = seasonId,
+                    CapturedAt = capturedAt
+                });
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> EditShinyCapturesAsync(
+        string? seasonId,
+        string originalName,
+        string nextName,
+        int nextCount,
+        string addSeasonId,
+        DateTimeOffset capturedAt)
+    {
+        seasonId = string.IsNullOrWhiteSpace(seasonId) ? null : seasonId.Trim();
+        originalName = originalName.Trim();
+        nextName = nextName.Trim();
+        addSeasonId = addSeasonId.Trim();
+        nextCount = Math.Max(0, nextCount);
+        if (string.IsNullOrWhiteSpace(originalName)
+            || string.IsNullOrWhiteSpace(nextName)
+            || string.IsNullOrWhiteSpace(addSeasonId)
+            || nextCount <= 0)
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            var originalCaptures = GetShinyCaptures(account, seasonId, originalName).ToList();
+            if (originalCaptures.Count == 0)
+            {
+                return _document;
+            }
+
+            if (nextCount < originalCaptures.Count)
+            {
+                foreach (var capture in originalCaptures
+                    .OrderByDescending(capture => capture.CapturedAt)
+                    .Take(originalCaptures.Count - nextCount)
+                    .ToList())
+                {
+                    RemoveShinyCapture(account, capture);
+                }
+            }
+            else if (nextCount > originalCaptures.Count)
+            {
+                var addSeason = ResolveSeason(account, addSeasonId);
+                for (var index = 0; index < nextCount - originalCaptures.Count; index++)
+                {
+                    addSeason.ShinyCaptures.Add(new ShinySpiritCaptureRecord
+                    {
+                        Name = originalName,
+                        Season = addSeasonId,
+                        CapturedAt = capturedAt
+                    });
+                }
+            }
+
+            foreach (var capture in GetShinyCaptures(account, seasonId, originalName).ToList())
+            {
+                capture.Name = nextName;
+                if (string.IsNullOrWhiteSpace(capture.Season))
+                {
+                    capture.Season = addSeasonId;
+                }
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> DeleteShinyCapturesAsync(string? seasonId, string spiritName)
+    {
+        seasonId = string.IsNullOrWhiteSpace(seasonId) ? null : seasonId.Trim();
+        spiritName = spiritName.Trim();
+        if (string.IsNullOrWhiteSpace(spiritName))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            foreach (var capture in GetShinyCaptures(account, seasonId, spiritName).ToList())
+            {
+                RemoveShinyCapture(account, capture);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
     public void SetSelectedAccountUid(string? uid)
     {
         var nextUid = string.IsNullOrWhiteSpace(uid) ? null : uid.Trim();
@@ -326,6 +610,53 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return seasonData;
+    }
+
+    private static SeasonStatisticsData ResolveSeason(AccountStatisticsData account, string seasonId)
+    {
+        seasonId = seasonId.Trim();
+        var seasonData = account.Seasons.FirstOrDefault(item =>
+            string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
+        if (seasonData is not null)
+        {
+            return seasonData;
+        }
+
+        seasonData = new SeasonStatisticsData
+        {
+            Id = seasonId,
+            Name = $"{seasonId}赛季"
+        };
+        account.Seasons.Add(seasonData);
+        return seasonData;
+    }
+
+    private static IEnumerable<ShinySpiritCaptureRecord> GetShinyCaptures(
+        AccountStatisticsData account,
+        string? seasonId,
+        string spiritName)
+    {
+        return account.Seasons
+            .Where(season => string.IsNullOrWhiteSpace(seasonId)
+                || string.Equals(season.Id, seasonId, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(season => season.ShinyCaptures)
+            .Where(capture => string.Equals(capture.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void RemoveShinyCapture(AccountStatisticsData account, ShinySpiritCaptureRecord capture)
+    {
+        foreach (var season in account.Seasons)
+        {
+            if (season.ShinyCaptures.Remove(capture))
+            {
+                return;
+            }
+        }
+    }
+
+    private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right)
+    {
+        return left >= right ? left : right;
     }
 
     private static StatisticsDocument NormalizeDocument(StatisticsDocument document)

@@ -674,7 +674,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             frame,
             BattleEnemyNameRegionIds,
             cancellationToken);
-        var enemyName = TextMatchingHelper.CleanRecognizedText(enemyNameText);
+        var enemyName = TextMatchingHelper.CleanSpiritName(enemyNameText);
         if (string.IsNullOrWhiteSpace(enemyName))
         {
             _logger.LogDebug("已匹配奇遇提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}", similarity);

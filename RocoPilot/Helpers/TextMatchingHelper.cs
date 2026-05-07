@@ -35,6 +35,29 @@ public static class TextMatchingHelper
         return builder.ToString();
     }
 
+    public static string CleanSpiritName(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return string.Empty;
+        }
+
+        var normalized = text.Normalize(NormalizationForm.FormKC);
+        var builder = new StringBuilder(normalized.Length);
+
+        foreach (var character in normalized)
+        {
+            if (IsChineseCharacter(character)
+                || IsAsciiLetter(character)
+                || character == '-')
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
+
     public static bool IsSimilar(
         string? actual,
         string? expected,
@@ -95,6 +118,19 @@ public static class TextMatchingHelper
             or UnicodeCategory.DecimalDigitNumber
             or UnicodeCategory.LetterNumber
             or UnicodeCategory.OtherNumber;
+    }
+
+    private static bool IsChineseCharacter(char character)
+    {
+        return character is >= '\u4E00' and <= '\u9FFF'
+            or >= '\u3400' and <= '\u4DBF'
+            or >= '\uF900' and <= '\uFAFF';
+    }
+
+    private static bool IsAsciiLetter(char character)
+    {
+        return character is >= 'A' and <= 'Z'
+            or >= 'a' and <= 'z';
     }
 
     private static double CalculateNormalizedLevenshteinSimilarity(string source, string target)

@@ -138,10 +138,10 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private int _autoBattleRoundIndex;
     private bool _wasAutoBattleSkillSelectionVisible;
     private bool _wasAutoBattlePetSwitchingVisible;
-    private bool _pendingAutoBattleRoundAdvance;
     private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
     private string? _currentAutoBattleSkillSelectionKey;
+    private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
@@ -498,8 +498,8 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 切换精灵",
                 DateTimeOffset.Now));
+            CompleteAutoBattleSkillSelectionState();
             await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
-            ResetAutoBattleSkillSelectionState();
             return GameStateScanResult.Battle;
         }
 
@@ -520,17 +520,21 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             return GameStateScanResult.Battle;
         }
 
-        ResetAutoBattleSkillSelectionState();
-
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
-            await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
+            var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
+            if (!recoveredEnergy)
+            {
+                CompleteAutoBattleSkillSelectionState();
+            }
+
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中",
                 DateTimeOffset.Now));
             return GameStateScanResult.Battle;
         }
 
+        CompleteAutoBattleSkillSelectionState();
         ResetAutoBattleBattleState();
         return await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
     }
@@ -696,8 +700,8 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             _wasAutoBattleSkillSelectionVisible = true;
             _autoBattleSkillSelectionVisibleSince = now;
             _lastAutoBattleSkillSelectionActionAt = null;
-            AdvanceAutoBattleRoundIfPending();
             _currentAutoBattleSkillSelectionKey = GetCurrentAutoBattleSkillKey(settings);
+            _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
             return;
         }
 
@@ -719,8 +723,12 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 return;
             }
 
+            var isRetryingEnergyRecovery =
+                _autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.EnergyRecovery;
             var skillKey = _currentAutoBattleSkillSelectionKey ?? GetCurrentAutoBattleSkillKey(settings);
-            var sequence = BuildAutoBattleTurnSequence(settings, skillKey);
+            var sequence = isRetryingEnergyRecovery
+                ? "X"
+                : BuildAutoBattleTurnSequence(settings, skillKey);
             if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
                 || keyStrokes.Count == 0)
             {
@@ -745,13 +753,16 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
                 AutoBattleKeyboardInputOptions,
                 cancellationToken);
 
-            _pendingAutoBattleRoundAdvance = true;
+            _autoBattleSkillSelectionAction = isRetryingEnergyRecovery
+                ? AutoBattleSkillSelectionAction.EnergyRecovery
+                : AutoBattleSkillSelectionAction.Skill;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
             _logger.LogInformation(
-                "自动战斗已执行：SkillKey={SkillKey}, Sequence={Sequence}",
+                "自动战斗已执行：SkillKey={SkillKey}, Sequence={Sequence}, Action={Action}",
                 skillKey,
-                sequence);
+                sequence,
+                _autoBattleSkillSelectionAction);
         }
         catch (OperationCanceledException)
         {
@@ -770,8 +781,6 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         RuntimeTaskState state,
         CancellationToken cancellationToken)
     {
-        AdvanceAutoBattleRoundIfPending();
-
         if (!_autoBattleSettings.IsEnabled)
         {
             _wasAutoBattlePetSwitchingVisible = true;
@@ -851,7 +860,8 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        if (!_autoBattleSettings.IsEnabled || !_pendingAutoBattleRoundAdvance)
+        if (!_autoBattleSettings.IsEnabled
+            || _autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.Skill)
         {
             return false;
         }
@@ -871,7 +881,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             return false;
         }
 
-        _pendingAutoBattleRoundAdvance = false;
+        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
         _logger.LogInformation("自动战斗检测到能量不足，已立即按 X 回复能量。");
         return true;
     }
@@ -985,15 +995,14 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             : turnSequence;
     }
 
-    private void AdvanceAutoBattleRoundIfPending()
+    private void CompleteAutoBattleSkillSelectionState()
     {
-        if (!_pendingAutoBattleRoundAdvance)
+        if (_autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.Skill)
         {
-            return;
+            _autoBattleRoundIndex++;
         }
 
-        _autoBattleRoundIndex++;
-        _pendingAutoBattleRoundAdvance = false;
+        ResetAutoBattleSkillSelectionState();
     }
 
     private bool ShouldRunAutoBattleSkillSelectionAction(DateTimeOffset now)
@@ -1034,7 +1043,6 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         _autoBattleRoundIndex = 0;
         ResetAutoBattleSkillSelectionState();
         _wasAutoBattlePetSwitchingVisible = false;
-        _pendingAutoBattleRoundAdvance = false;
     }
 
     private void ResetAutoBattleSkillSelectionState()
@@ -1043,6 +1051,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         _autoBattleSkillSelectionVisibleSince = null;
         _lastAutoBattleSkillSelectionActionAt = null;
         _currentAutoBattleSkillSelectionKey = null;
+        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
     }
 
     private async Task<GameStateScanResult> UpdateMagicPointSnapshotAsync(
@@ -1484,5 +1493,12 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         Battle,
         NonBattle,
         UnrecognizedPending
+    }
+
+    private enum AutoBattleSkillSelectionAction
+    {
+        None,
+        Skill,
+        EnergyRecovery
     }
 }

@@ -15,6 +15,8 @@ public partial class RealtimeViewModel : ObservableRecipient
     private bool _isAutoBattleEnabled;
     private string _autoBattleRoundOrder = AutoBattleSettings.DefaultRoundOrder;
     private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
+    private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
+    private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
 
     public bool IsEncounterStatisticsEnabled
     {
@@ -95,6 +97,10 @@ public partial class RealtimeViewModel : ObservableRecipient
         ? "已开启"
         : "已关闭";
 
+    public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(_autoBattleReleaseSequence);
+
+    public AutoBattleSettings AutoBattleSettings => BuildAutoBattleSettings();
+
     public RealtimeViewModel(
         IRuntimeTaskService runtimeTaskService,
         IEncounterSeasonConfigService encounterSeasonConfigService)
@@ -117,20 +123,58 @@ public partial class RealtimeViewModel : ObservableRecipient
         _isAutoBattleEnabled = settings.IsEnabled;
         _autoBattleRoundOrder = settings.RoundOrder;
         _autoBattleTurnSequence = settings.TurnSequence;
+        _autoBattleReleaseSequence = (settings.ReleaseSequence ?? []).Select(step => step.Clone()).ToList();
+        _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(AutoBattleRoundOrder));
         OnPropertyChanged(nameof(AutoBattleTurnSequence));
         OnPropertyChanged(nameof(AutoBattleStatus));
+        OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+        OnPropertyChanged(nameof(AutoBattleSettings));
+    }
+
+    public void UpdateAutoBattleSettings(AutoBattleSettings settings)
+    {
+        ApplyAutoBattleSettings(settings.Clone());
+        SaveAutoBattleSettings();
     }
 
     private void SaveAutoBattleSettings()
     {
-        _runtimeTaskService.SetAutoBattleSettings(new AutoBattleSettings
+        _runtimeTaskService.SetAutoBattleSettings(BuildAutoBattleSettings());
+        OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+        OnPropertyChanged(nameof(AutoBattleSettings));
+    }
+
+    private AutoBattleSettings BuildAutoBattleSettings()
+    {
+        return new AutoBattleSettings
         {
             IsEnabled = IsAutoBattleEnabled,
             RoundOrder = AutoBattleRoundOrder,
-            TurnSequence = AutoBattleTurnSequence
-        });
+            TurnSequence = AutoBattleTurnSequence,
+            ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
+            TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList()
+        };
+    }
+
+    private static string BuildAutoBattleConfigurationSummary(IReadOnlyList<AutoBattleReleaseStep> releaseSequence)
+    {
+        if (releaseSequence.Count == 0)
+        {
+            return "未配置释放顺序";
+        }
+
+        var previewItems = releaseSequence
+            .Take(6)
+            .Select(step => step.IsCustom
+                ? $"[{(string.IsNullOrWhiteSpace(step.Name) ? "自定义" : step.Name)}]"
+                : step.SkillKey);
+        var preview = string.Join(" → ", previewItems);
+        var suffix = releaseSequence.Count > 6
+            ? $"等 {releaseSequence.Count} 步"
+            : $"{releaseSequence.Count} 步";
+        return $"{preview} · {suffix}";
     }
 }

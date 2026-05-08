@@ -2,11 +2,14 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.ViewModels;
+using RocoPilot.Views.Windows;
 
 namespace RocoPilot.Views;
 
 public sealed partial class RealtimePage : Page
 {
+    private AutoBattleConfigWindow? _autoBattleConfigWindow;
+
     public RealtimeViewModel ViewModel
     {
         get;
@@ -23,5 +26,18 @@ public sealed partial class RealtimePage : Page
     {
         Loaded -= RealtimePage_Loaded;
         await ViewModel.LoadAsync();
+    }
+
+    private void ConfigureAutoBattleButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_autoBattleConfigWindow is not null)
+        {
+            _autoBattleConfigWindow.Activate();
+            return;
+        }
+
+        _autoBattleConfigWindow = new AutoBattleConfigWindow(ViewModel);
+        _autoBattleConfigWindow.Closed += (_, _) => _autoBattleConfigWindow = null;
+        _autoBattleConfigWindow.Activate();
     }
 }

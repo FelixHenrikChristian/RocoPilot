@@ -202,6 +202,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <FontIcon
                             Grid.Column="0"
@@ -210,54 +211,29 @@
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE8AB;" />
-                        <StackPanel
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Spacing="8">
-                            <TextBlock Text="回合顺序" TextWrapping="Wrap" />
-                            <TextBox
-                                Header="按键列表"
-                                PlaceholderText="1, 4, 3, X, 2"
-                                Text="{x:Bind ViewModel.AutoBattleRoundOrder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="战斗配置" TextWrapping="Wrap" />
                             <TextBlock
+                                Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="只会读取 1、2、3、4、X；战斗开始后从第一个开始循环。"
-                                TextWrapping="Wrap" />
+                                Text="{x:Bind ViewModel.AutoBattleConfigurationSummary, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
                         </StackPanel>
-                    </Grid>
-
-                    <Border
-                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0" />
-
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon
-                            Grid.Column="0"
+                        <Button
+                            Grid.Column="2"
+                            HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="18"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE7C1;" />
-                        <StackPanel
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            Spacing="8">
-                            <TextBlock Text="单回合执行序列" TextWrapping="Wrap" />
-                            <TextBox
-                                Header="按键序列"
-                                PlaceholderText="R, {skill}, Space"
-                                Text="{x:Bind ViewModel.AutoBattleTurnSequence, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{}{skill} 会替换为本回合顺序选中的按键；不填占位符时会按原序列执行。"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
+                            Click="ConfigureAutoBattleButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE713;" />
+                                <TextBlock Text="配置" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
                 </StackPanel>
             </Expander>

@@ -79,7 +79,7 @@ public sealed partial class RuntimeTaskService
     private bool _wasAutoBattlePetSwitchingVisible;
     private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
-    private string? _currentAutoBattleSkillSelectionKey;
+    private AutoBattleReleaseStep? _currentAutoBattleReleaseStep;
     private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
@@ -178,12 +178,12 @@ public sealed partial class RuntimeTaskService
             _wasAutoBattleSkillSelectionVisible = true;
             _autoBattleSkillSelectionVisibleSince = now;
             _lastAutoBattleSkillSelectionActionAt = null;
-            _currentAutoBattleSkillSelectionKey = GetCurrentAutoBattleSkillKey(settings);
+            _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
             _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
             _logger.LogDebug(
-                "自动战斗：检测到技能选择界面，等待 {DelayMs}ms 后执行。SkillKey={SkillKey}, RoundIndex={RoundIndex}",
+                "自动战斗：检测到技能选择界面，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
                 AutoBattleSkillSelectionActionDelay.TotalMilliseconds,
-                _currentAutoBattleSkillSelectionKey,
+                GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep),
                 _autoBattleRoundIndex);
             return;
         }
@@ -208,19 +208,20 @@ public sealed partial class RuntimeTaskService
 
             var isRetryingEnergyRecovery =
                 _autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.EnergyRecovery;
-            var skillKey = _currentAutoBattleSkillSelectionKey ?? GetCurrentAutoBattleSkillKey(settings);
+            var releaseStep = _currentAutoBattleReleaseStep ?? GetCurrentAutoBattleReleaseStep(settings);
             var sequence = isRetryingEnergyRecovery
                 ? "X"
-                : BuildAutoBattleTurnSequence(settings, skillKey);
+                : BuildAutoBattleReleaseSequence(settings, releaseStep);
             if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
                 || keyStrokes.Count == 0)
             {
                 _logger.LogWarning(
-                    "自动战斗单回合序列无效，已回退为技能键 {SkillKey}。Sequence={Sequence}, Error={Error}",
-                    skillKey,
+                    "自动战斗单回合序列无效。ReleaseStep={ReleaseStep}, Sequence={Sequence}, Error={Error}",
+                    GetAutoBattleReleaseStepDisplay(releaseStep),
                     sequence,
                     parseError);
-                keyStrokes = _keyboardInputService.TryParseSequence(skillKey, out var fallbackStrokes, out _)
+                keyStrokes = !releaseStep.IsCustom
+                    && _keyboardInputService.TryParseSequence(releaseStep.SkillKey, out var fallbackStrokes, out _)
                     ? fallbackStrokes
                     : [];
             }
@@ -242,15 +243,15 @@ public sealed partial class RuntimeTaskService
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
             var actionText = isRetryingEnergyRecovery ? "按回能键" : "按技能键";
-            var pressedKey = isRetryingEnergyRecovery ? "X" : skillKey;
+            var pressedKey = isRetryingEnergyRecovery ? "X" : GetAutoBattleReleaseStepDisplay(releaseStep);
             _logger.LogInformation(
                 "自动战斗：{Action} {Key}（序列 {Sequence}）",
                 actionText,
                 pressedKey,
                 sequence);
             _logger.LogDebug(
-                "自动战斗按键已发送：SkillKey={SkillKey}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
-                skillKey,
+                "自动战斗按键已发送：ReleaseStep={ReleaseStep}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
+                pressedKey,
                 sequence,
                 _autoBattleSkillSelectionAction,
                 keyStrokes.Count,
@@ -441,15 +442,15 @@ public sealed partial class RuntimeTaskService
             cancellationToken);
     }
 
-    private string GetCurrentAutoBattleSkillKey(AutoBattleSettings settings)
+    private AutoBattleReleaseStep GetCurrentAutoBattleReleaseStep(AutoBattleSettings settings)
     {
-        var roundOrder = ParseAutoBattleRoundOrder(settings.RoundOrder);
-        if (_autoBattleRoundIndex >= roundOrder.Count)
+        var releaseSequence = NormalizeAutoBattleReleaseSequence(settings);
+        if (_autoBattleRoundIndex >= releaseSequence.Count)
         {
             _autoBattleRoundIndex = 0;
         }
 
-        return roundOrder[_autoBattleRoundIndex];
+        return releaseSequence[_autoBattleRoundIndex].Clone();
     }
 
     private static IReadOnlyList<string> ParseAutoBattleRoundOrder(string roundOrder)
@@ -478,6 +479,33 @@ public sealed partial class RuntimeTaskService
         return turnSequence.Contains(AutoBattleSkillPlaceholder, StringComparison.OrdinalIgnoreCase)
             ? turnSequence.Replace(AutoBattleSkillPlaceholder, skillKey, StringComparison.OrdinalIgnoreCase)
             : turnSequence;
+    }
+
+    private static string BuildAutoBattleReleaseSequence(AutoBattleSettings settings, AutoBattleReleaseStep releaseStep)
+    {
+        if (releaseStep.IsCustom)
+        {
+            return releaseStep.Sequence.Trim();
+        }
+
+        return BuildAutoBattleTurnSequence(settings, releaseStep.SkillKey);
+    }
+
+    private static string GetAutoBattleReleaseStepDisplay(AutoBattleReleaseStep? releaseStep)
+    {
+        if (releaseStep is null)
+        {
+            return "-";
+        }
+
+        if (!releaseStep.IsCustom)
+        {
+            return releaseStep.SkillKey;
+        }
+
+        return string.IsNullOrWhiteSpace(releaseStep.Name)
+            ? releaseStep.Sequence
+            : releaseStep.Name;
     }
 
     private void CompleteAutoBattleSkillSelectionState()
@@ -535,7 +563,7 @@ public sealed partial class RuntimeTaskService
         _wasAutoBattleSkillSelectionVisible = false;
         _autoBattleSkillSelectionVisibleSince = null;
         _lastAutoBattleSkillSelectionActionAt = null;
-        _currentAutoBattleSkillSelectionKey = null;
+        _currentAutoBattleReleaseStep = null;
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
     }
 
@@ -552,7 +580,104 @@ public sealed partial class RuntimeTaskService
             normalized.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         }
 
+        normalized.ReleaseSequence = NormalizeAutoBattleReleaseSequence(normalized)
+            .Select(step => step.Clone())
+            .ToList();
+        normalized.TurnSequencePresets = NormalizeAutoBattleTurnSequencePresets(normalized.TurnSequencePresets);
+
         return normalized;
+    }
+
+    private static IReadOnlyList<AutoBattleReleaseStep> NormalizeAutoBattleReleaseSequence(AutoBattleSettings settings)
+    {
+        var releaseSequence = (settings.ReleaseSequence ?? [])
+            .Select(NormalizeAutoBattleReleaseStep)
+            .OfType<AutoBattleReleaseStep>()
+            .ToArray();
+
+        if (releaseSequence.Length > 0
+            && (!IsDefaultAutoBattleReleaseSequence(releaseSequence)
+                || IsDefaultAutoBattleRoundOrder(settings.RoundOrder)))
+        {
+            return releaseSequence;
+        }
+
+        return ParseAutoBattleRoundOrder(settings.RoundOrder)
+            .Select(AutoBattleReleaseStep.CreateSkill)
+            .ToArray();
+    }
+
+    private static bool IsDefaultAutoBattleReleaseSequence(IReadOnlyList<AutoBattleReleaseStep> releaseSequence)
+    {
+        return releaseSequence.Count == AutoBattleDefaultRoundOrder.Length
+            && releaseSequence
+                .Select(step => step.IsCustom ? string.Empty : step.SkillKey)
+                .SequenceEqual(AutoBattleDefaultRoundOrder, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDefaultAutoBattleRoundOrder(string roundOrder)
+    {
+        return ParseAutoBattleRoundOrder(roundOrder)
+            .SequenceEqual(AutoBattleDefaultRoundOrder, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static AutoBattleReleaseStep? NormalizeAutoBattleReleaseStep(AutoBattleReleaseStep? step)
+    {
+        if (step is null)
+        {
+            return null;
+        }
+
+        if (step.IsCustom)
+        {
+            var sequence = step.Sequence?.Trim();
+            if (string.IsNullOrWhiteSpace(sequence))
+            {
+                return null;
+            }
+
+            var name = string.IsNullOrWhiteSpace(step.Name)
+                ? "自定义序列"
+                : step.Name.Trim();
+            return AutoBattleReleaseStep.CreateCustom(name, sequence);
+        }
+
+        var skillKey = NormalizeAutoBattleSkillKey(step.SkillKey);
+        return string.IsNullOrWhiteSpace(skillKey)
+            ? null
+            : AutoBattleReleaseStep.CreateSkill(skillKey);
+    }
+
+    private static List<AutoBattleTurnSequencePreset> NormalizeAutoBattleTurnSequencePresets(
+        IEnumerable<AutoBattleTurnSequencePreset>? presets)
+    {
+        if (presets is null)
+        {
+            return [];
+        }
+
+        return presets
+            .Where(preset => !string.IsNullOrWhiteSpace(preset.Name)
+                && !string.IsNullOrWhiteSpace(preset.Sequence))
+            .Select(preset => new AutoBattleTurnSequencePreset
+            {
+                Name = preset.Name.Trim(),
+                Sequence = preset.Sequence.Trim()
+            })
+            .ToList();
+    }
+
+    private static string? NormalizeAutoBattleSkillKey(string? skillKey)
+    {
+        if (string.IsNullOrWhiteSpace(skillKey))
+        {
+            return null;
+        }
+
+        var normalized = skillKey.Trim().ToUpperInvariant();
+        return normalized is "1" or "2" or "3" or "4" or "X"
+            ? normalized
+            : null;
     }
 
     private enum AutoBattleSkillSelectionAction

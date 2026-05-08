@@ -74,48 +74,12 @@
                             <TextBlock
                                 Margin="0,4,0,0"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="管理日志文件与诊断行为"
+                                Text="管理日志文件"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
                 </Expander.Header>
                 <StackPanel Spacing="0">
-                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="18"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xEBE8;" />
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="诊断模式" TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,2,0,0"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开启后将记录更详细的日志（Debug 级），反馈问题前请先开启并复现"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ToggleSwitch
-                            Grid.Column="2"
-                            MinWidth="0"
-                            HorizontalAlignment="Right"
-                            VerticalAlignment="Center"
-                            IsOn="{x:Bind ViewModel.DiagnosticMode, Mode=TwoWay}"
-                            OffContent=""
-                            OnContent="" />
-                    </Grid>
-
-                    <Border
-                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0" />
-
                     <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

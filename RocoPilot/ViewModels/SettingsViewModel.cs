@@ -9,7 +9,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Settings;
@@ -25,7 +24,6 @@ public partial class SettingsViewModel : ObservableRecipient
     private readonly ILogger<SettingsViewModel> _logger;
 
     private bool _suppressThemeChange;
-    private bool _suppressDiagnosticModePersist;
 
     public ThemeOption[] ThemeOptions { get; } =
     {
@@ -36,9 +34,6 @@ public partial class SettingsViewModel : ObservableRecipient
 
     [ObservableProperty]
     private ThemeOption? _selectedThemeOption;
-
-    [ObservableProperty]
-    private bool _diagnosticMode;
 
     public string AppVersion { get; }
 
@@ -55,17 +50,6 @@ public partial class SettingsViewModel : ObservableRecipient
 
     public async Task LoadAsync()
     {
-        _suppressDiagnosticModePersist = true;
-        try
-        {
-            var savedDiag = await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.DiagnosticMode);
-            DiagnosticMode = savedDiag ?? false;
-        }
-        finally
-        {
-            _suppressDiagnosticModePersist = false;
-        }
-
         _suppressThemeChange = true;
         try
         {
@@ -91,18 +75,6 @@ public partial class SettingsViewModel : ObservableRecipient
     private async Task ApplyThemeAsync(ThemeOption option)
     {
         await _themeSelectorService.SetThemeAsync(ElementThemeFromKey(option.ThemeKey));
-    }
-
-    partial void OnDiagnosticModeChanged(bool value)
-    {
-        LoggingHelper.SetDiagnosticMode(value);
-
-        if (_suppressDiagnosticModePersist)
-        {
-            return;
-        }
-
-        _ = _localSettingsService.SaveSettingAsync(SettingsKeys.DiagnosticMode, value);
     }
 
     [RelayCommand]

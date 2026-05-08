@@ -5,7 +5,6 @@ using System.Reflection;
 using RocoPilot.Services.Logging;
 
 using Serilog;
-using Serilog.Core;
 using Serilog.Events;
 
 using Windows.ApplicationModel;
@@ -16,17 +15,7 @@ public static class LoggingHelper
 {
     public static string LogDirectory { get; } = ResolveLogDirectory();
 
-    public static LoggingLevelSwitch LevelSwitch { get; } = new(LogEventLevel.Information);
-
-    public const LogEventLevel DiagnosticLevel = LogEventLevel.Debug;
-    public const LogEventLevel NormalLevel = LogEventLevel.Information;
-
     public static InMemoryLogSink LogBuffer { get; } = new(2000);
-
-    public static void SetDiagnosticMode(bool enabled)
-    {
-        LevelSwitch.MinimumLevel = enabled ? DiagnosticLevel : NormalLevel;
-    }
 
     public static void ConfigureSerilog()
     {
@@ -35,12 +24,8 @@ public static class LoggingHelper
         const string outputTemplate =
             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-#if DEBUG
-        LevelSwitch.MinimumLevel = DiagnosticLevel;
-#endif
-
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.ControlledBy(LevelSwitch)
+            .MinimumLevel.Is(LogEventLevel.Debug)
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
             .Enrich.FromLogContext()

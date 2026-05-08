@@ -1,0 +1,599 @@
+using Microsoft.Extensions.Logging;
+
+using RocoPilot.Configuration;
+using RocoPilot.Helpers;
+using RocoPilot.Models.Capture;
+using RocoPilot.Models.ImageMatching;
+using RocoPilot.Models.Input;
+using RocoPilot.Models.Runtime;
+
+namespace RocoPilot.Services;
+
+public sealed partial class RuntimeTaskService
+{
+    private const string BattleChatTemplateName = "battle-chat.png";
+    private const string BattleSkillTemplateName = "battle-button-skill.png";
+    private const string BattleSpaceTemplateName = "battle-space.png";
+    private const string AutoBattleSkillPlaceholder = "{skill}";
+
+    private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan AutoBattlePetSwitchProbeDelay = TimeSpan.FromMilliseconds(1500);
+    private static readonly string[] AutoBattleDefaultRoundOrder =
+    [
+        "1",
+        "2",
+        "3",
+        "4",
+        "X"
+    ];
+    private static readonly string[] BattleChatRegionIds =
+    [
+        "battle-button-chat"
+    ];
+    private static readonly string[] BattleSkillRegionIds =
+    [
+        "battle-button-skill"
+    ];
+    private static readonly string[] BattleMagicRegionIds =
+    [
+        "battle-magic"
+    ];
+    private static readonly string[] BattleTipEnergyRegionIds =
+    [
+        "battle-tip-energe"
+    ];
+    private static readonly string[] BattleSpaceRegionIds =
+    [
+        "battle-space"
+    ];
+
+    private static readonly ImageMatchOptions BattleChatMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions BattleSkillMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions BattleSpaceMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly KeyboardInputOptions AutoBattleKeyboardInputOptions = new()
+    {
+        HoldDurationMs = 45,
+        IntervalMs = 120
+    };
+
+    private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
+    private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
+    private int _autoBattleRoundIndex;
+    private bool _wasAutoBattleSkillSelectionVisible;
+    private bool _wasAutoBattlePetSwitchingVisible;
+    private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
+    private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
+    private string? _currentAutoBattleSkillSelectionKey;
+    private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
+
+    public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
+
+    public void SetAutoBattleSettings(AutoBattleSettings settings)
+    {
+        _autoBattleSettings = NormalizeAutoBattleSettings(settings);
+        if (!_autoBattleSettings.IsEnabled)
+        {
+            ResetAutoBattleBattleState();
+        }
+
+        _settingsLoaded = true;
+        _ = SaveAutoBattleSettingsAsync(_autoBattleSettings);
+    }
+
+    private async Task SaveAutoBattleSettingsAsync(AutoBattleSettings settings)
+    {
+        try
+        {
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.AutoBattleSettings, settings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "保存自动战斗设置失败。");
+        }
+    }
+
+    private async Task<bool> IsBattlePetSwitchingAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleMagicRegion = FindRegion(state.RecognitionRegionConfig, BattleMagicRegionIds);
+        if (battleMagicRegion is null || !TemplateExists(MagicPointTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleMagicRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            MagicPointTemplateName,
+            MagicPointMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private async Task<bool> IsBattleSkillSelectionVisibleAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleSkillRegion = FindRegion(state.RecognitionRegionConfig, BattleSkillRegionIds);
+        if (battleSkillRegion is null || !TemplateExists(BattleSkillTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleSkillRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            BattleSkillTemplateName,
+            BattleSkillMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private async Task<bool> IsBattleChatVisibleAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleChatRegion = FindRegion(state.RecognitionRegionConfig, BattleChatRegionIds);
+        if (battleChatRegion is null || !TemplateExists(BattleChatTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleChatRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            BattleChatTemplateName,
+            BattleChatMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private async Task HandleAutoBattleSkillSelectionAsync(
+        RuntimeTaskState state,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.Now;
+        if (!_autoBattleSettings.IsEnabled)
+        {
+            _wasAutoBattleSkillSelectionVisible = true;
+            return;
+        }
+
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled)
+        {
+            return;
+        }
+
+        if (!_wasAutoBattleSkillSelectionVisible)
+        {
+            _wasAutoBattleSkillSelectionVisible = true;
+            _autoBattleSkillSelectionVisibleSince = now;
+            _lastAutoBattleSkillSelectionActionAt = null;
+            _currentAutoBattleSkillSelectionKey = GetCurrentAutoBattleSkillKey(settings);
+            _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
+            return;
+        }
+
+        if (!ShouldRunAutoBattleSkillSelectionAction(now))
+        {
+            return;
+        }
+
+        if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
+
+        try
+        {
+            if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
+            {
+                _logger.LogWarning("自动战斗未执行：目标游戏窗口句柄已失效。");
+                return;
+            }
+
+            var isRetryingEnergyRecovery =
+                _autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.EnergyRecovery;
+            var skillKey = _currentAutoBattleSkillSelectionKey ?? GetCurrentAutoBattleSkillKey(settings);
+            var sequence = isRetryingEnergyRecovery
+                ? "X"
+                : BuildAutoBattleTurnSequence(settings, skillKey);
+            if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
+                || keyStrokes.Count == 0)
+            {
+                _logger.LogWarning(
+                    "自动战斗单回合序列无效，已回退为技能键 {SkillKey}。Sequence={Sequence}, Error={Error}",
+                    skillKey,
+                    sequence,
+                    parseError);
+                keyStrokes = _keyboardInputService.TryParseSequence(skillKey, out var fallbackStrokes, out _)
+                    ? fallbackStrokes
+                    : [];
+            }
+
+            if (keyStrokes.Count == 0)
+            {
+                return;
+            }
+
+            await _keyboardInputService.SendSequenceAsync(
+                state.TargetWindow.Hwnd,
+                keyStrokes,
+                AutoBattleKeyboardInputOptions,
+                cancellationToken);
+
+            _autoBattleSkillSelectionAction = isRetryingEnergyRecovery
+                ? AutoBattleSkillSelectionAction.EnergyRecovery
+                : AutoBattleSkillSelectionAction.Skill;
+            _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+
+            _logger.LogInformation(
+                "自动战斗已执行：SkillKey={SkillKey}, Sequence={Sequence}, Action={Action}",
+                skillKey,
+                sequence,
+                _autoBattleSkillSelectionAction);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "自动战斗技能释放失败。");
+        }
+        finally
+        {
+            _autoBattleActionLock.Release();
+        }
+    }
+
+    private async Task HandleAutoBattlePetSwitchingAsync(
+        RuntimeTaskState state,
+        CancellationToken cancellationToken)
+    {
+        if (!_autoBattleSettings.IsEnabled)
+        {
+            _wasAutoBattlePetSwitchingVisible = true;
+            return;
+        }
+
+        if (_wasAutoBattlePetSwitchingVisible)
+        {
+            return;
+        }
+
+        _wasAutoBattlePetSwitchingVisible = true;
+        if (!TemplateExists(BattleSpaceTemplateName))
+        {
+            _logger.LogWarning("自动战斗换精灵未执行：未找到 {TemplateName}。", BattleSpaceTemplateName);
+            return;
+        }
+
+        if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
+        {
+            return;
+        }
+
+        try
+        {
+            if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
+            {
+                _logger.LogWarning("自动战斗换精灵未执行：目标游戏窗口句柄已失效。");
+                return;
+            }
+
+            for (var slot = 1; slot <= 6; slot++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var slotKey = slot.ToString();
+                await _keyboardInputService.SendSequenceAsync(
+                    state.TargetWindow.Hwnd,
+                    slotKey,
+                    AutoBattleKeyboardInputOptions,
+                    cancellationToken);
+
+                await Task.Delay(AutoBattlePetSwitchProbeDelay, cancellationToken);
+
+                using var frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
+                if (frame is null || !await IsBattleSpaceVisibleAsync(state, frame, cancellationToken))
+                {
+                    continue;
+                }
+
+                await _keyboardInputService.SendSequenceAsync(
+                    state.TargetWindow.Hwnd,
+                    "Space",
+                    AutoBattleKeyboardInputOptions,
+                    cancellationToken);
+                _logger.LogInformation("自动战斗已切换精灵：Slot={Slot}", slot);
+                return;
+            }
+
+            _logger.LogWarning("自动战斗换精灵失败：已尝试 1-6，但未检测到 battle-space 确认提示。");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "自动战斗换精灵失败。");
+        }
+        finally
+        {
+            _autoBattleActionLock.Release();
+        }
+    }
+
+    private async Task<bool> TryDetectAutoBattleEnergyShortageAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (!_autoBattleSettings.IsEnabled
+            || _autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.Skill)
+        {
+            return false;
+        }
+
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipEnergyRegionIds,
+            cancellationToken);
+        if (!IsEnergyShortageTip(tipText))
+        {
+            return false;
+        }
+
+        if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken))
+        {
+            return false;
+        }
+
+        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
+        _logger.LogInformation("自动战斗检测到能量不足，已立即按 X 回复能量。");
+        return true;
+    }
+
+    private async Task<bool> TrySendAutoBattleEnergyRecoveryAsync(
+        RuntimeTaskState state,
+        CancellationToken cancellationToken)
+    {
+        if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
+        {
+            return false;
+        }
+
+        try
+        {
+            if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
+            {
+                _logger.LogWarning("自动战斗回能未执行：目标游戏窗口句柄已失效。");
+                return false;
+            }
+
+            await _keyboardInputService.SendSequenceAsync(
+                state.TargetWindow.Hwnd,
+                "X",
+                AutoBattleKeyboardInputOptions,
+                cancellationToken);
+            _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "自动战斗回能失败。");
+            return false;
+        }
+        finally
+        {
+            _autoBattleActionLock.Release();
+        }
+    }
+
+    private async Task<bool> IsBattleSpaceVisibleAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var battleSpaceRegion = FindRegion(state.RecognitionRegionConfig, BattleSpaceRegionIds);
+        if (battleSpaceRegion is null || !TemplateExists(BattleSpaceTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            battleSpaceRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            BattleSpaceTemplateName,
+            BattleSpaceMatchOptions,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private string GetCurrentAutoBattleSkillKey(AutoBattleSettings settings)
+    {
+        var roundOrder = ParseAutoBattleRoundOrder(settings.RoundOrder);
+        if (_autoBattleRoundIndex >= roundOrder.Count)
+        {
+            _autoBattleRoundIndex = 0;
+        }
+
+        return roundOrder[_autoBattleRoundIndex];
+    }
+
+    private static IReadOnlyList<string> ParseAutoBattleRoundOrder(string roundOrder)
+    {
+        if (string.IsNullOrWhiteSpace(roundOrder))
+        {
+            return AutoBattleDefaultRoundOrder;
+        }
+
+        var keys = roundOrder
+            .Replace("\r", "\n", StringComparison.Ordinal)
+            .Replace(';', ',')
+            .Split([',', '\n', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(key => key.ToUpperInvariant())
+            .Where(key => key is "1" or "2" or "3" or "4" or "X")
+            .ToArray();
+        return keys.Length == 0 ? AutoBattleDefaultRoundOrder : keys;
+    }
+
+    private static string BuildAutoBattleTurnSequence(AutoBattleSettings settings, string skillKey)
+    {
+        var turnSequence = string.IsNullOrWhiteSpace(settings.TurnSequence)
+            ? AutoBattleSettings.DefaultTurnSequence
+            : settings.TurnSequence.Trim();
+
+        return turnSequence.Contains(AutoBattleSkillPlaceholder, StringComparison.OrdinalIgnoreCase)
+            ? turnSequence.Replace(AutoBattleSkillPlaceholder, skillKey, StringComparison.OrdinalIgnoreCase)
+            : turnSequence;
+    }
+
+    private void CompleteAutoBattleSkillSelectionState()
+    {
+        if (_autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.Skill)
+        {
+            _autoBattleRoundIndex++;
+        }
+
+        ResetAutoBattleSkillSelectionState();
+    }
+
+    private bool ShouldRunAutoBattleSkillSelectionAction(DateTimeOffset now)
+    {
+        if (!_autoBattleSkillSelectionVisibleSince.HasValue)
+        {
+            _autoBattleSkillSelectionVisibleSince = now;
+            return false;
+        }
+
+        if (now - _autoBattleSkillSelectionVisibleSince.Value < AutoBattleSkillSelectionActionDelay)
+        {
+            return false;
+        }
+
+        if (!_lastAutoBattleSkillSelectionActionAt.HasValue)
+        {
+            return true;
+        }
+
+        return now - _lastAutoBattleSkillSelectionActionAt.Value >= AutoBattleSkillSelectionRetryDelay;
+    }
+
+    private static bool IsEnergyShortageTip(string tipText)
+    {
+        if (string.IsNullOrWhiteSpace(tipText))
+        {
+            return false;
+        }
+
+        var normalized = new string(tipText.Where(character => !char.IsWhiteSpace(character)).ToArray());
+        return normalized.Contains("能量不足", StringComparison.Ordinal)
+            || TextMatchingHelper.IsSimilar(tipText, "能量不足", 0.65, out _);
+    }
+
+    private void ResetAutoBattleBattleState()
+    {
+        _autoBattleRoundIndex = 0;
+        ResetAutoBattleSkillSelectionState();
+        _wasAutoBattlePetSwitchingVisible = false;
+    }
+
+    private void ResetAutoBattleSkillSelectionState()
+    {
+        _wasAutoBattleSkillSelectionVisible = false;
+        _autoBattleSkillSelectionVisibleSince = null;
+        _lastAutoBattleSkillSelectionActionAt = null;
+        _currentAutoBattleSkillSelectionKey = null;
+        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
+    }
+
+    private static AutoBattleSettings NormalizeAutoBattleSettings(AutoBattleSettings? settings)
+    {
+        var normalized = settings?.Clone() ?? AutoBattleSettings.CreateDefault();
+        if (string.IsNullOrWhiteSpace(normalized.RoundOrder))
+        {
+            normalized.RoundOrder = AutoBattleSettings.DefaultRoundOrder;
+        }
+
+        if (string.IsNullOrWhiteSpace(normalized.TurnSequence))
+        {
+            normalized.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
+        }
+
+        return normalized;
+    }
+
+    private enum AutoBattleSkillSelectionAction
+    {
+        None,
+        Skill,
+        EnergyRecovery
+    }
+}

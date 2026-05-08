@@ -141,6 +141,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
     private bool _pendingAutoBattleRoundAdvance;
     private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
+    private string? _currentAutoBattleSkillSelectionKey;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
@@ -684,11 +685,19 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
             return;
         }
 
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled)
+        {
+            return;
+        }
+
         if (!_wasAutoBattleSkillSelectionVisible)
         {
             _wasAutoBattleSkillSelectionVisible = true;
             _autoBattleSkillSelectionVisibleSince = now;
             _lastAutoBattleSkillSelectionActionAt = null;
+            AdvanceAutoBattleRoundIfPending();
+            _currentAutoBattleSkillSelectionKey = GetCurrentAutoBattleSkillKey(settings);
             return;
         }
 
@@ -704,21 +713,13 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
 
         try
         {
-            var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-            if (!settings.IsEnabled)
-            {
-                return;
-            }
-
             if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
             {
                 _logger.LogWarning("自动战斗未执行：目标游戏窗口句柄已失效。");
                 return;
             }
 
-            AdvanceAutoBattleRoundIfPending();
-
-            var skillKey = GetCurrentAutoBattleSkillKey(settings);
+            var skillKey = _currentAutoBattleSkillSelectionKey ?? GetCurrentAutoBattleSkillKey(settings);
             var sequence = BuildAutoBattleTurnSequence(settings, skillKey);
             if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
                 || keyStrokes.Count == 0)
@@ -1041,6 +1042,7 @@ public sealed class RuntimeTaskService : IRuntimeTaskService
         _wasAutoBattleSkillSelectionVisible = false;
         _autoBattleSkillSelectionVisibleSince = null;
         _lastAutoBattleSkillSelectionActionAt = null;
+        _currentAutoBattleSkillSelectionKey = null;
     }
 
     private async Task<GameStateScanResult> UpdateMagicPointSnapshotAsync(

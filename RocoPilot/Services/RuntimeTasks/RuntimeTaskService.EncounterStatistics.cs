@@ -81,13 +81,22 @@ public sealed partial class RuntimeTaskService
             state,
             frame,
             BattleTipRelieveRegionIds,
-            cancellationToken);
+            cancellationToken,
+            "奇遇统计");
 
-        if (!TextMatchingHelper.IsSimilar(
+        var isTipMatch = TextMatchingHelper.IsSimilar(
                 tipText,
                 season.TipText,
                 season.MatchThreshold,
-                out var similarity))
+                out var similarity);
+        _logger.LogDebug(
+            "奇遇统计筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            FormatLogText(tipText),
+            FormatLogText(season.TipText),
+            similarity,
+            season.MatchThreshold,
+            isTipMatch);
+        if (!isTipMatch)
         {
             return;
         }
@@ -96,8 +105,14 @@ public sealed partial class RuntimeTaskService
             state,
             frame,
             BattleEnemyNameRegionIds,
-            cancellationToken);
+            cancellationToken,
+            "奇遇统计");
         var enemyName = TextMatchingHelper.CleanSpiritName(enemyNameText);
+        _logger.LogDebug(
+            "奇遇统计筛选：EnemyNameRaw={EnemyNameRaw}, Cleaned={SpiritName}, IsValid={IsValid}",
+            FormatLogText(enemyNameText),
+            enemyName,
+            !string.IsNullOrWhiteSpace(enemyName));
         if (string.IsNullOrWhiteSpace(enemyName))
         {
             _logger.LogDebug("已匹配奇遇提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}", similarity);
@@ -109,12 +124,24 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        var previousCount = GetEncounterCount(season.Id, enemyName);
         await _statisticsService.RecordEncounterAsync(season, enemyName, DateTimeOffset.Now);
-        _logger.LogInformation(
-            "检测到赛季奇遇：Season={SeasonId}, Type={EncounterType}, Spirit={SpiritName}, TipSimilarity={Similarity:P1}",
+        var currentCount = GetEncounterCount(season.Id, enemyName);
+        if (currentCount > previousCount)
+        {
+            _logger.LogInformation(
+                "奇遇统计：{SpiritName} 奇遇 +1（当前 {Count}）",
+                enemyName,
+                currentCount);
+        }
+
+        _logger.LogDebug(
+            "奇遇统计已记录：Season={SeasonId}, Type={EncounterType}, Spirit={SpiritName}, PreviousCount={PreviousCount}, CurrentCount={CurrentCount}, TipSimilarity={Similarity:P1}",
             season.Id,
             season.EncounterTypeName,
             enemyName,
+            previousCount,
+            currentCount,
             similarity);
     }
 
@@ -125,10 +152,14 @@ public sealed partial class RuntimeTaskService
             if (string.Equals(_lastRecordedEncounterSeasonId, seasonId, StringComparison.OrdinalIgnoreCase)
                 && (_hasActiveEncounterRecord || now - _lastRecordedEncounterAt < EncounterDuplicateSuppressWindow))
             {
+                var remaining = _hasActiveEncounterRecord
+                    ? EncounterDuplicateSuppressWindow
+                    : EncounterDuplicateSuppressWindow - (now - _lastRecordedEncounterAt);
                 _logger.LogDebug(
-                    "奇遇统计冷却中，本次识别已忽略。LastSpirit={LastSpiritName}, CurrentSpirit={CurrentSpiritName}",
+                    "奇遇统计筛选：冷却中，本次识别已忽略。LastSpirit={LastSpiritName}, CurrentSpirit={CurrentSpiritName}, Remaining={RemainingSeconds:F1}s",
                     _lastRecordedEncounterName,
-                    spiritName);
+                    spiritName,
+                    Math.Max(0, remaining.TotalSeconds));
                 return false;
             }
 
@@ -146,5 +177,13 @@ public sealed partial class RuntimeTaskService
         {
             _hasActiveEncounterRecord = false;
         }
+    }
+
+    private int GetEncounterCount(string seasonId, string spiritName)
+    {
+        var record = _statisticsService
+            .GetSelectedAccountSeasonEncounters(seasonId)
+            .FirstOrDefault(record => string.Equals(record.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+        return record?.Count ?? 0;
     }
 }

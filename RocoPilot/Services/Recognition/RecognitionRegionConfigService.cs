@@ -70,7 +70,7 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
                 ?? RecognitionRegionConfig.Empty(width, height, path);
 
             NormalizeConfig(config, width, height, path);
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "已载入识别区域配置：{ConfigPath}，区域数量：{RegionCount}",
                 path,
                 config.Regions.Count(region => region.Enabled));

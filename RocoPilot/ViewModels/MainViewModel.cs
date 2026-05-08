@@ -101,7 +101,7 @@ public partial class MainViewModel : ObservableRecipient
             await _runtimeTaskService.StopAsync();
             IsRealtimeCaptureRunning = false;
             TargetGameWindow = null;
-            _logger.LogInformation("实时任务已停止");
+            _logger.LogDebug("实时任务停止命令已完成");
             ShowLaunchNotification(InfoBarSeverity.Success, "任务已停止", "实时任务已停止。");
             return;
         }
@@ -162,7 +162,7 @@ public partial class MainViewModel : ObservableRecipient
         var gameWindow = result.State.TargetWindow;
         TargetGameWindow = gameWindow;
         IsRealtimeCaptureRunning = true;
-        _logger.LogInformation(
+        _logger.LogDebug(
             "启动成功：已找到游戏窗口。标题：{WindowTitle}  进程：{ProcessName}  PID：{ProcessId}  HWND：{WindowHandle}  窗口尺寸：{WindowWidth}x{WindowHeight}  客户区：{ClientWidth}x{ClientHeight}",
             gameWindow.Title,
             gameWindow.ProcessName,

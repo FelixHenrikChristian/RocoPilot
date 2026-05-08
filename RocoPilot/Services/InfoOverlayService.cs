@@ -67,7 +67,7 @@ public sealed class InfoOverlayService : IInfoOverlayService
             _overlayWindow.UpdateSnapshot(InfoOverlaySnapshot.CreateInitial(state.StartedAt));
             _overlayWindow.ShowOverlay();
 
-            _logger.LogInformation("信息遮罩窗口已显示。Locked={Locked}", state.Options.InfoOverlayLocked);
+            _logger.LogDebug("信息遮罩窗口已显示。Locked={Locked}", state.Options.InfoOverlayLocked);
         }
         catch (Exception ex)
         {

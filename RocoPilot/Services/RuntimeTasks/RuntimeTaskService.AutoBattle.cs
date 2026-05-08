@@ -113,29 +113,15 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        var battleMagicRegion = FindRegion(state.RecognitionRegionConfig, BattleMagicRegionIds);
-        if (battleMagicRegion is null || !TemplateExists(MagicPointTemplateName))
-        {
-            return false;
-        }
-
-        var frameRegion = ToFrameRegion(
-            battleMagicRegion,
+        return await MatchRuntimeTemplateAsync(
+            state,
             frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
-        {
-            return false;
-        }
-
-        var result = await _imageMatchingService.MatchAsync(
-            frame,
-            frameRegion,
+            BattleMagicRegionIds,
             MagicPointTemplateName,
             MagicPointMatchOptions,
+            "状态识别",
+            "切换精灵界面",
             cancellationToken);
-        return result.IsMatch;
     }
 
     private async Task<bool> IsBattleSkillSelectionVisibleAsync(
@@ -143,29 +129,15 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        var battleSkillRegion = FindRegion(state.RecognitionRegionConfig, BattleSkillRegionIds);
-        if (battleSkillRegion is null || !TemplateExists(BattleSkillTemplateName))
-        {
-            return false;
-        }
-
-        var frameRegion = ToFrameRegion(
-            battleSkillRegion,
+        return await MatchRuntimeTemplateAsync(
+            state,
             frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
-        {
-            return false;
-        }
-
-        var result = await _imageMatchingService.MatchAsync(
-            frame,
-            frameRegion,
+            BattleSkillRegionIds,
             BattleSkillTemplateName,
             BattleSkillMatchOptions,
+            "状态识别",
+            "技能选择按钮",
             cancellationToken);
-        return result.IsMatch;
     }
 
     private async Task<bool> IsBattleChatVisibleAsync(
@@ -173,29 +145,15 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        var battleChatRegion = FindRegion(state.RecognitionRegionConfig, BattleChatRegionIds);
-        if (battleChatRegion is null || !TemplateExists(BattleChatTemplateName))
-        {
-            return false;
-        }
-
-        var frameRegion = ToFrameRegion(
-            battleChatRegion,
+        return await MatchRuntimeTemplateAsync(
+            state,
             frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
-        {
-            return false;
-        }
-
-        var result = await _imageMatchingService.MatchAsync(
-            frame,
-            frameRegion,
+            BattleChatRegionIds,
             BattleChatTemplateName,
             BattleChatMatchOptions,
+            "状态识别",
+            "战斗聊天按钮",
             cancellationToken);
-        return result.IsMatch;
     }
 
     private async Task HandleAutoBattleSkillSelectionAsync(
@@ -222,6 +180,11 @@ public sealed partial class RuntimeTaskService
             _lastAutoBattleSkillSelectionActionAt = null;
             _currentAutoBattleSkillSelectionKey = GetCurrentAutoBattleSkillKey(settings);
             _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
+            _logger.LogDebug(
+                "自动战斗：检测到技能选择界面，等待 {DelayMs}ms 后执行。SkillKey={SkillKey}, RoundIndex={RoundIndex}",
+                AutoBattleSkillSelectionActionDelay.TotalMilliseconds,
+                _currentAutoBattleSkillSelectionKey,
+                _autoBattleRoundIndex);
             return;
         }
 
@@ -278,11 +241,20 @@ public sealed partial class RuntimeTaskService
                 : AutoBattleSkillSelectionAction.Skill;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
+            var actionText = isRetryingEnergyRecovery ? "按回能键" : "按技能键";
+            var pressedKey = isRetryingEnergyRecovery ? "X" : skillKey;
             _logger.LogInformation(
-                "自动战斗已执行：SkillKey={SkillKey}, Sequence={Sequence}, Action={Action}",
+                "自动战斗：{Action} {Key}（序列 {Sequence}）",
+                actionText,
+                pressedKey,
+                sequence);
+            _logger.LogDebug(
+                "自动战斗按键已发送：SkillKey={SkillKey}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
                 skillKey,
                 sequence,
-                _autoBattleSkillSelectionAction);
+                _autoBattleSkillSelectionAction,
+                keyStrokes.Count,
+                _autoBattleRoundIndex);
         }
         catch (OperationCanceledException)
         {
@@ -337,6 +309,7 @@ public sealed partial class RuntimeTaskService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var slotKey = slot.ToString();
+                _logger.LogDebug("自动战斗换精灵：尝试按 {SlotKey}", slotKey);
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
                     slotKey,
@@ -356,7 +329,7 @@ public sealed partial class RuntimeTaskService
                     "Space",
                     AutoBattleKeyboardInputOptions,
                     cancellationToken);
-                _logger.LogInformation("自动战斗已切换精灵：Slot={Slot}", slot);
+                _logger.LogInformation("自动战斗：切换到第 {Slot} 只精灵，按 Space 确认", slot);
                 return;
             }
 
@@ -390,8 +363,14 @@ public sealed partial class RuntimeTaskService
             state,
             frame,
             BattleTipEnergyRegionIds,
-            cancellationToken);
-        if (!IsEnergyShortageTip(tipText))
+            cancellationToken,
+            "自动战斗");
+        var isEnergyShortage = IsEnergyShortageTip(tipText);
+        _logger.LogDebug(
+            "自动战斗回能筛选：TipText={TipText}, IsEnergyShortage={IsEnergyShortage}",
+            FormatLogText(tipText),
+            isEnergyShortage);
+        if (!isEnergyShortage)
         {
             return false;
         }
@@ -402,7 +381,7 @@ public sealed partial class RuntimeTaskService
         }
 
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
-        _logger.LogInformation("自动战斗检测到能量不足，已立即按 X 回复能量。");
+        _logger.LogInformation("自动战斗：检测到能量不足，按 X 回能");
         return true;
     }
 
@@ -451,29 +430,15 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        var battleSpaceRegion = FindRegion(state.RecognitionRegionConfig, BattleSpaceRegionIds);
-        if (battleSpaceRegion is null || !TemplateExists(BattleSpaceTemplateName))
-        {
-            return false;
-        }
-
-        var frameRegion = ToFrameRegion(
-            battleSpaceRegion,
+        return await MatchRuntimeTemplateAsync(
+            state,
             frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
-        {
-            return false;
-        }
-
-        var result = await _imageMatchingService.MatchAsync(
-            frame,
-            frameRegion,
+            BattleSpaceRegionIds,
             BattleSpaceTemplateName,
             BattleSpaceMatchOptions,
+            "自动战斗",
+            "换精灵确认提示",
             cancellationToken);
-        return result.IsMatch;
     }
 
     private string GetCurrentAutoBattleSkillKey(AutoBattleSettings settings)

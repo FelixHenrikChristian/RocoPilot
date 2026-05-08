@@ -48,7 +48,7 @@ public sealed class RecognitionOverlayService : IRecognitionOverlayService
             _overlayWindow.Closed += (_, _) => _overlayWindow = null;
             _overlayWindow.ShowOverlay();
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "识别区域遮罩已显示，区域数量：{RegionCount}",
                 state.RecognitionRegionConfig.Regions.Count(region => region.Enabled));
         }

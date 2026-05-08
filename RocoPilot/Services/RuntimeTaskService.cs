@@ -187,8 +187,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 () => CaptureLoopAsync(state, cancellationTokenSource.Token),
                 cancellationTokenSource.Token);
 
-            _logger.LogInformation(
-                "运行任务已启动，窗口: {Window}, 客户区: {ClientWidth}x{ClientHeight}, 首帧: {FrameWidth}x{FrameHeight}, 截图方式: {CaptureMethod}, OCR: {TextRecognitionMethod}, 区域配置: {ConfigPath}",
+            _logger.LogInformation("实时任务：已启动（窗口 {Window}）", targetWindow.DisplayName);
+            _logger.LogDebug(
+                "实时任务启动详情：Window={Window}, Client={ClientWidth}x{ClientHeight}, FirstFrame={FrameWidth}x{FrameHeight}, CaptureMethod={CaptureMethod}, OCR={TextRecognitionMethod}, ConfigPath={ConfigPath}",
                 targetWindow.DisplayName,
                 configResolutionWidth,
                 configResolutionHeight,
@@ -198,7 +199,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 options.TextRecognitionMethod,
                 recognitionRegionConfig.SourcePath);
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "识别区域配置状态：Loaded={Loaded}, EnabledRegions={EnabledRegionCount}, Resolution={ResolutionWidth}x{ResolutionHeight}",
                 recognitionRegionConfig.LoadedFromFile,
                 recognitionRegionConfig.Regions.Count(region => region.Enabled),
@@ -271,7 +272,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             }
 
             cancellationTokenSource?.Dispose();
-            _logger.LogInformation("运行任务已停止");
+            _logger.LogInformation("实时任务：已停止");
         }
     }
 
@@ -491,6 +492,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             }
         }
 
+        _logger.LogDebug(
+            "状态识别目标结果：Target=魔力点, Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
+            magicPointRegion.Id,
+            magicPointCount,
+            MagicPointSlotCount,
+            frameRegion.X,
+            frameRegion.Y,
+            frameRegion.Width,
+            frameRegion.Height);
+
         var now = DateTimeOffset.Now;
         if (magicPointCount <= 0)
         {
@@ -509,11 +520,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         RuntimeTaskState state,
         CapturedFrame frame,
         IReadOnlyList<string> regionAliases,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string taskName)
     {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         if (region is null)
         {
+            _logger.LogDebug(
+                "{TaskName} OCR跳过：未找到识别区域。Aliases={RegionAliases}",
+                taskName,
+                string.Join("|", regionAliases));
             return string.Empty;
         }
 
@@ -524,6 +540,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
+            _logger.LogDebug(
+                "{TaskName} OCR跳过：识别区域不在截图内。Region={RegionId}, Aliases={RegionAliases}",
+                taskName,
+                region.Id,
+                string.Join("|", regionAliases));
             return string.Empty;
         }
 
@@ -532,6 +553,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             .FirstOrDefault(method => method.Method == state.Options.TextRecognitionMethod && method.IsAvailable);
         if (recognitionMethod is null)
         {
+            _logger.LogDebug(
+                "{TaskName} OCR跳过：OCR 方法不可用。Method={TextRecognitionMethod}, Region={RegionId}",
+                taskName,
+                state.Options.TextRecognitionMethod,
+                region.Id);
             return string.Empty;
         }
 
@@ -540,7 +566,105 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             imageBytes,
             recognitionMethod.Method,
             cancellationToken);
+        _logger.LogDebug(
+            "{TaskName} OCR结果：Region={RegionId}, Method={TextRecognitionMethod}, FrameRegion={X},{Y},{Width}x{Height}, Text={Text}",
+            taskName,
+            region.Id,
+            recognitionMethod.Method,
+            frameRegion.X,
+            frameRegion.Y,
+            frameRegion.Width,
+            frameRegion.Height,
+            FormatLogText(result.Text));
         return result.Text;
+    }
+
+    private async Task<bool> MatchRuntimeTemplateAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        IReadOnlyList<string> regionAliases,
+        string templateName,
+        ImageMatchOptions options,
+        string taskName,
+        string targetName,
+        CancellationToken cancellationToken)
+    {
+        var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
+        if (region is null)
+        {
+            _logger.LogDebug(
+                "{TaskName} 目标识别跳过：未找到识别区域。Target={Target}, Aliases={RegionAliases}, Template={Template}",
+                taskName,
+                targetName,
+                string.Join("|", regionAliases),
+                templateName);
+            return false;
+        }
+
+        if (!TemplateExists(templateName))
+        {
+            _logger.LogDebug(
+                "{TaskName} 目标识别跳过：未找到模板。Target={Target}, Region={RegionId}, Template={Template}",
+                taskName,
+                targetName,
+                region.Id,
+                templateName);
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            region,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            _logger.LogDebug(
+                "{TaskName} 目标识别跳过：识别区域不在截图内。Target={Target}, Region={RegionId}, Template={Template}",
+                taskName,
+                targetName,
+                region.Id,
+                templateName);
+            return false;
+        }
+
+        var result = await _imageMatchingService.MatchAsync(
+            frame,
+            frameRegion,
+            templateName,
+            options,
+            cancellationToken);
+        _logger.LogDebug(
+            "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}",
+            taskName,
+            targetName,
+            region.Id,
+            templateName,
+            result.Score,
+            options.MinimumScore,
+            result.IsMatch,
+            frameRegion.X,
+            frameRegion.Y,
+            frameRegion.Width,
+            frameRegion.Height);
+        return result.IsMatch;
+    }
+
+    private static string FormatLogText(string? text, int maximumLength = 120)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "<empty>";
+        }
+
+        var normalized = string.Join(
+            " ",
+            text
+                .Trim()
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= maximumLength
+            ? normalized
+            : $"{normalized[..maximumLength]}...";
     }
 
     private static async Task<byte[]> EncodeFrameRegionPngAsync(

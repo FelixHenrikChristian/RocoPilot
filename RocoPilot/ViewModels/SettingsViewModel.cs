@@ -40,8 +40,7 @@ public partial class SettingsViewModel : ObservableRecipient
     [ObservableProperty]
     private bool _diagnosticMode;
 
-    [ObservableProperty]
-    private string _versionDescription;
+    public string AppVersion { get; }
 
     public SettingsViewModel(
         IThemeSelectorService themeSelectorService,
@@ -51,7 +50,7 @@ public partial class SettingsViewModel : ObservableRecipient
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
         _logger = logger;
-        _versionDescription = GetVersionDescription();
+        AppVersion = GetShortAppVersion();
     }
 
     public async Task LoadAsync()
@@ -125,6 +124,12 @@ public partial class SettingsViewModel : ObservableRecipient
     }
 
     [RelayCommand]
+    private void CheckForUpdates()
+    {
+        // Placeholder until update checking is wired up.
+    }
+
+    [RelayCommand]
     private async Task ResetSettingsAsync()
     {
         var xamlRoot = (App.MainWindow.Content as FrameworkElement)?.XamlRoot;
@@ -167,7 +172,7 @@ public partial class SettingsViewModel : ObservableRecipient
         _ => "System",
     };
 
-    private static string GetVersionDescription()
+    private static string GetShortAppVersion()
     {
         Version version;
 
@@ -179,9 +184,9 @@ public partial class SettingsViewModel : ObservableRecipient
         }
         else
         {
-            version = Assembly.GetExecutingAssembly().GetName().Version!;
+            version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
         }
 
-        return $"{"AppDisplayName".GetLocalized()} - {version.Major}.{version.Minor}.{version.Build}.{version.Revision}";
+        return $"v{version.Major}.{version.Minor}.{version.Build}";
     }
 }

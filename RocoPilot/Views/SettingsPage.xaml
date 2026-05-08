@@ -202,20 +202,207 @@
                     Text="关于" />
             </StackPanel>
 
-            <Border Margin="0,0,0,8" Style="{StaticResource CardStyle}">
-                <StackPanel>
-                    <TextBlock
-                        Text="{x:Bind ViewModel.VersionDescription, Mode=OneWay}"
-                        Style="{ThemeResource BodyTextBlockStyle}" />
-                    <TextBlock
-                        x:Uid="Settings_AboutDescription"
-                        Margin="{StaticResource XSmallTopMargin}"
-                        Style="{ThemeResource BodyTextBlockStyle}" />
-                    <HyperlinkButton
-                        x:Uid="SettingsPage_PrivacyTermsLink"
-                        Margin="{StaticResource SettingsPageHyperlinkButtonMargin}" />
-                </StackPanel>
+            <Border
+                Margin="0,0,0,8"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" CornerRadius="8,8,0,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#1A6366F1" />
+                                <GradientStop Offset="1" Color="#1A8B5CF6" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Grid Padding="20,16" ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Grid.Column="0"
+                                Width="56"
+                                Height="56"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                                CornerRadius="12">
+                                <Image
+                                    Width="40"
+                                    Height="40"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="ms-appx:///Assets/WindowIcon.ico" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock
+                                    FontSize="18"
+                                    FontWeight="SemiBold"
+                                    Text="RocoPilot" />
+                                <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+                                    <Border
+                                        Padding="8,2"
+                                        VerticalAlignment="Center"
+                                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                        CornerRadius="4">
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="White"
+                                            Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" />
+                                    </Border>
+                                    <TextBlock
+                                        Margin="8,0,0,0"
+                                        VerticalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="稳定版" />
+                                </StackPanel>
+                            </StackPanel>
+
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Command="{x:Bind ViewModel.CheckForUpdatesCommand}"
+                                Content="检查更新"
+                                Style="{ThemeResource AccentButtonStyle}" />
+                        </Grid>
+                    </Border>
+
+                    <StackPanel Grid.Row="1" Margin="0,4,0,4">
+                        <Grid Margin="20,10" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <FontIcon
+                                    Margin="0,0,12,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE77B;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="软件作者" />
+                            </StackPanel>
+                            <HyperlinkButton
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Content="Felix Christian"
+                                NavigateUri="https://github.com/FelixHenrikChristian" />
+                        </Grid>
+
+                        <Border
+                            Margin="20,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <Grid Margin="20,10" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <FontIcon
+                                    Margin="0,0,12,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE943;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="开源地址" />
+                            </StackPanel>
+                            <HyperlinkButton
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Content="GitHub"
+                                NavigateUri="https://github.com/FelixHenrikChristian/RocoPilot" />
+                        </Grid>
+
+                        <Border
+                            Margin="20,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <Grid Margin="20,10" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <FontIcon
+                                    Margin="0,0,12,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE8A1;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="使用教程" />
+                            </StackPanel>
+                            <HyperlinkButton
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Content="查看文档"
+                                NavigateUri="https://github.com/FelixHenrikChristian/RocoPilot#readme" />
+                        </Grid>
+
+                        <Border
+                            Margin="20,0"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <Grid Margin="20,10" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                <FontIcon
+                                    Margin="0,0,12,0"
+                                    VerticalAlignment="Center"
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE8F2;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="问题反馈" />
+                            </StackPanel>
+                            <HyperlinkButton
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Content="提交 Issue"
+                                NavigateUri="https://github.com/FelixHenrikChristian/RocoPilot/issues" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </Border>
+
+            <TextBlock
+                Margin="0,12,0,0"
+                HorizontalAlignment="Center"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                Text="© 2024-2026 Felix Christian. 开源许可：MIT License" />
         </StackPanel>
     </ScrollViewer>
 </Page>

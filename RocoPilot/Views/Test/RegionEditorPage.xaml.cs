@@ -9,13 +9,13 @@ using Microsoft.UI.Xaml.Controls;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Recognition;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Views.Windows;
 
 using Windows.Graphics.Imaging;
 using Windows.Storage;
-using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 using Windows.System;
 
@@ -98,25 +98,35 @@ public sealed partial class RegionEditorPage : Page
         }
     }
 
-    private async void BrowseConfigButton_Click(object sender, RoutedEventArgs e)
+    private void BrowseConfigButton_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new FileOpenPicker
+        string? filePath;
+        try
         {
-            ViewMode = PickerViewMode.List,
-            SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-        };
-        picker.FileTypeFilter.Add(".json");
+            filePath = FileDialogHelper.PickOpenFile(
+                "选择识别区域配置文件",
+                "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+                Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionRegions"));
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"打开文件选择窗口失败：{ex.Message}", InfoBarSeverity.Error);
+            return;
+        }
 
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
+        if (filePath is null)
         {
             return;
         }
 
-        LoadConfig(file.Path);
+        try
+        {
+            LoadConfig(filePath);
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"载入配置文件失败：{ex.Message}", InfoBarSeverity.Error);
+        }
     }
 
     private void SaveConfigButton_Click(object sender, RoutedEventArgs e)

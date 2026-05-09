@@ -1,12 +1,13 @@
+using System.Runtime.InteropServices;
+
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 
+using RocoPilot.Helpers;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.TextRecognition;
 
 using Windows.ApplicationModel.DataTransfer;
-using Windows.Storage;
-using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 using Windows.System;
 
@@ -14,10 +15,13 @@ namespace RocoPilot.Views.Test;
 
 public sealed partial class TextRecognitionTestPage : Page
 {
+    private const int ScreenClipClipboardTimeoutSeconds = 30;
+
     private readonly ITextRecognitionService _textRecognitionService;
     private IReadOnlyList<TextRecognitionMethodOption> _recognitionMethods = Array.Empty<TextRecognitionMethodOption>();
     private byte[]? _loadedImageBytes;
     private string? _loadedSourceName;
+    private CancellationTokenSource? _screenClipClipboardCts;
     private bool _waitingForScreenClip;
     private bool _isRecognizing;
 
@@ -44,32 +48,28 @@ public sealed partial class TextRecognitionTestPage : Page
 
     private async void ImportImageButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        var picker = new FileOpenPicker
+        string? filePath;
+        try
         {
-            ViewMode = PickerViewMode.Thumbnail,
-            SuggestedStartLocation = PickerLocationId.PicturesLibrary
-        };
+            filePath = FileDialogHelper.PickOpenFile(
+                "导入图像",
+                "图像文件 (*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.webp)|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.webp|所有文件 (*.*)|*.*",
+                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
+        }
+        catch (Exception ex)
+        {
+            ShowInputError("无法打开文件选择窗口", ex);
+            return;
+        }
 
-        picker.FileTypeFilter.Add(".bmp");
-        picker.FileTypeFilter.Add(".jpg");
-        picker.FileTypeFilter.Add(".jpeg");
-        picker.FileTypeFilter.Add(".png");
-        picker.FileTypeFilter.Add(".tif");
-        picker.FileTypeFilter.Add(".tiff");
-        picker.FileTypeFilter.Add(".webp");
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
+        if (filePath is null)
         {
             return;
         }
 
         try
         {
-            await LoadPreviewFromFileAsync(file);
+            await LoadPreviewFromFileAsync(filePath);
         }
         catch (Exception ex)
         {
@@ -79,8 +79,10 @@ public sealed partial class TextRecognitionTestPage : Page
 
     private async void OpenScreenClipButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
+        var startClipboardSequence = GetClipboardSequenceNumber();
         _waitingForScreenClip = true;
         InputStatusText.Text = "截图工具已打开，截图完成后会尝试自动读取剪贴板";
+        StartScreenClipClipboardPolling(startClipboardSequence);
 
         try
         {
@@ -90,19 +92,19 @@ public sealed partial class TextRecognitionTestPage : Page
                 return;
             }
 
-            _waitingForScreenClip = false;
+            StopScreenClipClipboardPolling();
             InputStatusText.Text = "无法打开 Windows 截图工具";
         }
         catch (Exception ex)
         {
-            _waitingForScreenClip = false;
+            StopScreenClipClipboardPolling();
             ShowInputError("无法打开 Windows 截图工具", ex);
         }
     }
 
     private async void ReadClipboardButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
-        _waitingForScreenClip = false;
+        StopScreenClipClipboardPolling();
         try
         {
             await TryLoadPreviewFromClipboardAsync(showEmptyMessage: true);
@@ -168,15 +170,18 @@ public sealed partial class TextRecognitionTestPage : Page
             return;
         }
 
-        _waitingForScreenClip = false;
         DispatcherQueue.TryEnqueue(async () =>
         {
             try
             {
-                await TryLoadPreviewFromClipboardAsync(showEmptyMessage: false);
+                if (await TryLoadPreviewFromClipboardAsync(showEmptyMessage: false))
+                {
+                    StopScreenClipClipboardPolling();
+                }
             }
             catch (Exception ex)
             {
+                StopScreenClipClipboardPolling();
                 ShowInputError("无法读取截图图像", ex);
             }
         });
@@ -185,15 +190,32 @@ public sealed partial class TextRecognitionTestPage : Page
     private void TextRecognitionTestPage_Unloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         Clipboard.ContentChanged -= Clipboard_ContentChanged;
+        StopScreenClipClipboardPolling();
     }
 
-    private async Task LoadPreviewFromFileAsync(StorageFile file)
+    private async Task LoadPreviewFromFileAsync(string filePath)
     {
-        using var stream = await file.OpenReadAsync();
-        await LoadPreviewFromStreamAsync(stream, file.Name);
+        var fileInfo = new FileInfo(filePath);
+        if (!fileInfo.Exists)
+        {
+            throw new FileNotFoundException("图像文件不存在。", filePath);
+        }
+
+        if (fileInfo.Length == 0)
+        {
+            throw new InvalidOperationException("图像内容为空。");
+        }
+
+        if (fileInfo.Length > int.MaxValue)
+        {
+            throw new InvalidOperationException("图像文件过大，无法读取。");
+        }
+
+        var bytes = await File.ReadAllBytesAsync(filePath);
+        await LoadPreviewFromBytesAsync(bytes, Path.GetFileName(filePath));
     }
 
-    private async Task TryLoadPreviewFromClipboardAsync(bool showEmptyMessage)
+    private async Task<bool> TryLoadPreviewFromClipboardAsync(bool showEmptyMessage)
     {
         var content = Clipboard.GetContent();
         if (!content.Contains(StandardDataFormats.Bitmap))
@@ -203,20 +225,27 @@ public sealed partial class TextRecognitionTestPage : Page
                 InputStatusText.Text = "剪贴板中没有可读取的图像";
             }
 
-            return;
+            return false;
         }
 
         var bitmapReference = await content.GetBitmapAsync();
         using var stream = await bitmapReference.OpenReadAsync();
         await LoadPreviewFromStreamAsync(stream, "剪贴板图像");
+        return true;
     }
 
     private async Task LoadPreviewFromStreamAsync(IRandomAccessStream stream, string sourceName)
     {
-        _loadedImageBytes = await ReadStreamBytesAsync(stream);
+        var bytes = await ReadStreamBytesAsync(stream);
+        await LoadPreviewFromBytesAsync(bytes, sourceName);
+    }
+
+    private async Task LoadPreviewFromBytesAsync(byte[] bytes, string sourceName)
+    {
+        _loadedImageBytes = bytes;
         _loadedSourceName = sourceName;
 
-        using var previewStream = await CreateReadStreamAsync(_loadedImageBytes);
+        using var previewStream = await CreateReadStreamAsync(bytes);
         var imageSource = new BitmapImage();
         await imageSource.SetSourceAsync(previewStream);
 
@@ -227,6 +256,71 @@ public sealed partial class TextRecognitionTestPage : Page
         ResultTextBox.Text = string.Empty;
 
         UpdateRecognitionMethodStatus();
+    }
+
+    private void StartScreenClipClipboardPolling(uint startClipboardSequence)
+    {
+        StopScreenClipClipboardPolling();
+        _waitingForScreenClip = true;
+
+        _screenClipClipboardCts = new CancellationTokenSource();
+        _ = PollClipboardForScreenClipAsync(startClipboardSequence, _screenClipClipboardCts.Token);
+    }
+
+    private void StopScreenClipClipboardPolling()
+    {
+        _waitingForScreenClip = false;
+        _screenClipClipboardCts?.Cancel();
+        _screenClipClipboardCts?.Dispose();
+        _screenClipClipboardCts = null;
+    }
+
+    private async Task PollClipboardForScreenClipAsync(uint startClipboardSequence, CancellationToken cancellationToken)
+    {
+        var lastClipboardSequence = startClipboardSequence;
+        var timeoutAt = DateTimeOffset.UtcNow.AddSeconds(ScreenClipClipboardTimeoutSeconds);
+
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested
+                && _waitingForScreenClip
+                && DateTimeOffset.UtcNow < timeoutAt)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
+
+                var currentClipboardSequence = GetClipboardSequenceNumber();
+                if (currentClipboardSequence != 0 && currentClipboardSequence == lastClipboardSequence)
+                {
+                    continue;
+                }
+
+                lastClipboardSequence = currentClipboardSequence;
+                if (await TryLoadPreviewFromClipboardAsync(showEmptyMessage: false))
+                {
+                    StopScreenClipClipboardPolling();
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (COMException) when (!cancellationToken.IsCancellationRequested)
+        {
+            StopScreenClipClipboardPolling();
+            InputStatusText.Text = "暂时无法读取剪贴板，请截图后点击读取剪贴板";
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            StopScreenClipClipboardPolling();
+            ShowInputError("无法读取截图图像", ex);
+        }
+
+        if (_waitingForScreenClip && !cancellationToken.IsCancellationRequested)
+        {
+            StopScreenClipClipboardPolling();
+            InputStatusText.Text = "未检测到截图图像，请截图后点击读取剪贴板";
+        }
     }
 
     private static async Task<byte[]> ReadStreamBytesAsync(IRandomAccessStream stream)
@@ -328,4 +422,7 @@ public sealed partial class TextRecognitionTestPage : Page
     {
         InputStatusText.Text = $"{message}：{ex.Message}";
     }
+
+    [DllImport("user32.dll")]
+    private static extern uint GetClipboardSequenceNumber();
 }

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.Logging;
@@ -23,7 +23,7 @@ public sealed class StatisticsService : IStatisticsService
     private readonly ILogger<StatisticsService> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
-    private StatisticsDocument _document = CreateDefaultDocument();
+    private StatisticsDocument _document = StatisticsDocumentNormalizer.CreateDefault();
     private bool _isLoaded;
     private string? _selectedAccountUid;
 
@@ -62,7 +62,7 @@ public sealed class StatisticsService : IStatisticsService
 
     public async Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document)
     {
-        var changedDocument = await UpdateAsync(() => NormalizeDocument(document));
+        var changedDocument = await UpdateAsync(() => StatisticsDocumentNormalizer.Normalize(document));
         RaiseDocumentChanged(changedDocument);
         return changedDocument;
     }
@@ -78,7 +78,7 @@ public sealed class StatisticsService : IStatisticsService
             }
 
             _document.Accounts.Add(new AccountStatisticsData { Uid = uid });
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
         RaiseDocumentChanged(changedDocument);
         return changedDocument;
@@ -100,7 +100,7 @@ public sealed class StatisticsService : IStatisticsService
                 _selectedAccountUid = _document.Accounts.FirstOrDefault()?.Uid;
             }
 
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
         RaiseDocumentChanged(changedDocument);
         return changedDocument;
@@ -112,7 +112,7 @@ public sealed class StatisticsService : IStatisticsService
         {
             _document.Accounts.Clear();
             _selectedAccountUid = null;
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
         RaiseDocumentChanged(changedDocument);
         return changedDocument;
@@ -137,28 +137,9 @@ public sealed class StatisticsService : IStatisticsService
                 return _document;
             }
 
-            var seasonData = ResolveSeason(account, season);
-            var record = seasonData.Encounters.FirstOrDefault(item =>
-                string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            StatisticsMutationRules.RecordEncounter(account, season, spiritName, capturedAt);
 
-            if (record is null)
-            {
-                seasonData.Encounters.Add(new EncounterSpiritRecord
-                {
-                    Name = spiritName,
-                    Count = 1,
-                    Season = season.Id,
-                    LastCapturedAt = capturedAt
-                });
-            }
-            else
-            {
-                record.Count++;
-                record.Season = season.Id;
-                record.LastCapturedAt = capturedAt;
-            }
-
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -189,27 +170,9 @@ public sealed class StatisticsService : IStatisticsService
                 return _document;
             }
 
-            var seasonData = ResolveSeason(account, seasonId);
-            var record = seasonData.Encounters.FirstOrDefault(item =>
-                string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
-            if (record is null)
-            {
-                seasonData.Encounters.Add(new EncounterSpiritRecord
-                {
-                    Name = spiritName,
-                    Count = count,
-                    Season = seasonId,
-                    LastCapturedAt = countedAt
-                });
-            }
-            else
-            {
-                record.Count += count;
-                record.Season = seasonId;
-                record.LastCapturedAt = Max(record.LastCapturedAt, countedAt);
-            }
+            StatisticsMutationRules.UpsertEncounter(account, seasonId, spiritName, count, countedAt);
 
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -238,37 +201,14 @@ public sealed class StatisticsService : IStatisticsService
         var changedDocument = await UpdateAsync(() =>
         {
             var account = ResolveTargetAccount(_document);
-            var seasonData = account?.Seasons.FirstOrDefault(item =>
-                string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
-            var originalRecord = seasonData?.Encounters.FirstOrDefault(item =>
-                string.Equals(item.Name, originalName, StringComparison.OrdinalIgnoreCase));
-            if (seasonData is null || originalRecord is null)
+            if (account is null)
             {
                 return _document;
             }
 
-            var isRenamed = !string.Equals(originalName, nextName, StringComparison.OrdinalIgnoreCase);
-            var editedRecordTime = isRenamed ? editedAt : originalRecord.LastCapturedAt;
-            var targetRecord = seasonData.Encounters.FirstOrDefault(item =>
-                !ReferenceEquals(item, originalRecord)
-                && string.Equals(item.Name, nextName, StringComparison.OrdinalIgnoreCase));
+            StatisticsMutationRules.EditEncounter(account, seasonId, originalName, nextName, nextCount, editedAt);
 
-            if (targetRecord is null)
-            {
-                originalRecord.Name = nextName;
-                originalRecord.Count = nextCount;
-                originalRecord.Season = seasonId;
-                originalRecord.LastCapturedAt = editedRecordTime;
-            }
-            else
-            {
-                targetRecord.Count += nextCount;
-                targetRecord.Season = seasonId;
-                targetRecord.LastCapturedAt = Max(targetRecord.LastCapturedAt, editedRecordTime);
-                seasonData.Encounters.Remove(originalRecord);
-            }
-
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -287,16 +227,14 @@ public sealed class StatisticsService : IStatisticsService
         var changedDocument = await UpdateAsync(() =>
         {
             var account = ResolveTargetAccount(_document);
-            var seasonData = account?.Seasons.FirstOrDefault(item =>
-                string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
-            var record = seasonData?.Encounters.FirstOrDefault(item =>
-                string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
-            if (seasonData is not null && record is not null)
+            if (account is null)
             {
-                seasonData.Encounters.Remove(record);
+                return _document;
             }
 
-            return NormalizeDocument(_document);
+            StatisticsMutationRules.DeleteEncounter(account, seasonId, spiritName);
+
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -329,37 +267,16 @@ public sealed class StatisticsService : IStatisticsService
                 return _document;
             }
 
-            var seasonData = ResolveSeason(account, seasonId);
-            var resetEncounterRecords = resetEncounterCount
-                ? seasonData.Encounters
-                    .Where(item => string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))
-                    .ToList()
-                : new List<EncounterSpiritRecord>();
-            var resolvedEncounterCountBeforeCapture = NormalizeEncounterCountBeforeCapture(
-                encounterCountBeforeCapture
-                    ?? (resetEncounterCount
-                        ? resetEncounterRecords.Sum(item => Math.Max(0, item.Count))
-                        : 0));
-            for (var index = 0; index < count; index++)
-            {
-                seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
-                {
-                    Name = spiritName,
-                    Season = seasonId,
-                    CapturedAt = capturedAt,
-                    EncounterCountBeforeCapture = resolvedEncounterCountBeforeCapture
-                });
-            }
+            StatisticsMutationRules.AddShinyCaptures(
+                account,
+                seasonId,
+                spiritName,
+                count,
+                capturedAt,
+                resetEncounterCount,
+                encounterCountBeforeCapture);
 
-            if (resetEncounterCount)
-            {
-                foreach (var encounter in resetEncounterRecords)
-                {
-                    seasonData.Encounters.Remove(encounter);
-                }
-            }
-
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -395,46 +312,16 @@ public sealed class StatisticsService : IStatisticsService
                 return _document;
             }
 
-            var originalCaptures = GetShinyCaptures(account, seasonId, originalName).ToList();
-            if (originalCaptures.Count == 0)
-            {
-                return _document;
-            }
+            StatisticsMutationRules.EditShinyCaptures(
+                account,
+                seasonId,
+                originalName,
+                nextName,
+                nextCount,
+                addSeasonId,
+                capturedAt);
 
-            if (nextCount < originalCaptures.Count)
-            {
-                foreach (var capture in originalCaptures
-                    .OrderByDescending(capture => capture.CapturedAt)
-                    .Take(originalCaptures.Count - nextCount)
-                    .ToList())
-                {
-                    RemoveShinyCapture(account, capture);
-                }
-            }
-            else if (nextCount > originalCaptures.Count)
-            {
-                var addSeason = ResolveSeason(account, addSeasonId);
-                for (var index = 0; index < nextCount - originalCaptures.Count; index++)
-                {
-                    addSeason.ShinyCaptures.Add(new ShinySpiritCaptureRecord
-                    {
-                        Name = originalName,
-                        Season = addSeasonId,
-                        CapturedAt = capturedAt
-                    });
-                }
-            }
-
-            foreach (var capture in GetShinyCaptures(account, seasonId, originalName).ToList())
-            {
-                capture.Name = nextName;
-                if (string.IsNullOrWhiteSpace(capture.Season))
-                {
-                    capture.Season = addSeasonId;
-                }
-            }
-
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -458,12 +345,9 @@ public sealed class StatisticsService : IStatisticsService
                 return _document;
             }
 
-            foreach (var capture in GetShinyCaptures(account, seasonId, spiritName).ToList())
-            {
-                RemoveShinyCapture(account, capture);
-            }
+            StatisticsMutationRules.DeleteShinyCaptures(account, seasonId, spiritName);
 
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -489,29 +373,9 @@ public sealed class StatisticsService : IStatisticsService
                 return _document;
             }
 
-            _ = ResolveSeason(account, season);
+            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt);
 
-            var pendingCapture = account.PendingShinyCaptures.FirstOrDefault(item =>
-                string.Equals(item.Season, season.Id, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
-            if (pendingCapture is null)
-            {
-                account.PendingShinyCaptures.Add(new PendingShinyCaptureRecord
-                {
-                    Id = Guid.NewGuid().ToString("N"),
-                    Name = spiritName,
-                    Season = season.Id,
-                    DetectedAt = detectedAt
-                });
-            }
-            else
-            {
-                pendingCapture.Name = spiritName;
-                pendingCapture.Season = season.Id;
-                pendingCapture.DetectedAt = Max(pendingCapture.DetectedAt, detectedAt);
-            }
-
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -536,38 +400,19 @@ public sealed class StatisticsService : IStatisticsService
         var changedDocument = await UpdateAsync(() =>
         {
             var account = ResolveTargetAccount(_document);
-            var pendingCapture = account is null
-                ? null
-                : FindPendingShinyCapture(account, pendingCaptureId);
-            if (account is null || pendingCapture is null)
+            if (account is null)
             {
                 return _document;
             }
 
-            var originalName = pendingCapture.Name;
-            var seasonId = pendingCapture.Season;
-            account.PendingShinyCaptures.Remove(pendingCapture);
+            StatisticsMutationRules.ConfirmPendingShinyCapture(
+                account,
+                pendingCaptureId,
+                spiritName,
+                encounterCount,
+                confirmedAt);
 
-            var seasonData = ResolveSeason(account, seasonId);
-            seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
-            {
-                Name = spiritName,
-                Season = seasonId,
-                CapturedAt = pendingCapture.DetectedAt == default
-                    ? confirmedAt
-                    : pendingCapture.DetectedAt,
-                EncounterCountBeforeCapture = encounterCount
-            });
-
-            foreach (var encounter in seasonData.Encounters
-                .Where(item => string.Equals(item.Name, originalName, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))
-                .ToList())
-            {
-                seasonData.Encounters.Remove(encounter);
-            }
-
-            return NormalizeDocument(_document);
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -585,15 +430,14 @@ public sealed class StatisticsService : IStatisticsService
         var changedDocument = await UpdateAsync(() =>
         {
             var account = ResolveTargetAccount(_document);
-            var pendingCapture = account is null
-                ? null
-                : FindPendingShinyCapture(account, pendingCaptureId);
-            if (account is not null && pendingCapture is not null)
+            if (account is null)
             {
-                account.PendingShinyCaptures.Remove(pendingCapture);
+                return _document;
             }
 
-            return NormalizeDocument(_document);
+            StatisticsMutationRules.DiscardPendingShinyCapture(account, pendingCaptureId);
+
+            return StatisticsDocumentNormalizer.Normalize(_document);
         });
 
         RaiseDocumentChanged(changedDocument);
@@ -691,13 +535,13 @@ public sealed class StatisticsService : IStatisticsService
         {
             var savedDocument = await _localSettingsService.ReadSettingAsync<StatisticsDocument>(SettingsKeys.StatisticsData);
             _document = savedDocument is null
-                ? CreateDefaultDocument()
-                : NormalizeDocument(savedDocument);
+                ? StatisticsDocumentNormalizer.CreateDefault()
+                : StatisticsDocumentNormalizer.Normalize(savedDocument);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "读取统计数据失败，已使用空统计数据。");
-            _document = CreateDefaultDocument();
+            _document = StatisticsDocumentNormalizer.CreateDefault();
         }
 
         _isLoaded = true;
@@ -751,249 +595,10 @@ public sealed class StatisticsService : IStatisticsService
         return document.Accounts.FirstOrDefault();
     }
 
-    private static SeasonStatisticsData ResolveSeason(
-        AccountStatisticsData account,
-        EncounterSeasonDefinition season)
-    {
-        var seasonData = account.Seasons.FirstOrDefault(item =>
-            string.Equals(item.Id, season.Id, StringComparison.OrdinalIgnoreCase));
-        if (seasonData is null)
-        {
-            seasonData = new SeasonStatisticsData
-            {
-                Id = season.Id,
-                Name = string.IsNullOrWhiteSpace(season.Name) ? $"{season.Id}赛季" : season.Name,
-                DateRange = season.DateRange,
-                EncounterTypeName = season.EncounterTypeName
-            };
-            account.Seasons.Add(seasonData);
-        }
-
-        if (!string.IsNullOrWhiteSpace(season.Name))
-        {
-            seasonData.Name = season.Name;
-        }
-
-        if (!string.IsNullOrWhiteSpace(season.DateRange))
-        {
-            seasonData.DateRange = season.DateRange;
-        }
-
-        if (!string.IsNullOrWhiteSpace(season.EncounterTypeName))
-        {
-            seasonData.EncounterTypeName = season.EncounterTypeName;
-        }
-
-        return seasonData;
-    }
-
-    private static SeasonStatisticsData ResolveSeason(AccountStatisticsData account, string seasonId)
-    {
-        seasonId = seasonId.Trim();
-        var seasonData = account.Seasons.FirstOrDefault(item =>
-            string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
-        if (seasonData is not null)
-        {
-            return seasonData;
-        }
-
-        seasonData = new SeasonStatisticsData
-        {
-            Id = seasonId,
-            Name = $"{seasonId}赛季"
-        };
-        account.Seasons.Add(seasonData);
-        return seasonData;
-    }
-
-    private static IEnumerable<ShinySpiritCaptureRecord> GetShinyCaptures(
-        AccountStatisticsData account,
-        string? seasonId,
-        string spiritName)
-    {
-        return account.Seasons
-            .Where(season => string.IsNullOrWhiteSpace(seasonId)
-                || string.Equals(season.Id, seasonId, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(season => season.ShinyCaptures)
-            .Where(capture => string.Equals(capture.Name, spiritName, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static void RemoveShinyCapture(AccountStatisticsData account, ShinySpiritCaptureRecord capture)
-    {
-        foreach (var season in account.Seasons)
-        {
-            if (season.ShinyCaptures.Remove(capture))
-            {
-                return;
-            }
-        }
-    }
-
-    private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right)
-    {
-        return left >= right ? left : right;
-    }
-
-    private static StatisticsDocument NormalizeDocument(StatisticsDocument document)
-    {
-        document.Info ??= new StatisticsDocumentInfo();
-        document.Info.Format = string.IsNullOrWhiteSpace(document.Info.Format)
-            ? StatisticsDocumentFormats.RocoPilotStatistics
-            : document.Info.Format.Trim();
-        document.Info.Version = StatisticsDocumentFormats.CurrentVersion;
-        document.Info.ExportApp = string.IsNullOrWhiteSpace(document.Info.ExportApp)
-            ? "RocoPilot"
-            : document.Info.ExportApp.Trim();
-        document.Accounts ??= [];
-
-        document.Accounts = document.Accounts
-            .Where(account => !string.IsNullOrWhiteSpace(account.Uid))
-            .GroupBy(account => account.Uid.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(group =>
-            {
-                var account = group.First();
-                account.Uid = group.Key;
-                account.Seasons = group
-                    .SelectMany(item => item.Seasons ?? [])
-                    .GroupBy(season => ResolveSeasonId(season), StringComparer.OrdinalIgnoreCase)
-                    .Select(seasonGroup => NormalizeSeason(seasonGroup.Key, seasonGroup))
-                    .Where(season => !string.IsNullOrWhiteSpace(season.Id))
-                    .OrderBy(season => season.Id, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                account.PendingShinyCaptures = group
-                    .SelectMany(item => item.PendingShinyCaptures ?? [])
-                    .Select(NormalizePendingShinyCapture)
-                    .Where(record => !string.IsNullOrWhiteSpace(record.Id)
-                        && !string.IsNullOrWhiteSpace(record.Name)
-                        && !string.IsNullOrWhiteSpace(record.Season))
-                    .GroupBy(record => record.Id, StringComparer.OrdinalIgnoreCase)
-                    .Select(recordGroup => recordGroup
-                        .OrderByDescending(record => record.DetectedAt)
-                        .First())
-                    .OrderByDescending(record => record.DetectedAt)
-                    .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-                return account;
-            })
-            .OrderBy(account => account.Uid, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        return document;
-    }
-
-    private static SeasonStatisticsData NormalizeSeason(
-        string seasonId,
-        IEnumerable<SeasonStatisticsData> seasons)
-    {
-        var seasonList = seasons.ToList();
-        var first = seasonList.First();
-        var normalized = new SeasonStatisticsData
-        {
-            Id = seasonId,
-            Name = string.IsNullOrWhiteSpace(first.Name) ? $"{seasonId}赛季" : first.Name.Trim(),
-            DateRange = first.DateRange?.Trim() ?? string.Empty,
-            EncounterTypeName = first.EncounterTypeName?.Trim() ?? string.Empty
-        };
-
-        normalized.Encounters = seasonList
-            .SelectMany(season => season.Encounters ?? [])
-            .Where(record => !string.IsNullOrWhiteSpace(record.Name) && record.Count > 0)
-            .GroupBy(record => record.Name.Trim(), StringComparer.OrdinalIgnoreCase)
-            .Select(group =>
-            {
-                var latestRecord = group
-                    .OrderByDescending(record => record.LastCapturedAt)
-                    .First();
-                return new EncounterSpiritRecord
-                {
-                    Name = latestRecord.Name.Trim(),
-                    Count = group.Sum(record => Math.Max(0, record.Count)),
-                    Season = string.IsNullOrWhiteSpace(latestRecord.Season) ? seasonId : latestRecord.Season.Trim(),
-                    LastCapturedAt = latestRecord.LastCapturedAt
-                };
-            })
-            .OrderByDescending(record => record.LastCapturedAt)
-            .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        normalized.ShinyCaptures = seasonList
-            .SelectMany(season => season.ShinyCaptures ?? [])
-            .Where(record => !string.IsNullOrWhiteSpace(record.Name))
-            .Select(record => new ShinySpiritCaptureRecord
-            {
-                Name = record.Name.Trim(),
-                Season = string.IsNullOrWhiteSpace(record.Season) ? seasonId : record.Season.Trim(),
-                CapturedAt = record.CapturedAt,
-                EncounterCountBeforeCapture = NormalizeEncounterCountBeforeCapture(record.EncounterCountBeforeCapture)
-            })
-            .OrderByDescending(record => record.CapturedAt)
-            .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        return normalized;
-    }
-
-    private static int NormalizeEncounterCountBeforeCapture(int encounterCountBeforeCapture)
-    {
-        return Math.Max(0, encounterCountBeforeCapture);
-    }
-
-    private static string ResolveSeasonId(SeasonStatisticsData season)
-    {
-        if (!string.IsNullOrWhiteSpace(season.Id))
-        {
-            return season.Id.Trim();
-        }
-
-        if (!string.IsNullOrWhiteSpace(season.Name))
-        {
-            return season.Name.Trim().Replace("赛季", string.Empty, StringComparison.OrdinalIgnoreCase);
-        }
-
-        return string.Empty;
-    }
-
-    private static PendingShinyCaptureRecord NormalizePendingShinyCapture(PendingShinyCaptureRecord record)
-    {
-        return new PendingShinyCaptureRecord
-        {
-            Id = string.IsNullOrWhiteSpace(record.Id)
-                ? Guid.NewGuid().ToString("N")
-                : record.Id.Trim(),
-            Name = record.Name?.Trim() ?? string.Empty,
-            Season = record.Season?.Trim() ?? string.Empty,
-            DetectedAt = record.DetectedAt == default
-                ? DateTimeOffset.Now
-                : record.DetectedAt
-        };
-    }
-
-    private static PendingShinyCaptureRecord? FindPendingShinyCapture(
-        AccountStatisticsData account,
-        string pendingCaptureId)
-    {
-        return account.PendingShinyCaptures.FirstOrDefault(item =>
-            string.Equals(item.Id, pendingCaptureId, StringComparison.OrdinalIgnoreCase));
-    }
-
     private static StatisticsDocument CloneDocument(StatisticsDocument document)
     {
         var json = JsonSerializer.Serialize(document, JsonOptions);
         return JsonSerializer.Deserialize<StatisticsDocument>(json, JsonOptions) ?? new StatisticsDocument();
     }
-
-    private static StatisticsDocument CreateDefaultDocument()
-    {
-        return NormalizeDocument(new StatisticsDocument
-        {
-            Info = new StatisticsDocumentInfo
-            {
-                Format = StatisticsDocumentFormats.RocoPilotStatistics,
-                Version = StatisticsDocumentFormats.CurrentVersion,
-                ExportApp = "RocoPilot",
-                ExportedAt = DateTimeOffset.Now
-            },
-            Accounts = []
-        });
-    }
 }
+

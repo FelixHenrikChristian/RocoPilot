@@ -17,6 +17,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
     private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
+    private bool _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved;
 
     public bool IsEncounterStatisticsEnabled
     {
@@ -97,7 +98,22 @@ public partial class RealtimeViewModel : ObservableRecipient
         ? "已开启"
         : "已关闭";
 
-    public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(_autoBattleReleaseSequence);
+    public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(
+        _autoBattleReleaseSequence,
+        _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved);
+
+    public bool IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved
+    {
+        get => _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved;
+        set
+        {
+            if (SetProperty(ref _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved, value))
+            {
+                SaveAutoBattleSettings();
+                OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+            }
+        }
+    }
 
     public AutoBattleSettings AutoBattleSettings => BuildAutoBattleSettings();
 
@@ -125,10 +141,12 @@ public partial class RealtimeViewModel : ObservableRecipient
         _autoBattleTurnSequence = settings.TurnSequence;
         _autoBattleReleaseSequence = (settings.ReleaseSequence ?? []).Select(step => step.Clone()).ToList();
         _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
+        _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved = settings.OnlyRecoverEnergyAfterEncounterRelieved;
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(AutoBattleRoundOrder));
         OnPropertyChanged(nameof(AutoBattleTurnSequence));
+        OnPropertyChanged(nameof(IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved));
         OnPropertyChanged(nameof(AutoBattleStatus));
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
@@ -155,15 +173,20 @@ public partial class RealtimeViewModel : ObservableRecipient
             RoundOrder = AutoBattleRoundOrder,
             TurnSequence = AutoBattleTurnSequence,
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
-            TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList()
+            TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
+            OnlyRecoverEnergyAfterEncounterRelieved = IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved
         };
     }
 
-    private static string BuildAutoBattleConfigurationSummary(IReadOnlyList<AutoBattleReleaseStep> releaseSequence)
+    private static string BuildAutoBattleConfigurationSummary(
+        IReadOnlyList<AutoBattleReleaseStep> releaseSequence,
+        bool onlyRecoverEnergyAfterEncounterRelieved)
     {
         if (releaseSequence.Count == 0)
         {
-            return "未配置释放顺序";
+            return onlyRecoverEnergyAfterEncounterRelieved
+                ? "未配置释放顺序 · 奇遇解除后仅回能"
+                : "未配置释放顺序";
         }
 
         var previewItems = releaseSequence
@@ -175,6 +198,9 @@ public partial class RealtimeViewModel : ObservableRecipient
         var suffix = releaseSequence.Count > 6
             ? $"等 {releaseSequence.Count} 步"
             : $"{releaseSequence.Count} 步";
-        return $"{preview} · {suffix}";
+        var encounterEnergyRecoveryText = onlyRecoverEnergyAfterEncounterRelieved
+            ? " · 奇遇解除后仅回能"
+            : string.Empty;
+        return $"{preview} · {suffix}{encounterEnergyRecoveryText}";
     }
 }

@@ -35,6 +35,12 @@ public sealed class AutoBattleSettings
         set;
     } = [];
 
+    public bool OnlyRecoverEnergyAfterEncounterRelieved
+    {
+        get;
+        set;
+    }
+
     public static AutoBattleSettings CreateDefault()
     {
         return new AutoBattleSettings
@@ -43,7 +49,8 @@ public sealed class AutoBattleSettings
             RoundOrder = DefaultRoundOrder,
             TurnSequence = DefaultTurnSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
-            TurnSequencePresets = []
+            TurnSequencePresets = [],
+            OnlyRecoverEnergyAfterEncounterRelieved = false
         };
     }
 
@@ -67,7 +74,8 @@ public sealed class AutoBattleSettings
             RoundOrder = RoundOrder,
             TurnSequence = TurnSequence,
             ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
-            TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList()
+            TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
+            OnlyRecoverEnergyAfterEncounterRelieved = OnlyRecoverEnergyAfterEncounterRelieved
         };
     }
 }

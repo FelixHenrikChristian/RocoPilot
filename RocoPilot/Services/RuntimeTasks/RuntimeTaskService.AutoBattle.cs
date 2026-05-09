@@ -18,6 +18,7 @@ public sealed partial class RuntimeTaskService
 
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattlePetSwitchProbeDelay = TimeSpan.FromMilliseconds(1500);
     private static readonly string[] AutoBattleDefaultRoundOrder =
     [
@@ -81,6 +82,8 @@ public sealed partial class RuntimeTaskService
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
     private AutoBattleReleaseStep? _currentAutoBattleReleaseStep;
     private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
+    private bool _isAutoBattleEncounterEnergyRecoveryActive;
+    private DateTimeOffset _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
@@ -90,6 +93,10 @@ public sealed partial class RuntimeTaskService
         if (!_autoBattleSettings.IsEnabled)
         {
             ResetAutoBattleBattleState();
+        }
+        else if (!_autoBattleSettings.OnlyRecoverEnergyAfterEncounterRelieved)
+        {
+            ResetAutoBattleEncounterEnergyRecoveryState();
         }
 
         _settingsLoaded = true;
@@ -206,10 +213,14 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
-            var isRetryingEnergyRecovery =
-                _autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.EnergyRecovery;
+            var isEncounterEnergyRecoveryActive =
+                settings.OnlyRecoverEnergyAfterEncounterRelieved
+                && _isAutoBattleEncounterEnergyRecoveryActive;
+            var isEnergyRecoveryAction =
+                isEncounterEnergyRecoveryActive
+                || _autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.EnergyRecovery;
             var releaseStep = _currentAutoBattleReleaseStep ?? GetCurrentAutoBattleReleaseStep(settings);
-            var sequence = isRetryingEnergyRecovery
+            var sequence = isEnergyRecoveryAction
                 ? "X"
                 : BuildAutoBattleReleaseSequence(settings, releaseStep);
             if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
@@ -237,13 +248,15 @@ public sealed partial class RuntimeTaskService
                 AutoBattleKeyboardInputOptions,
                 cancellationToken);
 
-            _autoBattleSkillSelectionAction = isRetryingEnergyRecovery
+            _autoBattleSkillSelectionAction = isEnergyRecoveryAction
                 ? AutoBattleSkillSelectionAction.EnergyRecovery
                 : AutoBattleSkillSelectionAction.Skill;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
-            var actionText = isRetryingEnergyRecovery ? "按回能键" : "按技能键";
-            var pressedKey = isRetryingEnergyRecovery ? "X" : GetAutoBattleReleaseStepDisplay(releaseStep);
+            var actionText = isEncounterEnergyRecoveryActive
+                ? "奇遇解除后回能"
+                : isEnergyRecoveryAction ? "按回能键" : "按技能键";
+            var pressedKey = isEnergyRecoveryAction ? "X" : GetAutoBattleReleaseStepDisplay(releaseStep);
             _logger.LogInformation(
                 "自动战斗：{Action} {Key}（序列 {Sequence}）",
                 actionText,
@@ -383,6 +396,65 @@ public sealed partial class RuntimeTaskService
 
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
         _logger.LogInformation("自动战斗：检测到能量不足，按 X 回能");
+        return true;
+    }
+
+    private async Task<bool> TryUpdateAutoBattleEncounterEnergyRecoveryModeAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled || !settings.OnlyRecoverEnergyAfterEncounterRelieved)
+        {
+            return false;
+        }
+
+        if (_isAutoBattleEncounterEnergyRecoveryActive)
+        {
+            return true;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (now < _nextAutoBattleEncounterRelieveScanAt)
+        {
+            return false;
+        }
+
+        _nextAutoBattleEncounterRelieveScanAt = now + AutoBattleEncounterRelieveScanInterval;
+
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        if (season is null || string.IsNullOrWhiteSpace(season.TipText))
+        {
+            return false;
+        }
+
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipRelieveRegionIds,
+            cancellationToken,
+            "自动战斗");
+        var isTipMatch = TextMatchingHelper.IsSimilar(
+            tipText,
+            season.TipText,
+            season.MatchThreshold,
+            out var similarity);
+        _logger.LogDebug(
+            "自动战斗奇遇回能筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            FormatLogText(tipText),
+            FormatLogText(season.TipText),
+            similarity,
+            season.MatchThreshold,
+            isTipMatch);
+
+        if (!isTipMatch)
+        {
+            return false;
+        }
+
+        _isAutoBattleEncounterEnergyRecoveryActive = true;
+        _logger.LogInformation("自动战斗：检测到奇遇效果解除，进入仅按 X 回能模式，直到退出战斗。");
         return true;
     }
 
@@ -555,7 +627,14 @@ public sealed partial class RuntimeTaskService
     {
         _autoBattleRoundIndex = 0;
         ResetAutoBattleSkillSelectionState();
+        ResetAutoBattleEncounterEnergyRecoveryState();
         _wasAutoBattlePetSwitchingVisible = false;
+    }
+
+    private void ResetAutoBattleEncounterEnergyRecoveryState()
+    {
+        _isAutoBattleEncounterEnergyRecoveryActive = false;
+        _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
     }
 
     private void ResetAutoBattleSkillSelectionState()

@@ -20,7 +20,7 @@ namespace RocoPilot.Views.Windows;
 public sealed partial class InfoOverlayWindow : WindowEx
 {
     private const int OverlayWidth = 320;
-    private const int OverlayHeight = 288;
+    private const int OverlayHeight = 336;
     private const int MinOverlayWidth = 260;
     private const int MinOverlayHeight = 240;
     private const int DefaultMargin = 16;
@@ -115,6 +115,17 @@ public sealed partial class InfoOverlayWindow : WindowEx
 
     public void UpdateSnapshot(InfoOverlaySnapshot snapshot)
     {
+        if (snapshot.PendingShinyCapture is null)
+        {
+            PendingShinyAlert.Visibility = Visibility.Collapsed;
+            PendingShinyAlertText.Text = string.Empty;
+        }
+        else
+        {
+            PendingShinyAlert.Visibility = Visibility.Visible;
+            PendingShinyAlertText.Text = $"{snapshot.PendingShinyCapture.CreatureName} · 等待统计页面确认";
+        }
+
         var statusText = string.IsNullOrWhiteSpace(snapshot.StatusText)
             ? "状态待识别"
             : snapshot.StatusText;

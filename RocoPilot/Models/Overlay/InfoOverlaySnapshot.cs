@@ -5,7 +5,8 @@ public sealed record InfoOverlaySnapshot(
     IReadOnlyList<InfoOverlayCounter> Counters,
     DateTimeOffset UpdatedAt,
     int? MagicPointCount = null,
-    int MagicPointMaximum = 6)
+    int MagicPointMaximum = 6,
+    InfoOverlayPendingShinyCapture? PendingShinyCapture = null)
 {
     public static InfoOverlaySnapshot CreateInitial(DateTimeOffset startedAt)
     {
@@ -17,3 +18,8 @@ public sealed record InfoOverlaySnapshot(
             DateTimeOffset.Now);
     }
 }
+
+public sealed record InfoOverlayPendingShinyCapture(
+    string CreatureName,
+    string Season,
+    DateTimeOffset DetectedAt);

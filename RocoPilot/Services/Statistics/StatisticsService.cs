@@ -307,7 +307,9 @@ public sealed class StatisticsService : IStatisticsService
         string seasonId,
         string spiritName,
         int count,
-        DateTimeOffset capturedAt)
+        DateTimeOffset capturedAt,
+        bool resetEncounterCount = false,
+        int? encounterCountBeforeCapture = null)
     {
         seasonId = seasonId.Trim();
         spiritName = spiritName.Trim();
@@ -328,14 +330,33 @@ public sealed class StatisticsService : IStatisticsService
             }
 
             var seasonData = ResolveSeason(account, seasonId);
+            var resetEncounterRecords = resetEncounterCount
+                ? seasonData.Encounters
+                    .Where(item => string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))
+                    .ToList()
+                : new List<EncounterSpiritRecord>();
+            var resolvedEncounterCountBeforeCapture = NormalizeEncounterCountBeforeCapture(
+                encounterCountBeforeCapture
+                    ?? (resetEncounterCount
+                        ? resetEncounterRecords.Sum(item => Math.Max(0, item.Count))
+                        : 0));
             for (var index = 0; index < count; index++)
             {
                 seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
                 {
                     Name = spiritName,
                     Season = seasonId,
-                    CapturedAt = capturedAt
+                    CapturedAt = capturedAt,
+                    EncounterCountBeforeCapture = resolvedEncounterCountBeforeCapture
                 });
+            }
+
+            if (resetEncounterCount)
+            {
+                foreach (var encounter in resetEncounterRecords)
+                {
+                    seasonData.Encounters.Remove(encounter);
+                }
             }
 
             return NormalizeDocument(_document);
@@ -449,6 +470,136 @@ public sealed class StatisticsService : IStatisticsService
         return changedDocument;
     }
 
+    public async Task<StatisticsDocument> AddPendingShinyCaptureAsync(
+        EncounterSeasonDefinition season,
+        string spiritName,
+        DateTimeOffset detectedAt)
+    {
+        spiritName = spiritName.Trim();
+        if (string.IsNullOrWhiteSpace(season.Id) || string.IsNullOrWhiteSpace(spiritName))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            _ = ResolveSeason(account, season);
+
+            var pendingCapture = account.PendingShinyCaptures.FirstOrDefault(item =>
+                string.Equals(item.Season, season.Id, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            if (pendingCapture is null)
+            {
+                account.PendingShinyCaptures.Add(new PendingShinyCaptureRecord
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    Name = spiritName,
+                    Season = season.Id,
+                    DetectedAt = detectedAt
+                });
+            }
+            else
+            {
+                pendingCapture.Name = spiritName;
+                pendingCapture.Season = season.Id;
+                pendingCapture.DetectedAt = Max(pendingCapture.DetectedAt, detectedAt);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
+        string pendingCaptureId,
+        string spiritName,
+        int encounterCount,
+        DateTimeOffset confirmedAt)
+    {
+        pendingCaptureId = pendingCaptureId.Trim();
+        spiritName = spiritName.Trim();
+        encounterCount = Math.Max(0, encounterCount);
+        if (string.IsNullOrWhiteSpace(pendingCaptureId)
+            || string.IsNullOrWhiteSpace(spiritName))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            var pendingCapture = account is null
+                ? null
+                : FindPendingShinyCapture(account, pendingCaptureId);
+            if (account is null || pendingCapture is null)
+            {
+                return _document;
+            }
+
+            var originalName = pendingCapture.Name;
+            var seasonId = pendingCapture.Season;
+            account.PendingShinyCaptures.Remove(pendingCapture);
+
+            var seasonData = ResolveSeason(account, seasonId);
+            seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
+            {
+                Name = spiritName,
+                Season = seasonId,
+                CapturedAt = pendingCapture.DetectedAt == default
+                    ? confirmedAt
+                    : pendingCapture.DetectedAt,
+                EncounterCountBeforeCapture = encounterCount
+            });
+
+            foreach (var encounter in seasonData.Encounters
+                .Where(item => string.Equals(item.Name, originalName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))
+                .ToList())
+            {
+                seasonData.Encounters.Remove(encounter);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(string pendingCaptureId)
+    {
+        pendingCaptureId = pendingCaptureId.Trim();
+        if (string.IsNullOrWhiteSpace(pendingCaptureId))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            var pendingCapture = account is null
+                ? null
+                : FindPendingShinyCapture(account, pendingCaptureId);
+            if (account is not null && pendingCapture is not null)
+            {
+                account.PendingShinyCaptures.Remove(pendingCapture);
+            }
+
+            return NormalizeDocument(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
     public void SetSelectedAccountUid(string? uid)
     {
         var nextUid = string.IsNullOrWhiteSpace(uid) ? null : uid.Trim();
@@ -486,6 +637,30 @@ public sealed class StatisticsService : IStatisticsService
                 LastCapturedAt = record.LastCapturedAt
             })
             .OrderByDescending(record => record.LastCapturedAt)
+            .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public IReadOnlyList<PendingShinyCaptureRecord> GetSelectedAccountPendingShinyCaptures()
+    {
+        var account = ResolveSelectedAccountForRead(_document);
+        if (account is null)
+        {
+            return [];
+        }
+
+        return account.PendingShinyCaptures
+            .Where(record => !string.IsNullOrWhiteSpace(record.Id)
+                && !string.IsNullOrWhiteSpace(record.Name)
+                && !string.IsNullOrWhiteSpace(record.Season))
+            .Select(record => new PendingShinyCaptureRecord
+            {
+                Id = record.Id.Trim(),
+                Name = record.Name.Trim(),
+                Season = record.Season.Trim(),
+                DetectedAt = record.DetectedAt
+            })
+            .OrderByDescending(record => record.DetectedAt)
             .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -665,9 +840,7 @@ public sealed class StatisticsService : IStatisticsService
         document.Info.Format = string.IsNullOrWhiteSpace(document.Info.Format)
             ? StatisticsDocumentFormats.RocoPilotStatistics
             : document.Info.Format.Trim();
-        document.Info.Version = string.IsNullOrWhiteSpace(document.Info.Version)
-            ? StatisticsDocumentFormats.CurrentVersion
-            : document.Info.Version.Trim();
+        document.Info.Version = StatisticsDocumentFormats.CurrentVersion;
         document.Info.ExportApp = string.IsNullOrWhiteSpace(document.Info.ExportApp)
             ? "RocoPilot"
             : document.Info.ExportApp.Trim();
@@ -686,6 +859,19 @@ public sealed class StatisticsService : IStatisticsService
                     .Select(seasonGroup => NormalizeSeason(seasonGroup.Key, seasonGroup))
                     .Where(season => !string.IsNullOrWhiteSpace(season.Id))
                     .OrderBy(season => season.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                account.PendingShinyCaptures = group
+                    .SelectMany(item => item.PendingShinyCaptures ?? [])
+                    .Select(NormalizePendingShinyCapture)
+                    .Where(record => !string.IsNullOrWhiteSpace(record.Id)
+                        && !string.IsNullOrWhiteSpace(record.Name)
+                        && !string.IsNullOrWhiteSpace(record.Season))
+                    .GroupBy(record => record.Id, StringComparer.OrdinalIgnoreCase)
+                    .Select(recordGroup => recordGroup
+                        .OrderByDescending(record => record.DetectedAt)
+                        .First())
+                    .OrderByDescending(record => record.DetectedAt)
+                    .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 return account;
             })
@@ -737,13 +923,19 @@ public sealed class StatisticsService : IStatisticsService
             {
                 Name = record.Name.Trim(),
                 Season = string.IsNullOrWhiteSpace(record.Season) ? seasonId : record.Season.Trim(),
-                CapturedAt = record.CapturedAt
+                CapturedAt = record.CapturedAt,
+                EncounterCountBeforeCapture = NormalizeEncounterCountBeforeCapture(record.EncounterCountBeforeCapture)
             })
             .OrderByDescending(record => record.CapturedAt)
             .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         return normalized;
+    }
+
+    private static int NormalizeEncounterCountBeforeCapture(int encounterCountBeforeCapture)
+    {
+        return Math.Max(0, encounterCountBeforeCapture);
     }
 
     private static string ResolveSeasonId(SeasonStatisticsData season)
@@ -759,6 +951,29 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return string.Empty;
+    }
+
+    private static PendingShinyCaptureRecord NormalizePendingShinyCapture(PendingShinyCaptureRecord record)
+    {
+        return new PendingShinyCaptureRecord
+        {
+            Id = string.IsNullOrWhiteSpace(record.Id)
+                ? Guid.NewGuid().ToString("N")
+                : record.Id.Trim(),
+            Name = record.Name?.Trim() ?? string.Empty,
+            Season = record.Season?.Trim() ?? string.Empty,
+            DetectedAt = record.DetectedAt == default
+                ? DateTimeOffset.Now
+                : record.DetectedAt
+        };
+    }
+
+    private static PendingShinyCaptureRecord? FindPendingShinyCapture(
+        AccountStatisticsData account,
+        string pendingCaptureId)
+    {
+        return account.PendingShinyCaptures.FirstOrDefault(item =>
+            string.Equals(item.Id, pendingCaptureId, StringComparison.OrdinalIgnoreCase));
     }
 
     private static StatisticsDocument CloneDocument(StatisticsDocument document)

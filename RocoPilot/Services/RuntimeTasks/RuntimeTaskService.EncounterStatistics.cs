@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using RocoPilot.Configuration;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
+using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
 
@@ -11,10 +12,19 @@ namespace RocoPilot.Services;
 public sealed partial class RuntimeTaskService
 {
     private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(6);
+    private static readonly TimeSpan PendingShinyDuplicateSuppressWindow = TimeSpan.FromSeconds(12);
+
+    private const string HeterochromiaTipText = "发现异色精灵";
+    private const double HeterochromiaTipMatchThreshold = 0.78;
+    private const int HeterochromiaTipMinimumTextLength = 4;
 
     private static readonly string[] BattleTipRelieveRegionIds =
     [
         "battle-tip-relieve"
+    ];
+    private static readonly string[] BattleTipHeterochromiaRegionIds =
+    [
+        "battle-tip-heterochromia"
     ];
     private static readonly string[] BattleEnemyNameRegionIds =
     [
@@ -22,11 +32,16 @@ public sealed partial class RuntimeTaskService
     ];
 
     private readonly object _encounterRecordLock = new();
+    private readonly object _pendingShinyRecordLock = new();
     private volatile bool _encounterStatisticsEnabled = true;
     private bool _hasActiveEncounterRecord;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
     private DateTimeOffset _lastRecordedEncounterAt;
+    private bool _hasActivePendingShinyRecord;
+    private string? _lastPendingShinySeasonId;
+    private string? _lastPendingShinyName;
+    private DateTimeOffset _lastPendingShinyAt;
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
 
@@ -66,13 +81,33 @@ public sealed partial class RuntimeTaskService
             .ToList();
     }
 
+    private InfoOverlayPendingShinyCapture? GetCurrentPendingShinyCapture()
+    {
+        var pendingCapture = _statisticsService
+            .GetSelectedAccountPendingShinyCaptures()
+            .FirstOrDefault();
+        return pendingCapture is null
+            ? null
+            : new InfoOverlayPendingShinyCapture(
+                pendingCapture.Name,
+                pendingCapture.Season,
+                pendingCapture.DetectedAt);
+    }
+
     private async Task TryUpdateEncounterStatisticsAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
         var season = _encounterSeasonConfigService.GetCurrentSeason();
-        if (season is null || string.IsNullOrWhiteSpace(season.TipText))
+        if (season is null)
+        {
+            return;
+        }
+
+        await TryUpdatePendingShinyCaptureAsync(state, frame, season, cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(season.TipText))
         {
             return;
         }
@@ -145,6 +180,62 @@ public sealed partial class RuntimeTaskService
             similarity);
     }
 
+    private async Task TryUpdatePendingShinyCaptureAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        EncounterSeasonDefinition season,
+        CancellationToken cancellationToken)
+    {
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipHeterochromiaRegionIds,
+            cancellationToken,
+            "异色识别");
+
+        var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
+        _logger.LogDebug(
+            "异色识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            FormatLogText(tipText),
+            HeterochromiaTipText,
+            similarity,
+            HeterochromiaTipMatchThreshold,
+            isTipMatch);
+        if (!isTipMatch)
+        {
+            return;
+        }
+
+        var enemyNameText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleEnemyNameRegionIds,
+            cancellationToken,
+            "异色识别");
+        var enemyName = TextMatchingHelper.CleanSpiritName(enemyNameText);
+        _logger.LogDebug(
+            "异色识别筛选：EnemyNameRaw={EnemyNameRaw}, Cleaned={SpiritName}, IsValid={IsValid}",
+            FormatLogText(enemyNameText),
+            enemyName,
+            !string.IsNullOrWhiteSpace(enemyName));
+        if (string.IsNullOrWhiteSpace(enemyName))
+        {
+            _logger.LogDebug("已匹配异色提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}", similarity);
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (!TryReservePendingShinyRecord(season.Id, enemyName, now))
+        {
+            return;
+        }
+
+        await _statisticsService.AddPendingShinyCaptureAsync(season, enemyName, now);
+        _logger.LogInformation(
+            "异色识别：{SpiritName} 已暂存，等待统计页面确认后计入异色并清空对应赛季奇遇计数。",
+            enemyName);
+    }
+
     private bool TryReserveEncounterRecord(string seasonId, string spiritName, DateTimeOffset now)
     {
         lock (_encounterRecordLock)
@@ -171,11 +262,42 @@ public sealed partial class RuntimeTaskService
         }
     }
 
+    private bool TryReservePendingShinyRecord(string seasonId, string spiritName, DateTimeOffset now)
+    {
+        lock (_pendingShinyRecordLock)
+        {
+            if (string.Equals(_lastPendingShinySeasonId, seasonId, StringComparison.OrdinalIgnoreCase)
+                && (_hasActivePendingShinyRecord || now - _lastPendingShinyAt < PendingShinyDuplicateSuppressWindow))
+            {
+                var remaining = _hasActivePendingShinyRecord
+                    ? PendingShinyDuplicateSuppressWindow
+                    : PendingShinyDuplicateSuppressWindow - (now - _lastPendingShinyAt);
+                _logger.LogDebug(
+                    "异色识别筛选：冷却中，本次识别已忽略。LastSpirit={LastSpiritName}, CurrentSpirit={CurrentSpiritName}, Remaining={RemainingSeconds:F1}s",
+                    _lastPendingShinyName,
+                    spiritName,
+                    Math.Max(0, remaining.TotalSeconds));
+                return false;
+            }
+
+            _lastPendingShinySeasonId = seasonId;
+            _lastPendingShinyName = spiritName;
+            _lastPendingShinyAt = now;
+            _hasActivePendingShinyRecord = true;
+            return true;
+        }
+    }
+
     private void ResetEncounterRecordSuppression()
     {
         lock (_encounterRecordLock)
         {
             _hasActiveEncounterRecord = false;
+        }
+
+        lock (_pendingShinyRecordLock)
+        {
+            _hasActivePendingShinyRecord = false;
         }
     }
 
@@ -185,5 +307,27 @@ public sealed partial class RuntimeTaskService
             .GetSelectedAccountSeasonEncounters(seasonId)
             .FirstOrDefault(record => string.Equals(record.Name, spiritName, StringComparison.OrdinalIgnoreCase));
         return record?.Count ?? 0;
+    }
+
+    private static bool IsHeterochromiaTip(string tipText, out double similarity)
+    {
+        var normalized = TextMatchingHelper.CleanRecognizedText(tipText);
+        if (normalized.Length < HeterochromiaTipMinimumTextLength)
+        {
+            similarity = 0;
+            return false;
+        }
+
+        if (normalized.Contains("异色", StringComparison.OrdinalIgnoreCase)
+            && normalized.Contains("精灵", StringComparison.OrdinalIgnoreCase))
+        {
+            similarity = 1;
+            return true;
+        }
+
+        similarity = Math.Max(
+            TextMatchingHelper.CalculateSimilarity(normalized, HeterochromiaTipText),
+            TextMatchingHelper.CalculateSimilarity(normalized, "异色精灵"));
+        return similarity >= HeterochromiaTipMatchThreshold;
     }
 }

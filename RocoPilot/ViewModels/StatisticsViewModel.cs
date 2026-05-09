@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services.Statistics;
@@ -35,6 +36,10 @@ public partial class StatisticsViewModel : ObservableRecipient
     private int _selectedShinyScopeIndex;
     private IReadOnlyList<SeasonStatisticsGroup> _seasons = [];
     private IReadOnlyList<SpiritCountItem> _allShinyCounts = [];
+    private IReadOnlyList<PendingShinyCaptureItem> _pendingShinyCaptures = [];
+    private string? _editingPendingShinyId;
+    private string _pendingShinyEditName = string.Empty;
+    private double _pendingShinyEditEncounterCount;
 
     public IReadOnlyList<AccountStatisticsOption> Accounts
     {
@@ -102,6 +107,54 @@ public partial class StatisticsViewModel : ObservableRecipient
         get => _allShinyCounts;
         private set => SetProperty(ref _allShinyCounts, value);
     }
+
+    public IReadOnlyList<PendingShinyCaptureItem> PendingShinyCaptures
+    {
+        get => _pendingShinyCaptures;
+        private set => SetProperty(ref _pendingShinyCaptures, value);
+    }
+
+    public int PendingShinyCount => PendingShinyCaptures.Count;
+
+    public PendingShinyCaptureItem? LatestPendingShinyCapture => PendingShinyCaptures.FirstOrDefault();
+
+    public Visibility PendingShinyBadgeVisibility => PendingShinyCount > 0
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public Visibility PendingShinyConfirmationVisibility => PendingShinyCount > 0
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public string PendingShinyEditName
+    {
+        get => _pendingShinyEditName;
+        set
+        {
+            if (SetProperty(ref _pendingShinyEditName, value))
+            {
+                UpdatePendingShinyEncounterCountFromName();
+            }
+        }
+    }
+
+    public double PendingShinyEditEncounterCount
+    {
+        get => _pendingShinyEditEncounterCount;
+        set
+        {
+            var nextValue = double.IsNaN(value) ? 0 : Math.Max(0, value);
+            SetProperty(ref _pendingShinyEditEncounterCount, nextValue);
+        }
+    }
+
+    public string PendingShinySeasonDisplay => LatestPendingShinyCapture?.SeasonDisplay ?? "--";
+
+    public string PendingShinyDetectedAtDisplay => LatestPendingShinyCapture?.DetectedAtDisplay ?? "--";
+
+    public string PendingShinyQueueDisplay => PendingShinyCount > 1
+        ? $"还有 {PendingShinyCount - 1} 条待确认"
+        : "当前仅此一条";
 
     public int TotalAllShiny => AllShinyCounts.Sum(item => item.Count);
 
@@ -301,7 +354,13 @@ public partial class StatisticsViewModel : ObservableRecipient
         ShowNotification(InfoBarSeverity.Success, "已删除奇遇", $"已删除 {item.Name}。");
     }
 
-    public async Task<bool> AddShinyAsync(string? seasonId, string name, int count)
+    public async Task<bool> AddShinyAsync(
+        string? seasonId,
+        string name,
+        int count,
+        DateTimeOffset? capturedAt = null,
+        bool resetEncounterCount = false,
+        int? encounterCountBeforeCapture = null)
     {
         seasonId = string.IsNullOrWhiteSpace(seasonId) ? DefaultShinyAddSeasonId : seasonId.Trim();
         name = CleanSpiritName(name);
@@ -310,8 +369,17 @@ public partial class StatisticsViewModel : ObservableRecipient
             return false;
         }
 
-        ApplyDocument(await _statisticsService.AddShinyCapturesAsync(seasonId!, name, count, DateTimeOffset.Now));
-        ShowNotification(InfoBarSeverity.Success, "已添加异色", $"已添加 {name} x{count}。");
+        ApplyDocument(await _statisticsService.AddShinyCapturesAsync(
+            seasonId!,
+            name,
+            count,
+            capturedAt ?? DateTimeOffset.Now,
+            resetEncounterCount,
+            encounterCountBeforeCapture));
+        var message = resetEncounterCount
+            ? $"已添加 {name} x{count}，并清空对应奇遇计数。"
+            : $"已添加 {name} x{count}。";
+        ShowNotification(InfoBarSeverity.Success, "已添加异色", message);
         return true;
     }
 
@@ -341,6 +409,75 @@ public partial class StatisticsViewModel : ObservableRecipient
     {
         ApplyDocument(await _statisticsService.DeleteShinyCapturesAsync(SelectedShinyScopeSeasonId, item.Name));
         ShowNotification(InfoBarSeverity.Success, "已删除异色", $"已删除 {item.Name}。");
+    }
+
+    public IReadOnlyList<ShinyCaptureDetailItem> GetShinyCaptureDetails(SpiritCountItem item)
+    {
+        var selectedAccount = FindSelectedAccount();
+        var seasonId = SelectedShinyScopeSeasonId;
+        if (selectedAccount is null || string.IsNullOrWhiteSpace(item.Name))
+        {
+            return [];
+        }
+
+        var captures = selectedAccount.Seasons
+            .Where(season => string.IsNullOrWhiteSpace(seasonId)
+                || string.Equals(season.Id, seasonId, StringComparison.OrdinalIgnoreCase))
+            .SelectMany(season => season.ShinyCaptures
+                .Where(capture => string.Equals(capture.Name, item.Name, StringComparison.OrdinalIgnoreCase))
+                .Select(capture => new { Season = season, Capture = capture }))
+            .OrderByDescending(item => item.Capture.CapturedAt)
+            .ThenBy(item => item.Season.Id, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return captures
+            .Select((capture, index) => new ShinyCaptureDetailItem(
+                capture.Capture.Name,
+                string.IsNullOrWhiteSpace(capture.Season.Name) ? $"{capture.Season.Id}赛季" : capture.Season.Name,
+                capture.Capture.CapturedAt,
+                capture.Capture.EncounterCountBeforeCapture,
+                index + 1,
+                captures.Count))
+            .ToList();
+    }
+
+    public async Task ConfirmLatestPendingShinyAsync()
+    {
+        var pendingCapture = LatestPendingShinyCapture;
+        if (pendingCapture is null)
+        {
+            return;
+        }
+
+        var spiritName = CleanSpiritName(PendingShinyEditName);
+        if (string.IsNullOrWhiteSpace(spiritName))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "确认失败", "精灵名不能为空，且只能包含中文、英文和短横线。");
+            return;
+        }
+
+        var encounterCount = (int)Math.Round(PendingShinyEditEncounterCount);
+        ApplyDocument(await _statisticsService.ConfirmPendingShinyCaptureAsync(
+            pendingCapture.Id,
+            spiritName,
+            encounterCount,
+            DateTimeOffset.Now));
+        ShowNotification(
+            InfoBarSeverity.Success,
+            "已确认异色",
+            $"已计入 {spiritName}，并清空对应赛季 {encounterCount} 次奇遇计数。");
+    }
+
+    public async Task DiscardLatestPendingShinyAsync()
+    {
+        var pendingCapture = LatestPendingShinyCapture;
+        if (pendingCapture is null)
+        {
+            return;
+        }
+
+        ApplyDocument(await _statisticsService.DiscardPendingShinyCaptureAsync(pendingCapture.Id));
+        ShowNotification(InfoBarSeverity.Informational, "已忽略待确认异色", pendingCapture.Name);
     }
 
     public void ShowExported(string path)
@@ -400,6 +537,8 @@ public partial class StatisticsViewModel : ObservableRecipient
         AllShinyCounts = BuildShinyCounts(
             seasons.SelectMany(season => season.ShinyCaptures),
             season: null);
+        PendingShinyCaptures = BuildPendingShinyCaptures(selectedAccount);
+        SyncPendingShinyEditor();
 
         SelectedSeasonIndex = Math.Min(SelectedSeasonIndex, Math.Max(0, Seasons.Count - 1));
         SelectedShinyScopeIndex = Math.Min(SelectedShinyScopeIndex, Math.Max(0, ShinyScopes.Count - 1));
@@ -408,6 +547,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
         OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
         OnPropertyChanged(nameof(TotalAllShiny));
+        NotifyPendingShinyChanged();
         NotifySelectedShinyChanged();
     }
 
@@ -464,6 +604,36 @@ public partial class StatisticsViewModel : ObservableRecipient
             .ToList();
     }
 
+    private static IReadOnlyList<PendingShinyCaptureItem> BuildPendingShinyCaptures(AccountStatisticsData? account)
+    {
+        if (account is null)
+        {
+            return [];
+        }
+
+        return account.PendingShinyCaptures
+            .Where(record => !string.IsNullOrWhiteSpace(record.Id)
+                && !string.IsNullOrWhiteSpace(record.Name)
+                && !string.IsNullOrWhiteSpace(record.Season))
+            .Select(record =>
+            {
+                var season = account.Seasons.FirstOrDefault(item =>
+                    string.Equals(item.Id, record.Season, StringComparison.OrdinalIgnoreCase));
+                var encounterCount = season?.Encounters.FirstOrDefault(item =>
+                    string.Equals(item.Name, record.Name, StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+                return new PendingShinyCaptureItem(
+                    record.Id.Trim(),
+                    record.Name.Trim(),
+                    record.Season.Trim(),
+                    string.IsNullOrWhiteSpace(season?.Name) ? $"{record.Season.Trim()}赛季" : season.Name,
+                    record.DetectedAt,
+                    encounterCount);
+            })
+            .OrderByDescending(item => item.DetectedAt)
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private string BuildAllSeasonDateDisplay()
     {
         if (Seasons.Count == 0)
@@ -479,6 +649,58 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SelectedShinyCounts));
         OnPropertyChanged(nameof(TotalSelectedShiny));
         OnPropertyChanged(nameof(SelectedShinyDateDisplay));
+    }
+
+    private void NotifyPendingShinyChanged()
+    {
+        OnPropertyChanged(nameof(PendingShinyCount));
+        OnPropertyChanged(nameof(LatestPendingShinyCapture));
+        OnPropertyChanged(nameof(PendingShinyBadgeVisibility));
+        OnPropertyChanged(nameof(PendingShinyConfirmationVisibility));
+        OnPropertyChanged(nameof(PendingShinySeasonDisplay));
+        OnPropertyChanged(nameof(PendingShinyDetectedAtDisplay));
+        OnPropertyChanged(nameof(PendingShinyQueueDisplay));
+    }
+
+    private void SyncPendingShinyEditor()
+    {
+        var pendingCapture = LatestPendingShinyCapture;
+        if (pendingCapture is null)
+        {
+            _editingPendingShinyId = null;
+            PendingShinyEditName = string.Empty;
+            PendingShinyEditEncounterCount = 0;
+            return;
+        }
+
+        if (string.Equals(_editingPendingShinyId, pendingCapture.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _editingPendingShinyId = pendingCapture.Id;
+        PendingShinyEditName = pendingCapture.Name;
+        PendingShinyEditEncounterCount = pendingCapture.EncounterCount;
+    }
+
+    private void UpdatePendingShinyEncounterCountFromName()
+    {
+        var pendingCapture = LatestPendingShinyCapture;
+        var selectedAccount = FindSelectedAccount();
+        var spiritName = CleanSpiritName(PendingShinyEditName);
+        if (pendingCapture is null
+            || selectedAccount is null
+            || string.IsNullOrWhiteSpace(spiritName))
+        {
+            PendingShinyEditEncounterCount = 0;
+            return;
+        }
+
+        var season = selectedAccount.Seasons.FirstOrDefault(item =>
+            string.Equals(item.Id, pendingCapture.Season, StringComparison.OrdinalIgnoreCase));
+        var encounterCount = season?.Encounters.FirstOrDefault(item =>
+            string.Equals(CleanSpiritName(item.Name), spiritName, StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+        PendingShinyEditEncounterCount = encounterCount;
     }
 
     private bool ValidateStatisticInput(string? seasonId, string name, int count)
@@ -638,4 +860,76 @@ public sealed class SpiritCountItem
     public double ProgressRatio => PityThreshold <= 0
         ? 0
         : Math.Clamp(Count / PityThreshold, 0, 1);
+}
+
+public sealed class ShinyCaptureDetailItem
+{
+    public ShinyCaptureDetailItem(
+        string name,
+        string seasonDisplay,
+        DateTimeOffset capturedAt,
+        int encounterCountBeforeCapture,
+        int position,
+        int totalCount)
+    {
+        Name = name;
+        SeasonDisplay = seasonDisplay;
+        CapturedAt = capturedAt;
+        EncounterCountBeforeCapture = Math.Max(0, encounterCountBeforeCapture);
+        Position = position;
+        TotalCount = totalCount;
+    }
+
+    public string Name { get; }
+
+    public string SeasonDisplay { get; }
+
+    public DateTimeOffset CapturedAt { get; }
+
+    public int EncounterCountBeforeCapture { get; }
+
+    public int Position { get; }
+
+    public int TotalCount { get; }
+
+    public string PositionDisplay => $"{Position} / {TotalCount}";
+
+    public string CapturedDateDisplay => CapturedAt.ToLocalTime().ToString("yyyy-MM-dd");
+
+    public string CapturedTimeDisplay => CapturedAt.ToLocalTime().ToString("HH:mm:ss");
+
+    public string EncounterCountDisplay => $"{EncounterCountBeforeCapture} 次";
+}
+
+public sealed class PendingShinyCaptureItem
+{
+    public PendingShinyCaptureItem(
+        string id,
+        string name,
+        string season,
+        string seasonDisplay,
+        DateTimeOffset detectedAt,
+        int encounterCount)
+    {
+        Id = id;
+        Name = name;
+        Season = season;
+        SeasonDisplay = seasonDisplay;
+        DetectedAt = detectedAt;
+        EncounterCount = encounterCount;
+    }
+
+    public string Id { get; }
+
+    public string Name { get; }
+
+    public string Season { get; }
+
+    public string SeasonDisplay { get; }
+
+    public DateTimeOffset DetectedAt { get; }
+
+    public int EncounterCount { get; }
+
+    public string DetectedAtDisplay => DetectedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
 }

@@ -47,7 +47,9 @@ public interface IStatisticsService
         string seasonId,
         string spiritName,
         int count,
-        DateTimeOffset capturedAt);
+        DateTimeOffset capturedAt,
+        bool resetEncounterCount = false,
+        int? encounterCountBeforeCapture = null);
 
     Task<StatisticsDocument> EditShinyCapturesAsync(
         string? seasonId,
@@ -61,7 +63,23 @@ public interface IStatisticsService
         string? seasonId,
         string spiritName);
 
+    Task<StatisticsDocument> AddPendingShinyCaptureAsync(
+        EncounterSeasonDefinition season,
+        string spiritName,
+        DateTimeOffset detectedAt);
+
+    Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
+        string pendingCaptureId,
+        string spiritName,
+        int encounterCount,
+        DateTimeOffset confirmedAt);
+
+    Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(
+        string pendingCaptureId);
+
     IReadOnlyList<EncounterSpiritRecord> GetSelectedAccountSeasonEncounters(string seasonId);
+
+    IReadOnlyList<PendingShinyCaptureRecord> GetSelectedAccountPendingShinyCaptures();
 
     void SetSelectedAccountUid(string? uid);
 }

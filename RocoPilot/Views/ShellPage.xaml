@@ -49,6 +49,11 @@
                     <NavigationViewItem.Icon>
                         <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE9D2;"/>
                     </NavigationViewItem.Icon>
+                    <NavigationViewItem.InfoBadge>
+                        <InfoBadge
+                            Value="{x:Bind ViewModel.PendingShinyCount, Mode=OneWay}"
+                            Visibility="{x:Bind ViewModel.PendingShinyBadgeVisibility, Mode=OneWay}" />
+                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
                 <NavigationViewItem Content="日志" helpers:NavigationHelper.NavigateTo="RocoPilot.ViewModels.LogViewModel">
                     <NavigationViewItem.Icon>

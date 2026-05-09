@@ -441,7 +441,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             GetCurrentSeasonEncounterCounters(),
             updatedAt,
             magicPointCount,
-            magicPointMaximum);
+            magicPointMaximum,
+            GetCurrentPendingShinyCapture());
     }
 
     private async Task<GameStateScanResult> UpdateMagicPointSnapshotAsync(

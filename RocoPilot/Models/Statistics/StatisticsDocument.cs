@@ -22,7 +22,7 @@ public static class StatisticsDocumentFormats
 {
     public const string RocoPilotStatistics = "RocoPilot.Statistics";
 
-    public const string CurrentVersion = "1.0";
+    public const string CurrentVersion = "1.1";
 }
 
 public sealed class AccountStatisticsData
@@ -30,6 +30,8 @@ public sealed class AccountStatisticsData
     public string Uid { get; set; } = string.Empty;
 
     public List<SeasonStatisticsData> Seasons { get; set; } = [];
+
+    public List<PendingShinyCaptureRecord> PendingShinyCaptures { get; set; } = [];
 }
 
 public sealed class SeasonStatisticsData
@@ -65,4 +67,17 @@ public sealed class ShinySpiritCaptureRecord
     public string Season { get; set; } = string.Empty;
 
     public DateTimeOffset CapturedAt { get; set; }
+
+    public int EncounterCountBeforeCapture { get; set; }
+}
+
+public sealed class PendingShinyCaptureRecord
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Season { get; set; } = string.Empty;
+
+    public DateTimeOffset DetectedAt { get; set; }
 }

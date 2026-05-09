@@ -77,7 +77,7 @@
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="开关打开后，实时任务会在战斗状态识别赛季奇遇提示。"
+                                Text="开关打开后，实时任务会在战斗状态识别赛季奇遇提示和异色提示。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                         <TextBlock

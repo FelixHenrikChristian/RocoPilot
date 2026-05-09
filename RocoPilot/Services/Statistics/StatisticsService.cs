@@ -283,51 +283,6 @@ public sealed class StatisticsService : IStatisticsService
         return changedDocument;
     }
 
-    public async Task<StatisticsDocument> EditShinyCapturesAsync(
-        string? seasonId,
-        string originalName,
-        string nextName,
-        int nextCount,
-        string addSeasonId,
-        DateTimeOffset capturedAt)
-    {
-        seasonId = string.IsNullOrWhiteSpace(seasonId) ? null : seasonId.Trim();
-        originalName = originalName.Trim();
-        nextName = nextName.Trim();
-        addSeasonId = addSeasonId.Trim();
-        nextCount = Math.Max(0, nextCount);
-        if (string.IsNullOrWhiteSpace(originalName)
-            || string.IsNullOrWhiteSpace(nextName)
-            || string.IsNullOrWhiteSpace(addSeasonId)
-            || nextCount <= 0)
-        {
-            return await LoadAsync();
-        }
-
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.EditShinyCaptures(
-                account,
-                seasonId,
-                originalName,
-                nextName,
-                nextCount,
-                addSeasonId,
-                capturedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
-    }
-
     public async Task<StatisticsDocument> DeleteShinyCapturesAsync(string? seasonId, string spiritName)
     {
         seasonId = string.IsNullOrWhiteSpace(seasonId) ? null : seasonId.Trim();
@@ -346,6 +301,67 @@ public sealed class StatisticsService : IStatisticsService
             }
 
             StatisticsMutationRules.DeleteShinyCaptures(account, seasonId, spiritName);
+
+            return StatisticsDocumentNormalizer.Normalize(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> EditShinyCaptureAsync(
+        string captureId,
+        string nextName,
+        int encounterCountBeforeCapture,
+        DateTimeOffset capturedAt)
+    {
+        captureId = captureId.Trim();
+        nextName = nextName.Trim();
+        encounterCountBeforeCapture = Math.Max(0, encounterCountBeforeCapture);
+        if (string.IsNullOrWhiteSpace(captureId) || string.IsNullOrWhiteSpace(nextName))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            StatisticsMutationRules.EditShinyCapture(
+                account,
+                captureId,
+                nextName,
+                encounterCountBeforeCapture,
+                capturedAt);
+
+            return StatisticsDocumentNormalizer.Normalize(_document);
+        });
+
+        RaiseDocumentChanged(changedDocument);
+        return changedDocument;
+    }
+
+    public async Task<StatisticsDocument> DeleteShinyCaptureAsync(string captureId)
+    {
+        captureId = captureId.Trim();
+        if (string.IsNullOrWhiteSpace(captureId))
+        {
+            return await LoadAsync();
+        }
+
+        var changedDocument = await UpdateAsync(() =>
+        {
+            var account = ResolveTargetAccount(_document);
+            if (account is null)
+            {
+                return _document;
+            }
+
+            StatisticsMutationRules.DeleteShinyCapture(account, captureId);
 
             return StatisticsDocumentNormalizer.Normalize(_document);
         });

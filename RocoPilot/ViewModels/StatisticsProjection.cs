@@ -23,7 +23,7 @@ internal static class StatisticsProjection
     public static IReadOnlyList<ShinyScopeOption> BuildShinyScopes(IReadOnlyList<SeasonStatisticsGroup> seasons)
     {
         return new[] { new ShinyScopeOption("全部") }
-            .Concat(seasons.Select(season => new ShinyScopeOption(season.SeasonCode)))
+            .Concat(seasons.Select(season => new ShinyScopeOption(season.ScopeName)))
             .ToList();
     }
 
@@ -83,6 +83,7 @@ internal static class StatisticsProjection
 
         return captures
             .Select((capture, index) => new ShinyCaptureDetailItem(
+                capture.Capture.Id,
                 capture.Capture.Name,
                 string.IsNullOrWhiteSpace(capture.Season.Name) ? $"{capture.Season.Id}赛季" : capture.Season.Name,
                 capture.Capture.CapturedAt,
@@ -213,6 +214,11 @@ public sealed class SeasonStatisticsGroup
         ? Name.Replace("赛季", string.Empty)
         : Id;
 
+    public string ScopeName => string.IsNullOrWhiteSpace(Name)
+        || string.Equals(Name, SeasonCode, StringComparison.OrdinalIgnoreCase)
+        ? $"{SeasonCode}赛季"
+        : Name;
+
     private int DateRangeSeparatorIndex => DateRange.IndexOf('-');
 
     public IReadOnlyList<SpiritCountItem> PollutionCounts { get; }
@@ -274,6 +280,7 @@ public sealed class SpiritCountItem
 public sealed class ShinyCaptureDetailItem
 {
     public ShinyCaptureDetailItem(
+        string id,
         string name,
         string seasonDisplay,
         DateTimeOffset capturedAt,
@@ -281,6 +288,7 @@ public sealed class ShinyCaptureDetailItem
         int position,
         int totalCount)
     {
+        Id = id;
         Name = name;
         SeasonDisplay = seasonDisplay;
         CapturedAt = capturedAt;
@@ -288,6 +296,8 @@ public sealed class ShinyCaptureDetailItem
         Position = position;
         TotalCount = totalCount;
     }
+
+    public string Id { get; }
 
     public string Name { get; }
 

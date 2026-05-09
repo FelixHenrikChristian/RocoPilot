@@ -383,31 +383,37 @@ public partial class StatisticsViewModel : ObservableRecipient
         return true;
     }
 
-    public async Task<bool> EditShinyAsync(SpiritCountItem item, string nextName, int nextCount)
+    public async Task<bool> EditShinyCaptureAsync(
+        ShinyCaptureDetailItem item,
+        string nextName,
+        int encounterCountBeforeCapture,
+        DateTimeOffset capturedAt)
     {
-        var addSeasonId = string.IsNullOrWhiteSpace(item.Season)
-            ? DefaultShinyAddSeasonId
-            : item.Season;
         nextName = CleanSpiritName(nextName);
-        if (!ValidateStatisticInput(addSeasonId, nextName, nextCount))
+        if (SelectedAccount is null)
         {
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先添加或选择账号。");
             return false;
         }
 
-        ApplyDocument(await _statisticsService.EditShinyCapturesAsync(
-            SelectedShinyScopeSeasonId,
-            item.Name,
+        if (string.IsNullOrWhiteSpace(nextName))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空，且只能包含中文、英文和短横线。");
+            return false;
+        }
+
+        ApplyDocument(await _statisticsService.EditShinyCaptureAsync(
+            item.Id,
             nextName,
-            nextCount,
-            addSeasonId!,
-            DateTimeOffset.Now));
+            Math.Max(0, encounterCountBeforeCapture),
+            capturedAt));
         ShowNotification(InfoBarSeverity.Success, "已更新异色", $"已更新 {nextName}。");
         return true;
     }
 
-    public async Task DeleteShinyAsync(SpiritCountItem item)
+    public async Task DeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
     {
-        ApplyDocument(await _statisticsService.DeleteShinyCapturesAsync(SelectedShinyScopeSeasonId, item.Name));
+        ApplyDocument(await _statisticsService.DeleteShinyCaptureAsync(item.Id));
         ShowNotification(InfoBarSeverity.Success, "已删除异色", $"已删除 {item.Name}。");
     }
 
@@ -507,6 +513,8 @@ public partial class StatisticsViewModel : ObservableRecipient
         SelectedSeasonIndex = Math.Min(SelectedSeasonIndex, Math.Max(0, Seasons.Count - 1));
         SelectedShinyScopeIndex = Math.Min(SelectedShinyScopeIndex, Math.Max(0, ShinyScopes.Count - 1));
 
+        OnPropertyChanged(nameof(SelectedSeasonIndex));
+        OnPropertyChanged(nameof(SelectedShinyScopeIndex));
         OnPropertyChanged(nameof(SelectedSeason));
         OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
         OnPropertyChanged(nameof(DefaultShinyAddSeasonId));

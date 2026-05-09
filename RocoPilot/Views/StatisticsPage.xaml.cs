@@ -127,7 +127,7 @@ public sealed partial class StatisticsPage : Page
         }
     }
 
-    private void PollutionCountItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    private async void PollutionCountItem_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement target
             || target.DataContext is not SpiritCountItem item
@@ -136,25 +136,18 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var flyout = CreateStatisticItemMenu(
-            editHandler: async () => await EditEncounterAsync(item.Season, item),
-            deleteHandler: async () => await DeleteEncounterAsync(item.Season, item));
-        flyout.ShowAt(target);
+        await ShowEncounterDetailsAsync(item.Season, item);
         e.Handled = true;
     }
 
-    private void ShinyCountItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    private async void ShinyCountItem_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement target || target.DataContext is not SpiritCountItem item)
         {
             return;
         }
 
-        var flyout = CreateStatisticItemMenu(
-            editHandler: async () => await EditShinyAsync(item),
-            deleteHandler: async () => await DeleteShinyAsync(item),
-            detailHandler: async () => await ShowShinyDetailsAsync(item));
-        flyout.ShowAt(target);
+        await ShowShinyDetailsAsync(item);
         e.Handled = true;
     }
 
@@ -180,41 +173,6 @@ public sealed partial class StatisticsPage : Page
         var flyout = CreateAddStatisticMenu(async () => await AddShinyAsync());
         flyout.ShowAt(target);
         e.Handled = true;
-    }
-
-    private static MenuFlyout CreateStatisticItemMenu(
-        Func<Task> editHandler,
-        Func<Task> deleteHandler,
-        Func<Task>? detailHandler = null)
-    {
-        var flyout = new MenuFlyout();
-        if (detailHandler is not null)
-        {
-            var detailItem = new MenuFlyoutItem
-            {
-                Text = "详情"
-            };
-            detailItem.Click += async (_, _) => await detailHandler();
-            flyout.Items.Add(detailItem);
-            flyout.Items.Add(new MenuFlyoutSeparator());
-        }
-
-        var editItem = new MenuFlyoutItem
-        {
-            Text = "编辑"
-        };
-        editItem.Click += async (_, _) => await editHandler();
-
-        var deleteItem = new MenuFlyoutItem
-        {
-            Text = "删除",
-            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C))
-        };
-        deleteItem.Click += async (_, _) => await deleteHandler();
-
-        flyout.Items.Add(editItem);
-        flyout.Items.Add(deleteItem);
-        return flyout;
     }
 
     private static MenuFlyout CreateAddStatisticMenu(Func<Task> addHandler)
@@ -265,6 +223,78 @@ public sealed partial class StatisticsPage : Page
         }
     }
 
+    private async Task ShowEncounterDetailsAsync(string seasonId, SpiritCountItem item)
+    {
+        var xamlRoot = XamlRoot;
+        if (xamlRoot is null)
+        {
+            return;
+        }
+
+        var action = StatisticDetailAction.None;
+        ContentDialog? dialog = null;
+        var editButton = new Button { Content = "编辑" };
+        var deleteButton = new Button
+        {
+            Content = "删除",
+            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C))
+        };
+        editButton.Click += (_, _) =>
+        {
+            action = StatisticDetailAction.Edit;
+            dialog?.Hide();
+        };
+        deleteButton.Click += (_, _) =>
+        {
+            action = StatisticDetailAction.Delete;
+            dialog?.Hide();
+        };
+
+        var actions = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children =
+            {
+                editButton,
+                deleteButton
+            }
+        };
+        var content = new StackPanel
+        {
+            Width = 340,
+            Spacing = 16,
+            Children =
+            {
+                CreateDetailHeader(item.Name),
+                CreateDetailRow("奇遇计数", $"{item.Count} 次"),
+                CreateDetailRow("最近记录", item.LastCapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")),
+                actions
+            }
+        };
+
+        dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = "奇遇详情",
+            Content = content,
+            CloseButtonText = "关闭",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        await dialog.ShowAsync();
+
+        if (action == StatisticDetailAction.Edit)
+        {
+            await EditEncounterAsync(seasonId, item);
+        }
+        else if (action == StatisticDetailAction.Delete)
+        {
+            await DeleteEncounterAsync(seasonId, item);
+        }
+    }
+
     private async Task AddShinyAsync()
     {
         var input = await StatisticsEntryDialogs.ShowShinyEntryAsync(XamlRoot);
@@ -280,30 +310,6 @@ public sealed partial class StatisticsPage : Page
             input.CapturedAt,
             input.ResetEncounterCount,
             input.EncounterCountBeforeCapture);
-    }
-
-    private async Task EditShinyAsync(SpiritCountItem item)
-    {
-        var input = await StatisticsEntryDialogs.ShowStatisticEntryAsync(
-            XamlRoot,
-            "编辑异色条目",
-            "保存",
-            item.Name,
-            item.Count);
-        if (input is null)
-        {
-            return;
-        }
-
-        await ViewModel.EditShinyAsync(item, input.Name, input.Count);
-    }
-
-    private async Task DeleteShinyAsync(SpiritCountItem item)
-    {
-        if (await ConfirmDeleteStatisticItemAsync("删除异色条目", $"将删除 {item.Name} 的异色统计记录。是否继续？"))
-        {
-            await ViewModel.DeleteShinyAsync(item);
-        }
     }
 
     private async Task ShowShinyDetailsAsync(SpiritCountItem item)
@@ -322,11 +328,12 @@ public sealed partial class StatisticsPage : Page
 
         var flipView = new FlipView
         {
-            Width = 460,
-            MinHeight = 260,
+            Width = 470,
+            Height = 226,
             Background = null,
             ItemTemplate = Resources["ShinyCaptureDetailTemplate"] as DataTemplate,
-            ItemsSource = details
+            ItemsSource = details,
+            SelectedIndex = 0
         };
 
         flipView.PointerWheelChanged += (_, args) =>
@@ -342,16 +349,112 @@ public sealed partial class StatisticsPage : Page
             args.Handled = true;
         };
 
+        ShinyCaptureDetailItem? GetSelectedDetail()
+        {
+            return flipView.SelectedItem as ShinyCaptureDetailItem
+                ?? details.ElementAtOrDefault(Math.Max(0, flipView.SelectedIndex));
+        }
+
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "异色详情",
             Content = flipView,
+            PrimaryButtonText = "编辑",
+            SecondaryButtonText = "删除",
             CloseButtonText = "关闭",
             DefaultButton = ContentDialogButton.Close
         };
 
-        await dialog.ShowAsync();
+        var result = await dialog.ShowAsync();
+
+        var selectedDetail = GetSelectedDetail();
+        if (selectedDetail is null)
+        {
+            return;
+        }
+
+        if (result == ContentDialogResult.Primary)
+        {
+            await EditShinyCaptureAsync(selectedDetail);
+        }
+        else if (result == ContentDialogResult.Secondary)
+        {
+            await DeleteShinyCaptureAsync(selectedDetail);
+        }
+    }
+
+    private async Task EditShinyCaptureAsync(ShinyCaptureDetailItem item)
+    {
+        var input = await StatisticsEntryDialogs.ShowShinyCaptureEditAsync(XamlRoot, item);
+        if (input is null)
+        {
+            return;
+        }
+
+        await ViewModel.EditShinyCaptureAsync(
+            item,
+            input.Name,
+            input.EncounterCountBeforeCapture,
+            input.CapturedAt);
+    }
+
+    private async Task DeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
+    {
+        if (await ConfirmDeleteStatisticItemAsync(
+                "删除异色记录",
+                $"将删除 {item.Name} 在 {item.CapturedDateDisplay} {item.CapturedTimeDisplay} 获取的异色记录。是否继续？"))
+        {
+            await ViewModel.DeleteShinyCaptureAsync(item);
+        }
+    }
+
+    private static TextBlock CreateDetailHeader(string text)
+    {
+        return new TextBlock
+        {
+            Text = text,
+            FontSize = 22,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        };
+    }
+
+    private static Grid CreateDetailRow(string label, string value)
+    {
+        var row = new Grid
+        {
+            MinHeight = 34,
+            ColumnSpacing = 14
+        };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var labelTextBlock = new TextBlock
+        {
+            Text = label,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 13,
+            Opacity = 0.72,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        };
+        var valueTextBlock = new TextBlock
+        {
+            Text = value,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        };
+
+        Grid.SetColumn(labelTextBlock, 0);
+        Grid.SetColumn(valueTextBlock, 1);
+        row.Children.Add(labelTextBlock);
+        row.Children.Add(valueTextBlock);
+        return row;
     }
 
     private async void ConfirmPendingShinyButton_Click(object sender, RoutedEventArgs e)
@@ -509,4 +612,10 @@ public sealed partial class StatisticsPage : Page
         timer.Start();
     }
 
+    private enum StatisticDetailAction
+    {
+        None,
+        Edit,
+        Delete
+    }
 }

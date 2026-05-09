@@ -111,6 +111,9 @@ internal static class StatisticsDocumentNormalizer
             .Where(record => !string.IsNullOrWhiteSpace(record.Name))
             .Select(record => new ShinySpiritCaptureRecord
             {
+                Id = string.IsNullOrWhiteSpace(record.Id)
+                    ? Guid.NewGuid().ToString("N")
+                    : record.Id.Trim(),
                 Name = record.Name.Trim(),
                 Season = string.IsNullOrWhiteSpace(record.Season) ? seasonId : record.Season.Trim(),
                 CapturedAt = record.CapturedAt,

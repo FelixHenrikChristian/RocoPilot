@@ -51,17 +51,18 @@ public interface IStatisticsService
         bool resetEncounterCount = false,
         int? encounterCountBeforeCapture = null);
 
-    Task<StatisticsDocument> EditShinyCapturesAsync(
-        string? seasonId,
-        string originalName,
-        string nextName,
-        int nextCount,
-        string addSeasonId,
-        DateTimeOffset capturedAt);
-
     Task<StatisticsDocument> DeleteShinyCapturesAsync(
         string? seasonId,
         string spiritName);
+
+    Task<StatisticsDocument> EditShinyCaptureAsync(
+        string captureId,
+        string nextName,
+        int encounterCountBeforeCapture,
+        DateTimeOffset capturedAt);
+
+    Task<StatisticsDocument> DeleteShinyCaptureAsync(
+        string captureId);
 
     Task<StatisticsDocument> AddPendingShinyCaptureAsync(
         EncounterSeasonDefinition season,

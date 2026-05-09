@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using RocoPilot.ViewModels;
+
 namespace RocoPilot.Views;
 
 internal static class StatisticsEntryDialogs
@@ -186,6 +188,81 @@ internal static class StatisticsEntryDialogs
             resetEncounterCount ? null : encounterCountBeforeCapture);
     }
 
+    public static async Task<ShinyCaptureEditResult?> ShowShinyCaptureEditAsync(
+        XamlRoot? xamlRoot,
+        ShinyCaptureDetailItem item)
+    {
+        if (xamlRoot is null)
+        {
+            return null;
+        }
+
+        var capturedAt = item.CapturedAt.ToLocalTime();
+        var nameTextBox = new TextBox
+        {
+            Header = "精灵名",
+            MaxLength = 32,
+            PlaceholderText = "仅支持中文、英文和短横线",
+            Text = item.Name
+        };
+        var encounterCountNumberBox = new NumberBox
+        {
+            Header = "异色前奇遇",
+            Minimum = 0,
+            Value = item.EncounterCountBeforeCapture,
+            SmallChange = 1,
+            LargeChange = 5,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
+        };
+        var capturedDatePicker = new CalendarDatePicker
+        {
+            Header = "获取日期",
+            Date = capturedAt,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var capturedTimePicker = new TimePicker
+        {
+            Header = "获取时间",
+            Time = capturedAt.TimeOfDay,
+            MinuteIncrement = 1,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        var content = new StackPanel
+        {
+            Spacing = 12,
+            Children =
+            {
+                nameTextBox,
+                encounterCountNumberBox,
+                capturedDatePicker,
+                capturedTimePicker
+            }
+        };
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = "编辑异色记录",
+            Content = content,
+            PrimaryButtonText = "保存",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+        {
+            return null;
+        }
+
+        var encounterCount = double.IsNaN(encounterCountNumberBox.Value)
+            ? 0
+            : Math.Max(0, (int)Math.Round(encounterCountNumberBox.Value));
+        return new ShinyCaptureEditResult(
+            nameTextBox.Text,
+            encounterCount,
+            ResolveHistoricalCapturedAt(capturedDatePicker, capturedTimePicker, capturedAt));
+    }
+
     private static DateTimeOffset ResolveHistoricalCapturedAt(
         CalendarDatePicker capturedDatePicker,
         TimePicker capturedTimePicker,
@@ -205,3 +282,8 @@ internal sealed record ShinyEntryAddResult(
     DateTimeOffset CapturedAt,
     bool ResetEncounterCount,
     int? EncounterCountBeforeCapture);
+
+internal sealed record ShinyCaptureEditResult(
+    string Name,
+    int EncounterCountBeforeCapture,
+    DateTimeOffset CapturedAt);

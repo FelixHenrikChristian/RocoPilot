@@ -18,8 +18,9 @@
         <DataTemplate x:Key="PollutionCountRowTemplate">
             <Grid
                 MinHeight="32"
+                Background="Transparent"
                 ColumnSpacing="8"
-                RightTapped="PollutionCountItem_RightTapped">
+                DoubleTapped="PollutionCountItem_DoubleTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="28" />
                     <ColumnDefinition Width="*" />
@@ -79,8 +80,9 @@
         <DataTemplate x:Key="ShinyCountRowTemplate">
             <Grid
                 MinHeight="32"
+                Background="Transparent"
                 ColumnSpacing="8"
-                RightTapped="ShinyCountItem_RightTapped">
+                DoubleTapped="ShinyCountItem_DoubleTapped">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="28" />
                     <ColumnDefinition Width="*" />
@@ -122,103 +124,174 @@
         </DataTemplate>
 
         <DataTemplate x:Key="ShinyCaptureDetailTemplate">
-            <Grid
-                Width="430"
-                MinHeight="220"
-                Padding="24,10,24,20"
-                RowSpacing="18">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
+            <Border
+                Width="440"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <Grid ColumnSpacing="14">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                    <Border CornerRadius="8,8,0,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#246366F1" />
+                                <GradientStop Offset="1" Color="#188B5CF6" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Grid Padding="18,14" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                    <StackPanel Spacing="4">
-                        <TextBlock
-                            FontSize="24"
-                            FontWeight="SemiBold"
-                            Text="{Binding Name}"
-                            TextTrimming="CharacterEllipsis"
-                            TextWrapping="NoWrap" />
-                        <TextBlock
-                            FontSize="13"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{Binding SeasonDisplay}"
-                            TextTrimming="CharacterEllipsis"
-                            TextWrapping="NoWrap" />
-                    </StackPanel>
+                            <Border
+                                Width="42"
+                                Height="42"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="20"
+                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                    Glyph="&#xE734;" />
+                            </Border>
 
-                    <Border
-                        Grid.Column="1"
-                        MinWidth="58"
-                        Height="30"
-                        Padding="10,0"
-                        VerticalAlignment="Top"
-                        Background="{ThemeResource ControlFillColorDefaultBrush}"
-                        CornerRadius="15">
-                        <TextBlock
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            FontSize="12"
-                            FontWeight="SemiBold"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{Binding PositionDisplay}" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                <TextBlock
+                                    FontSize="22"
+                                    FontWeight="SemiBold"
+                                    Text="{Binding Name}"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="NoWrap" />
+                                <TextBlock
+                                    FontSize="13"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding SeasonDisplay}"
+                                    TextTrimming="CharacterEllipsis"
+                                    TextWrapping="NoWrap" />
+                            </StackPanel>
+
+                            <Border
+                                Grid.Column="2"
+                                MinWidth="58"
+                                Height="28"
+                                Padding="10,0"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="14">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding PositionDisplay}" />
+                            </Border>
+                        </Grid>
                     </Border>
+
+                    <Grid Grid.Row="1" Padding="18,14,18,16" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1.35*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border
+                            Padding="12"
+                            Background="{ThemeResource ControlFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Width="32"
+                                    Height="32"
+                                    VerticalAlignment="Center"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    CornerRadius="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="16"
+                                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                        Glyph="&#xE81D;" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="异色前奇遇"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="NoWrap" />
+                                    <TextBlock
+                                        FontSize="22"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding EncounterCountDisplay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="NoWrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Grid.Column="1"
+                            Padding="12"
+                            Background="{ThemeResource ControlFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Width="32"
+                                    Height="32"
+                                    VerticalAlignment="Center"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    CornerRadius="6">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="16"
+                                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                        Glyph="&#xE787;" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="获得时间"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="NoWrap" />
+                                    <TextBlock
+                                        FontSize="16"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding CapturedDateDisplay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="NoWrap" />
+                                    <TextBlock
+                                        FontSize="13"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding CapturedTimeDisplay}"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="NoWrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
-
-                <Grid Grid.Row="1" ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="1.35*" />
-                    </Grid.ColumnDefinitions>
-
-                    <Border
-                        Padding="16,14"
-                        Background="{ThemeResource ControlFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                        <StackPanel Spacing="8">
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="异色前奇遇" />
-                            <TextBlock
-                                FontSize="26"
-                                FontWeight="SemiBold"
-                                Text="{Binding EncounterCountDisplay}" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border
-                        Grid.Column="1"
-                        Padding="16,14"
-                        Background="{ThemeResource ControlFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="8">
-                        <StackPanel Spacing="8">
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="获取时间" />
-                            <TextBlock
-                                FontSize="18"
-                                FontWeight="SemiBold"
-                                Text="{Binding CapturedDateDisplay}" />
-                            <TextBlock
-                                FontSize="14"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{Binding CapturedTimeDisplay}" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
-            </Grid>
+            </Border>
         </DataTemplate>
     </Page.Resources>
 

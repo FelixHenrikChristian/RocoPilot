@@ -134,6 +134,7 @@ internal static class StatisticsMutationRules
         {
             seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
             {
+                Id = Guid.NewGuid().ToString("N"),
                 Name = spiritName,
                 Season = seasonId,
                 CapturedAt = capturedAt,
@@ -152,58 +153,37 @@ internal static class StatisticsMutationRules
         }
     }
 
-    public static void EditShinyCaptures(
+    public static void DeleteShinyCaptures(AccountStatisticsData account, string? seasonId, string spiritName)
+    {
+        foreach (var capture in GetShinyCaptures(account, seasonId, spiritName).ToList())
+        {
+            RemoveShinyCapture(account, capture);
+        }
+    }
+
+    public static void EditShinyCapture(
         AccountStatisticsData account,
-        string? seasonId,
-        string originalName,
+        string captureId,
         string nextName,
-        int nextCount,
-        string addSeasonId,
+        int encounterCountBeforeCapture,
         DateTimeOffset capturedAt)
     {
-        var originalCaptures = GetShinyCaptures(account, seasonId, originalName).ToList();
-        if (originalCaptures.Count == 0)
+        var capture = FindShinyCapture(account, captureId);
+        if (capture is null)
         {
             return;
         }
 
-        if (nextCount < originalCaptures.Count)
-        {
-            foreach (var capture in originalCaptures
-                .OrderByDescending(capture => capture.CapturedAt)
-                .Take(originalCaptures.Count - nextCount)
-                .ToList())
-            {
-                RemoveShinyCapture(account, capture);
-            }
-        }
-        else if (nextCount > originalCaptures.Count)
-        {
-            var addSeason = ResolveSeason(account, addSeasonId);
-            for (var index = 0; index < nextCount - originalCaptures.Count; index++)
-            {
-                addSeason.ShinyCaptures.Add(new ShinySpiritCaptureRecord
-                {
-                    Name = originalName,
-                    Season = addSeasonId,
-                    CapturedAt = capturedAt
-                });
-            }
-        }
-
-        foreach (var capture in GetShinyCaptures(account, seasonId, originalName).ToList())
-        {
-            capture.Name = nextName;
-            if (string.IsNullOrWhiteSpace(capture.Season))
-            {
-                capture.Season = addSeasonId;
-            }
-        }
+        capture.Name = nextName;
+        capture.EncounterCountBeforeCapture =
+            StatisticsDocumentNormalizer.NormalizeEncounterCountBeforeCapture(encounterCountBeforeCapture);
+        capture.CapturedAt = capturedAt;
     }
 
-    public static void DeleteShinyCaptures(AccountStatisticsData account, string? seasonId, string spiritName)
+    public static void DeleteShinyCapture(AccountStatisticsData account, string captureId)
     {
-        foreach (var capture in GetShinyCaptures(account, seasonId, spiritName).ToList())
+        var capture = FindShinyCapture(account, captureId);
+        if (capture is not null)
         {
             RemoveShinyCapture(account, capture);
         }
@@ -257,6 +237,7 @@ internal static class StatisticsMutationRules
         var seasonData = ResolveSeason(account, seasonId);
         seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
         {
+            Id = Guid.NewGuid().ToString("N"),
             Name = spiritName,
             Season = seasonId,
             CapturedAt = pendingCapture.DetectedAt == default
@@ -359,6 +340,13 @@ internal static class StatisticsMutationRules
                 return;
             }
         }
+    }
+
+    private static ShinySpiritCaptureRecord? FindShinyCapture(AccountStatisticsData account, string captureId)
+    {
+        return account.Seasons
+            .SelectMany(season => season.ShinyCaptures)
+            .FirstOrDefault(capture => string.Equals(capture.Id, captureId, StringComparison.OrdinalIgnoreCase));
     }
 
     private static PendingShinyCaptureRecord? FindPendingShinyCapture(

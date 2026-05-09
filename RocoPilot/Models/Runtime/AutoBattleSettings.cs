@@ -39,7 +39,7 @@ public sealed class AutoBattleSettings
     {
         get;
         set;
-    }
+    } = true;
 
     public static AutoBattleSettings CreateDefault()
     {
@@ -50,7 +50,7 @@ public sealed class AutoBattleSettings
             TurnSequence = DefaultTurnSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
-            OnlyRecoverEnergyAfterEncounterRelieved = false
+            OnlyRecoverEnergyAfterEncounterRelieved = true
         };
     }
 

@@ -17,7 +17,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
     private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
-    private bool _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved;
+    private bool _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved = true;
 
     public bool IsEncounterStatisticsEnabled
     {

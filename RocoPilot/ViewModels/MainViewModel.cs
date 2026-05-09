@@ -49,7 +49,7 @@ public partial class MainViewModel : ObservableRecipient
     private bool _isRealtimeCaptureRunning;
 
     [ObservableProperty]
-    private bool _isMaskOverlayEnabled = true;
+    private bool _isMaskOverlayEnabled;
 
     [ObservableProperty]
     private bool _isInfoOverlayEnabled = true;

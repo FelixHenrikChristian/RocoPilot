@@ -26,7 +26,7 @@ internal static class StatisticsEntryDialogs
         {
             Header = "精灵名",
             MaxLength = 32,
-            PlaceholderText = "仅支持中文、英文和短横线",
+            PlaceholderText = "输入精灵名",
             Text = name
         };
         var countNumberBox = new NumberBox
@@ -103,7 +103,7 @@ internal static class StatisticsEntryDialogs
         {
             Header = "精灵名",
             MaxLength = 32,
-            PlaceholderText = "仅支持中文、英文和短横线"
+            PlaceholderText = "输入精灵名"
         };
         var countNumberBox = new NumberBox
         {
@@ -299,7 +299,7 @@ internal static class StatisticsEntryDialogs
         {
             Header = "精灵名",
             MaxLength = 32,
-            PlaceholderText = "仅支持中文、英文和短横线",
+            PlaceholderText = "输入精灵名",
             Text = item.Name
         };
         var encounterCountNumberBox = new NumberBox

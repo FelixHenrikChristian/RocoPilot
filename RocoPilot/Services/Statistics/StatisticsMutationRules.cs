@@ -1,3 +1,4 @@
+using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 
@@ -13,7 +14,7 @@ internal static class StatisticsMutationRules
     {
         var seasonData = ResolveSeason(account, season);
         var record = seasonData.Encounters.FirstOrDefault(item =>
-            string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            TextMatchingHelper.AreSameSpiritName(item.Name, spiritName));
 
         if (record is null)
         {
@@ -27,6 +28,7 @@ internal static class StatisticsMutationRules
             return;
         }
 
+        record.Name = spiritName;
         record.Count++; 
         record.Season = season.Id;
         record.LastCapturedAt = capturedAt;
@@ -41,7 +43,7 @@ internal static class StatisticsMutationRules
     {
         var seasonData = ResolveSeason(account, seasonId);
         var record = seasonData.Encounters.FirstOrDefault(item =>
-            string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            TextMatchingHelper.AreSameSpiritName(item.Name, spiritName));
         if (record is null)
         {
             seasonData.Encounters.Add(new EncounterSpiritRecord
@@ -54,6 +56,7 @@ internal static class StatisticsMutationRules
             return;
         }
 
+        record.Name = spiritName;
         record.Count += count;
         record.Season = seasonId;
         record.LastCapturedAt = Max(record.LastCapturedAt, countedAt);
@@ -70,7 +73,7 @@ internal static class StatisticsMutationRules
         var seasonData = account.Seasons.FirstOrDefault(item =>
             string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
         var originalRecord = seasonData?.Encounters.FirstOrDefault(item =>
-            string.Equals(item.Name, originalName, StringComparison.OrdinalIgnoreCase));
+            TextMatchingHelper.AreSameSpiritName(item.Name, originalName));
         if (seasonData is null || originalRecord is null)
         {
             return;
@@ -80,7 +83,7 @@ internal static class StatisticsMutationRules
         var editedRecordTime = isRenamed ? editedAt : originalRecord.LastCapturedAt;
         var targetRecord = seasonData.Encounters.FirstOrDefault(item =>
             !ReferenceEquals(item, originalRecord)
-            && string.Equals(item.Name, nextName, StringComparison.OrdinalIgnoreCase));
+            && TextMatchingHelper.AreSameSpiritName(item.Name, nextName));
 
         if (targetRecord is null)
         {
@@ -102,7 +105,7 @@ internal static class StatisticsMutationRules
         var seasonData = account.Seasons.FirstOrDefault(item =>
             string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
         var record = seasonData?.Encounters.FirstOrDefault(item =>
-            string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            TextMatchingHelper.AreSameSpiritName(item.Name, spiritName));
         if (seasonData is not null && record is not null)
         {
             seasonData.Encounters.Remove(record);
@@ -121,7 +124,7 @@ internal static class StatisticsMutationRules
         var seasonData = ResolveSeason(account, seasonId);
         var resetEncounterRecords = resetEncounterCount
             ? seasonData.Encounters
-                .Where(item => string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))
+                .Where(item => TextMatchingHelper.AreSameSpiritName(item.Name, spiritName))
                 .ToList()
             : new List<EncounterSpiritRecord>();
         var resolvedEncounterCountBeforeCapture = StatisticsDocumentNormalizer.NormalizeEncounterCountBeforeCapture(
@@ -199,7 +202,7 @@ internal static class StatisticsMutationRules
 
         var pendingCapture = account.PendingShinyCaptures.FirstOrDefault(item =>
             string.Equals(item.Season, season.Id, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            && TextMatchingHelper.AreSameSpiritName(item.Name, spiritName));
         if (pendingCapture is null)
         {
             account.PendingShinyCaptures.Add(new PendingShinyCaptureRecord
@@ -247,8 +250,8 @@ internal static class StatisticsMutationRules
         });
 
         foreach (var encounter in seasonData.Encounters
-            .Where(item => string.Equals(item.Name, originalName, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))
+            .Where(item => TextMatchingHelper.AreSameSpiritName(item.Name, originalName)
+                || TextMatchingHelper.AreSameSpiritName(item.Name, spiritName))
             .ToList())
         {
             seasonData.Encounters.Remove(encounter);
@@ -328,7 +331,7 @@ internal static class StatisticsMutationRules
             .Where(season => string.IsNullOrWhiteSpace(seasonId)
                 || string.Equals(season.Id, seasonId, StringComparison.OrdinalIgnoreCase))
             .SelectMany(season => season.ShinyCaptures)
-            .Where(capture => string.Equals(capture.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            .Where(capture => TextMatchingHelper.AreSameSpiritName(capture.Name, spiritName));
     }
 
     private static void RemoveShinyCapture(AccountStatisticsData account, ShinySpiritCaptureRecord capture)

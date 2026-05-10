@@ -866,7 +866,7 @@
                                         x:Name="PendingShinyNameTextBox"
                                         Header="精灵名"
                                         MaxLength="32"
-                                        PlaceholderText="仅支持中文、英文和短横线"
+                                        PlaceholderText="输入精灵名"
                                         Text="{x:Bind ViewModel.PendingShinyEditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                                     <NumberBox

@@ -62,6 +62,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _localDataRoot;
     private SpiritCatalogDocument? _document;
+    private IReadOnlyList<SpiritNameMatchCandidate>? _nameMatchCandidates;
 
     public SpiritCatalogService(
         IOptions<LocalSettingsOptions> options,
@@ -85,6 +86,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             if (File.Exists(localPath))
             {
                 _document = await ReadDocumentAsync(localPath, cancellationToken);
+                _nameMatchCandidates = null;
                 return _document;
             }
 
@@ -92,6 +94,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             if (File.Exists(bundledPath))
             {
                 _document = await ReadDocumentAsync(bundledPath, cancellationToken);
+                _nameMatchCandidates = null;
                 return _document;
             }
 
@@ -103,6 +106,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                     ListUrl = ListUrl
                 }
             };
+            _nameMatchCandidates = null;
             return _document;
         }
         finally
@@ -171,6 +175,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                 cancellationToken);
 
             _document = document;
+            _nameMatchCandidates = null;
             progress?.Report(new SpiritCatalogSyncProgress(states.Count, states.Count, "图鉴数据同步完成"));
             return document;
         }
@@ -183,6 +188,45 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         {
             _gate.Release();
         }
+    }
+
+    public async Task<string> MatchSpiritNameAsync(string recognizedText, CancellationToken cancellationToken = default)
+    {
+        var query = TextMatchingHelper.NormalizeSpiritNameForMatching(recognizedText);
+        if (query.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var document = await LoadAsync(cancellationToken);
+        var candidates = _nameMatchCandidates ??= BuildNameMatchCandidates(document);
+        if (candidates.Count == 0)
+        {
+            return query;
+        }
+
+        SpiritNameMatchCandidate? bestCandidate = null;
+        var bestSimilarity = -1d;
+        foreach (var candidate in candidates)
+        {
+            foreach (var searchName in candidate.SearchNames)
+            {
+                var similarity = TextMatchingHelper.CalculateSimilarity(query, searchName);
+                if (similarity <= bestSimilarity)
+                {
+                    continue;
+                }
+
+                bestSimilarity = similarity;
+                bestCandidate = candidate;
+                if (similarity >= 1)
+                {
+                    return candidate.Name;
+                }
+            }
+        }
+
+        return bestCandidate?.Name ?? query;
     }
 
     public string? ResolveAvatarPath(string? avatarPath)
@@ -492,6 +536,57 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             .ToList();
     }
 
+    private static IReadOnlyList<SpiritNameMatchCandidate> BuildNameMatchCandidates(SpiritCatalogDocument document)
+    {
+        var candidates = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in document.Spirits)
+        {
+            var displayName = BuildDisplayName(item);
+            if (displayName.Length == 0)
+            {
+                continue;
+            }
+
+            if (!candidates.TryGetValue(displayName, out var searchNames))
+            {
+                searchNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                candidates[displayName] = searchNames;
+            }
+
+            AddSearchName(searchNames, item.Name);
+            AddSearchName(searchNames, item.WikiName);
+            foreach (var alias in item.Aliases)
+            {
+                AddSearchName(searchNames, alias);
+            }
+
+            searchNames.Add(displayName);
+        }
+
+        return candidates
+            .Select(pair => new SpiritNameMatchCandidate(pair.Key, pair.Value.ToList()))
+            .OrderBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string BuildDisplayName(SpiritCatalogItem item)
+    {
+        var wikiName = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.WikiName);
+        return wikiName.Length == 0
+            ? TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name)
+            : wikiName;
+    }
+
+    private static void AddSearchName(HashSet<string> searchNames, string? name)
+    {
+        var normalizedName = TextMatchingHelper.NormalizeSpiritNameForMatching(name);
+        if (normalizedName.Length > 0)
+        {
+            searchNames.Add(normalizedName);
+        }
+    }
+
     private static int StageRank(string stage)
     {
         if (string.IsNullOrWhiteSpace(stage))
@@ -615,4 +710,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
         public int StageRank { get; set; }
     }
+
+    private sealed record SpiritNameMatchCandidate(string Name, IReadOnlyList<string> SearchNames);
 }

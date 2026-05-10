@@ -1,11 +1,16 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace RocoPilot.Helpers;
 
 public static class TextMatchingHelper
 {
-    private const string CommonSymbols = "，。？！：；、,.!?:;+-*/%()[]{}<>《》【】「」“”\"'~·";
+    private const string CommonSymbols = "，。？！：；、,.!?:;+-*/%()（）[]{}<>《》【】「」“”\"'~·";
+
+    private static readonly Regex SpiritVariantSuffixRegex = new(
+        "[（(][^（）()]*[）)]",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static string CleanRecognizedText(string? text)
     {
@@ -37,25 +42,50 @@ public static class TextMatchingHelper
 
     public static string CleanSpiritName(string? text)
     {
+        return NormalizeSpiritNameInput(text);
+    }
+
+    public static string NormalizeSpiritNameInput(string? text)
+    {
         if (string.IsNullOrWhiteSpace(text))
         {
             return string.Empty;
         }
 
-        var normalized = text.Normalize(NormalizationForm.FormKC);
-        var builder = new StringBuilder(normalized.Length);
+        return text.Normalize(NormalizationForm.FormKC).Trim();
+    }
 
-        foreach (var character in normalized)
+    public static string NormalizeSpiritNameForDisplay(string? text)
+    {
+        var normalized = NormalizeSpiritNameInput(text);
+        if (normalized.Length == 0)
         {
-            if (IsChineseCharacter(character)
-                || IsAsciiLetter(character)
-                || character == '-')
-            {
-                builder.Append(character);
-            }
+            return string.Empty;
         }
 
-        return builder.ToString();
+        var withoutVariantSuffix = SpiritVariantSuffixRegex.Replace(normalized, string.Empty).Trim();
+        return withoutVariantSuffix.Length == 0 ? normalized : withoutVariantSuffix;
+    }
+
+    public static string NormalizeSpiritNameForMatching(string? text)
+    {
+        var cleaned = CleanRecognizedText(text);
+        if (cleaned.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var withoutVariantSuffix = SpiritVariantSuffixRegex.Replace(cleaned, string.Empty).Trim();
+        return withoutVariantSuffix.Length == 0 ? cleaned : withoutVariantSuffix;
+    }
+
+    public static bool AreSameSpiritName(string? left, string? right)
+    {
+        var normalizedLeft = NormalizeSpiritNameForMatching(left);
+        var normalizedRight = NormalizeSpiritNameForMatching(right);
+        return normalizedLeft.Length > 0
+            && normalizedRight.Length > 0
+            && string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool IsSimilar(
@@ -118,19 +148,6 @@ public static class TextMatchingHelper
             or UnicodeCategory.DecimalDigitNumber
             or UnicodeCategory.LetterNumber
             or UnicodeCategory.OtherNumber;
-    }
-
-    private static bool IsChineseCharacter(char character)
-    {
-        return character is >= '\u4E00' and <= '\u9FFF'
-            or >= '\u3400' and <= '\u4DBF'
-            or >= '\uF900' and <= '\uFAFF';
-    }
-
-    private static bool IsAsciiLetter(char character)
-    {
-        return character is >= 'A' and <= 'Z'
-            or >= 'a' and <= 'z';
     }
 
     private static double CalculateNormalizedLevenshteinSimilarity(string source, string target)

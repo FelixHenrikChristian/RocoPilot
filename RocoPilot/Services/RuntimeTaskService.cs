@@ -9,6 +9,7 @@ using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Recognition;
+using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Helpers;
@@ -51,6 +52,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly IImageMatchingService _imageMatchingService;
     private readonly ITextRecognitionService _textRecognitionService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
+    private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly IStatisticsService _statisticsService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
@@ -80,6 +82,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         IImageMatchingService imageMatchingService,
         ITextRecognitionService textRecognitionService,
         IEncounterSeasonConfigService encounterSeasonConfigService,
+        ISpiritCatalogService spiritCatalogService,
         IStatisticsService statisticsService,
         ILocalSettingsService localSettingsService,
         IRecognitionOverlayService recognitionOverlayService,
@@ -93,6 +96,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         _imageMatchingService = imageMatchingService;
         _textRecognitionService = textRecognitionService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
+        _spiritCatalogService = spiritCatalogService;
         _statisticsService = statisticsService;
         _localSettingsService = localSettingsService;
         _recognitionOverlayService = recognitionOverlayService;

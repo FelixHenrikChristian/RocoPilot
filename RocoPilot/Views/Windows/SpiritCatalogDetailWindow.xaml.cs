@@ -63,7 +63,8 @@ public sealed partial class SpiritCatalogDetailWindow : WindowEx
                 [],
                 [],
                 showVariantButton: false,
-                showChainButton: false))
+                showChainButton: false,
+                showFullName: true))
             .ToList();
         var window = new SpiritCatalogDetailWindow(
             $"NO.{item.Id} 变种",

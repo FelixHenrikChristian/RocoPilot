@@ -10,5 +10,7 @@ public interface ISpiritCatalogService
         IProgress<SpiritCatalogSyncProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
+    Task<string> MatchSpiritNameAsync(string recognizedText, CancellationToken cancellationToken = default);
+
     string? ResolveAvatarPath(string? avatarPath);
 }

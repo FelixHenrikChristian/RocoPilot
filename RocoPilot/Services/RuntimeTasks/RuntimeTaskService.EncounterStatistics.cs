@@ -142,9 +142,9 @@ public sealed partial class RuntimeTaskService
             BattleEnemyNameRegionIds,
             cancellationToken,
             "奇遇统计");
-        var enemyName = TextMatchingHelper.CleanSpiritName(enemyNameText);
+        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
         _logger.LogDebug(
-            "奇遇统计筛选：EnemyNameRaw={EnemyNameRaw}, Cleaned={SpiritName}, IsValid={IsValid}",
+            "奇遇统计筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, IsValid={IsValid}",
             FormatLogText(enemyNameText),
             enemyName,
             !string.IsNullOrWhiteSpace(enemyName));
@@ -212,9 +212,9 @@ public sealed partial class RuntimeTaskService
             BattleEnemyNameRegionIds,
             cancellationToken,
             "异色识别");
-        var enemyName = TextMatchingHelper.CleanSpiritName(enemyNameText);
+        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
         _logger.LogDebug(
-            "异色识别筛选：EnemyNameRaw={EnemyNameRaw}, Cleaned={SpiritName}, IsValid={IsValid}",
+            "异色识别筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, IsValid={IsValid}",
             FormatLogText(enemyNameText),
             enemyName,
             !string.IsNullOrWhiteSpace(enemyName));
@@ -305,8 +305,23 @@ public sealed partial class RuntimeTaskService
     {
         var record = _statisticsService
             .GetSelectedAccountSeasonEncounters(seasonId)
-            .FirstOrDefault(record => string.Equals(record.Name, spiritName, StringComparison.OrdinalIgnoreCase));
+            .FirstOrDefault(record => TextMatchingHelper.AreSameSpiritName(record.Name, spiritName));
         return record?.Count ?? 0;
+    }
+
+    private async Task<string> MatchRecognizedSpiritNameAsync(
+        string recognizedText,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _spiritCatalogService.MatchSpiritNameAsync(recognizedText, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "精灵名图鉴匹配失败，已使用 OCR 原始结果。");
+            return TextMatchingHelper.NormalizeSpiritNameForMatching(recognizedText);
+        }
     }
 
     private static bool IsHeterochromiaTip(string tipText, out double similarity)

@@ -398,7 +398,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
         if (string.IsNullOrWhiteSpace(nextName))
         {
-            ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空，且只能包含中文、英文和短横线。");
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空。");
             return false;
         }
 
@@ -433,7 +433,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         var spiritName = CleanSpiritName(PendingShinyEditName);
         if (string.IsNullOrWhiteSpace(spiritName))
         {
-            ShowNotification(InfoBarSeverity.Warning, "确认失败", "精灵名不能为空，且只能包含中文、英文和短横线。");
+            ShowNotification(InfoBarSeverity.Warning, "确认失败", "精灵名不能为空。");
             return;
         }
 
@@ -604,7 +604,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空，且只能包含中文、英文和短横线。");
+            ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空。");
             return false;
         }
 
@@ -619,7 +619,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     private static string CleanSpiritName(string name)
     {
-        return TextMatchingHelper.CleanSpiritName(name);
+        return TextMatchingHelper.NormalizeSpiritNameInput(name);
     }
 
     private void ShowNotification(InfoBarSeverity severity, string title, string message)

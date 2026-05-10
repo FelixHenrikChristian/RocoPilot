@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Statistics;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 
@@ -489,12 +490,20 @@ public sealed class StatisticsService : IStatisticsService
 
         return season.Encounters
             .Where(record => !string.IsNullOrWhiteSpace(record.Name) && record.Count > 0)
-            .Select(record => new EncounterSpiritRecord
+            .GroupBy(record => TextMatchingHelper.NormalizeSpiritNameForMatching(record.Name), StringComparer.OrdinalIgnoreCase)
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
+            .Select(group =>
             {
-                Name = record.Name.Trim(),
-                Count = record.Count,
-                Season = string.IsNullOrWhiteSpace(record.Season) ? season.Id : record.Season.Trim(),
-                LastCapturedAt = record.LastCapturedAt
+                var latestRecord = group
+                    .OrderByDescending(record => record.LastCapturedAt)
+                    .First();
+                return new EncounterSpiritRecord
+                {
+                    Name = TextMatchingHelper.NormalizeSpiritNameForDisplay(latestRecord.Name),
+                    Count = group.Sum(record => Math.Max(0, record.Count)),
+                    Season = string.IsNullOrWhiteSpace(latestRecord.Season) ? season.Id : latestRecord.Season.Trim(),
+                    LastCapturedAt = latestRecord.LastCapturedAt
+                };
             })
             .OrderByDescending(record => record.LastCapturedAt)
             .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)

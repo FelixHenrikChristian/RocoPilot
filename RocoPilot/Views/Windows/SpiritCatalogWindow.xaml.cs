@@ -76,7 +76,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
                     variants,
                     BuildEvolutionChainRepresentatives(representative),
                     showVariantButton: true,
-                    showChainButton: true));
+                    showChainButton: true,
+                    showFullName: false));
             }
 
             Summary = BuildSummary(document);
@@ -101,7 +102,13 @@ public sealed partial class SpiritCatalogWindow : WindowEx
         }
 
         var items = item.Variants
-            .Select(variant => CreateDisplayItem(variant, [], [], showVariantButton: false, showChainButton: false))
+            .Select(variant => CreateDisplayItem(
+                variant,
+                [],
+                [],
+                showVariantButton: false,
+                showChainButton: false,
+                showFullName: true))
             .ToList();
         var window = new SpiritCatalogDetailWindow(
             $"NO.{item.Id} 变种",
@@ -124,7 +131,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
                 GetVariants(chainItem.Id),
                 [],
                 showVariantButton: true,
-                showChainButton: false))
+                showChainButton: false,
+                showFullName: false))
             .ToList();
         var window = new SpiritCatalogDetailWindow(
             $"进化链 - {item.Name}",
@@ -139,7 +147,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
         IReadOnlyList<SpiritCatalogItem> variants,
         IReadOnlyList<SpiritCatalogItem> chainItems,
         bool showVariantButton,
-        bool showChainButton)
+        bool showChainButton,
+        bool showFullName)
     {
         return SpiritCatalogDisplayItem.FromCatalogItem(
             item,
@@ -147,7 +156,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             variants,
             chainItems,
             showVariantButton,
-            showChainButton);
+            showChainButton,
+            showFullName);
     }
 
     private List<SpiritCatalogItem> BuildEvolutionChainRepresentatives(SpiritCatalogItem item)
@@ -239,12 +249,15 @@ public sealed class SpiritCatalogDisplayItem
         IReadOnlyList<SpiritCatalogItem> variants,
         IReadOnlyList<SpiritCatalogItem> chainItems,
         bool showVariantButton,
-        bool showChainButton)
+        bool showChainButton,
+        bool showFullName)
     {
         return new SpiritCatalogDisplayItem
         {
             Id = item.Id,
-            Name = item.Name,
+            Name = showFullName
+                ? item.Name
+                : RocoPilot.Helpers.TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name),
             Avatar = CreateAvatar(spiritCatalogService.ResolveAvatarPath(item.AvatarPath)),
             Variants = variants,
             ChainItems = chainItems,

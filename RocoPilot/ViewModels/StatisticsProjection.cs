@@ -1,3 +1,4 @@
+using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.ViewModels;
@@ -75,7 +76,7 @@ internal static class StatisticsProjection
             .Where(season => string.IsNullOrWhiteSpace(seasonId)
                 || string.Equals(season.Id, seasonId, StringComparison.OrdinalIgnoreCase))
             .SelectMany(season => season.ShinyCaptures
-                .Where(capture => string.Equals(capture.Name, spiritName, StringComparison.OrdinalIgnoreCase))
+                .Where(capture => TextMatchingHelper.AreSameSpiritName(capture.Name, spiritName))
                 .Select(capture => new { Season = season, Capture = capture }))
             .OrderByDescending(item => item.Capture.CapturedAt)
             .ThenBy(item => item.Season.Id, StringComparer.OrdinalIgnoreCase)
@@ -112,19 +113,28 @@ internal static class StatisticsProjection
 
         var season = account.Seasons.FirstOrDefault(item =>
             string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
-        return season?.Encounters.FirstOrDefault(item =>
-            string.Equals(item.Name, spiritName, StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+        return season?.Encounters
+            .Where(item => TextMatchingHelper.AreSameSpiritName(item.Name, spiritName))
+            .Sum(item => Math.Max(0, item.Count)) ?? 0;
     }
 
     private static SeasonStatisticsGroup ToSeasonStatisticsGroup(SeasonStatisticsData season)
     {
         var pollutionCounts = season.Encounters
             .Where(item => !string.IsNullOrWhiteSpace(item.Name) && item.Count > 0)
-            .Select(item => new SpiritCountItem(
-                item.Name,
-                item.Count,
-                item.LastCapturedAt,
-                string.IsNullOrWhiteSpace(item.Season) ? season.Id : item.Season))
+            .GroupBy(item => TextMatchingHelper.NormalizeSpiritNameForMatching(item.Name), StringComparer.OrdinalIgnoreCase)
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
+            .Select(group =>
+            {
+                var latestItem = group
+                    .OrderByDescending(item => item.LastCapturedAt)
+                    .First();
+                return new SpiritCountItem(
+                    TextMatchingHelper.NormalizeSpiritNameForDisplay(latestItem.Name),
+                    group.Sum(item => Math.Max(0, item.Count)),
+                    latestItem.LastCapturedAt,
+                    string.IsNullOrWhiteSpace(latestItem.Season) ? season.Id : latestItem.Season);
+            })
             .OrderByDescending(item => item.LastCapturedAt)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -145,14 +155,15 @@ internal static class StatisticsProjection
     {
         return captures
             .Where(capture => !string.IsNullOrWhiteSpace(capture.Name))
-            .GroupBy(capture => capture.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(capture => TextMatchingHelper.NormalizeSpiritNameForMatching(capture.Name), StringComparer.OrdinalIgnoreCase)
+            .Where(group => !string.IsNullOrWhiteSpace(group.Key))
             .Select(group =>
             {
                 var latestCapture = group
                     .OrderByDescending(capture => capture.CapturedAt)
                     .First();
                 return new SpiritCountItem(
-                    latestCapture.Name,
+                    TextMatchingHelper.NormalizeSpiritNameForDisplay(latestCapture.Name),
                     group.Count(),
                     latestCapture.CapturedAt,
                     season ?? latestCapture.Season);

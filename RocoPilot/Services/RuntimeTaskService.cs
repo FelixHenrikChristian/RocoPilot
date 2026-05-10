@@ -64,6 +64,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private CancellationTokenSource? _captureCancellationTokenSource;
     private Task? _captureTask;
     private bool _settingsLoaded;
+    private bool _isBattleStateActive;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
 
     public RuntimeTaskState? CurrentState
@@ -183,6 +184,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var cancellationTokenSource = new CancellationTokenSource();
             _captureCancellationTokenSource = cancellationTokenSource;
             CurrentState = state;
+            _isBattleStateActive = false;
+            _unrecognizedStateDetectedAt = null;
+            ResetAutoBattleBattleState();
+            ResetEncounterRecordSuppression();
             _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
             _autoBattleSettings = NormalizeAutoBattleSettings(options.AutoBattleSettings);
             _recognitionOverlayService.Show(state);
@@ -370,6 +375,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var isPetSwitchingVisible = await IsBattlePetSwitchingAsync(state, frame, cancellationToken);
         if (isPetSwitchingVisible)
         {
+            _isBattleStateActive = true;
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 切换精灵",
                 DateTimeOffset.Now));
@@ -383,6 +389,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var isSkillSelectionVisible = await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken);
         if (isSkillSelectionVisible)
         {
+            _isBattleStateActive = true;
             await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
             var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
@@ -398,6 +405,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
+            _isBattleStateActive = true;
             await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
             var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
             if (!recoveredEnergy)
@@ -405,6 +413,23 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 CompleteAutoBattleSkillSelectionState();
             }
 
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+                "战斗中",
+                DateTimeOffset.Now));
+            return GameStateScanResult.Battle;
+        }
+
+        if (_isBattleStateActive)
+        {
+            if (await TryUpdateMagicPointWorldSnapshotAsync(state, frame, cancellationToken))
+            {
+                _isBattleStateActive = false;
+                CompleteAutoBattleSkillSelectionState();
+                ResetAutoBattleBattleState();
+                return GameStateScanResult.NonBattle;
+            }
+
+            CompleteAutoBattleSkillSelectionState();
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中",
                 DateTimeOffset.Now));
@@ -447,6 +472,65 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             magicPointCount,
             magicPointMaximum,
             GetCurrentPendingShinyCapture());
+    }
+
+    private async Task<bool> TryUpdateMagicPointWorldSnapshotAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
+        if (magicPointRegion is null || !TemplateExists(MagicPointTemplateName))
+        {
+            return false;
+        }
+
+        var frameRegion = ToFrameRegion(
+            magicPointRegion,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
+        {
+            return false;
+        }
+
+        var magicPointCount = 0;
+        foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
+        {
+            var result = await _imageMatchingService.MatchAsync(
+                frame,
+                slotRegion,
+                MagicPointTemplateName,
+                MagicPointMatchOptions,
+                cancellationToken);
+            if (result.IsMatch)
+            {
+                magicPointCount++;
+            }
+        }
+
+        _logger.LogDebug(
+            "状态识别目标结果：Target=大世界魔力点 Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
+            magicPointRegion.Id,
+            magicPointCount,
+            MagicPointSlotCount,
+            frameRegion.X,
+            frameRegion.Y,
+            frameRegion.Width,
+            frameRegion.Height);
+
+        if (magicPointCount <= 0)
+        {
+            return false;
+        }
+
+        UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+            "大世界",
+            DateTimeOffset.Now,
+            magicPointCount,
+            MagicPointSlotCount));
+        return true;
     }
 
     private async Task<GameStateScanResult> UpdateMagicPointSnapshotAsync(

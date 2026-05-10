@@ -14,13 +14,10 @@ namespace RocoPilot.ViewModels;
 
 public partial class MainViewModel : ObservableRecipient
 {
-    private const int LaunchNotificationAutoCloseDelayMilliseconds = 4500;
-
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ITextRecognitionService _textRecognitionService;
     private readonly ILogger<MainViewModel> _logger;
-    private CancellationTokenSource? _launchNotificationAutoCloseCts;
 
     public IReadOnlyList<CaptureMethodOption> CaptureMethods
     {
@@ -192,17 +189,11 @@ public partial class MainViewModel : ObservableRecipient
 
     private void ShowLaunchNotification(InfoBarSeverity severity, string title, string message)
     {
-        _launchNotificationAutoCloseCts?.Cancel();
-        _launchNotificationAutoCloseCts?.Dispose();
-        _launchNotificationAutoCloseCts = new CancellationTokenSource();
-
         LaunchNotificationSeverity = severity;
         LaunchNotificationTitle = title;
         LaunchNotificationMessage = message;
         IsLaunchNotificationOpen = false;
         IsLaunchNotificationOpen = true;
-
-        _ = AutoCloseLaunchNotificationAsync(_launchNotificationAutoCloseCts.Token);
     }
 
     private TextRecognitionMethodOption? GetInitialTextRecognitionMethod()
@@ -221,15 +212,4 @@ public partial class MainViewModel : ObservableRecipient
             ?? TextRecognitionMethods.FirstOrDefault();
     }
 
-    private async Task AutoCloseLaunchNotificationAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(LaunchNotificationAutoCloseDelayMilliseconds, cancellationToken);
-            IsLaunchNotificationOpen = false;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
 }

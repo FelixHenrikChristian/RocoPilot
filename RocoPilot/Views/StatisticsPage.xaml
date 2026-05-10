@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
@@ -733,7 +734,8 @@
             Canvas.ZIndex="10"
             Margin="{StaticResource NavigationViewPageContentPadding}"
             VerticalAlignment="Bottom"
-            IsClosable="True"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsClosable="False"
             IsOpen="{x:Bind ViewModel.IsNotificationOpen, Mode=TwoWay}"
             Message="{x:Bind ViewModel.NotificationMessage, Mode=OneWay}"
             Severity="{x:Bind ViewModel.NotificationSeverity, Mode=OneWay}"

@@ -664,6 +664,7 @@ public sealed partial class InputSimulationTestPage : Page
     {
         InputSimulationInfoBar.Message = message;
         InputSimulationInfoBar.Severity = severity;
+        InputSimulationInfoBar.IsOpen = false;
         InputSimulationInfoBar.IsOpen = true;
     }
 

@@ -375,6 +375,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         MessageBar.Title = title;
         MessageBar.Message = message;
         MessageBar.Severity = severity;
+        MessageBar.IsOpen = false;
         MessageBar.IsOpen = true;
     }
 }

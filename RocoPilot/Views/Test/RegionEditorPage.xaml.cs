@@ -439,6 +439,7 @@ public sealed partial class RegionEditorPage : Page
     {
         EditorInfoBar.Message = message;
         EditorInfoBar.Severity = severity;
+        EditorInfoBar.IsOpen = false;
         EditorInfoBar.IsOpen = true;
     }
 

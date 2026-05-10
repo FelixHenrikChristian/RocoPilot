@@ -741,144 +741,284 @@
 
         <Grid
             Canvas.ZIndex="9"
-            Background="#99000000"
+            Background="#B3000000"
             Visibility="{x:Bind ViewModel.PendingShinyConfirmationVisibility, Mode=OneWay}">
             <Border
-                Width="560"
-                MaxWidth="560"
-                Padding="22"
+                Width="590"
+                MaxWidth="590"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center"
                 Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="8">
-                <StackPanel Spacing="16">
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                        <FontIcon
-                            Width="32"
-                            Height="32"
-                            VerticalAlignment="Top"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="24"
-                            Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                            Glyph="&#xE7BA;" />
+                    <Border CornerRadius="8,8,0,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#246366F1" />
+                                <GradientStop Offset="1" Color="#188B5CF6" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Grid Padding="20,16" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="1" Spacing="4">
-                            <TextBlock
-                                FontSize="20"
-                                FontWeight="SemiBold"
-                                Text="发现异色精灵"
-                                TextWrapping="Wrap" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="确认后会计入异色统计，并重置对应精灵的赛季奇遇计数。"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
+                            <Border
+                                Width="48"
+                                Height="48"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="24"
+                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                    Glyph="&#xE7BA;" />
+                            </Border>
 
-                        <InfoBadge
-                            Grid.Column="2"
-                            VerticalAlignment="Top"
-                            Value="{x:Bind ViewModel.PendingShinyCount, Mode=OneWay}" />
-                    </Grid>
-
-                    <Grid ColumnSpacing="12" RowSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="160" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <TextBox
-                            x:Name="PendingShinyNameTextBox"
-                            Header="精灵名"
-                            MaxLength="32"
-                            PlaceholderText="仅支持中文、英文和短横线"
-                            Text="{x:Bind ViewModel.PendingShinyEditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-
-                        <NumberBox
-                            Grid.Column="1"
-                            Header="当前奇遇计数"
-                            Minimum="0"
-                            SmallChange="1"
-                            LargeChange="5"
-                            SpinButtonPlacementMode="Compact"
-                            Value="{x:Bind ViewModel.PendingShinyEditEncounterCount, Mode=TwoWay}" />
-
-                        <Border
-                            Grid.Row="1"
-                            Padding="12"
-                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                            <StackPanel Spacing="4">
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
                                 <TextBlock
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="赛季" />
-                                <TextBlock
+                                    FontSize="22"
                                     FontWeight="SemiBold"
-                                    Text="{x:Bind ViewModel.PendingShinySeasonDisplay, Mode=OneWay}"
-                                    TextTrimming="CharacterEllipsis"
-                                    TextWrapping="NoWrap" />
-                            </StackPanel>
-                        </Border>
-
-                        <Border
-                            Grid.Row="1"
-                            Grid.Column="1"
-                            Padding="12"
-                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="6">
-                            <StackPanel Spacing="4">
+                                    Text="发现异色精灵"
+                                    TextWrapping="Wrap" />
                                 <TextBlock
-                                    FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="识别时间" />
-                                <TextBlock
-                                    FontWeight="SemiBold"
-                                    Text="{x:Bind ViewModel.PendingShinyDetectedAtDisplay, Mode=OneWay}"
+                                    Text="确认识别结果后计入异色统计，并重置对应精灵的当前赛季奇遇计数。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
-                        </Border>
-                    </Grid>
 
-                    <Grid>
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="{x:Bind ViewModel.PendingShinyQueueDisplay, Mode=OneWay}" />
-                        <StackPanel
-                            HorizontalAlignment="Right"
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <Button Click="DiscardPendingShinyButton_Click" Content="忽略" />
-                        <Button
-                            Click="ConfirmPendingShinyButton_Click"
-                            Style="{ThemeResource AccentButtonStyle}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border
+                                Grid.Column="2"
+                                MinWidth="54"
+                                Height="30"
+                                Padding="10,0"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="15">
+                                <StackPanel
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Spacing="6">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="待确认" />
+                                    <InfoBadge Value="{x:Bind ViewModel.PendingShinyCount, Mode=OneWay}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+
+                    <StackPanel
+                        Grid.Row="1"
+                        Padding="20,18"
+                        Spacing="14">
+                        <Border
+                            Padding="14"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <FontIcon
+                                        VerticalAlignment="Center"
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="18"
+                                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                        Glyph="&#xE70F;" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="确认识别结果" />
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="精灵名会实时匹配当前奇遇计数，识别有误时可在这里修正。" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="180" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBox
+                                        x:Name="PendingShinyNameTextBox"
+                                        Header="精灵名"
+                                        MaxLength="32"
+                                        PlaceholderText="仅支持中文、英文和短横线"
+                                        Text="{x:Bind ViewModel.PendingShinyEditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                                    <NumberBox
+                                        Grid.Column="1"
+                                        Header="当前奇遇计数"
+                                        Minimum="0"
+                                        SmallChange="1"
+                                        LargeChange="5"
+                                        SpinButtonPlacementMode="Compact"
+                                        Value="{x:Bind ViewModel.PendingShinyEditEncounterCount, Mode=TwoWay}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Padding="12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Width="32"
+                                        Height="32"
+                                        VerticalAlignment="Center"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        CornerRadius="6">
+                                        <FontIcon
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="15"
+                                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                            Glyph="&#xE9D2;" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="赛季" />
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind ViewModel.PendingShinySeasonDisplay, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="NoWrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <Border
+                                Grid.Column="1"
+                                Padding="12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border
+                                        Width="32"
+                                        Height="32"
+                                        VerticalAlignment="Center"
+                                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                        CornerRadius="6">
+                                        <FontIcon
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="15"
+                                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                            Glyph="&#xE787;" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                        <TextBlock
+                                            FontSize="12"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="识别时间" />
+                                        <TextBlock
+                                            FontWeight="SemiBold"
+                                            Text="{x:Bind ViewModel.PendingShinyDetectedAtDisplay, Mode=OneWay}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="NoWrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <Border
+                        Grid.Row="2"
+                        Padding="20,14"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0"
+                        CornerRadius="0,0,8,8">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
                                 <FontIcon
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
                                     FontSize="14"
-                                    Glyph="&#xE73E;" />
-                                <TextBlock Text="确认计入" />
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE823;" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind ViewModel.PendingShinyQueueDisplay, Mode=OneWay}" />
                             </StackPanel>
-                        </Button>
-                        </StackPanel>
-                    </Grid>
-                </StackPanel>
+
+                            <StackPanel
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <Button Click="DiscardPendingShinyButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="14"
+                                            Glyph="&#xE711;" />
+                                        <TextBlock Text="忽略" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    Click="ConfirmPendingShinyButton_Click"
+                                    Style="{ThemeResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="14"
+                                            Glyph="&#xE73E;" />
+                                        <TextBlock Text="确认计入" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

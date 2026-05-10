@@ -14,6 +14,7 @@ public sealed partial class RuntimeTaskService
     private const string BattleChatTemplateName = "battle-chat.png";
     private const string BattleSkillTemplateName = "battle-button-skill.png";
     private const string BattleSpaceTemplateName = "battle-space.png";
+    private const string AutoBattleCaptureSequence = "W, 1, Space";
     private const string AutoBattleSkillPlaceholder = "{skill}";
 
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
@@ -72,6 +73,11 @@ public sealed partial class RuntimeTaskService
         HoldDurationMs = 45,
         IntervalMs = 120
     };
+    private static readonly KeyboardInputOptions AutoBattleCaptureKeyboardInputOptions = new()
+    {
+        HoldDurationMs = 45,
+        IntervalMs = 500
+    };
 
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
@@ -82,7 +88,7 @@ public sealed partial class RuntimeTaskService
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
     private AutoBattleReleaseStep? _currentAutoBattleReleaseStep;
     private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
-    private bool _isAutoBattleEncounterEnergyRecoveryActive;
+    private bool _isAutoBattleEncounterRelieved;
     private DateTimeOffset _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
@@ -94,9 +100,9 @@ public sealed partial class RuntimeTaskService
         {
             ResetAutoBattleBattleState();
         }
-        else if (!_autoBattleSettings.OnlyRecoverEnergyAfterEncounterRelieved)
+        else if (!RequiresAutoBattleEncounterRelieveDetection(_autoBattleSettings.EncounterRelievedAction))
         {
-            ResetAutoBattleEncounterEnergyRecoveryState();
+            ResetAutoBattleEncounterRelievedActionState();
         }
 
         _settingsLoaded = true;
@@ -213,16 +219,42 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
-            var isEncounterEnergyRecoveryActive =
-                settings.OnlyRecoverEnergyAfterEncounterRelieved
-                && _isAutoBattleEncounterEnergyRecoveryActive;
-            var isEnergyRecoveryAction =
-                isEncounterEnergyRecoveryActive
-                || _autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.EnergyRecovery;
+            var encounterRelievedAction = settings.EncounterRelievedAction;
+            var isEncounterRelievedActionActive =
+                _isAutoBattleEncounterRelieved
+                && RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction);
             var releaseStep = _currentAutoBattleReleaseStep ?? GetCurrentAutoBattleReleaseStep(settings);
-            var sequence = isEnergyRecoveryAction
-                ? "X"
-                : BuildAutoBattleReleaseSequence(settings, releaseStep);
+            var sequence = BuildAutoBattleReleaseSequence(settings, releaseStep);
+            var inputOptions = AutoBattleKeyboardInputOptions;
+            var action = AutoBattleSkillSelectionAction.Skill;
+            var actionText = "按技能键";
+            var pressedKey = GetAutoBattleReleaseStepDisplay(releaseStep);
+
+            if (isEncounterRelievedActionActive)
+            {
+                switch (encounterRelievedAction)
+                {
+                    case AutoBattleEncounterRelievedAction.NoAction:
+                        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.NoAction;
+                        _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+                        _logger.LogInformation("自动战斗：检测到奇遇效果解除，当前配置为无操作，等待手动释放技能。");
+                        return;
+                    case AutoBattleEncounterRelievedAction.RecoverEnergy:
+                        sequence = "X";
+                        action = AutoBattleSkillSelectionAction.EnergyRecovery;
+                        actionText = "奇遇解除后回能";
+                        pressedKey = "X";
+                        break;
+                    case AutoBattleEncounterRelievedAction.Capture:
+                        sequence = AutoBattleCaptureSequence;
+                        inputOptions = AutoBattleCaptureKeyboardInputOptions;
+                        action = AutoBattleSkillSelectionAction.Capture;
+                        actionText = "奇遇解除后捕捉";
+                        pressedKey = "W, 1, Space";
+                        break;
+                }
+            }
+
             if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
                 || keyStrokes.Count == 0)
             {
@@ -231,7 +263,8 @@ public sealed partial class RuntimeTaskService
                     GetAutoBattleReleaseStepDisplay(releaseStep),
                     sequence,
                     parseError);
-                keyStrokes = !releaseStep.IsCustom
+                keyStrokes = action == AutoBattleSkillSelectionAction.Skill
+                    && !releaseStep.IsCustom
                     && _keyboardInputService.TryParseSequence(releaseStep.SkillKey, out var fallbackStrokes, out _)
                     ? fallbackStrokes
                     : [];
@@ -245,18 +278,12 @@ public sealed partial class RuntimeTaskService
             await _keyboardInputService.SendSequenceAsync(
                 state.TargetWindow.Hwnd,
                 keyStrokes,
-                AutoBattleKeyboardInputOptions,
+                inputOptions,
                 cancellationToken);
 
-            _autoBattleSkillSelectionAction = isEnergyRecoveryAction
-                ? AutoBattleSkillSelectionAction.EnergyRecovery
-                : AutoBattleSkillSelectionAction.Skill;
+            _autoBattleSkillSelectionAction = action;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
-            var actionText = isEncounterEnergyRecoveryActive
-                ? "奇遇解除后回能"
-                : isEnergyRecoveryAction ? "按回能键" : "按技能键";
-            var pressedKey = isEnergyRecoveryAction ? "X" : GetAutoBattleReleaseStepDisplay(releaseStep);
             _logger.LogInformation(
                 "自动战斗：{Action} {Key}（序列 {Sequence}）",
                 actionText,
@@ -367,8 +394,17 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        if (!_autoBattleSettings.IsEnabled
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled
             || _autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.Skill)
+        {
+            return false;
+        }
+
+        var encounterRelievedAction = settings.EncounterRelievedAction;
+        if (_isAutoBattleEncounterRelieved
+            && RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction)
+            && encounterRelievedAction is AutoBattleEncounterRelievedAction.NoAction or AutoBattleEncounterRelievedAction.Capture)
         {
             return false;
         }
@@ -399,18 +435,19 @@ public sealed partial class RuntimeTaskService
         return true;
     }
 
-    private async Task<bool> TryUpdateAutoBattleEncounterEnergyRecoveryModeAsync(
+    private async Task<bool> TryUpdateAutoBattleEncounterRelievedActionModeAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-        if (!settings.IsEnabled || !settings.OnlyRecoverEnergyAfterEncounterRelieved)
+        var encounterRelievedAction = settings.EncounterRelievedAction;
+        if (!settings.IsEnabled || !RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction))
         {
             return false;
         }
 
-        if (_isAutoBattleEncounterEnergyRecoveryActive)
+        if (_isAutoBattleEncounterRelieved)
         {
             return true;
         }
@@ -441,7 +478,7 @@ public sealed partial class RuntimeTaskService
             season.MatchThreshold,
             out var similarity);
         _logger.LogDebug(
-            "自动战斗奇遇回能筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            "自动战斗奇遇解除操作筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
             FormatLogText(tipText),
             FormatLogText(season.TipText),
             similarity,
@@ -453,8 +490,10 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        _isAutoBattleEncounterEnergyRecoveryActive = true;
-        _logger.LogInformation("自动战斗：检测到奇遇效果解除，进入仅按 X 回能模式，直到退出战斗。");
+        _isAutoBattleEncounterRelieved = true;
+        _logger.LogInformation(
+            "自动战斗：检测到奇遇效果解除，解除操作：{Action}。",
+            GetAutoBattleEncounterRelievedActionLogText(encounterRelievedAction));
         return true;
     }
 
@@ -627,13 +666,13 @@ public sealed partial class RuntimeTaskService
     {
         _autoBattleRoundIndex = 0;
         ResetAutoBattleSkillSelectionState();
-        ResetAutoBattleEncounterEnergyRecoveryState();
+        ResetAutoBattleEncounterRelievedActionState();
         _wasAutoBattlePetSwitchingVisible = false;
     }
 
-    private void ResetAutoBattleEncounterEnergyRecoveryState()
+    private void ResetAutoBattleEncounterRelievedActionState()
     {
-        _isAutoBattleEncounterEnergyRecoveryActive = false;
+        _isAutoBattleEncounterRelieved = false;
         _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
     }
 
@@ -663,6 +702,10 @@ public sealed partial class RuntimeTaskService
             .Select(step => step.Clone())
             .ToList();
         normalized.TurnSequencePresets = NormalizeAutoBattleTurnSequencePresets(normalized.TurnSequencePresets);
+        if (!Enum.IsDefined(normalized.EncounterRelievedAction))
+        {
+            normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
+        }
 
         return normalized;
     }
@@ -759,10 +802,31 @@ public sealed partial class RuntimeTaskService
             : null;
     }
 
+    private static bool RequiresAutoBattleEncounterRelieveDetection(AutoBattleEncounterRelievedAction action)
+    {
+        return action is AutoBattleEncounterRelievedAction.NoAction
+            or AutoBattleEncounterRelievedAction.RecoverEnergy
+            or AutoBattleEncounterRelievedAction.Capture;
+    }
+
+    private static string GetAutoBattleEncounterRelievedActionLogText(AutoBattleEncounterRelievedAction action)
+    {
+        return action switch
+        {
+            AutoBattleEncounterRelievedAction.NoAction => "无操作",
+            AutoBattleEncounterRelievedAction.RecoverEnergy => "回能",
+            AutoBattleEncounterRelievedAction.ReleaseSkill => "战技",
+            AutoBattleEncounterRelievedAction.Capture => "捕捉",
+            _ => "回能"
+        };
+    }
+
     private enum AutoBattleSkillSelectionAction
     {
         None,
         Skill,
-        EnergyRecovery
+        EnergyRecovery,
+        NoAction,
+        Capture
     }
 }

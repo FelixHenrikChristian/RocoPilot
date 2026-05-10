@@ -17,7 +17,12 @@ public partial class RealtimeViewModel : ObservableRecipient
     private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
     private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
-    private bool _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved = true;
+    private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
+
+    public IReadOnlyList<AutoBattleEncounterRelievedActionOption> AutoBattleEncounterRelievedActionOptions
+    {
+        get;
+    } = AutoBattleEncounterRelievedActionOption.CreateDefaultOptions();
 
     public bool IsEncounterStatisticsEnabled
     {
@@ -100,22 +105,30 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(
         _autoBattleReleaseSequence,
-        _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved);
+        SelectedAutoBattleEncounterRelievedAction);
 
-    public bool IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved
+    public AutoBattleEncounterRelievedActionOption? SelectedAutoBattleEncounterRelievedActionOption
     {
-        get => _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved;
+        get => _selectedAutoBattleEncounterRelievedActionOption;
         set
         {
-            if (SetProperty(ref _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved, value))
+            if (value is not null
+                && SetProperty(ref _selectedAutoBattleEncounterRelievedActionOption, value))
             {
                 SaveAutoBattleSettings();
                 OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+                OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
             }
         }
     }
 
+    public string AutoBattleEncounterRelievedActionDescription =>
+        SelectedAutoBattleEncounterRelievedActionOption?.Description ?? string.Empty;
+
     public AutoBattleSettings AutoBattleSettings => BuildAutoBattleSettings();
+
+    private AutoBattleEncounterRelievedAction SelectedAutoBattleEncounterRelievedAction =>
+        SelectedAutoBattleEncounterRelievedActionOption?.Action ?? AutoBattleEncounterRelievedAction.RecoverEnergy;
 
     public RealtimeViewModel(
         IRuntimeTaskService runtimeTaskService,
@@ -141,12 +154,14 @@ public partial class RealtimeViewModel : ObservableRecipient
         _autoBattleTurnSequence = settings.TurnSequence;
         _autoBattleReleaseSequence = (settings.ReleaseSequence ?? []).Select(step => step.Clone()).ToList();
         _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
-        _isAutoBattleOnlyRecoverEnergyAfterEncounterRelieved = settings.OnlyRecoverEnergyAfterEncounterRelieved;
+        _selectedAutoBattleEncounterRelievedActionOption =
+            FindAutoBattleEncounterRelievedActionOption(settings.EncounterRelievedAction);
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(AutoBattleRoundOrder));
         OnPropertyChanged(nameof(AutoBattleTurnSequence));
-        OnPropertyChanged(nameof(IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved));
+        OnPropertyChanged(nameof(SelectedAutoBattleEncounterRelievedActionOption));
+        OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
         OnPropertyChanged(nameof(AutoBattleStatus));
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
@@ -174,19 +189,18 @@ public partial class RealtimeViewModel : ObservableRecipient
             TurnSequence = AutoBattleTurnSequence,
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
             TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
-            OnlyRecoverEnergyAfterEncounterRelieved = IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved
+            EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction
         };
     }
 
     private static string BuildAutoBattleConfigurationSummary(
         IReadOnlyList<AutoBattleReleaseStep> releaseSequence,
-        bool onlyRecoverEnergyAfterEncounterRelieved)
+        AutoBattleEncounterRelievedAction encounterRelievedAction)
     {
+        var encounterRelievedActionText = GetAutoBattleEncounterRelievedActionSummary(encounterRelievedAction);
         if (releaseSequence.Count == 0)
         {
-            return onlyRecoverEnergyAfterEncounterRelieved
-                ? "未配置释放顺序 · 奇遇解除后仅回能"
-                : "未配置释放顺序";
+            return $"未配置释放顺序 · {encounterRelievedActionText}";
         }
 
         var previewItems = releaseSequence
@@ -198,9 +212,54 @@ public partial class RealtimeViewModel : ObservableRecipient
         var suffix = releaseSequence.Count > 6
             ? $"等 {releaseSequence.Count} 步"
             : $"{releaseSequence.Count} 步";
-        var encounterEnergyRecoveryText = onlyRecoverEnergyAfterEncounterRelieved
-            ? " · 奇遇解除后仅回能"
-            : string.Empty;
-        return $"{preview} · {suffix}{encounterEnergyRecoveryText}";
+        return $"{preview} · {suffix} · {encounterRelievedActionText}";
+    }
+
+    private AutoBattleEncounterRelievedActionOption FindAutoBattleEncounterRelievedActionOption(
+        AutoBattleEncounterRelievedAction action)
+    {
+        return AutoBattleEncounterRelievedActionOptions.FirstOrDefault(option => option.Action == action)
+            ?? AutoBattleEncounterRelievedActionOptions.First(option => option.Action == AutoBattleEncounterRelievedAction.RecoverEnergy);
+    }
+
+    private static string GetAutoBattleEncounterRelievedActionSummary(AutoBattleEncounterRelievedAction action)
+    {
+        return action switch
+        {
+            AutoBattleEncounterRelievedAction.NoAction => "奇遇解除后无操作",
+            AutoBattleEncounterRelievedAction.RecoverEnergy => "奇遇解除后回能",
+            AutoBattleEncounterRelievedAction.ReleaseSkill => "始终战技",
+            AutoBattleEncounterRelievedAction.Capture => "奇遇解除后捕捉",
+            _ => "奇遇解除后回能"
+        };
+    }
+}
+
+public sealed record AutoBattleEncounterRelievedActionOption(
+    AutoBattleEncounterRelievedAction Action,
+    string Name,
+    string Description)
+{
+    public static IReadOnlyList<AutoBattleEncounterRelievedActionOption> CreateDefaultOptions()
+    {
+        return
+        [
+            new(
+                AutoBattleEncounterRelievedAction.NoAction,
+                "无操作",
+                "识别到奇遇解除后不再按键，等待手动释放技能。"),
+            new(
+                AutoBattleEncounterRelievedAction.RecoverEnergy,
+                "回能",
+                "识别到奇遇解除后只按 X 回能，直到退出战斗。"),
+            new(
+                AutoBattleEncounterRelievedAction.ReleaseSkill,
+                "战技",
+                "不等待奇遇解除，始终按战斗配置释放技能。"),
+            new(
+                AutoBattleEncounterRelievedAction.Capture,
+                "捕捉",
+                "识别到奇遇解除后进入技能选择界面会依次按 W、1、Space。")
+        ];
     }
 }

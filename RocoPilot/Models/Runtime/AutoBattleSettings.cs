@@ -35,11 +35,11 @@ public sealed class AutoBattleSettings
         set;
     } = [];
 
-    public bool OnlyRecoverEnergyAfterEncounterRelieved
+    public AutoBattleEncounterRelievedAction EncounterRelievedAction
     {
         get;
         set;
-    } = true;
+    } = AutoBattleEncounterRelievedAction.RecoverEnergy;
 
     public static AutoBattleSettings CreateDefault()
     {
@@ -50,7 +50,7 @@ public sealed class AutoBattleSettings
             TurnSequence = DefaultTurnSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
-            OnlyRecoverEnergyAfterEncounterRelieved = true
+            EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy
         };
     }
 
@@ -75,9 +75,17 @@ public sealed class AutoBattleSettings
             TurnSequence = TurnSequence,
             ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
-            OnlyRecoverEnergyAfterEncounterRelieved = OnlyRecoverEnergyAfterEncounterRelieved
+            EncounterRelievedAction = EncounterRelievedAction
         };
     }
+}
+
+public enum AutoBattleEncounterRelievedAction
+{
+    NoAction = 0,
+    RecoverEnergy = 1,
+    ReleaseSkill = 2,
+    Capture = 3
 }
 
 public sealed class AutoBattleReleaseStep

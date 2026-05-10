@@ -379,7 +379,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var isSkillSelectionVisible = await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken);
         if (isSkillSelectionVisible)
         {
-            await TryUpdateAutoBattleEncounterEnergyRecoveryModeAsync(state, frame, cancellationToken);
+            await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
             var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 "战斗中 - 技能选择",
@@ -394,7 +394,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
-            await TryUpdateAutoBattleEncounterEnergyRecoveryModeAsync(state, frame, cancellationToken);
+            await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
             var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
             if (!recoveredEnergy)
             {

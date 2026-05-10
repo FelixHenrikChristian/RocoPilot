@@ -212,21 +212,21 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE945;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="奇遇解除后仅回能" TextWrapping="Wrap" />
+                            <TextBlock Text="奇遇解除操作" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="识别到当前赛季奇遇效果解除提示后，只按 X 回能，直到退出战斗。"
+                                Text="{x:Bind ViewModel.AutoBattleEncounterRelievedActionDescription, Mode=OneWay}"
                                 TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch
+                        <ComboBox
                             Grid.Column="2"
-                            MinWidth="0"
+                            MinWidth="120"
                             VerticalAlignment="Center"
-                            IsOn="{x:Bind ViewModel.IsAutoBattleOnlyRecoverEnergyAfterEncounterRelieved, Mode=TwoWay}"
-                            OffContent=""
-                            OnContent="" />
+                            DisplayMemberPath="Name"
+                            ItemsSource="{x:Bind ViewModel.AutoBattleEncounterRelievedActionOptions, Mode=OneWay}"
+                            SelectedItem="{x:Bind ViewModel.SelectedAutoBattleEncounterRelievedActionOption, Mode=TwoWay}" />
                     </Grid>
 
                     <Border

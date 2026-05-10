@@ -27,7 +27,7 @@ internal static class StatisticsMutationRules
             return;
         }
 
-        record.Count++;
+        record.Count++; 
         record.Season = season.Id;
         record.LastCapturedAt = capturedAt;
     }

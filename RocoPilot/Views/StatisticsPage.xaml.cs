@@ -17,6 +17,9 @@ public sealed partial class StatisticsPage : Page
     private static readonly TimeSpan ScrollBarHideDelay = TimeSpan.FromMilliseconds(700);
 
     private readonly Dictionary<ScrollViewer, DispatcherTimer> _scrollBarHideTimers = [];
+    private ContentDialog? _activeShinyDetailDialog;
+    private StatisticDetailAction _requestedShinyDetailAction = StatisticDetailAction.None;
+    private ShinyCaptureDetailItem? _requestedShinyDetailItem;
 
     public StatisticsViewModel ViewModel
     {
@@ -217,10 +220,81 @@ public sealed partial class StatisticsPage : Page
 
     private async Task DeleteEncounterAsync(string seasonId, SpiritCountItem item)
     {
-        if (await ConfirmDeleteStatisticItemAsync("删除奇遇条目", $"将删除 {item.Name} 的奇遇统计记录。是否继续？"))
+        if (await ConfirmDeleteEncounterAsync(seasonId, item))
         {
             await ViewModel.DeleteEncounterAsync(seasonId, item);
         }
+    }
+
+    private async Task<bool> ConfirmDeleteEncounterAsync(string seasonId, SpiritCountItem item)
+    {
+        var xamlRoot = XamlRoot;
+        if (xamlRoot is null)
+        {
+            return false;
+        }
+
+        var content = new StackPanel
+        {
+            Width = 420,
+            Spacing = 14,
+            Children =
+            {
+                CreateDialogHeaderCard(
+                    "\uE74D",
+                    item.Name,
+                    $"{FormatSeasonDisplay(seasonId)} · 奇遇统计",
+                    "该操作会删除当前赛季中这个精灵的奇遇计数。",
+                    new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
+                    new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C))),
+            }
+        };
+
+        var detailGrid = new Grid
+        {
+            ColumnSpacing = 10,
+            RowSpacing = 10
+        };
+        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var countTile = CreateDialogInfoTile("\uE81D", "奇遇计数", $"{item.Count} 次");
+        var progressTile = CreateDialogInfoTile("\uE9D2", "保底进度", $"{Math.Clamp(item.Count / Math.Max(1, item.PityThreshold), 0, 1):P0}");
+        var latestTile = CreateDialogInfoTile("\uE787", "最近记录", item.LastCapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
+        Grid.SetColumn(progressTile, 1);
+        Grid.SetRow(latestTile, 1);
+        Grid.SetColumnSpan(latestTile, 2);
+        detailGrid.Children.Add(countTile);
+        detailGrid.Children.Add(progressTile);
+        detailGrid.Children.Add(latestTile);
+        content.Children.Add(detailGrid);
+        content.Children.Add(new Border
+        {
+            Padding = new Thickness(12),
+            Background = new SolidColorBrush(Color.FromArgb(0x12, 0xC4, 0x2B, 0x1C)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x2E, 0xC4, 0x2B, 0x1C)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Child = new TextBlock
+            {
+                Text = "删除奇遇统计不会删除已记录的异色精灵，但会影响后续保底计数判断。",
+                Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
+                TextWrapping = TextWrapping.Wrap
+            }
+        });
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = "删除奇遇条目",
+            Content = content,
+            PrimaryButtonText = "删除",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close
+        };
+
+        return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
 
     private async Task ShowEncounterDetailsAsync(string seasonId, SpiritCountItem item)
@@ -233,12 +307,8 @@ public sealed partial class StatisticsPage : Page
 
         var action = StatisticDetailAction.None;
         ContentDialog? dialog = null;
-        var editButton = new Button { Content = "编辑" };
-        var deleteButton = new Button
-        {
-            Content = "删除",
-            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C))
-        };
+        var editButton = CreateDialogIconButton("\uE70F", "编辑", GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))));
+        var deleteButton = CreateDialogIconButton("\uE74D", "删除", new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)));
         editButton.Click += (_, _) =>
         {
             action = StatisticDetailAction.Edit;
@@ -250,27 +320,86 @@ public sealed partial class StatisticsPage : Page
             dialog?.Hide();
         };
 
-        var actions = new StackPanel
+        var headerCard = new Border
         {
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Orientation = Orientation.Horizontal,
-            Spacing = 8,
-            Children =
-            {
-                editButton,
-                deleteButton
-            }
+            Padding = new Thickness(16, 14, 16, 14),
+            Background = new SolidColorBrush(Color.FromArgb(0x1F, 0x63, 0x66, 0xF1)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x63, 0x66, 0xF1)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8)
         };
+        var headerGrid = new Grid { ColumnSpacing = 10 };
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        headerGrid.Children.Add(new Border
+        {
+            Width = 42,
+            Height = 42,
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
+            CornerRadius = new CornerRadius(8),
+            Child = new FontIcon
+            {
+                Glyph = "\uE77B",
+                FontSize = 19,
+                Foreground = GetResourceBrush("AccentFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x63, 0x66, 0xF1))),
+                FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+            }
+        });
+        var titlePanel = new StackPanel { Spacing = 3 };
+        titlePanel.Children.Add(new TextBlock
+        {
+            Text = item.Name,
+            FontSize = 20,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        titlePanel.Children.Add(new TextBlock
+        {
+            Text = $"{FormatSeasonDisplay(seasonId)} · 奇遇统计",
+            FontSize = 13,
+            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x5F, 0x64, 0x73))),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        Grid.SetColumn(titlePanel, 1);
+        Grid.SetColumn(editButton, 2);
+        Grid.SetColumn(deleteButton, 3);
+        headerGrid.Children.Add(titlePanel);
+        headerGrid.Children.Add(editButton);
+        headerGrid.Children.Add(deleteButton);
+        headerCard.Child = headerGrid;
+
+        var detailGrid = new Grid
+        {
+            ColumnSpacing = 10,
+            RowSpacing = 10
+        };
+        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var countTile = CreateDialogInfoTile("\uE81D", "奇遇计数", $"{item.Count} 次");
+        var progressTile = CreateDialogInfoTile("\uE9D2", "保底进度", $"{Math.Clamp(item.Count / Math.Max(1, item.PityThreshold), 0, 1):P0}");
+        var latestTile = CreateDialogInfoTile("\uE787", "最近记录", item.LastCapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
+        Grid.SetColumn(progressTile, 1);
+        Grid.SetRow(latestTile, 1);
+        Grid.SetColumnSpan(latestTile, 2);
+        detailGrid.Children.Add(countTile);
+        detailGrid.Children.Add(progressTile);
+        detailGrid.Children.Add(latestTile);
+
         var content = new StackPanel
         {
-            Width = 340,
-            Spacing = 16,
+            Width = 420,
+            Spacing = 14,
             Children =
             {
-                CreateDetailHeader(item.Name),
-                CreateDetailRow("奇遇计数", $"{item.Count} 次"),
-                CreateDetailRow("最近记录", item.LastCapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")),
-                actions
+                headerCard,
+                detailGrid
             }
         };
 
@@ -349,39 +478,70 @@ public sealed partial class StatisticsPage : Page
             args.Handled = true;
         };
 
-        ShinyCaptureDetailItem? GetSelectedDetail()
-        {
-            return flipView.SelectedItem as ShinyCaptureDetailItem
-                ?? details.ElementAtOrDefault(Math.Max(0, flipView.SelectedIndex));
-        }
-
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "异色详情",
             Content = flipView,
-            PrimaryButtonText = "编辑",
-            SecondaryButtonText = "删除",
             CloseButtonText = "关闭",
             DefaultButton = ContentDialogButton.Close
         };
 
-        var result = await dialog.ShowAsync();
+        _activeShinyDetailDialog = dialog;
+        _requestedShinyDetailAction = StatisticDetailAction.None;
+        _requestedShinyDetailItem = null;
 
-        var selectedDetail = GetSelectedDetail();
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeShinyDetailDialog, dialog))
+            {
+                _activeShinyDetailDialog = null;
+            }
+        }
+
+        var action = _requestedShinyDetailAction;
+        var selectedDetail = _requestedShinyDetailItem;
+        _requestedShinyDetailAction = StatisticDetailAction.None;
+        _requestedShinyDetailItem = null;
         if (selectedDetail is null)
         {
             return;
         }
 
-        if (result == ContentDialogResult.Primary)
+        if (action == StatisticDetailAction.Edit)
         {
             await EditShinyCaptureAsync(selectedDetail);
         }
-        else if (result == ContentDialogResult.Secondary)
+        else if (action == StatisticDetailAction.Delete)
         {
             await DeleteShinyCaptureAsync(selectedDetail);
         }
+    }
+
+    private void ShinyCaptureEditButton_Click(object sender, RoutedEventArgs e)
+    {
+        RequestShinyDetailAction(sender, StatisticDetailAction.Edit);
+    }
+
+    private void ShinyCaptureDeleteButton_Click(object sender, RoutedEventArgs e)
+    {
+        RequestShinyDetailAction(sender, StatisticDetailAction.Delete);
+    }
+
+    private void RequestShinyDetailAction(object sender, StatisticDetailAction action)
+    {
+        if (sender is not FrameworkElement { DataContext: ShinyCaptureDetailItem item })
+        {
+            return;
+        }
+
+        _requestedShinyDetailAction = action;
+        _requestedShinyDetailItem = item;
+        _activeShinyDetailDialog?.Hide();
     }
 
     private async Task EditShinyCaptureAsync(ShinyCaptureDetailItem item)
@@ -401,73 +561,13 @@ public sealed partial class StatisticsPage : Page
 
     private async Task DeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
     {
-        if (await ConfirmDeleteStatisticItemAsync(
-                "删除异色记录",
-                $"将删除 {item.Name} 在 {item.CapturedDateDisplay} {item.CapturedTimeDisplay} 获取的异色记录。是否继续？"))
+        if (await ConfirmDeleteShinyCaptureAsync(item))
         {
             await ViewModel.DeleteShinyCaptureAsync(item);
         }
     }
 
-    private static TextBlock CreateDetailHeader(string text)
-    {
-        return new TextBlock
-        {
-            Text = text,
-            FontSize = 22,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        };
-    }
-
-    private static Grid CreateDetailRow(string label, string value)
-    {
-        var row = new Grid
-        {
-            MinHeight = 34,
-            ColumnSpacing = 14
-        };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var labelTextBlock = new TextBlock
-        {
-            Text = label,
-            VerticalAlignment = VerticalAlignment.Center,
-            FontSize = 13,
-            Opacity = 0.72,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        };
-        var valueTextBlock = new TextBlock
-        {
-            Text = value,
-            VerticalAlignment = VerticalAlignment.Center,
-            FontSize = 15,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        };
-
-        Grid.SetColumn(labelTextBlock, 0);
-        Grid.SetColumn(valueTextBlock, 1);
-        row.Children.Add(labelTextBlock);
-        row.Children.Add(valueTextBlock);
-        return row;
-    }
-
-    private async void ConfirmPendingShinyButton_Click(object sender, RoutedEventArgs e)
-    {
-        await ViewModel.ConfirmLatestPendingShinyAsync();
-    }
-
-    private async void DiscardPendingShinyButton_Click(object sender, RoutedEventArgs e)
-    {
-        await ViewModel.DiscardLatestPendingShinyAsync();
-    }
-
-    private async Task<bool> ConfirmDeleteStatisticItemAsync(string title, string content)
+    private async Task<bool> ConfirmDeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
     {
         var xamlRoot = XamlRoot;
         if (xamlRoot is null)
@@ -478,14 +578,222 @@ public sealed partial class StatisticsPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
-            Title = title,
-            Content = content,
+            Title = "删除异色记录",
+            Content = CreateShinyDeleteDialogContent(item),
             PrimaryButtonText = "删除",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close
         };
 
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
+    }
+
+    private static StackPanel CreateShinyDeleteDialogContent(ShinyCaptureDetailItem item)
+    {
+        var content = new StackPanel
+        {
+            Width = 420,
+            Spacing = 14
+        };
+
+        content.Children.Add(CreateDialogHeaderCard(
+            "\uE74D",
+            item.Name,
+            $"{item.SeasonDisplay} · {item.PositionDisplay}",
+            "该操作只删除当前这一只异色记录。",
+            new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
+            new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C))));
+
+        var detailGrid = new Grid
+        {
+            ColumnSpacing = 10,
+            RowSpacing = 10
+        };
+        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        var encounterTile = CreateDialogInfoTile("\uE81D", "异色前奇遇", item.EncounterCountDisplay);
+        var dateTile = CreateDialogInfoTile("\uE787", "获得日期", item.CapturedDateDisplay);
+        var timeTile = CreateDialogInfoTile("\uE823", "获得时间", item.CapturedTimeDisplay);
+        Grid.SetColumn(dateTile, 1);
+        Grid.SetRow(timeTile, 1);
+        Grid.SetColumnSpan(timeTile, 2);
+        detailGrid.Children.Add(encounterTile);
+        detailGrid.Children.Add(dateTile);
+        detailGrid.Children.Add(timeTile);
+
+        content.Children.Add(detailGrid);
+        content.Children.Add(new Border
+        {
+            Padding = new Thickness(12),
+            Background = new SolidColorBrush(Color.FromArgb(0x12, 0xC4, 0x2B, 0x1C)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x2E, 0xC4, 0x2B, 0x1C)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Child = new TextBlock
+            {
+                Text = "删除后不会清空或改动同名精灵的其他异色记录，也不会回滚奇遇计数。",
+                Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
+                TextWrapping = TextWrapping.Wrap
+            }
+        });
+        return content;
+    }
+
+    private static Border CreateDialogHeaderCard(
+        string glyph,
+        string title,
+        string subtitle,
+        string description,
+        Brush iconBrush,
+        Brush backgroundBrush)
+    {
+        var card = new Border
+        {
+            Padding = new Thickness(16, 14, 16, 14),
+            Background = backgroundBrush,
+            BorderBrush = iconBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8)
+        };
+        var grid = new Grid { ColumnSpacing = 12 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var iconBox = new Border
+        {
+            Width = 42,
+            Height = 42,
+            VerticalAlignment = VerticalAlignment.Center,
+            Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
+            CornerRadius = new CornerRadius(8),
+            Child = new FontIcon
+            {
+                Glyph = glyph,
+                FontSize = 19,
+                Foreground = iconBrush,
+                FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+            }
+        };
+        var textPanel = new StackPanel { Spacing = 3 };
+        textPanel.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 20,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        textPanel.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 13,
+            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x5F, 0x64, 0x73))),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        textPanel.Children.Add(new TextBlock
+        {
+            Text = description,
+            FontSize = 12,
+            Foreground = GetResourceBrush("TextFillColorTertiaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        Grid.SetColumn(textPanel, 1);
+        grid.Children.Add(iconBox);
+        grid.Children.Add(textPanel);
+        card.Child = grid;
+        return card;
+    }
+
+    private static Border CreateDialogInfoTile(string glyph, string label, string value)
+    {
+        var tile = new Border
+        {
+            Padding = new Thickness(12),
+            Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF))),
+            BorderBrush = GetResourceBrush("CardStrokeColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF))),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8)
+        };
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.Children.Add(new FontIcon
+        {
+            Glyph = glyph,
+            FontSize = 15,
+            Foreground = GetResourceBrush("AccentFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x63, 0x66, 0xF1))),
+            FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+        });
+        var textPanel = new StackPanel { Spacing = 3 };
+        textPanel.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = 12,
+            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        textPanel.Children.Add(new TextBlock
+        {
+            Text = value,
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        Grid.SetColumn(textPanel, 1);
+        grid.Children.Add(textPanel);
+        tile.Child = grid;
+        return tile;
+    }
+
+    private static Brush GetResourceBrush(string key, Brush fallback)
+    {
+        return Application.Current.Resources.TryGetValue(key, out var value) && value is Brush brush
+            ? brush
+            : fallback;
+    }
+
+    private static Button CreateDialogIconButton(string glyph, string tooltip, Brush foreground)
+    {
+        var button = new Button
+        {
+            Width = 32,
+            Height = 32,
+            Padding = new Thickness(0),
+            Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
+            Content = new FontIcon
+            {
+                Glyph = glyph,
+                FontSize = 14,
+                Foreground = foreground,
+                FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+            }
+        };
+        ToolTipService.SetToolTip(button, tooltip);
+        return button;
+    }
+
+    private static string FormatSeasonDisplay(string seasonId)
+    {
+        return string.IsNullOrWhiteSpace(seasonId) || seasonId.EndsWith("赛季", StringComparison.Ordinal)
+            ? seasonId
+            : $"{seasonId}赛季";
+    }
+
+    private async void ConfirmPendingShinyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ConfirmLatestPendingShinyAsync();
+    }
+
+    private async void DiscardPendingShinyButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.DiscardLatestPendingShinyAsync();
     }
 
     private async void ImportStatisticsMenuFlyoutItem_Click(object sender, RoutedEventArgs e)

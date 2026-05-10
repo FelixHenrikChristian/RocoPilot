@@ -82,8 +82,11 @@ public sealed partial class RuntimeTaskService
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
     private int _autoBattleRoundIndex;
+    private int _autoBattleTurnNumber;
+    private int _currentAutoBattleTurnNumber;
     private bool _wasAutoBattleSkillSelectionVisible;
     private bool _wasAutoBattlePetSwitchingVisible;
+    private bool _hasLoggedCurrentAutoBattleTurnAction;
     private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
     private AutoBattleReleaseStep? _currentAutoBattleReleaseStep;
@@ -188,13 +191,17 @@ public sealed partial class RuntimeTaskService
 
         if (!_wasAutoBattleSkillSelectionVisible)
         {
+            _autoBattleTurnNumber++;
+            _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
+            _hasLoggedCurrentAutoBattleTurnAction = false;
             _wasAutoBattleSkillSelectionVisible = true;
             _autoBattleSkillSelectionVisibleSince = now;
             _lastAutoBattleSkillSelectionActionAt = null;
             _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
             _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
             _logger.LogDebug(
-                "自动战斗：检测到技能选择界面，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
+                "自动战斗：进入第 {TurnNumber} 回合技能选择，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
+                _currentAutoBattleTurnNumber,
                 AutoBattleSkillSelectionActionDelay.TotalMilliseconds,
                 GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep),
                 _autoBattleRoundIndex);
@@ -235,9 +242,13 @@ public sealed partial class RuntimeTaskService
                 switch (encounterRelievedAction)
                 {
                     case AutoBattleEncounterRelievedAction.NoAction:
+                        if (_autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.NoAction)
+                        {
+                            LogAutoBattleTurnAction("无操作，检测到奇遇效果解除，等待手动释放技能");
+                        }
+
                         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.NoAction;
                         _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
-                        _logger.LogInformation("自动战斗：检测到奇遇效果解除，当前配置为无操作，等待手动释放技能。");
                         return;
                     case AutoBattleEncounterRelievedAction.RecoverEnergy:
                         sequence = "X";
@@ -284,11 +295,7 @@ public sealed partial class RuntimeTaskService
             _autoBattleSkillSelectionAction = action;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
-            _logger.LogInformation(
-                "自动战斗：{Action} {Key}（序列 {Sequence}）",
-                actionText,
-                pressedKey,
-                sequence);
+            LogAutoBattleTurnAction(BuildAutoBattleTurnActionDescription(action, releaseStep, actionText, pressedKey), sequence);
             _logger.LogDebug(
                 "自动战斗按键已发送：ReleaseStep={ReleaseStep}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
                 pressedKey,
@@ -431,7 +438,7 @@ public sealed partial class RuntimeTaskService
         }
 
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
-        _logger.LogInformation("自动战斗：检测到能量不足，按 X 回能");
+        LogAutoBattleTurnAction("检测到能量不足，临时回能 X", "X", forceInformation: true);
         return true;
     }
 
@@ -619,6 +626,69 @@ public sealed partial class RuntimeTaskService
             : releaseStep.Name;
     }
 
+    private void LogAutoBattleTurnAction(
+        string description,
+        string? sequence = null,
+        bool forceInformation = false)
+    {
+        var turnNumber = _currentAutoBattleTurnNumber > 0
+            ? _currentAutoBattleTurnNumber
+            : _autoBattleTurnNumber;
+        if (turnNumber <= 0)
+        {
+            turnNumber = 1;
+        }
+
+        if (!_hasLoggedCurrentAutoBattleTurnAction || forceInformation)
+        {
+            if (string.IsNullOrWhiteSpace(sequence))
+            {
+                _logger.LogInformation("自动战斗：第 {TurnNumber} 回合，{Description}", turnNumber, description);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "自动战斗：第 {TurnNumber} 回合，{Description}（序列 {Sequence}）",
+                    turnNumber,
+                    description,
+                    sequence);
+            }
+
+            _hasLoggedCurrentAutoBattleTurnAction = true;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(sequence))
+        {
+            _logger.LogDebug("自动战斗：第 {TurnNumber} 回合重试，{Description}", turnNumber, description);
+        }
+        else
+        {
+            _logger.LogDebug(
+                "自动战斗：第 {TurnNumber} 回合重试，{Description}（序列 {Sequence}）",
+                turnNumber,
+                description,
+                sequence);
+        }
+    }
+
+    private static string BuildAutoBattleTurnActionDescription(
+        AutoBattleSkillSelectionAction action,
+        AutoBattleReleaseStep releaseStep,
+        string actionText,
+        string pressedKey)
+    {
+        return action switch
+        {
+            AutoBattleSkillSelectionAction.Skill when releaseStep.IsCustom => $"执行自定义序列 {pressedKey}",
+            AutoBattleSkillSelectionAction.Skill => $"释放技能 {pressedKey}",
+            AutoBattleSkillSelectionAction.EnergyRecovery => $"{actionText} {pressedKey}",
+            AutoBattleSkillSelectionAction.Capture => $"{actionText} {pressedKey}",
+            AutoBattleSkillSelectionAction.NoAction => "无操作",
+            _ => $"{actionText} {pressedKey}"
+        };
+    }
+
     private void CompleteAutoBattleSkillSelectionState()
     {
         if (_autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.Skill)
@@ -665,6 +735,7 @@ public sealed partial class RuntimeTaskService
     private void ResetAutoBattleBattleState()
     {
         _autoBattleRoundIndex = 0;
+        _autoBattleTurnNumber = 0;
         ResetAutoBattleSkillSelectionState();
         ResetAutoBattleEncounterRelievedActionState();
         _wasAutoBattlePetSwitchingVisible = false;
@@ -682,6 +753,8 @@ public sealed partial class RuntimeTaskService
         _autoBattleSkillSelectionVisibleSince = null;
         _lastAutoBattleSkillSelectionActionAt = null;
         _currentAutoBattleReleaseStep = null;
+        _currentAutoBattleTurnNumber = 0;
+        _hasLoggedCurrentAutoBattleTurnAction = false;
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
     }
 

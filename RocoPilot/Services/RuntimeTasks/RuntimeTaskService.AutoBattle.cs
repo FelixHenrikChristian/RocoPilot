@@ -59,12 +59,12 @@ public sealed partial class RuntimeTaskService
     };
     private static readonly KeyboardInputOptions AutoBattleKeyboardInputOptions = new()
     {
-        HoldDurationMs = 45,
+        HoldDurationMs = 100,
         IntervalMs = 120
     };
     private static readonly KeyboardInputOptions AutoBattleCaptureKeyboardInputOptions = new()
     {
-        HoldDurationMs = 45,
+        HoldDurationMs = 100,
         IntervalMs = 500
     };
 

@@ -9,6 +9,7 @@ namespace RocoPilot.Views;
 public sealed partial class RealtimePage : Page
 {
     private AutoBattleConfigWindow? _autoBattleConfigWindow;
+    private SpiritCatalogWindow? _spiritCatalogWindow;
 
     public RealtimeViewModel ViewModel
     {
@@ -39,5 +40,27 @@ public sealed partial class RealtimePage : Page
         _autoBattleConfigWindow = new AutoBattleConfigWindow(ViewModel);
         _autoBattleConfigWindow.Closed += (_, _) => _autoBattleConfigWindow = null;
         _autoBattleConfigWindow.Activate();
+    }
+
+    private void ViewSpiritCatalogButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_spiritCatalogWindow is not null)
+        {
+            _spiritCatalogWindow.Activate();
+            return;
+        }
+
+        _spiritCatalogWindow = new SpiritCatalogWindow();
+        _spiritCatalogWindow.Closed += (_, _) => _spiritCatalogWindow = null;
+        _spiritCatalogWindow.Activate();
+    }
+
+    private async void SyncSpiritCatalogButton_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.SyncSpiritCatalogAsync();
+        if (_spiritCatalogWindow is not null)
+        {
+            await _spiritCatalogWindow.ReloadAsync();
+        }
     }
 }

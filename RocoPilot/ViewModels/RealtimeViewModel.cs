@@ -2,7 +2,11 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Encounters;
+using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.Spirits;
+
+using Microsoft.UI.Xaml;
 
 namespace RocoPilot.ViewModels;
 
@@ -10,8 +14,12 @@ public partial class RealtimeViewModel : ObservableRecipient
 {
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
+    private readonly ISpiritCatalogService _spiritCatalogService;
 
     private bool _isEncounterStatisticsEnabled = true;
+    private bool _isSpiritCatalogSyncing;
+    private string _spiritCatalogSummary = "图鉴数据待加载";
+    private string _spiritCatalogSyncStatus = "可手动同步 wiki 图鉴";
     private bool _isAutoBattleEnabled;
     private string _autoBattleRoundOrder = AutoBattleSettings.DefaultRoundOrder;
     private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
@@ -61,6 +69,37 @@ public partial class RealtimeViewModel : ObservableRecipient
     public string EncounterStatisticsStatus => IsEncounterStatisticsEnabled
         ? "已开启"
         : "已关闭";
+
+    public string SpiritCatalogSummary
+    {
+        get => _spiritCatalogSummary;
+        private set => SetProperty(ref _spiritCatalogSummary, value);
+    }
+
+    public string SpiritCatalogSyncStatus
+    {
+        get => _spiritCatalogSyncStatus;
+        private set => SetProperty(ref _spiritCatalogSyncStatus, value);
+    }
+
+    public bool IsSpiritCatalogSyncing
+    {
+        get => _isSpiritCatalogSyncing;
+        private set
+        {
+            if (SetProperty(ref _isSpiritCatalogSyncing, value))
+            {
+                OnPropertyChanged(nameof(CanSyncSpiritCatalog));
+                OnPropertyChanged(nameof(SpiritCatalogSyncProgressVisibility));
+            }
+        }
+    }
+
+    public bool CanSyncSpiritCatalog => !IsSpiritCatalogSyncing;
+
+    public Visibility SpiritCatalogSyncProgressVisibility => IsSpiritCatalogSyncing
+        ? Visibility.Visible
+        : Visibility.Collapsed;
 
     public bool IsAutoBattleEnabled
     {
@@ -132,10 +171,12 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     public RealtimeViewModel(
         IRuntimeTaskService runtimeTaskService,
-        IEncounterSeasonConfigService encounterSeasonConfigService)
+        IEncounterSeasonConfigService encounterSeasonConfigService,
+        ISpiritCatalogService spiritCatalogService)
     {
         _runtimeTaskService = runtimeTaskService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
+        _spiritCatalogService = spiritCatalogService;
         _isEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
         ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
     }
@@ -145,6 +186,62 @@ public partial class RealtimeViewModel : ObservableRecipient
         await _runtimeTaskService.LoadSettingsAsync();
         IsEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
         ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
+        await LoadSpiritCatalogSummaryAsync();
+    }
+
+    public async Task SyncSpiritCatalogAsync()
+    {
+        if (IsSpiritCatalogSyncing)
+        {
+            return;
+        }
+
+        IsSpiritCatalogSyncing = true;
+        SpiritCatalogSyncStatus = "正在同步 wiki 图鉴";
+        try
+        {
+            var progress = new Progress<SpiritCatalogSyncProgress>(UpdateSpiritCatalogSyncProgress);
+            var document = await _spiritCatalogService.SyncAsync(progress);
+            ApplySpiritCatalogSummary(document);
+            SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号 / {document.ChainCount} 条进化链";
+        }
+        catch (Exception ex)
+        {
+            SpiritCatalogSyncStatus = $"同步失败：{ex.Message}";
+        }
+        finally
+        {
+            IsSpiritCatalogSyncing = false;
+        }
+    }
+
+    private async Task LoadSpiritCatalogSummaryAsync()
+    {
+        try
+        {
+            var document = await _spiritCatalogService.LoadAsync();
+            ApplySpiritCatalogSummary(document);
+        }
+        catch (Exception ex)
+        {
+            SpiritCatalogSummary = "图鉴数据加载失败";
+            SpiritCatalogSyncStatus = ex.Message;
+        }
+    }
+
+    private void ApplySpiritCatalogSummary(SpiritCatalogDocument document)
+    {
+        var scrapedAt = document.Source.ScrapedAt == default
+            ? string.Empty
+            : $" · {document.Source.ScrapedAt.ToLocalTime():yyyy-MM-dd HH:mm}";
+        SpiritCatalogSummary = $"{document.Count} 个图鉴编号 / {document.ChainCount} 条进化链{scrapedAt}";
+    }
+
+    private void UpdateSpiritCatalogSyncProgress(SpiritCatalogSyncProgress progress)
+    {
+        SpiritCatalogSyncStatus = progress.Total > 0
+            ? $"{progress.Message}：{progress.Completed}/{progress.Total}"
+            : progress.Message;
     }
 
     private void ApplyAutoBattleSettings(AutoBattleSettings settings)

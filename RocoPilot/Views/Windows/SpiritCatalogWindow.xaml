@@ -1,0 +1,206 @@
+<windowex:WindowEx
+    x:Class="RocoPilot.Views.Windows.SpiritCatalogWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:RocoPilot.Controls"
+    xmlns:windowex="using:WinUIEx"
+    Width="760"
+    Height="720"
+    MinWidth="660"
+    MinHeight="520"
+    mc:Ignorable="d">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid
+        x:Name="ContentRoot"
+        Padding="16"
+        RowSpacing="12"
+        Loaded="ContentRoot_Loaded">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource CardStyle}">
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border
+                    Width="42"
+                    Height="42"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    CornerRadius="8">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="20"
+                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                        Glyph="&#xE8D2;" />
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                    <TextBlock
+                        FontSize="18"
+                        FontWeight="SemiBold"
+                        Text="精灵图鉴数据" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{x:Bind Summary, Mode=OneWay}"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                </StackPanel>
+
+            </Grid>
+        </Border>
+
+        <Border
+            Grid.Row="1"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="8">
+            <Grid>
+                <ScrollViewer
+                    HorizontalScrollBarVisibility="Disabled"
+                    HorizontalScrollMode="Disabled"
+                    VerticalScrollBarVisibility="Auto"
+                    VerticalScrollMode="Auto">
+                    <ItemsControl
+                        Margin="0,12,16,12"
+                        ItemsSource="{x:Bind Items, Mode=OneWay}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <controls:BalancedWrapPanel
+                                HorizontalInset="12"
+                                ItemHeight="190"
+                                ItemWidth="184" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border
+                                Width="176"
+                                Height="182"
+                                Margin="4"
+                                Padding="10"
+                                HorizontalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                                <Grid RowSpacing="8">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Grid
+                                        Width="108"
+                                        Height="108"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                        <Border
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            CornerRadius="8">
+                                            <Image
+                                                MaxWidth="104"
+                                                MaxHeight="104"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Source="{Binding Avatar}"
+                                                Stretch="Uniform" />
+                                        </Border>
+
+                                        <Button
+                                            Width="28"
+                                            Height="28"
+                                            Margin="4"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Bottom"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="14"
+                                            Padding="0"
+                                            Click="VariantButton_Click"
+                                            ToolTipService.ToolTip="查看变种"
+                                            Visibility="{Binding VariantButtonVisibility}">
+                                            <FontIcon
+                                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                                FontSize="13"
+                                                Glyph="&#xE8C8;" />
+                                        </Button>
+
+                                        <Button
+                                            Width="28"
+                                            Height="28"
+                                            Margin="4"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="14"
+                                            Padding="0"
+                                            Click="EvolutionChainButton_Click"
+                                            ToolTipService.ToolTip="查看进化链"
+                                            Visibility="{Binding ChainButtonVisibility}">
+                                            <FontIcon
+                                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                                FontSize="13"
+                                                Glyph="&#xE8F0;" />
+                                        </Button>
+                                    </Grid>
+
+                                    <TextBlock
+                                        Grid.Row="1"
+                                        HorizontalAlignment="Center"
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding IdDisplay}" />
+
+                                    <TextBlock
+                                        Grid.Row="2"
+                                        HorizontalAlignment="Center"
+                                        MinHeight="24"
+                                        VerticalAlignment="Center"
+                                        FontSize="15"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding Name}"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="NoWrap" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <StackPanel
+                    x:Name="EmptyState"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="8"
+                    Visibility="Collapsed">
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="36"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Glyph="&#xE8D2;" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="暂无图鉴数据" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</windowex:WindowEx>

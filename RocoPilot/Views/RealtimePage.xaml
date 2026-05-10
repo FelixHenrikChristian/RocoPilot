@@ -96,6 +96,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <FontIcon
                             Grid.Column="0"
@@ -103,15 +104,80 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE713;" />
+                            Glyph="&#xE8D2;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="配置" TextWrapping="Wrap" />
+                            <TextBlock Text="精灵图鉴数据" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="暂无可配置项"
+                                Text="{x:Bind ViewModel.SpiritCatalogSummary, Mode=OneWay}"
                                 TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button
+                            Grid.Column="2"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Click="ViewSpiritCatalogButton_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE8A5;" />
+                                <TextBlock Text="查看" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE895;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="同步图鉴数据" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.SpiritCatalogSyncStatus, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="8">
+                            <ProgressRing
+                                Width="20"
+                                Height="20"
+                                IsActive="{x:Bind ViewModel.IsSpiritCatalogSyncing, Mode=OneWay}"
+                                Visibility="{x:Bind ViewModel.SpiritCatalogSyncProgressVisibility, Mode=OneWay}" />
+                            <Button
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Click="SyncSpiritCatalogButton_Click"
+                                IsEnabled="{x:Bind ViewModel.CanSyncSpiritCatalog, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE895;" />
+                                    <TextBlock Text="同步" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Grid>
                 </StackPanel>

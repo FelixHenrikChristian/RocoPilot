@@ -74,6 +74,8 @@ public sealed class ImageMatchingService : IImageMatchingService
         var template = await GetTemplateAsync(
             resolvedTemplatePath,
             normalizedOptions.AlphaThreshold,
+            normalizedOptions.TemplateScaleX,
+            normalizedOptions.TemplateScaleY,
             cancellationToken);
 
         return MatchTemplate(frame, region, template, resolvedTemplatePath, normalizedOptions, cancellationToken);
@@ -91,7 +93,14 @@ public sealed class ImageMatchingService : IImageMatchingService
 
     private static ImageMatchOptions NormalizeOptions(ImageMatchOptions? options)
     {
-        var normalized = options ?? new ImageMatchOptions();
+        var normalized = new ImageMatchOptions
+        {
+            MinimumScore = options?.MinimumScore ?? 0.9,
+            AlphaThreshold = options?.AlphaThreshold ?? 16,
+            SearchStep = options?.SearchStep ?? 1,
+            TemplateScaleX = NormalizeScale(options?.TemplateScaleX ?? 1),
+            TemplateScaleY = NormalizeScale(options?.TemplateScaleY ?? 1)
+        };
         if (double.IsNaN(normalized.MinimumScore) || normalized.MinimumScore < 0 || normalized.MinimumScore > 1)
         {
             throw new ArgumentOutOfRangeException(nameof(options), "MinimumScore must be between 0 and 1.");
@@ -105,9 +114,21 @@ public sealed class ImageMatchingService : IImageMatchingService
         return normalized;
     }
 
+    private static double NormalizeScale(double scale)
+    {
+        if (double.IsNaN(scale) || double.IsInfinity(scale) || scale <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(scale), "Template scale must be greater than 0.");
+        }
+
+        return Math.Round(scale, 4);
+    }
+
     private async Task<ImageTemplate> LoadTemplateAsync(
         string templatePath,
         byte alphaThreshold,
+        double scaleX,
+        double scaleY,
         CancellationToken cancellationToken)
     {
         if (!File.Exists(templatePath))
@@ -118,10 +139,22 @@ public sealed class ImageMatchingService : IImageMatchingService
         var imageBytes = await File.ReadAllBytesAsync(templatePath, cancellationToken);
         using var stream = await CreateImageStreamAsync(imageBytes, cancellationToken);
         var decoder = await BitmapDecoder.CreateAsync(stream).AsTask(cancellationToken);
+        var sourceWidth = checked((int)decoder.PixelWidth);
+        var sourceHeight = checked((int)decoder.PixelHeight);
+        var scaledWidth = Math.Max(1, (int)Math.Round(sourceWidth * scaleX));
+        var scaledHeight = Math.Max(1, (int)Math.Round(sourceHeight * scaleY));
+        var transform = new BitmapTransform();
+        if (scaledWidth != sourceWidth || scaledHeight != sourceHeight)
+        {
+            transform.ScaledWidth = checked((uint)scaledWidth);
+            transform.ScaledHeight = checked((uint)scaledHeight);
+            transform.InterpolationMode = BitmapInterpolationMode.Fant;
+        }
+
         using var bitmap = await decoder.GetSoftwareBitmapAsync(
             BitmapPixelFormat.Bgra8,
             BitmapAlphaMode.Straight,
-            new BitmapTransform(),
+            transform,
             ExifOrientationMode.RespectExifOrientation,
             ColorManagementMode.DoNotColorManage).AsTask(cancellationToken);
 
@@ -130,10 +163,12 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         var template = ImageTemplate.Create(bitmap.PixelWidth, bitmap.PixelHeight, pixels, alphaThreshold);
         _logger.LogDebug(
-            "Loaded image matching template {TemplatePath}: {Width}x{Height}, active pixels: {ActivePixelCount}",
+            "Loaded image matching template {TemplatePath}: {Width}x{Height}, scale={ScaleX:F4}x{ScaleY:F4}, active pixels: {ActivePixelCount}",
             templatePath,
             template.Width,
             template.Height,
+            scaleX,
+            scaleY,
             template.ActivePixels.Count);
 
         return template;
@@ -142,6 +177,8 @@ public sealed class ImageMatchingService : IImageMatchingService
     private async Task<ImageTemplate> GetTemplateAsync(
         string templatePath,
         byte alphaThreshold,
+        double scaleX,
+        double scaleY,
         CancellationToken cancellationToken)
     {
         if (!File.Exists(templatePath))
@@ -150,11 +187,16 @@ public sealed class ImageMatchingService : IImageMatchingService
         }
 
         var lastWriteTimeUtc = File.GetLastWriteTimeUtc(templatePath);
-        var cacheKey = new TemplateCacheKey(templatePath, alphaThreshold, lastWriteTimeUtc);
+        var cacheKey = new TemplateCacheKey(templatePath, alphaThreshold, scaleX, scaleY, lastWriteTimeUtc);
         var lazyTemplate = _templateCache.GetOrAdd(
             cacheKey,
             key => new Lazy<Task<ImageTemplate>>(
-                () => LoadTemplateAsync(key.TemplatePath, key.AlphaThreshold, CancellationToken.None),
+                () => LoadTemplateAsync(
+                    key.TemplatePath,
+                    key.AlphaThreshold,
+                    key.ScaleX,
+                    key.ScaleY,
+                    CancellationToken.None),
                 LazyThreadSafetyMode.ExecutionAndPublication));
 
         var template = await lazyTemplate.Value.WaitAsync(cancellationToken);
@@ -168,6 +210,8 @@ public sealed class ImageMatchingService : IImageMatchingService
         {
             if (!string.Equals(key.TemplatePath, currentKey.TemplatePath, StringComparison.OrdinalIgnoreCase)
                 || key.AlphaThreshold != currentKey.AlphaThreshold
+                || key.ScaleX != currentKey.ScaleX
+                || key.ScaleY != currentKey.ScaleY
                 || key.LastWriteTimeUtc == currentKey.LastWriteTimeUtc)
             {
                 continue;
@@ -425,5 +469,7 @@ public sealed class ImageMatchingService : IImageMatchingService
     private readonly record struct TemplateCacheKey(
         string TemplatePath,
         byte AlphaThreshold,
+        double ScaleX,
+        double ScaleY,
         DateTime LastWriteTimeUtc);
 }

@@ -19,4 +19,16 @@ public sealed class ImageMatchOptions
         get;
         set;
     } = 1;
+
+    public double TemplateScaleX
+    {
+        get;
+        set;
+    } = 1;
+
+    public double TemplateScaleY
+    {
+        get;
+        set;
+    } = 1;
 }

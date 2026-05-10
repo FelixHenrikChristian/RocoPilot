@@ -44,13 +44,29 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
     public RecognitionRegionConfig LoadForResolution(int width, int height)
     {
         var path = GetConfigPath(width, height);
-        if (!File.Exists(path))
+        if (File.Exists(path))
         {
-            _logger.LogWarning("未找到识别区域配置：{ConfigPath}", path);
+            return LoadFromPath(path, width, height);
+        }
+
+        var fallbackPath = FindBestFallbackConfigPath(width, height);
+        if (string.IsNullOrWhiteSpace(fallbackPath))
+        {
+            _logger.LogWarning(
+                "No recognition region config found for {Width}x{Height}: {ConfigPath}",
+                width,
+                height,
+                path);
             return RecognitionRegionConfig.Empty(width, height, path);
         }
 
-        return LoadFromPath(path, width, height);
+        _logger.LogInformation(
+            "No exact recognition region config found for {Width}x{Height}. Using fallback config: {ConfigPath}",
+            width,
+            height,
+            fallbackPath);
+
+        return LoadFromPath(fallbackPath, width, height);
     }
 
     public RecognitionRegionConfig LoadFromPath(string path)
@@ -63,15 +79,15 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         try
         {
             var (fallbackWidth, fallbackHeight) = GetResolutionFromPath(path);
-            var width = expectedWidth > 0 ? expectedWidth : fallbackWidth;
-            var height = expectedHeight > 0 ? expectedHeight : fallbackHeight;
+            var width = fallbackWidth > 0 ? fallbackWidth : expectedWidth;
+            var height = fallbackHeight > 0 ? fallbackHeight : expectedHeight;
             var json = File.ReadAllText(path);
             var config = JsonSerializer.Deserialize<RecognitionRegionConfig>(json, SerializerOptions)
                 ?? RecognitionRegionConfig.Empty(width, height, path);
 
-            NormalizeConfig(config, width, height, path);
+            NormalizeConfig(config, width, height, path, expectedWidth, expectedHeight);
             _logger.LogDebug(
-                "已载入识别区域配置：{ConfigPath}，区域数量：{RegionCount}",
+                "Loaded recognition region config {ConfigPath}. Enabled region count: {RegionCount}",
                 path,
                 config.Regions.Count(region => region.Enabled));
 
@@ -79,12 +95,12 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "识别区域配置 JSON 无效：{ConfigPath}", path);
+            _logger.LogError(ex, "Recognition region config JSON is invalid: {ConfigPath}", path);
             return RecognitionRegionConfig.Empty(expectedWidth, expectedHeight, path);
         }
         catch (IOException ex)
         {
-            _logger.LogError(ex, "读取识别区域配置失败：{ConfigPath}", path);
+            _logger.LogError(ex, "Failed to read recognition region config: {ConfigPath}", path);
             return RecognitionRegionConfig.Empty(expectedWidth, expectedHeight, path);
         }
     }
@@ -97,7 +113,7 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
 
         if (string.IsNullOrWhiteSpace(path))
         {
-            throw new InvalidOperationException("识别区域配置缺少保存路径。");
+            throw new InvalidOperationException("Recognition region config is missing a save path.");
         }
 
         var directory = Path.GetDirectoryName(path);
@@ -113,7 +129,7 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         File.WriteAllText(path, json);
 
         _logger.LogInformation(
-            "已保存识别区域配置：{ConfigPath}，区域数量：{RegionCount}",
+            "Saved recognition region config {ConfigPath}. Enabled region count: {RegionCount}",
             path,
             config.Regions.Count(region => region.Enabled));
     }
@@ -123,7 +139,13 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         return Path.Combine(_configDirectory, $"{width}x{height}.json");
     }
 
-    private void NormalizeConfig(RecognitionRegionConfig config, int width, int height, string path)
+    private void NormalizeConfig(
+        RecognitionRegionConfig config,
+        int width,
+        int height,
+        string path,
+        int expectedWidth = 0,
+        int expectedHeight = 0)
     {
         if (config.ResolutionWidth == 0)
         {
@@ -138,17 +160,58 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         config.SourcePath = path;
         config.LoadedFromFile = true;
 
-        if (width > 0
-            && height > 0
-            && (config.ResolutionWidth != width || config.ResolutionHeight != height))
+        if (expectedWidth > 0
+            && expectedHeight > 0
+            && (config.ResolutionWidth != expectedWidth || config.ResolutionHeight != expectedHeight))
         {
             _logger.LogWarning(
-                "识别区域配置分辨率与当前截图不一致。配置：{ConfigWidth}x{ConfigHeight}，当前：{FrameWidth}x{FrameHeight}",
+                "Recognition region config resolution differs from current frame. Config={ConfigWidth}x{ConfigHeight}, Current={FrameWidth}x{FrameHeight}",
                 config.ResolutionWidth,
                 config.ResolutionHeight,
-                width,
-                height);
+                expectedWidth,
+                expectedHeight);
         }
+    }
+
+    private string? FindBestFallbackConfigPath(int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return ListConfigPaths().FirstOrDefault();
+        }
+
+        return ListConfigPaths()
+            .Select(path => new
+            {
+                Path = path,
+                Resolution = GetResolutionFromPath(path)
+            })
+            .Where(candidate => candidate.Resolution.Width > 0 && candidate.Resolution.Height > 0)
+            .OrderBy(candidate => GetResolutionMatchScore(
+                width,
+                height,
+                candidate.Resolution.Width,
+                candidate.Resolution.Height))
+            .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
+            .Select(candidate => candidate.Path)
+            .FirstOrDefault();
+    }
+
+    private static double GetResolutionMatchScore(
+        int targetWidth,
+        int targetHeight,
+        int configWidth,
+        int configHeight)
+    {
+        var targetAspect = targetWidth / (double)targetHeight;
+        var configAspect = configWidth / (double)configHeight;
+        var aspectDifference = Math.Abs(targetAspect - configAspect) / targetAspect;
+
+        var targetArea = targetWidth * (double)targetHeight;
+        var configArea = configWidth * (double)configHeight;
+        var areaDifference = Math.Abs(Math.Log(configArea / targetArea));
+
+        return (aspectDifference * 1000d) + areaDifference;
     }
 
     private static (int Width, int Height) GetResolutionFromPath(string path)

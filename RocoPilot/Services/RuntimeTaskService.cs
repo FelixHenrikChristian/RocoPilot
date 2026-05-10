@@ -495,6 +495,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return false;
         }
 
+        var matchOptions = CreateScaledImageMatchOptions(
+            MagicPointMatchOptions,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
         var magicPointCount = 0;
         foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
         {
@@ -502,7 +507,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 frame,
                 slotRegion,
                 MagicPointTemplateName,
-                MagicPointMatchOptions,
+                matchOptions,
                 cancellationToken);
             if (result.IsMatch)
             {
@@ -568,6 +573,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return GameStateScanResult.NonBattle;
         }
 
+        var matchOptions = CreateScaledImageMatchOptions(
+            MagicPointMatchOptions,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
         var magicPointCount = 0;
         foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
         {
@@ -575,7 +585,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 frame,
                 slotRegion,
                 MagicPointTemplateName,
-                MagicPointMatchOptions,
+                matchOptions,
                 cancellationToken);
             if (result.IsMatch)
             {
@@ -719,11 +729,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return false;
         }
 
+        var matchOptions = CreateScaledImageMatchOptions(
+            options,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
         var result = await _imageMatchingService.MatchAsync(
             frame,
             frameRegion,
             templateName,
-            options,
+            matchOptions,
             cancellationToken);
         _logger.LogDebug(
             "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}",
@@ -732,7 +747,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             region.Id,
             templateName,
             result.Score,
-            options.MinimumScore,
+            matchOptions.MinimumScore,
             result.IsMatch,
             frameRegion.X,
             frameRegion.Y,
@@ -853,6 +868,49 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 Enabled = region.Enabled
             };
         }
+    }
+
+    private static ImageMatchOptions CreateScaledImageMatchOptions(
+        ImageMatchOptions options,
+        CapturedFrame frame,
+        CaptureTargetWindow targetWindow,
+        RecognitionRegionConfig config)
+    {
+        var configWidth = config.ResolutionWidth > 0
+            ? config.ResolutionWidth
+            : targetWindow.HasClientArea ? targetWindow.ClientWidth : frame.Width;
+        var configHeight = config.ResolutionHeight > 0
+            ? config.ResolutionHeight
+            : targetWindow.HasClientArea ? targetWindow.ClientHeight : frame.Height;
+
+        if (configWidth <= 0 || configHeight <= 0)
+        {
+            return CloneImageMatchOptions(options, 1, 1);
+        }
+
+        _ = TryGetClientAreaInCapturedFrame(
+            frame,
+            targetWindow,
+            out _,
+            out _,
+            out var sourceWidth,
+            out var sourceHeight);
+
+        var scaleX = sourceWidth > 0 ? sourceWidth / (double)configWidth : 1;
+        var scaleY = sourceHeight > 0 ? sourceHeight / (double)configHeight : 1;
+        return CloneImageMatchOptions(options, scaleX, scaleY);
+    }
+
+    private static ImageMatchOptions CloneImageMatchOptions(ImageMatchOptions options, double scaleX, double scaleY)
+    {
+        return new ImageMatchOptions
+        {
+            MinimumScore = options.MinimumScore,
+            AlphaThreshold = options.AlphaThreshold,
+            SearchStep = options.SearchStep,
+            TemplateScaleX = options.TemplateScaleX * scaleX,
+            TemplateScaleY = options.TemplateScaleY * scaleY
+        };
     }
 
     private static RecognitionRegion ToFrameRegion(

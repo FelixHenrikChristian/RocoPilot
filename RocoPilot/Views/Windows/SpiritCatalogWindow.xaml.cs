@@ -24,6 +24,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
 
     public string Summary { get; private set; } = "正在加载图鉴数据";
 
+    public string UpdatedAtDisplay { get; private set; } = string.Empty;
+
     public SpiritCatalogWindow()
     {
         _spiritCatalogService = App.GetService<ISpiritCatalogService>();
@@ -78,11 +80,13 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             }
 
             Summary = BuildSummary(document);
+            UpdatedAtDisplay = BuildUpdatedAtDisplay(document);
             EmptyState.Visibility = Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception ex)
         {
             Summary = $"图鉴数据加载失败：{ex.Message}";
+            UpdatedAtDisplay = string.Empty;
             EmptyState.Visibility = Visibility.Visible;
         }
 
@@ -195,10 +199,14 @@ public sealed partial class SpiritCatalogWindow : WindowEx
 
     private static string BuildSummary(SpiritCatalogDocument document)
     {
-        var scrapedAt = document.Source.ScrapedAt == default
-            ? string.Empty
-            : $" · {document.Source.ScrapedAt.ToLocalTime():yyyy-MM-dd HH:mm}";
-        return $"{document.Count} 个图鉴编号 / {document.ChainCount} 条进化链{scrapedAt}";
+        return $"{document.Count} 个图鉴编号";
+    }
+
+    private static string BuildUpdatedAtDisplay(SpiritCatalogDocument document)
+    {
+        return document.Source.ScrapedAt == default
+            ? "更新时间：未同步"
+            : $"更新时间：{document.Source.ScrapedAt.ToLocalTime():yyyy-MM-dd HH:mm}";
     }
 
     internal static int ParseId(string id)

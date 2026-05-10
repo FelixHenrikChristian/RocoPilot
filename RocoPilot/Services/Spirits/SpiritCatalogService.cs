@@ -160,7 +160,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                     ScrapedAt = DateTimeOffset.UtcNow
                 },
                 Count = CountCatalogIds(spirits),
-                ChainCount = chains.Count,
                 Spirits = spirits,
                 EvolutionChains = chains
             };
@@ -256,7 +255,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         document.Spirits ??= [];
         document.EvolutionChains ??= [];
         document.Count = CountCatalogIds(document.Spirits);
-        document.ChainCount = document.EvolutionChains.Count;
         return document;
     }
 

@@ -6,8 +6,6 @@ public sealed class SpiritCatalogDocument
 
     public int Count { get; set; }
 
-    public int ChainCount { get; set; }
-
     public List<SpiritCatalogItem> Spirits { get; set; } = [];
 
     public List<SpiritEvolutionChain> EvolutionChains { get; set; } = [];

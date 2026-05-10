@@ -40,7 +40,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             if (SetProperty(ref _isEncounterStatisticsEnabled, value))
             {
                 _runtimeTaskService.SetEncounterStatisticsEnabled(value);
-                OnPropertyChanged(nameof(EncounterStatisticsStatus));
             }
         }
     }
@@ -65,10 +64,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             return string.Join(" · ", parts);
         }
     }
-
-    public string EncounterStatisticsStatus => IsEncounterStatisticsEnabled
-        ? "已开启"
-        : "已关闭";
 
     public string SpiritCatalogSummary
     {
@@ -109,7 +104,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             if (SetProperty(ref _isAutoBattleEnabled, value))
             {
                 SaveAutoBattleSettings();
-                OnPropertyChanged(nameof(AutoBattleStatus));
             }
         }
     }
@@ -137,10 +131,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             }
         }
     }
-
-    public string AutoBattleStatus => IsAutoBattleEnabled
-        ? "已开启"
-        : "已关闭";
 
     public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(
         _autoBattleReleaseSequence,
@@ -203,7 +193,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             var progress = new Progress<SpiritCatalogSyncProgress>(UpdateSpiritCatalogSyncProgress);
             var document = await _spiritCatalogService.SyncAsync(progress);
             ApplySpiritCatalogSummary(document);
-            SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号 / {document.ChainCount} 条进化链";
+            SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号";
         }
         catch (Exception ex)
         {
@@ -231,10 +221,7 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     private void ApplySpiritCatalogSummary(SpiritCatalogDocument document)
     {
-        var scrapedAt = document.Source.ScrapedAt == default
-            ? string.Empty
-            : $" · {document.Source.ScrapedAt.ToLocalTime():yyyy-MM-dd HH:mm}";
-        SpiritCatalogSummary = $"{document.Count} 个图鉴编号 / {document.ChainCount} 条进化链{scrapedAt}";
+        SpiritCatalogSummary = $"{document.Count} 个图鉴编号";
     }
 
     private void UpdateSpiritCatalogSyncProgress(SpiritCatalogSyncProgress progress)
@@ -259,7 +246,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         OnPropertyChanged(nameof(AutoBattleTurnSequence));
         OnPropertyChanged(nameof(SelectedAutoBattleEncounterRelievedActionOption));
         OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
-        OnPropertyChanged(nameof(AutoBattleStatus));
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }

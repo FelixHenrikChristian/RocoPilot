@@ -204,10 +204,16 @@
             </Grid>
         </Border>
 
-        <StackPanel
+        <Grid
             Grid.Row="2"
-            Spacing="4">
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
             <RichTextBlock
+                Grid.Column="0"
                 FontSize="12"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}">
                 <Paragraph>
@@ -217,6 +223,15 @@
                     </Hyperlink>
                 </Paragraph>
             </RichTextBlock>
-        </StackPanel>
+            <TextBlock
+                Grid.Column="1"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind UpdatedAtDisplay, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="NoWrap" />
+        </Grid>
     </Grid>
 </windowex:WindowEx>

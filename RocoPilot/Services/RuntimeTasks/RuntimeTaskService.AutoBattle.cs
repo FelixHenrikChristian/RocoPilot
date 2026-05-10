@@ -13,14 +13,14 @@ public sealed partial class RuntimeTaskService
 {
     private const string BattleChatTemplateName = "battle-chat.png";
     private const string BattleSkillTemplateName = "battle-button-skill.png";
-    private const string BattleSpaceTemplateName = "battle-space.png";
     private const string AutoBattleCaptureSequence = "W, 1, Space";
     private const string AutoBattleSkillPlaceholder = "{skill}";
 
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan AutoBattlePetSwitchProbeDelay = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan AutoBattlePetSwitchConfirmDelay = TimeSpan.FromMilliseconds(1500);
+    private static readonly TimeSpan AutoBattlePetSwitchStateCheckDelay = TimeSpan.FromMilliseconds(1500);
     private static readonly string[] AutoBattleDefaultRoundOrder =
     [
         "1",
@@ -45,11 +45,6 @@ public sealed partial class RuntimeTaskService
     [
         "battle-tip-energe"
     ];
-    private static readonly string[] BattleSpaceRegionIds =
-    [
-        "battle-space"
-    ];
-
     private static readonly ImageMatchOptions BattleChatMatchOptions = new()
     {
         MinimumScore = 0.88,
@@ -57,12 +52,6 @@ public sealed partial class RuntimeTaskService
         SearchStep = 1
     };
     private static readonly ImageMatchOptions BattleSkillMatchOptions = new()
-    {
-        MinimumScore = 0.88,
-        AlphaThreshold = 16,
-        SearchStep = 1
-    };
-    private static readonly ImageMatchOptions BattleSpaceMatchOptions = new()
     {
         MinimumScore = 0.88,
         AlphaThreshold = 16,
@@ -333,12 +322,6 @@ public sealed partial class RuntimeTaskService
         }
 
         _wasAutoBattlePetSwitchingVisible = true;
-        if (!TemplateExists(BattleSpaceTemplateName))
-        {
-            _logger.LogWarning("自动战斗换精灵未执行：未找到 {TemplateName}。", BattleSpaceTemplateName);
-            return;
-        }
-
         if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
         {
             return;
@@ -364,24 +347,34 @@ public sealed partial class RuntimeTaskService
                     AutoBattleKeyboardInputOptions,
                     cancellationToken);
 
-                await Task.Delay(AutoBattlePetSwitchProbeDelay, cancellationToken);
-
-                using var frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
-                if (frame is null || !await IsBattleSpaceVisibleAsync(state, frame, cancellationToken))
-                {
-                    continue;
-                }
+                await Task.Delay(AutoBattlePetSwitchConfirmDelay, cancellationToken);
 
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
                     "Space",
                     AutoBattleKeyboardInputOptions,
                     cancellationToken);
-                _logger.LogInformation("自动战斗：切换到第 {Slot} 只精灵，按 Space 确认", slot);
+
+                await Task.Delay(AutoBattlePetSwitchStateCheckDelay, cancellationToken);
+
+                using var frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
+                if (frame is null)
+                {
+                    _logger.LogWarning("自动战斗换精灵：按 Space 确认后未能获取画面，停止本轮自动换精灵。");
+                    return;
+                }
+
+                if (await IsBattlePetSwitchingAsync(state, frame, cancellationToken))
+                {
+                    _logger.LogDebug("自动战斗换精灵：第 {Slot} 只精灵确认后仍在切换界面，继续尝试下一只", slot);
+                    continue;
+                }
+
+                _logger.LogInformation("自动战斗：切换到第 {Slot} 只精灵，按 Space 确认后离开切换界面", slot);
                 return;
             }
 
-            _logger.LogWarning("自动战斗换精灵失败：已尝试 1-6，但未检测到 battle-space 确认提示。");
+            _logger.LogWarning("自动战斗换精灵失败：已尝试 1-6 并按 Space 确认，但仍处于切换精灵界面。");
         }
         catch (OperationCanceledException)
         {
@@ -542,22 +535,6 @@ public sealed partial class RuntimeTaskService
         {
             _autoBattleActionLock.Release();
         }
-    }
-
-    private async Task<bool> IsBattleSpaceVisibleAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
-    {
-        return await MatchRuntimeTemplateAsync(
-            state,
-            frame,
-            BattleSpaceRegionIds,
-            BattleSpaceTemplateName,
-            BattleSpaceMatchOptions,
-            "自动战斗",
-            "换精灵确认提示",
-            cancellationToken);
     }
 
     private AutoBattleReleaseStep GetCurrentAutoBattleReleaseStep(AutoBattleSettings settings)

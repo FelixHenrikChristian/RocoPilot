@@ -35,14 +35,6 @@
       "enabled": true
     },
     {
-      "id": "battle-space",
-      "x": 1285,
-      "y": 913,
-      "width": 85,
-      "height": 34,
-      "enabled": true
-    },
-    {
       "id": "battle-tip-energe",
       "x": 797,
       "y": 155,

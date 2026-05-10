@@ -7,10 +7,13 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 
+using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Models.Spirits;
 
 namespace RocoPilot.ViewModels;
 
@@ -23,11 +26,13 @@ public partial class StatisticsViewModel : ObservableRecipient
     };
 
     private readonly IStatisticsService _statisticsService;
+    private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly ILogger<StatisticsViewModel> _logger;
     private readonly DispatcherQueue? _dispatcherQueue;
 
     private StatisticsDocument _document;
     private bool _isLoaded;
+    private IReadOnlyDictionary<string, string> _spiritAvatarPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     private IReadOnlyList<AccountStatisticsOption> _accounts = [];
     private AccountStatisticsOption? _selectedAccount;
@@ -152,6 +157,16 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public string PendingShinyDetectedAtDisplay => LatestPendingShinyCapture?.DetectedAtDisplay ?? "--";
 
+    public BitmapImage? LatestPendingShinyAvatar => LatestPendingShinyCapture?.Avatar;
+
+    public Visibility LatestPendingShinyAvatarVisibility => LatestPendingShinyAvatar is null
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
+    public Visibility LatestPendingShinyAvatarFallbackVisibility => LatestPendingShinyAvatar is null
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     public string PendingShinyQueueDisplay => PendingShinyCount > 1
         ? $"还有 {PendingShinyCount - 1} 条待确认"
         : "当前仅此一条";
@@ -215,9 +230,11 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public StatisticsViewModel(
         IStatisticsService statisticsService,
+        ISpiritCatalogService spiritCatalogService,
         ILogger<StatisticsViewModel> logger)
     {
         _statisticsService = statisticsService;
+        _spiritCatalogService = spiritCatalogService;
         _logger = logger;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _document = _statisticsService.CurrentDocument;
@@ -242,6 +259,8 @@ public partial class StatisticsViewModel : ObservableRecipient
             _logger.LogWarning(ex, "读取统计数据失败。");
             ShowNotification(InfoBarSeverity.Warning, "读取统计失败", "已使用当前内存统计数据。");
         }
+
+        await LoadSpiritAvatarPathsAsync();
     }
 
     public string ExportToJson()
@@ -419,7 +438,11 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public IReadOnlyList<ShinyCaptureDetailItem> GetShinyCaptureDetails(SpiritCountItem item)
     {
-        return StatisticsProjection.BuildShinyCaptureDetails(FindSelectedAccount(), SelectedShinyScopeSeasonId, item.Name);
+        return StatisticsProjection.BuildShinyCaptureDetails(
+            FindSelectedAccount(),
+            SelectedShinyScopeSeasonId,
+            item.Name,
+            ResolveSpiritAvatar);
     }
 
     public async Task ConfirmLatestPendingShinyAsync()
@@ -504,10 +527,10 @@ public partial class StatisticsViewModel : ObservableRecipient
     {
         var selectedAccount = FindSelectedAccount();
 
-        Seasons = StatisticsProjection.BuildSeasons(selectedAccount);
+        Seasons = StatisticsProjection.BuildSeasons(selectedAccount, ResolveSpiritAvatar);
         ShinyScopes = StatisticsProjection.BuildShinyScopes(Seasons);
-        AllShinyCounts = StatisticsProjection.BuildAllShinyCounts(selectedAccount);
-        PendingShinyCaptures = StatisticsProjection.BuildPendingShinyCaptures(selectedAccount);
+        AllShinyCounts = StatisticsProjection.BuildAllShinyCounts(selectedAccount, ResolveSpiritAvatar);
+        PendingShinyCaptures = StatisticsProjection.BuildPendingShinyCaptures(selectedAccount, ResolveSpiritAvatar);
         SyncPendingShinyEditor();
 
         SelectedSeasonIndex = Math.Min(SelectedSeasonIndex, Math.Max(0, Seasons.Count - 1));
@@ -545,7 +568,67 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(PendingShinyConfirmationVisibility));
         OnPropertyChanged(nameof(PendingShinySeasonDisplay));
         OnPropertyChanged(nameof(PendingShinyDetectedAtDisplay));
+        OnPropertyChanged(nameof(LatestPendingShinyAvatar));
+        OnPropertyChanged(nameof(LatestPendingShinyAvatarVisibility));
+        OnPropertyChanged(nameof(LatestPendingShinyAvatarFallbackVisibility));
         OnPropertyChanged(nameof(PendingShinyQueueDisplay));
+    }
+
+    private async Task LoadSpiritAvatarPathsAsync()
+    {
+        try
+        {
+            _spiritAvatarPaths = BuildSpiritAvatarPaths(await _spiritCatalogService.LoadAsync());
+            RefreshSelectedAccount();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取精灵头像失败。");
+        }
+    }
+
+    private IReadOnlyDictionary<string, string> BuildSpiritAvatarPaths(SpiritCatalogDocument document)
+    {
+        var avatarPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in document.Spirits)
+        {
+            var path = _spiritCatalogService.ResolveAvatarPath(item.AvatarPath);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            AddSpiritAvatarName(avatarPaths, item.Name, path);
+            AddSpiritAvatarName(avatarPaths, item.WikiName, path);
+            AddSpiritAvatarName(avatarPaths, item.BaseName, path);
+            foreach (var alias in item.Aliases)
+            {
+                AddSpiritAvatarName(avatarPaths, alias, path);
+            }
+        }
+
+        return avatarPaths;
+    }
+
+    private BitmapImage? ResolveSpiritAvatar(string spiritName)
+    {
+        var key = TextMatchingHelper.NormalizeSpiritNameForMatching(spiritName);
+        if (key.Length == 0 || !_spiritAvatarPaths.TryGetValue(key, out var path))
+        {
+            return null;
+        }
+
+        return new BitmapImage(new Uri(path, UriKind.Absolute));
+    }
+
+    private static void AddSpiritAvatarName(Dictionary<string, string> avatarPaths, string? name, string path)
+    {
+        var key = TextMatchingHelper.NormalizeSpiritNameForMatching(name);
+        if (key.Length > 0)
+        {
+            avatarPaths.TryAdd(key, path);
+        }
     }
 
     private void SyncPendingShinyEditor()

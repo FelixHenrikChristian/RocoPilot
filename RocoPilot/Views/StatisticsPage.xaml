@@ -41,11 +41,19 @@
                         VerticalAlignment="Center"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="6">
-                        <FontIcon
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="12"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE77B;" />
+                        <Grid>
+                            <Image
+                                Margin="1"
+                                Source="{Binding Avatar}"
+                                Stretch="Uniform"
+                                Visibility="{Binding AvatarVisibility}" />
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="12"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE77B;"
+                                Visibility="{Binding AvatarFallbackVisibility}" />
+                        </Grid>
                     </Border>
 
                     <Grid
@@ -118,11 +126,19 @@
                         VerticalAlignment="Center"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="6">
-                        <FontIcon
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="12"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE734;" />
+                        <Grid>
+                            <Image
+                                Margin="1"
+                                Source="{Binding Avatar}"
+                                Stretch="Uniform"
+                                Visibility="{Binding AvatarVisibility}" />
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="12"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE734;"
+                                Visibility="{Binding AvatarFallbackVisibility}" />
+                        </Grid>
                     </Border>
 
                     <TextBlock
@@ -188,11 +204,19 @@
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                                 CornerRadius="8">
-                                <FontIcon
-                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                    FontSize="20"
-                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                    Glyph="&#xE734;" />
+                                <Grid>
+                                    <Image
+                                        Margin="2"
+                                        Source="{Binding Avatar}"
+                                        Stretch="Uniform"
+                                        Visibility="{Binding AvatarVisibility}" />
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="20"
+                                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                        Glyph="&#xE734;"
+                                        Visibility="{Binding AvatarFallbackVisibility}" />
+                                </Grid>
                             </Border>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
@@ -781,11 +805,19 @@
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                                 CornerRadius="8">
-                                <FontIcon
-                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                    FontSize="24"
-                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                    Glyph="&#xE7BA;" />
+                                <Grid>
+                                    <Image
+                                        Margin="2"
+                                        Source="{x:Bind ViewModel.LatestPendingShinyAvatar, Mode=OneWay}"
+                                        Stretch="Uniform"
+                                        Visibility="{x:Bind ViewModel.LatestPendingShinyAvatarVisibility, Mode=OneWay}" />
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="24"
+                                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                        Glyph="&#xE7BA;"
+                                        Visibility="{x:Bind ViewModel.LatestPendingShinyAvatarFallbackVisibility, Mode=OneWay}" />
+                                </Grid>
                             </Border>
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">

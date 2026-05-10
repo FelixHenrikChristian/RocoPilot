@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.ViewModels;
 
@@ -246,7 +247,8 @@ public sealed partial class StatisticsPage : Page
                     $"{FormatSeasonDisplay(seasonId)} · 奇遇统计",
                     "该操作会删除当前赛季中这个精灵的奇遇计数。",
                     new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
-                    new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C))),
+                    new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C)),
+                    item.Avatar),
             }
         };
 
@@ -340,13 +342,11 @@ public sealed partial class StatisticsPage : Page
             VerticalAlignment = VerticalAlignment.Center,
             Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
             CornerRadius = new CornerRadius(8),
-            Child = new FontIcon
-            {
-                Glyph = "\uE77B",
-                FontSize = 19,
-                Foreground = GetResourceBrush("AccentFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x63, 0x66, 0xF1))),
-                FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
-            }
+            Child = CreateDialogAvatarContent(
+                item.Avatar,
+                "\uE77B",
+                GetResourceBrush("AccentFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x63, 0x66, 0xF1))),
+                19)
         });
         var titlePanel = new StackPanel { Spacing = 3 };
         titlePanel.Children.Add(new TextBlock
@@ -602,7 +602,8 @@ public sealed partial class StatisticsPage : Page
             $"{item.SeasonDisplay} · {item.PositionDisplay}",
             "该操作只删除当前这一只异色记录。",
             new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
-            new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C))));
+            new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C)),
+            item.Avatar));
 
         var detailGrid = new Grid
         {
@@ -648,7 +649,8 @@ public sealed partial class StatisticsPage : Page
         string subtitle,
         string description,
         Brush iconBrush,
-        Brush backgroundBrush)
+        Brush backgroundBrush,
+        BitmapImage? avatar = null)
     {
         var card = new Border
         {
@@ -669,13 +671,7 @@ public sealed partial class StatisticsPage : Page
             VerticalAlignment = VerticalAlignment.Center,
             Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
             CornerRadius = new CornerRadius(8),
-            Child = new FontIcon
-            {
-                Glyph = glyph,
-                FontSize = 19,
-                Foreground = iconBrush,
-                FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
-            }
+            Child = CreateDialogAvatarContent(avatar, glyph, iconBrush, 19)
         };
         var textPanel = new StackPanel { Spacing = 3 };
         textPanel.Children.Add(new TextBlock
@@ -707,6 +703,31 @@ public sealed partial class StatisticsPage : Page
         grid.Children.Add(textPanel);
         card.Child = grid;
         return card;
+    }
+
+    private static UIElement CreateDialogAvatarContent(
+        BitmapImage? avatar,
+        string fallbackGlyph,
+        Brush fallbackBrush,
+        double fallbackFontSize)
+    {
+        if (avatar is not null)
+        {
+            return new Image
+            {
+                Margin = new Thickness(2),
+                Source = avatar,
+                Stretch = Stretch.Uniform
+            };
+        }
+
+        return new FontIcon
+        {
+            Glyph = fallbackGlyph,
+            FontSize = fallbackFontSize,
+            Foreground = fallbackBrush,
+            FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+        };
     }
 
     private static Border CreateDialogInfoTile(string glyph, string label, string value)

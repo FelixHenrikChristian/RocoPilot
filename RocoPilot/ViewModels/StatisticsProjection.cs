@@ -1,6 +1,9 @@
 using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
 
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media.Imaging;
+
 namespace RocoPilot.ViewModels;
 
 internal static class StatisticsProjection
@@ -12,10 +15,12 @@ internal static class StatisticsProjection
             .ToList();
     }
 
-    public static IReadOnlyList<SeasonStatisticsGroup> BuildSeasons(AccountStatisticsData? account)
+    public static IReadOnlyList<SeasonStatisticsGroup> BuildSeasons(
+        AccountStatisticsData? account,
+        Func<string, BitmapImage?>? avatarResolver = null)
     {
         return (account?.Seasons ?? [])
-            .Select(ToSeasonStatisticsGroup)
+            .Select(season => ToSeasonStatisticsGroup(season, avatarResolver))
             .OrderByDescending(season => season.LatestCapturedAt)
             .ThenBy(season => season.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -28,12 +33,19 @@ internal static class StatisticsProjection
             .ToList();
     }
 
-    public static IReadOnlyList<SpiritCountItem> BuildAllShinyCounts(AccountStatisticsData? account)
+    public static IReadOnlyList<SpiritCountItem> BuildAllShinyCounts(
+        AccountStatisticsData? account,
+        Func<string, BitmapImage?>? avatarResolver = null)
     {
-        return BuildShinyCounts(account?.Seasons.SelectMany(season => season.ShinyCaptures) ?? [], season: null);
+        return BuildShinyCounts(
+            account?.Seasons.SelectMany(season => season.ShinyCaptures) ?? [],
+            season: null,
+            avatarResolver);
     }
 
-    public static IReadOnlyList<PendingShinyCaptureItem> BuildPendingShinyCaptures(AccountStatisticsData? account)
+    public static IReadOnlyList<PendingShinyCaptureItem> BuildPendingShinyCaptures(
+        AccountStatisticsData? account,
+        Func<string, BitmapImage?>? avatarResolver = null)
     {
         if (account is null)
         {
@@ -55,7 +67,8 @@ internal static class StatisticsProjection
                     record.Season.Trim(),
                     string.IsNullOrWhiteSpace(season?.Name) ? $"{record.Season.Trim()}赛季" : season.Name,
                     record.DetectedAt,
-                    encounterCount);
+                    encounterCount,
+                    avatarResolver?.Invoke(record.Name));
             })
             .OrderByDescending(item => item.DetectedAt)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
@@ -65,7 +78,8 @@ internal static class StatisticsProjection
     public static IReadOnlyList<ShinyCaptureDetailItem> BuildShinyCaptureDetails(
         AccountStatisticsData? account,
         string? seasonId,
-        string spiritName)
+        string spiritName,
+        Func<string, BitmapImage?>? avatarResolver = null)
     {
         if (account is null || string.IsNullOrWhiteSpace(spiritName))
         {
@@ -90,7 +104,8 @@ internal static class StatisticsProjection
                 capture.Capture.CapturedAt,
                 capture.Capture.EncounterCountBeforeCapture,
                 index + 1,
-                captures.Count))
+                captures.Count,
+                avatarResolver?.Invoke(capture.Capture.Name)))
             .ToList();
     }
 
@@ -118,7 +133,9 @@ internal static class StatisticsProjection
             .Sum(item => Math.Max(0, item.Count)) ?? 0;
     }
 
-    private static SeasonStatisticsGroup ToSeasonStatisticsGroup(SeasonStatisticsData season)
+    private static SeasonStatisticsGroup ToSeasonStatisticsGroup(
+        SeasonStatisticsData season,
+        Func<string, BitmapImage?>? avatarResolver)
     {
         var pollutionCounts = season.Encounters
             .Where(item => !string.IsNullOrWhiteSpace(item.Name) && item.Count > 0)
@@ -133,12 +150,13 @@ internal static class StatisticsProjection
                     TextMatchingHelper.NormalizeSpiritNameForDisplay(latestItem.Name),
                     group.Sum(item => Math.Max(0, item.Count)),
                     latestItem.LastCapturedAt,
-                    string.IsNullOrWhiteSpace(latestItem.Season) ? season.Id : latestItem.Season);
+                    string.IsNullOrWhiteSpace(latestItem.Season) ? season.Id : latestItem.Season,
+                    avatar: avatarResolver?.Invoke(latestItem.Name));
             })
             .OrderByDescending(item => item.LastCapturedAt)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var shinyCounts = BuildShinyCounts(season.ShinyCaptures, season.Id);
+        var shinyCounts = BuildShinyCounts(season.ShinyCaptures, season.Id, avatarResolver);
 
         return new SeasonStatisticsGroup(
             season.Id,
@@ -151,7 +169,8 @@ internal static class StatisticsProjection
 
     private static IReadOnlyList<SpiritCountItem> BuildShinyCounts(
         IEnumerable<ShinySpiritCaptureRecord> captures,
-        string? season)
+        string? season,
+        Func<string, BitmapImage?>? avatarResolver)
     {
         return captures
             .Where(capture => !string.IsNullOrWhiteSpace(capture.Name))
@@ -166,7 +185,8 @@ internal static class StatisticsProjection
                     TextMatchingHelper.NormalizeSpiritNameForDisplay(latestCapture.Name),
                     group.Count(),
                     latestCapture.CapturedAt,
-                    season ?? latestCapture.Season);
+                    season ?? latestCapture.Season,
+                    avatar: avatarResolver?.Invoke(latestCapture.Name));
             })
             .OrderByDescending(item => item.LastCapturedAt)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
@@ -264,13 +284,15 @@ public sealed class SpiritCountItem
         int count,
         DateTimeOffset lastCapturedAt,
         string season,
-        double pityThreshold = DefaultPityThreshold)
+        double pityThreshold = DefaultPityThreshold,
+        BitmapImage? avatar = null)
     {
         Name = name;
         Count = count;
         LastCapturedAt = lastCapturedAt;
         Season = season;
         PityThreshold = pityThreshold;
+        Avatar = avatar;
     }
 
     public string Name { get; }
@@ -282,6 +304,12 @@ public sealed class SpiritCountItem
     public string Season { get; }
 
     public double PityThreshold { get; }
+
+    public BitmapImage? Avatar { get; }
+
+    public Visibility AvatarVisibility => Avatar is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility AvatarFallbackVisibility => Avatar is null ? Visibility.Visible : Visibility.Collapsed;
 
     public double ProgressRatio => PityThreshold <= 0
         ? 0
@@ -297,7 +325,8 @@ public sealed class ShinyCaptureDetailItem
         DateTimeOffset capturedAt,
         int encounterCountBeforeCapture,
         int position,
-        int totalCount)
+        int totalCount,
+        BitmapImage? avatar = null)
     {
         Id = id;
         Name = name;
@@ -306,6 +335,7 @@ public sealed class ShinyCaptureDetailItem
         EncounterCountBeforeCapture = Math.Max(0, encounterCountBeforeCapture);
         Position = position;
         TotalCount = totalCount;
+        Avatar = avatar;
     }
 
     public string Id { get; }
@@ -321,6 +351,12 @@ public sealed class ShinyCaptureDetailItem
     public int Position { get; }
 
     public int TotalCount { get; }
+
+    public BitmapImage? Avatar { get; }
+
+    public Visibility AvatarVisibility => Avatar is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility AvatarFallbackVisibility => Avatar is null ? Visibility.Visible : Visibility.Collapsed;
 
     public string PositionDisplay => $"{Position} / {TotalCount}";
 
@@ -339,7 +375,8 @@ public sealed class PendingShinyCaptureItem
         string season,
         string seasonDisplay,
         DateTimeOffset detectedAt,
-        int encounterCount)
+        int encounterCount,
+        BitmapImage? avatar = null)
     {
         Id = id;
         Name = name;
@@ -347,6 +384,7 @@ public sealed class PendingShinyCaptureItem
         SeasonDisplay = seasonDisplay;
         DetectedAt = detectedAt;
         EncounterCount = encounterCount;
+        Avatar = avatar;
     }
 
     public string Id { get; }
@@ -360,6 +398,12 @@ public sealed class PendingShinyCaptureItem
     public DateTimeOffset DetectedAt { get; }
 
     public int EncounterCount { get; }
+
+    public BitmapImage? Avatar { get; }
+
+    public Visibility AvatarVisibility => Avatar is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public Visibility AvatarFallbackVisibility => Avatar is null ? Visibility.Visible : Visibility.Collapsed;
 
     public string DetectedAtDisplay => DetectedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
 }

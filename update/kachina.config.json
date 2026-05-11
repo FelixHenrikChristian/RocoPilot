@@ -1,0 +1,23 @@
+{
+  "source": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "uri": "https://github.com/FelixHenrikChristian/RocoPilot/releases/latest/download/RocoPilot.Install.exe"
+    }
+  ],
+  "appName": "RocoPilot",
+  "publisher": "Felix Henrik Christian",
+  "regName": "RocoPilot",
+  "exeName": "RocoPilot.exe",
+  "uninstallName": "RocoPilot.uninst.exe",
+  "updaterName": "RocoPilot.update.exe",
+  "programFilesPath": "RocoPilot",
+  "title": "RocoPilot",
+  "description": "RocoPilot",
+  "windowTitle": "RocoPilot Installer",
+  "uacStrategy": "prefer-admin",
+  "runtimes": [
+    "Microsoft.VCRedist.2015+.x64"
+  ]
+}

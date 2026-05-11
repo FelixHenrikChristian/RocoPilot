@@ -353,6 +353,15 @@ ASALocalRun/
 # BeatPulse healthcheck temp database
 healthchecksdb
 
+# Kachina installer build outputs
+update/kachina-builder.exe
+update/.kachina.config.effective.json
+update/publish/
+update/hashed/
+update/metadata.json
+update/RocoPilot.update.exe
+update/RocoPilot.Install.exe
+
 # Backup folder for Package Reference Convert tool in Visual Studio 2017
 MigrationBackup/
 

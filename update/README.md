@@ -36,6 +36,8 @@ Add a Cloudflare/R2 source when you have the final URL:
 
 You can also set `ROCO_KACHINA_CLOUDFLARE_URL` instead of passing the parameter.
 
+In GitHub Actions, set the repository variable `ROCO_R2_PUBLIC_URL` to the R2 public URL prefix. The workflow appends `/RocoPilot.Install.exe` and adds that as the R2 source automatically.
+
 Generated files are intentionally ignored by git:
 
 - `RocoPilot.update.exe`

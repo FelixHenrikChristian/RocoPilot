@@ -7,15 +7,6 @@ on:
         description: "Release version. Leave empty to use RocoPilot.csproj."
         required: false
         type: string
-      cloudflare_installer_url:
-        description: "Optional Cloudflare/R2 URL for RocoPilot.Install.exe."
-        required: false
-        type: string
-      upload_to_r2:
-        description: "Upload RocoPilot.Install.exe to Cloudflare R2."
-        required: false
-        default: false
-        type: boolean
       prerelease:
         description: "Mark the GitHub release as prerelease."
         required: false
@@ -124,9 +115,15 @@ jobs:
       - name: Build Kachina updater and offline installer
         shell: pwsh
         env:
-          ROCO_KACHINA_CLOUDFLARE_URL: ${{ github.event.inputs.cloudflare_installer_url }}
+          ROCO_R2_PUBLIC_URL: ${{ vars.ROCO_R2_PUBLIC_URL }}
         run: |
           $ErrorActionPreference = "Stop"
+          if (-not [string]::IsNullOrWhiteSpace($env:ROCO_R2_PUBLIC_URL)) {
+            $r2PublicUrl = ($env:ROCO_R2_PUBLIC_URL).TrimEnd("/")
+            $env:ROCO_KACHINA_CLOUDFLARE_URL = "$r2PublicUrl/RocoPilot.Install.exe"
+            Write-Host "Kachina R2 source: $env:ROCO_KACHINA_CLOUDFLARE_URL"
+          }
+
           .\update\build-kachina.ps1 `
             -Version "$env:APP_VERSION" `
             -SkipPublish `
@@ -190,10 +187,10 @@ jobs:
           files: artifacts/*
 
   upload_to_r2:
-    name: Upload Kachina package to Cloudflare R2
+    name: Upload release assets to Cloudflare R2
     needs: [build_release_assets, create_github_release]
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_to_r2 }}
+    if: ${{ vars.ROCO_UPLOAD_TO_R2 == 'true' }}
 
     steps:
       - name: Download release assets
@@ -214,5 +211,21 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           aws s3 cp artifacts/RocoPilot.Install.exe \
-            s3://${{ secrets.CLOUDFLARE_BUCKET_NAME }}/RocoPilot.Install.exe \
-            --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+            s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/RocoPilot.Install.exe \
+            --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+
+      - name: Upload MicaSetup installer
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          mica_installer="$(find artifacts -maxdepth 1 -type f -name 'RocoPilot-Setup-v*.exe' | head -n 1)"
+          if [ -z "$mica_installer" ]; then
+            echo "MicaSetup installer was not found."
+            exit 1
+          fi
+
+          aws s3 cp "$mica_installer" \
+            s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/RocoPilot-Setup.exe \
+            --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com

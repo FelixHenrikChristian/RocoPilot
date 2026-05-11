@@ -16,6 +16,8 @@ param(
 
     [string]$KachinaBuilderUrl = $env:KACHINA_BUILDER_URL,
 
+    [string]$PublishDir,
+
     [switch]$SkipPublish,
 
     [switch]$UpdaterOnly
@@ -29,12 +31,58 @@ $project = Join-Path $repoRoot "RocoPilot\RocoPilot.csproj"
 $configTemplate = Join-Path $updateDir "kachina.config.json"
 $effectiveConfig = Join-Path $updateDir ".kachina.config.effective.json"
 $builder = Join-Path $updateDir "kachina-builder.exe"
-$publishDir = Join-Path $updateDir "publish"
+if ([string]::IsNullOrWhiteSpace($PublishDir)) {
+    $publishDir = Join-Path $updateDir "publish"
+}
+else {
+    $publishDir = [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $PublishDir))
+}
 $metadata = Join-Path $updateDir "metadata.json"
 $hashedDir = Join-Path $updateDir "hashed"
 $updater = Join-Path $updateDir "RocoPilot.update.exe"
 $installer = Join-Path $updateDir "RocoPilot.Install.exe"
 $icon = Join-Path $repoRoot "RocoPilot\Assets\RocoPilot-Install.ico"
+
+function ConvertTo-CmdArgument {
+    param([string]$Value)
+
+    return '"' + $Value.Replace('"', '""') + '"'
+}
+
+function Invoke-KachinaBuilder {
+    param(
+        [string]$Description,
+        [string[]]$Arguments
+    )
+
+    $commandLine = (
+        @($builder) + $Arguments |
+            ForEach-Object { ConvertTo-CmdArgument ([string]$_) }
+    ) -join " "
+
+    Write-Host $Description
+    Write-Host "> $commandLine"
+    & $env:ComSpec /d /s /c $commandLine
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Description failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Unblock-Executable {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return
+    }
+
+    try {
+        Unblock-File -LiteralPath $Path -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $Path -Stream SmartScreen -Force -ErrorAction SilentlyContinue
+    }
+    catch {
+        Write-Warning "Could not remove Windows download markers from '$Path': $($_.Exception.Message)"
+    }
+}
 
 function Get-RocoPilotVersion {
     [xml]$projectXml = Get-Content $project -Raw
@@ -51,6 +99,7 @@ function Get-RocoPilotVersion {
 
 function Ensure-KachinaBuilder {
     if (Test-Path $builder) {
+        Unblock-Executable $builder
         return
     }
 
@@ -70,6 +119,8 @@ function Ensure-KachinaBuilder {
     if (-not (Test-Path $builder)) {
         throw "kachina-builder.exe was not created at '$builder'."
     }
+
+    Unblock-Executable $builder
 }
 
 function New-EffectiveConfig {
@@ -96,7 +147,9 @@ function New-EffectiveConfig {
     }
 
     $config.source = $sources
-    $config | ConvertTo-Json -Depth 8 | Set-Content -Path $effectiveConfig -Encoding UTF8
+    $json = $config | ConvertTo-Json -Depth 8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($effectiveConfig, $json, $utf8NoBom)
 
     return $effectiveConfig
 }
@@ -112,12 +165,16 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 Ensure-KachinaBuilder
 $config = New-EffectiveConfig
 
-Write-Host "Building Kachina updater..."
 Remove-Item $updater -Force -ErrorAction SilentlyContinue
-& $builder pack -c $config -o $updater --icon $icon
-if ($LASTEXITCODE -ne 0) {
-    throw "kachina-builder pack for updater failed with exit code $LASTEXITCODE."
-}
+Invoke-KachinaBuilder "Building Kachina updater..." @(
+    "pack",
+    "-c",
+    $config,
+    "-o",
+    $updater,
+    "--icon",
+    $icon
+)
 if (-not (Test-Path $updater)) {
     throw "kachina-builder pack for updater completed but '$updater' was not created."
 }
@@ -148,21 +205,27 @@ if (-not (Test-Path $publishDir)) {
     throw "Publish directory was not found at '$publishDir'. Run without -SkipPublish or create it first."
 }
 
-Write-Host "Generating Kachina metadata and hashed payload..."
 Remove-Item $metadata -Force -ErrorAction SilentlyContinue
 Remove-Item $hashedDir -Recurse -Force -ErrorAction SilentlyContinue
-& $builder gen `
-    -j $CompressionThreads `
-    -i $publishDir `
-    -m $metadata `
-    -o $hashedDir `
-    -r RocoPilot `
-    -t $Version `
-    -u $updater `
-    -p "RocoPilot.update.exe"
-if ($LASTEXITCODE -ne 0) {
-    throw "kachina-builder gen failed with exit code $LASTEXITCODE."
-}
+Invoke-KachinaBuilder "Generating Kachina metadata and hashed payload..." @(
+    "gen",
+    "-j",
+    $CompressionThreads,
+    "-i",
+    $publishDir,
+    "-m",
+    $metadata,
+    "-o",
+    $hashedDir,
+    "-r",
+    "RocoPilot",
+    "-t",
+    $Version,
+    "-u",
+    $updater,
+    "-p",
+    "RocoPilot.update.exe"
+)
 if (-not (Test-Path $metadata)) {
     throw "kachina-builder gen completed but '$metadata' was not created."
 }
@@ -170,12 +233,20 @@ if (-not (Test-Path $hashedDir)) {
     throw "kachina-builder gen completed but '$hashedDir' was not created."
 }
 
-Write-Host "Packing Kachina offline installer..."
 Remove-Item $installer -Force -ErrorAction SilentlyContinue
-& $builder pack -c $config -m $metadata -d $hashedDir -o $installer --icon $icon
-if ($LASTEXITCODE -ne 0) {
-    throw "kachina-builder pack for installer failed with exit code $LASTEXITCODE."
-}
+Invoke-KachinaBuilder "Packing Kachina offline installer..." @(
+    "pack",
+    "-c",
+    $config,
+    "-m",
+    $metadata,
+    "-d",
+    $hashedDir,
+    "-o",
+    $installer,
+    "--icon",
+    $icon
+)
 if (-not (Test-Path $installer)) {
     throw "kachina-builder pack for installer completed but '$installer' was not created."
 }

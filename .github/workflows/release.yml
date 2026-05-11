@@ -258,6 +258,30 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create release tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.build_release_assets.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.build_release_assets.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            echo "Release tag already exists: ${RELEASE_TAG}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${RELEASE_TAG}" "${GITHUB_SHA}" -m "RocoPilot ${RELEASE_VERSION}"
+          git push origin "${RELEASE_TAG}"
+
       - name: Download release assets
         uses: actions/download-artifact@v4
         with:

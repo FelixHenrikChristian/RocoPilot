@@ -136,6 +136,8 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        ApplyAutoBattleEncounterRelievedDetection("奇遇统计");
+
         var enemyNameText = await RecognizeRegionTextAsync(
             state,
             frame,
@@ -205,6 +207,8 @@ public sealed partial class RuntimeTaskService
         {
             return;
         }
+
+        ApplyAutoBattleShinySuspension(tipText, "异色识别");
 
         var enemyNameText = await RecognizeRegionTextAsync(
             state,

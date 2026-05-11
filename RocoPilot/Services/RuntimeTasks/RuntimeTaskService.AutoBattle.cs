@@ -218,6 +218,11 @@ public sealed partial class RuntimeTaskService
 
         try
         {
+            if (_isAutoBattleSuspendedForShiny)
+            {
+                return;
+            }
+
             if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
             {
                 _logger.LogWarning("自动战斗未执行：目标游戏窗口句柄已失效。");
@@ -511,11 +516,7 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        _isAutoBattleEncounterRelieved = true;
-        _logger.LogInformation(
-            "自动战斗：检测到奇遇效果解除，解除操作：{Action}。",
-            GetAutoBattleEncounterRelievedActionLogText(encounterRelievedAction));
-        return true;
+        return ApplyAutoBattleEncounterRelievedDetection("自动战斗");
     }
 
     private async Task<bool> TrySuspendAutoBattleForShinyAsync(
@@ -562,10 +563,51 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
+        return ApplyAutoBattleShinySuspension(tipText, "自动战斗异色保护");
+    }
+
+    private bool ApplyAutoBattleEncounterRelievedDetection(string source)
+    {
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        var encounterRelievedAction = settings.EncounterRelievedAction;
+        if (!settings.IsEnabled
+            || _isAutoBattleSuspendedForShiny
+            || !RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction))
+        {
+            return false;
+        }
+
+        if (_isAutoBattleEncounterRelieved)
+        {
+            return true;
+        }
+
+        _isAutoBattleEncounterRelieved = true;
+        _logger.LogInformation(
+            "自动战斗：{Source}检测到奇遇效果解除，解除操作：{Action}。",
+            source,
+            GetAutoBattleEncounterRelievedActionLogText(encounterRelievedAction));
+        return true;
+    }
+
+    private bool ApplyAutoBattleShinySuspension(string tipText, string source)
+    {
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled)
+        {
+            return false;
+        }
+
+        if (_isAutoBattleSuspendedForShiny)
+        {
+            return true;
+        }
+
         _isAutoBattleSuspendedForShiny = true;
         ResetAutoBattleSkillSelectionState();
         _logger.LogInformation(
-            "自动战斗：检测到异色精灵提示，本场战斗暂停所有自动操作，退出战斗后恢复。TipText={TipText}",
+            "自动战斗：{Source}检测到异色精灵提示，本场战斗暂停所有自动操作，退出战斗后恢复。TipText={TipText}",
+            source,
             FormatLogText(tipText));
         return true;
     }

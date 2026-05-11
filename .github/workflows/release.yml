@@ -1,0 +1,218 @@
+name: Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version. Leave empty to use RocoPilot.csproj."
+        required: false
+        type: string
+      cloudflare_installer_url:
+        description: "Optional Cloudflare/R2 URL for RocoPilot.Install.exe."
+        required: false
+        type: string
+      upload_to_r2:
+        description: "Upload RocoPilot.Install.exe to Cloudflare R2."
+        required: false
+        default: false
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub release as prerelease."
+        required: false
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build_release_assets:
+    name: Build release assets
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          [xml]$projectXml = Get-Content "RocoPilot/RocoPilot.csproj" -Raw
+          $projectVersion = [string](($projectXml.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version)
+          if ([string]::IsNullOrWhiteSpace($projectVersion)) {
+            throw "RocoPilot.csproj does not contain a <Version> value."
+          }
+
+          if ($env:REF_TYPE -eq "tag") {
+            $version = $env:REF_NAME -replace "^v", ""
+            if ($version -ne $projectVersion) {
+              throw "Tag version '$version' does not match RocoPilot.csproj version '$projectVersion'."
+            }
+          }
+          elseif (-not [string]::IsNullOrWhiteSpace($env:INPUT_VERSION)) {
+            $version = $env:INPUT_VERSION.Trim()
+            if ($version -ne $projectVersion) {
+              throw "Input version '$version' does not match RocoPilot.csproj version '$projectVersion'."
+            }
+          }
+          else {
+            $version = $projectVersion
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+            throw "Version '$version' is not a supported release version."
+          }
+
+          $tag = "v$version"
+          if ($env:REF_TYPE -ne "tag") {
+            git fetch --tags --force
+            git rev-parse -q --verify "refs/tags/$tag" *> $null
+            if ($LASTEXITCODE -eq 0) {
+              throw "Tag '$tag' already exists. Bump RocoPilot.csproj <Version> before releasing."
+            }
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "APP_VERSION=$version" >> $env:GITHUB_ENV
+          Write-Host "Release version: $version"
+          Write-Host "Release tag: $tag"
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore RocoPilot
+        shell: pwsh
+        run: dotnet restore RocoPilot/RocoPilot.csproj
+
+      - name: Download Kachina builder
+        shell: pwsh
+        env:
+          KACHINA_BUILDER_URL: ${{ vars.KACHINA_BUILDER_URL }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = $env:KACHINA_BUILDER_URL
+          if ([string]::IsNullOrWhiteSpace($url)) {
+            $url = "https://github.com/YuehaiTeam/kachina-installer/releases/latest/download/kachina-builder.exe"
+          }
+
+          Write-Host "Downloading kachina-builder.exe from $url"
+          Invoke-WebRequest -Uri $url -OutFile "update/kachina-builder.exe"
+          Unblock-File -LiteralPath "update/kachina-builder.exe" -ErrorAction SilentlyContinue
+
+      - name: Build MicaSetup installer and publish app
+        shell: pwsh
+        run: .\build\build-installer.ps1
+
+      - name: Build Kachina updater and offline installer
+        shell: pwsh
+        env:
+          ROCO_KACHINA_CLOUDFLARE_URL: ${{ github.event.inputs.cloudflare_installer_url }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          .\update\build-kachina.ps1 `
+            -Version "$env:APP_VERSION" `
+            -SkipPublish `
+            -PublishDir ".\build\publish"
+
+      - name: Collect release assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "artifacts" | Out-Null
+
+          Copy-Item "update/RocoPilot.update.exe" "artifacts/RocoPilot.update.exe" -Force
+          Copy-Item "update/RocoPilot.Install.exe" "artifacts/RocoPilot.Install.exe" -Force
+
+          $micaInstaller = Get-ChildItem "build" -Filter "RocoPilot-Setup-v*.exe" -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if ($null -eq $micaInstaller) {
+            throw "MicaSetup installer was not created."
+          }
+          Copy-Item $micaInstaller.FullName "artifacts/$($micaInstaller.Name)" -Force
+
+          Get-ChildItem "artifacts" -File | Format-Table Name, Length
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: artifacts/*
+          if-no-files-found: error
+          retention-days: 7
+
+  create_github_release:
+    name: Create GitHub release
+    needs: build_release_assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: artifacts
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build_release_assets.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: RocoPilot ${{ needs.build_release_assets.outputs.version }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          body: |
+            Automated release for RocoPilot ${{ needs.build_release_assets.outputs.version }}.
+
+            Assets:
+            - RocoPilot.update.exe: Kachina updater / online installer
+            - RocoPilot.Install.exe: Kachina offline package used by update sources
+            - RocoPilot-Setup-v*.exe: MicaSetup installer
+          files: artifacts/*
+
+  upload_to_r2:
+    name: Upload Kachina package to Cloudflare R2
+    needs: [build_release_assets, create_github_release]
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_to_r2 }}
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: artifacts
+
+      - name: Install AWS CLI
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Upload RocoPilot.Install.exe
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp artifacts/RocoPilot.Install.exe \
+            s3://${{ secrets.CLOUDFLARE_BUCKET_NAME }}/RocoPilot.Install.exe \
+            --endpoint-url https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com

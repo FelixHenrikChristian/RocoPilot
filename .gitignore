@@ -361,6 +361,8 @@ update/hashed/
 update/metadata.json
 update/RocoPilot.update.exe
 update/RocoPilot.Install.exe
+update/*.update.exe
+update/*.Install.exe
 
 # Backup folder for Package Reference Convert tool in Visual Studio 2017
 MigrationBackup/

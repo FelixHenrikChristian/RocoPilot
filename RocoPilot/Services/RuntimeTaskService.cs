@@ -376,11 +376,17 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         if (isPetSwitchingVisible)
         {
             _isBattleStateActive = true;
+            var isAutoBattleSuspendedForShiny =
+                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                "战斗中 - 切换精灵",
+                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 切换精灵",
                 DateTimeOffset.Now));
             CompleteAutoBattleSkillSelectionState();
-            await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
+            if (!isAutoBattleSuspendedForShiny)
+            {
+                await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
+            }
+
             return GameStateScanResult.Battle;
         }
 
@@ -390,12 +396,19 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         if (isSkillSelectionVisible)
         {
             _isBattleStateActive = true;
-            await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
-            var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
+            var isAutoBattleSuspendedForShiny =
+                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+            var recoveredEnergy = false;
+            if (!isAutoBattleSuspendedForShiny)
+            {
+                await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
+                recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
+            }
+
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                "战斗中 - 技能选择",
+                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 技能选择",
                 DateTimeOffset.Now));
-            if (!recoveredEnergy)
+            if (!isAutoBattleSuspendedForShiny && !recoveredEnergy)
             {
                 await HandleAutoBattleSkillSelectionAsync(state, cancellationToken);
             }
@@ -406,15 +419,20 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
         {
             _isBattleStateActive = true;
-            await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
-            var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
-            if (!recoveredEnergy)
+            var isAutoBattleSuspendedForShiny =
+                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+            if (!isAutoBattleSuspendedForShiny)
             {
-                CompleteAutoBattleSkillSelectionState();
+                await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
+                var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
+                if (!recoveredEnergy)
+                {
+                    CompleteAutoBattleSkillSelectionState();
+                }
             }
 
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                "战斗中",
+                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中",
                 DateTimeOffset.Now));
             return GameStateScanResult.Battle;
         }

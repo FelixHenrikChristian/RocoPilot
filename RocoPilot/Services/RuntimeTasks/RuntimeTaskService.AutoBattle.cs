@@ -19,6 +19,7 @@ public sealed partial class RuntimeTaskService
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan AutoBattleShinySuspendScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattlePetSwitchConfirmDelay = TimeSpan.FromMilliseconds(1500);
     private static readonly TimeSpan AutoBattlePetSwitchStateCheckDelay = TimeSpan.FromMilliseconds(1500);
     private static readonly string[] AutoBattleDefaultRoundOrder =
@@ -82,6 +83,8 @@ public sealed partial class RuntimeTaskService
     private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
     private bool _isAutoBattleEncounterRelieved;
     private DateTimeOffset _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
+    private bool _isAutoBattleSuspendedForShiny;
+    private DateTimeOffset _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
@@ -175,6 +178,12 @@ public sealed partial class RuntimeTaskService
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
         if (!settings.IsEnabled)
         {
+            return;
+        }
+
+        if (_isAutoBattleSuspendedForShiny)
+        {
+            _wasAutoBattleSkillSelectionVisible = true;
             return;
         }
 
@@ -316,6 +325,12 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        if (_isAutoBattleSuspendedForShiny)
+        {
+            _wasAutoBattlePetSwitchingVisible = true;
+            return;
+        }
+
         if (_wasAutoBattlePetSwitchingVisible)
         {
             return;
@@ -396,6 +411,7 @@ public sealed partial class RuntimeTaskService
     {
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
         if (!settings.IsEnabled
+            || _isAutoBattleSuspendedForShiny
             || _autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.Skill)
         {
             return false;
@@ -443,6 +459,11 @@ public sealed partial class RuntimeTaskService
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
         var encounterRelievedAction = settings.EncounterRelievedAction;
         if (!settings.IsEnabled || !RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction))
+        {
+            return false;
+        }
+
+        if (_isAutoBattleSuspendedForShiny)
         {
             return false;
         }
@@ -497,10 +518,67 @@ public sealed partial class RuntimeTaskService
         return true;
     }
 
+    private async Task<bool> TrySuspendAutoBattleForShinyAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled)
+        {
+            return false;
+        }
+
+        if (_isAutoBattleSuspendedForShiny)
+        {
+            return true;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (now < _nextAutoBattleShinySuspendScanAt)
+        {
+            return false;
+        }
+
+        _nextAutoBattleShinySuspendScanAt = now + AutoBattleShinySuspendScanInterval;
+
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipHeterochromiaRegionIds,
+            cancellationToken,
+            "自动战斗异色保护");
+        var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
+        _logger.LogDebug(
+            "自动战斗异色保护筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            FormatLogText(tipText),
+            HeterochromiaTipText,
+            similarity,
+            HeterochromiaTipMatchThreshold,
+            isTipMatch);
+
+        if (!isTipMatch)
+        {
+            return false;
+        }
+
+        _isAutoBattleSuspendedForShiny = true;
+        ResetAutoBattleSkillSelectionState();
+        _logger.LogInformation(
+            "自动战斗：检测到异色精灵提示，本场战斗暂停所有自动操作，退出战斗后恢复。TipText={TipText}",
+            FormatLogText(tipText));
+        return true;
+    }
+
     private async Task<bool> TrySendAutoBattleEnergyRecoveryAsync(
         RuntimeTaskState state,
         CancellationToken cancellationToken)
     {
+        if (_isAutoBattleSuspendedForShiny)
+        {
+            return false;
+        }
+
         if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
         {
             return false;
@@ -715,6 +793,7 @@ public sealed partial class RuntimeTaskService
         _autoBattleTurnNumber = 0;
         ResetAutoBattleSkillSelectionState();
         ResetAutoBattleEncounterRelievedActionState();
+        ResetAutoBattleShinySuspendState();
         _wasAutoBattlePetSwitchingVisible = false;
     }
 
@@ -722,6 +801,12 @@ public sealed partial class RuntimeTaskService
     {
         _isAutoBattleEncounterRelieved = false;
         _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
+    }
+
+    private void ResetAutoBattleShinySuspendState()
+    {
+        _isAutoBattleSuspendedForShiny = false;
+        _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
     }
 
     private void ResetAutoBattleSkillSelectionState()

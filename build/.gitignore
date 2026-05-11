@@ -1,0 +1,5 @@
+publish/
+publish.7z
+RocoPilot-Setup-v*.exe
+.dist/
+.template/

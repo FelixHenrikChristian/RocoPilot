@@ -70,12 +70,106 @@ jobs:
           }
 
           $tag = "v$version"
-          if ($env:REF_TYPE -ne "tag") {
-            git fetch --tags --force
-            git rev-parse -q --verify "refs/tags/$tag" *> $null
-            if ($LASTEXITCODE -eq 0) {
-              throw "Tag '$tag' already exists. Bump RocoPilot.csproj <Version> before releasing."
+          function Split-SemVer {
+            param([string]$Value)
+
+            $versionWithoutBuild = ($Value -split "\+", 2)[0]
+            $versionParts = $versionWithoutBuild -split "-", 2
+            $coreParts = $versionParts[0] -split "\."
+
+            [pscustomobject]@{
+              Major = [int]$coreParts[0]
+              Minor = [int]$coreParts[1]
+              Patch = [int]$coreParts[2]
+              PreRelease = if ($versionParts.Count -gt 1) { $versionParts[1] } else { $null }
             }
+          }
+
+          function Compare-SemVer {
+            param(
+              [string]$Left,
+              [string]$Right
+            )
+
+            $leftVersion = Split-SemVer $Left
+            $rightVersion = Split-SemVer $Right
+
+            foreach ($part in @("Major", "Minor", "Patch")) {
+              if ($leftVersion.$part -lt $rightVersion.$part) { return -1 }
+              if ($leftVersion.$part -gt $rightVersion.$part) { return 1 }
+            }
+
+            if ([string]::IsNullOrWhiteSpace($leftVersion.PreRelease) -and [string]::IsNullOrWhiteSpace($rightVersion.PreRelease)) {
+              return 0
+            }
+            if ([string]::IsNullOrWhiteSpace($leftVersion.PreRelease)) { return 1 }
+            if ([string]::IsNullOrWhiteSpace($rightVersion.PreRelease)) { return -1 }
+
+            $leftIdentifiers = $leftVersion.PreRelease -split "\."
+            $rightIdentifiers = $rightVersion.PreRelease -split "\."
+            $count = [Math]::Max($leftIdentifiers.Count, $rightIdentifiers.Count)
+
+            for ($i = 0; $i -lt $count; $i++) {
+              if ($i -ge $leftIdentifiers.Count) { return -1 }
+              if ($i -ge $rightIdentifiers.Count) { return 1 }
+
+              $leftId = $leftIdentifiers[$i]
+              $rightId = $rightIdentifiers[$i]
+              $leftNumber = 0
+              $rightNumber = 0
+              $leftIsNumber = [int]::TryParse($leftId, [ref]$leftNumber)
+              $rightIsNumber = [int]::TryParse($rightId, [ref]$rightNumber)
+
+              if ($leftIsNumber -and $rightIsNumber) {
+                if ($leftNumber -lt $rightNumber) { return -1 }
+                if ($leftNumber -gt $rightNumber) { return 1 }
+              }
+              elseif ($leftIsNumber) {
+                return -1
+              }
+              elseif ($rightIsNumber) {
+                return 1
+              }
+              else {
+                $textComparison = [string]::CompareOrdinal($leftId, $rightId)
+                if ($textComparison -lt 0) { return -1 }
+                if ($textComparison -gt 0) { return 1 }
+              }
+            }
+
+            return 0
+          }
+
+          git fetch --tags --force
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to fetch git tags."
+          }
+
+          $existingVersions = @(
+            git tag --list "v*" |
+              ForEach-Object {
+                if ($_ -match '^v(?<version>\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)$') {
+                  $Matches.version
+                }
+              }
+          )
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to list git tags."
+          }
+
+          $newerVersion = $null
+          foreach ($existingVersion in $existingVersions) {
+            $comparison = Compare-SemVer $existingVersion $version
+            if ($comparison -eq 0 -and $env:REF_TYPE -ne "tag") {
+              throw "Tag 'v$existingVersion' already exists. Bump RocoPilot.csproj <Version> before releasing."
+            }
+            if ($comparison -gt 0 -and ($null -eq $newerVersion -or (Compare-SemVer $existingVersion $newerVersion) -gt 0)) {
+              $newerVersion = $existingVersion
+            }
+          }
+
+          if ($null -ne $newerVersion) {
+            throw "Existing release tag 'v$newerVersion' is newer than '$tag'. Bump RocoPilot.csproj <Version> before releasing."
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT

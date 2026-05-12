@@ -157,7 +157,8 @@ public sealed class UpdateService : IUpdateService
 
     private async Task<UpdateWindow.UpdateResult> ShowUpdateDialogAsync(GitHubRelease release)
     {
-        var taskCompletionSource = new TaskCompletionSource<UpdateWindow.UpdateResult>();
+        var taskCompletionSource =
+            new TaskCompletionSource<UpdateWindow.UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         var dispatcherQueue = App.MainWindow.DispatcherQueue;
 
         if (!dispatcherQueue.TryEnqueue(() => _ = ShowUpdateWindowAsync()))

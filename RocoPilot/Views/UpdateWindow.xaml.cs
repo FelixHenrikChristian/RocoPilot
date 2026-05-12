@@ -1,11 +1,10 @@
-using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 
-using WinUIEx;
+using Windows.Graphics;
 
 namespace RocoPilot.Views;
 
@@ -19,9 +18,9 @@ public sealed partial class UpdateWindow : WindowEx
     }
 
     private readonly GitHubRelease _release;
-    private readonly ILogger<UpdateWindow> _logger = App.GetService<ILogger<UpdateWindow>>();
     private UpdateResult _result = UpdateResult.Cancel;
     private TaskCompletionSource<UpdateResult>? _completion;
+    private bool _isClosed;
 
     public UpdateWindow(GitHubRelease release)
     {
@@ -31,20 +30,23 @@ public sealed partial class UpdateWindow : WindowEx
         RootHost.RequestedTheme = App.GetService<IThemeSelectorService>().Theme;
 
         Title = "发现新版本";
-        VersionTitleText.Text = $"发现新版本 {_release.TagName}";
-        PublishDateText.Text = $"发布时间：{_release.PublishedAt:yyyy年MM月dd日}";
-
+        AppWindow.Title = Title;
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarRoot);
-        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
+        AppWindow.Resize(new SizeInt32(800, 800));
 
-        RootHost.ActualThemeChanged += (_, _) => TitleBarHelper.UpdateTitleBar(this, RootHost.ActualTheme);
-        RootHost.Loaded += OnRootLoaded;
+        VersionTitleText.Text = $"发现新版本 {_release.TagName}";
+        PublishDateText.Text = $"发布时间：{_release.PublishedAt:yyyy年MM月dd日}";
+        ReleaseNotesText.Text = NormalizeReleaseNotes(_release.Body);
+
+        RootHost.ActualThemeChanged += OnRootHostActualThemeChanged;
+        RootHost.Loaded += OnRootHostLoaded;
     }
 
     public Task<UpdateResult> ShowAsync()
     {
-        _completion = new TaskCompletionSource<UpdateResult>();
+        _completion = new TaskCompletionSource<UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         Closed += OnWindowClosed;
 
         WindowPlacementHelper.CenterOnParent(this, App.MainWindow);
@@ -52,100 +54,63 @@ public sealed partial class UpdateWindow : WindowEx
         return _completion.Task;
     }
 
-    private void OnRootLoaded(object sender, RoutedEventArgs e)
-    {
-        TitleBarHelper.UpdateTitleBar(this, RootHost.ActualTheme);
-        _ = InitializeWebViewAsync();
-    }
-
     private void OnWindowClosed(object sender, WindowEventArgs args)
     {
+        _isClosed = true;
         Closed -= OnWindowClosed;
+        RootHost.ActualThemeChanged -= OnRootHostActualThemeChanged;
+        RootHost.Loaded -= OnRootHostLoaded;
         _completion?.TrySetResult(_result);
         _completion = null;
     }
 
-    private async Task InitializeWebViewAsync()
+    private void OnRootHostLoaded(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            await ReleaseNotesWebView.EnsureCoreWebView2Async();
-            var settings = ReleaseNotesWebView.CoreWebView2.Settings;
-            settings.IsGeneralAutofillEnabled = false;
-            settings.IsPasswordAutosaveEnabled = false;
-            settings.AreDevToolsEnabled = false;
-            settings.AreDefaultContextMenusEnabled = false;
-            settings.AreHostObjectsAllowed = false;
-            settings.IsWebMessageEnabled = false;
-            await LoadReleaseNotesAsync();
-        }
-        catch (Exception ex)
-        {
-            if (string.Equals(
-                    ex.GetType().FullName,
-                    "Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException",
-                    StringComparison.Ordinal))
-            {
-                _logger.LogWarning("未检测到 WebView2 运行时，更新日志将无法显示");
-                ShowReleaseNotesFallback(
-                    "WebView2 运行时未安装",
-                    "无法显示更新内容。你仍然可以使用下方按钮自动更新，或前往 GitHub 手动下载。");
-                return;
-            }
-
-            _logger.LogWarning(ex, "WebView2 初始化失败");
-            ShowReleaseNotesFallback(
-                "更新内容暂时不可用",
-                "无法初始化更新日志视图。你仍然可以使用下方按钮自动更新，或前往 GitHub 手动下载。");
-        }
+        RootHost.Loaded -= OnRootHostLoaded;
+        TitleBarHelper.UpdateTitleBar(this, RootHost.ActualTheme);
     }
 
-    private async Task LoadReleaseNotesAsync()
+    private void OnRootHostActualThemeChanged(FrameworkElement sender, object args)
     {
-        try
-        {
-            var isDark = ReleaseNotesHtmlHelper.ResolveIsDarkTheme(RootHost);
-            var html = await ReleaseNotesHtmlHelper.GenerateReleaseNotesHtmlAsync(_release.Body, isDark, _logger);
-            ReleaseNotesWebView.NavigateToString(html);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "加载更新日志失败，使用降级显示");
-            await LoadFallbackContentAsync();
-        }
+        TitleBarHelper.UpdateTitleBar(this, RootHost.ActualTheme);
     }
 
-    private Task LoadFallbackContentAsync()
+    private static string NormalizeReleaseNotes(string? releaseNotes)
     {
-        var isDark = ReleaseNotesHtmlHelper.ResolveIsDarkTheme(RootHost);
-        var html = ReleaseNotesHtmlHelper.GenerateFallbackHtml(isDark);
-        ReleaseNotesWebView.NavigateToString(html);
-        return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(releaseNotes))
+        {
+            return "此版本没有提供更新日志。";
+        }
+
+        return releaseNotes
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Trim();
     }
 
-    private void ShowReleaseNotesFallback(string title, string message)
+    private void Complete(UpdateResult result)
     {
-        ReleaseNotesWebView.Visibility = Visibility.Collapsed;
-        ReleaseNotesFallbackTitleText.Text = title;
-        ReleaseNotesFallbackMessageText.Text = message;
-        ReleaseNotesFallbackHost.Visibility = Visibility.Visible;
+        if (_isClosed)
+        {
+            return;
+        }
+
+        _result = result;
+        Close();
     }
 
     private void UpdateButton_Click(object sender, RoutedEventArgs e)
     {
-        _result = UpdateResult.Update;
-        Close();
+        Complete(UpdateResult.Update);
     }
 
     private void DownloadButton_Click(object sender, RoutedEventArgs e)
     {
-        _result = UpdateResult.Download;
-        Close();
+        Complete(UpdateResult.Download);
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
     {
-        _result = UpdateResult.Cancel;
-        Close();
+        Complete(UpdateResult.Cancel);
     }
 }

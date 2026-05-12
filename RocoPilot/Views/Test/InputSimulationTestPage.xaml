@@ -113,6 +113,7 @@
                                 <ColumnDefinition Width="2*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -131,25 +132,33 @@
                             <TextBox
                                 x:Name="HoldDurationTextBox"
                                 Grid.Row="0"
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 Header="按住时长 ms"
                                 InputScope="Number"
-                                Text="45"
+                                Text="100"
                                 TextAlignment="Center" />
 
                             <TextBox
                                 x:Name="KeyIntervalTextBox"
                                 Grid.Row="0"
-                                Grid.Column="2"
+                                Grid.Column="3"
                                 Header="间隔 ms"
                                 InputScope="Number"
-                                Text="120"
+                                Text="500"
                                 TextAlignment="Center" />
+
+                            <ComboBox
+                                x:Name="DeliveryModeComboBox"
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                HorizontalAlignment="Stretch"
+                                Header="发送方式"
+                                DisplayMemberPath="Name" />
 
                             <TextBlock
                                 x:Name="PresetDescriptionText"
                                 Grid.Row="1"
-                                Grid.ColumnSpan="3"
+                                Grid.ColumnSpan="4"
                                 Style="{StaticResource CaptionTextBlockStyle}"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 TextWrapping="Wrap" />

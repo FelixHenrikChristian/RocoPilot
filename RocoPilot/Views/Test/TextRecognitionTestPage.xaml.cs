@@ -9,7 +9,6 @@ using RocoPilot.Models.TextRecognition;
 
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Streams;
-using Windows.System;
 
 namespace RocoPilot.Views.Test;
 
@@ -77,7 +76,7 @@ public sealed partial class TextRecognitionTestPage : Page
         }
     }
 
-    private async void OpenScreenClipButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private void OpenScreenClipButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         var startClipboardSequence = GetClipboardSequenceNumber();
         _waitingForScreenClip = true;
@@ -86,7 +85,7 @@ public sealed partial class TextRecognitionTestPage : Page
 
         try
         {
-            var launched = await Launcher.LaunchUriAsync(new Uri("ms-screenclip:"));
+            var launched = ShellLaunchHelper.LaunchUri(new Uri("ms-screenclip:"));
             if (launched)
             {
                 return;

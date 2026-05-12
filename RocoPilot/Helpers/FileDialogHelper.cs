@@ -69,6 +69,93 @@ public static class FileDialogHelper
         }
     }
 
+    public static string? PickSaveFile(
+        string title,
+        string filter,
+        string? initialDirectory = null,
+        string? initialFileName = null,
+        string? defaultExtension = null)
+    {
+        const int fileBufferCharCount = 32768;
+
+        var filterBuffer = IntPtr.Zero;
+        var fileBuffer = IntPtr.Zero;
+        var initialDirectoryBuffer = IntPtr.Zero;
+        var titleBuffer = IntPtr.Zero;
+        var defaultExtensionBuffer = IntPtr.Zero;
+
+        try
+        {
+            filterBuffer = Marshal.StringToHGlobalUni(BuildWin32Filter(filter));
+            fileBuffer = Marshal.AllocHGlobal(fileBufferCharCount * sizeof(char));
+            ZeroMemory(fileBuffer, fileBufferCharCount * sizeof(char));
+            titleBuffer = Marshal.StringToHGlobalUni(title);
+
+            if (!string.IsNullOrWhiteSpace(initialFileName))
+            {
+                CopyInitialFileName(fileBuffer, fileBufferCharCount, initialFileName);
+            }
+
+            if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
+            {
+                initialDirectoryBuffer = Marshal.StringToHGlobalUni(initialDirectory);
+            }
+
+            if (!string.IsNullOrWhiteSpace(defaultExtension))
+            {
+                defaultExtensionBuffer = Marshal.StringToHGlobalUni(defaultExtension.TrimStart('.'));
+            }
+
+            var openFileName = new OpenFileName
+            {
+                lStructSize = Marshal.SizeOf<OpenFileName>(),
+                hwndOwner = WindowNative.GetWindowHandle(App.MainWindow),
+                lpstrFilter = filterBuffer,
+                nFilterIndex = 1,
+                lpstrFile = fileBuffer,
+                nMaxFile = fileBufferCharCount,
+                lpstrInitialDir = initialDirectoryBuffer,
+                lpstrTitle = titleBuffer,
+                lpstrDefExt = defaultExtensionBuffer,
+                Flags = OpenFileNameFlags.Explorer
+                    | OpenFileNameFlags.PathMustExist
+                    | OpenFileNameFlags.NoChangeDir
+                    | OpenFileNameFlags.HideReadOnly
+                    | OpenFileNameFlags.OverwritePrompt
+                    | OpenFileNameFlags.NoReadOnlyReturn
+                    | OpenFileNameFlags.DontAddToRecent
+            };
+
+            if (GetSaveFileName(ref openFileName))
+            {
+                return Marshal.PtrToStringUni(fileBuffer);
+            }
+
+            var error = CommDlgExtendedError();
+            if (error == 0)
+            {
+                return null;
+            }
+
+            throw new InvalidOperationException($"文件保存窗口返回错误：0x{error:X}");
+        }
+        finally
+        {
+            FreeHGlobal(filterBuffer);
+            FreeHGlobal(fileBuffer);
+            FreeHGlobal(initialDirectoryBuffer);
+            FreeHGlobal(titleBuffer);
+            FreeHGlobal(defaultExtensionBuffer);
+        }
+    }
+
+    private static void CopyInitialFileName(IntPtr fileBuffer, int fileBufferCharCount, string initialFileName)
+    {
+        var charCount = Math.Min(initialFileName.Length, fileBufferCharCount - 1);
+        var chars = initialFileName.ToCharArray(0, charCount);
+        Marshal.Copy(chars, 0, fileBuffer, chars.Length);
+    }
+
     private static string BuildWin32Filter(string filter)
     {
         var parts = filter.Split('|', StringSplitOptions.None);
@@ -91,6 +178,10 @@ public static class FileDialogHelper
     [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetOpenFileName(ref OpenFileName openFileName);
+
+    [DllImport("comdlg32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetSaveFileName(ref OpenFileName openFileName);
 
     [DllImport("comdlg32.dll")]
     private static extern int CommDlgExtendedError();
@@ -130,9 +221,11 @@ public static class FileDialogHelper
     {
         public const int HideReadOnly = 0x00000004;
         public const int NoChangeDir = 0x00000008;
+        public const int OverwritePrompt = 0x00000002;
         public const int PathMustExist = 0x00000800;
         public const int FileMustExist = 0x00001000;
         public const int Explorer = 0x00080000;
+        public const int NoReadOnlyReturn = 0x00008000;
         public const int DontAddToRecent = 0x02000000;
     }
 }

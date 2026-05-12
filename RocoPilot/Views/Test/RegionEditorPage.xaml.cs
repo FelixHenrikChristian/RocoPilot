@@ -15,9 +15,7 @@ using RocoPilot.Models.Recognition;
 using RocoPilot.Views.Windows;
 
 using Windows.Graphics.Imaging;
-using Windows.Storage;
 using Windows.Storage.Streams;
-using Windows.System;
 
 namespace RocoPilot.Views.Test;
 
@@ -77,13 +75,12 @@ public sealed partial class RegionEditorPage : Page
         }
     }
 
-    private async void OpenRegionScreenshotFolderButton_Click(object sender, RoutedEventArgs e)
+    private void OpenRegionScreenshotFolderButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             Directory.CreateDirectory(RegionScreenshotDirectory);
-            var folder = await StorageFolder.GetFolderFromPathAsync(RegionScreenshotDirectory);
-            var opened = await Launcher.LaunchFolderAsync(folder);
+            var opened = ShellLaunchHelper.OpenFolder(RegionScreenshotDirectory);
             if (!opened)
             {
                 ShowMessage($"无法打开截图文件夹：{RegionScreenshotDirectory}", InfoBarSeverity.Warning);

@@ -4,11 +4,9 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
+using RocoPilot.Helpers;
 using RocoPilot.ViewModels;
 
-using Windows.Storage;
-using Windows.Storage.Pickers;
-using Windows.Storage.Streams;
 using Windows.UI;
 
 namespace RocoPilot.Views;
@@ -819,24 +817,28 @@ public sealed partial class StatisticsPage : Page
 
     private async void ImportStatisticsMenuFlyoutItem_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new FileOpenPicker
+        string? filePath;
+        try
         {
-            ViewMode = PickerViewMode.List,
-            SuggestedStartLocation = PickerLocationId.DocumentsLibrary
-        };
-        picker.FileTypeFilter.Add(".json");
+            filePath = FileDialogHelper.PickOpenFile(
+                "导入统计数据",
+                "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ShowOperationFailed("打开导入窗口失败", ex);
+            return;
+        }
 
-        InitializePicker(picker);
-
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
+        if (filePath is null)
         {
             return;
         }
 
         try
         {
-            var json = await FileIO.ReadTextAsync(file, UnicodeEncoding.Utf8);
+            var json = await File.ReadAllTextAsync(filePath);
             await ViewModel.ImportFromJsonAsync(json);
         }
         catch (Exception ex)
@@ -847,25 +849,31 @@ public sealed partial class StatisticsPage : Page
 
     private async void ExportStatisticsMenuFlyoutItem_Click(object sender, RoutedEventArgs e)
     {
-        var picker = new FileSavePicker
+        string? filePath;
+        try
         {
-            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-            SuggestedFileName = $"RocoPilot_Statistics_{DateTimeOffset.Now:yyyyMMdd_HHmmss}"
-        };
-        picker.FileTypeChoices.Add("JSON 文件", new List<string> { ".json" });
+            filePath = FileDialogHelper.PickSaveFile(
+                "导出统计数据",
+                "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                $"RocoPilot_Statistics_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.json",
+                ".json");
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ShowOperationFailed("打开导出窗口失败", ex);
+            return;
+        }
 
-        InitializePicker(picker);
-
-        var file = await picker.PickSaveFileAsync();
-        if (file is null)
+        if (filePath is null)
         {
             return;
         }
 
         try
         {
-            await FileIO.WriteTextAsync(file, ViewModel.ExportToJson(), UnicodeEncoding.Utf8);
-            ViewModel.ShowExported(file.Path);
+            await File.WriteAllTextAsync(filePath, ViewModel.ExportToJson());
+            ViewModel.ShowExported(filePath);
         }
         catch (Exception ex)
         {
@@ -895,12 +903,6 @@ public sealed partial class StatisticsPage : Page
         {
             await ViewModel.ClearAllAsync();
         }
-    }
-
-    private static void InitializePicker(object picker)
-    {
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
     }
 
     private void CardScrollViewer_ViewChanging(object sender, ScrollViewerViewChangingEventArgs e)

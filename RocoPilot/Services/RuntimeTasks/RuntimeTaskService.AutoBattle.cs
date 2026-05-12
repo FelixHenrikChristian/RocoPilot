@@ -324,7 +324,8 @@ public sealed partial class RuntimeTaskService
         RuntimeTaskState state,
         CancellationToken cancellationToken)
     {
-        if (!_autoBattleSettings.IsEnabled)
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled)
         {
             _wasAutoBattlePetSwitchingVisible = true;
             return;
@@ -341,6 +342,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        BeginAutoBattlePetSwitchingTurn(settings);
         _wasAutoBattlePetSwitchingVisible = true;
         if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
         {
@@ -407,6 +409,23 @@ public sealed partial class RuntimeTaskService
         {
             _autoBattleActionLock.Release();
         }
+    }
+
+    private void BeginAutoBattlePetSwitchingTurn(AutoBattleSettings settings)
+    {
+        var releaseStep = GetCurrentAutoBattleReleaseStep(settings);
+        _autoBattleTurnNumber++;
+        _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
+        _hasLoggedCurrentAutoBattleTurnAction = false;
+        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
+
+        LogAutoBattleTurnAction(
+            $"切换精灵，本回合不释放技能，下回合继续 {GetAutoBattleReleaseStepDisplay(releaseStep)}");
+        _logger.LogDebug(
+            "自动战斗：进入第 {TurnNumber} 回合切换精灵，不推进释放顺序。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
+            _currentAutoBattleTurnNumber,
+            GetAutoBattleReleaseStepDisplay(releaseStep),
+            _autoBattleRoundIndex);
     }
 
     private async Task<bool> TryDetectAutoBattleEnergyShortageAsync(

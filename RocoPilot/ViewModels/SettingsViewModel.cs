@@ -11,6 +11,7 @@ using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
+using RocoPilot.Models;
 using RocoPilot.Settings;
 
 using Windows.ApplicationModel;
@@ -21,6 +22,7 @@ public partial class SettingsViewModel : ObservableRecipient
 {
     private readonly IThemeSelectorService _themeSelectorService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly IUpdateService _updateService;
     private readonly ILogger<SettingsViewModel> _logger;
 
     private bool _suppressThemeChange;
@@ -35,15 +37,29 @@ public partial class SettingsViewModel : ObservableRecipient
     [ObservableProperty]
     private ThemeOption? _selectedThemeOption;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsUpdateCheckEnabled))]
+    [NotifyPropertyChangedFor(nameof(UpdateButtonText))]
+    private bool _isCheckingUpdate;
+
+    [ObservableProperty]
+    private string _updateStatusText = "从 GitHub Releases 获取最新版本信息";
+
+    public bool IsUpdateCheckEnabled => !IsCheckingUpdate;
+
+    public string UpdateButtonText => IsCheckingUpdate ? "正在检查" : "检查更新";
+
     public string AppVersion { get; }
 
     public SettingsViewModel(
         IThemeSelectorService themeSelectorService,
         ILocalSettingsService localSettingsService,
+        IUpdateService updateService,
         ILogger<SettingsViewModel> logger)
     {
         _themeSelectorService = themeSelectorService;
         _localSettingsService = localSettingsService;
+        _updateService = updateService;
         _logger = logger;
         AppVersion = GetShortAppVersion();
     }
@@ -96,9 +112,30 @@ public partial class SettingsViewModel : ObservableRecipient
     }
 
     [RelayCommand]
-    private void CheckForUpdates()
+    private async Task CheckForUpdatesAsync()
     {
-        // Placeholder until update checking is wired up.
+        if (IsCheckingUpdate)
+        {
+            return;
+        }
+
+        IsCheckingUpdate = true;
+        UpdateStatusText = "正在连接 GitHub Releases...";
+
+        try
+        {
+            var result = await _updateService.CheckUpdateAsync(new UpdateOption { Trigger = UpdateTrigger.Manual });
+            UpdateStatusText = BuildUpdateStatusText(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "检查更新失败");
+            UpdateStatusText = "检查更新失败，请检查网络连接后重试。";
+        }
+        finally
+        {
+            IsCheckingUpdate = false;
+        }
     }
 
     [RelayCommand]
@@ -143,6 +180,22 @@ public partial class SettingsViewModel : ObservableRecipient
         ElementTheme.Dark => "Dark",
         _ => "System",
     };
+
+    private static string BuildUpdateStatusText(UpdateCheckResult result)
+    {
+        var checkedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+        return result.Status switch
+        {
+            UpdateCheckStatus.UpToDate => $"当前已是最新版本 · 上次检查：{checkedAt}",
+            UpdateCheckStatus.UpdateAvailable when !string.IsNullOrWhiteSpace(result.Message) =>
+                $"{result.Message} · 上次检查：{checkedAt}",
+            UpdateCheckStatus.UpdateAvailable when result.Release != null =>
+                $"发现新版本 {result.Release.TagName} · 上次检查：{checkedAt}",
+            UpdateCheckStatus.Failed when !string.IsNullOrWhiteSpace(result.Message) =>
+                $"{result.Message} · 上次检查：{checkedAt}",
+            _ => $"上次检查：{checkedAt}",
+        };
+    }
 
     private static string GetShortAppVersion()
     {

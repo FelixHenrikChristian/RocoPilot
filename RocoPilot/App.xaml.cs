@@ -103,6 +103,7 @@ public partial class App : Application
             services.AddSingleton<IEncounterSeasonConfigService, EncounterSeasonConfigService>();
             services.AddSingleton<ISpiritCatalogService, SpiritCatalogService>();
             services.AddSingleton<IStatisticsService, StatisticsService>();
+            services.AddSingleton<IUpdateService, UpdateService>();
             services.AddSingleton<IWindowEnumerationService, WindowEnumerationService>();
             services.AddSingleton<ICaptureBackend, BitBltCaptureBackend>();
             services.AddSingleton<ICaptureBackend, PrintWindowCaptureBackend>();

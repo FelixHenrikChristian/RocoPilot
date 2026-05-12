@@ -231,14 +231,28 @@
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                         Text="稳定版" />
                                 </StackPanel>
+                                <TextBlock
+                                    Margin="0,6,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}"
+                                    TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Command="{x:Bind ViewModel.CheckForUpdatesCommand}"
-                                Content="检查更新"
-                                Style="{ThemeResource AccentButtonStyle}" />
+                                IsEnabled="{x:Bind ViewModel.IsUpdateCheckEnabled, Mode=OneWay}"
+                                Style="{ThemeResource AccentButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="&#xE895;" />
+                                    <TextBlock Text="{x:Bind ViewModel.UpdateButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </Border>
 

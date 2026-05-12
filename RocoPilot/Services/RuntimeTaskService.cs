@@ -372,30 +372,49 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        var isPetSwitchingVisible = await IsBattlePetSwitchingAsync(state, frame, cancellationToken);
-        if (isPetSwitchingVisible)
+        if (!_isBattleStateActive)
         {
-            _isBattleStateActive = true;
-            var isAutoBattleSuspendedForShiny =
-                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 切换精灵",
-                DateTimeOffset.Now));
             CompleteAutoBattleSkillSelectionState();
-            if (!isAutoBattleSuspendedForShiny)
+            ResetAutoBattleBattleState();
+
+            if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
             {
-                await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
+                _isBattleStateActive = true;
+                return await UpdateActiveBattleSnapshotAsync(
+                    state,
+                    frame,
+                    isBattleChatVisible: true,
+                    cancellationToken);
             }
 
-            return GameStateScanResult.Battle;
+            return await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
         }
 
-        _wasAutoBattlePetSwitchingVisible = false;
+        if (await TryUpdateMagicPointWorldSnapshotAsync(state, frame, cancellationToken))
+        {
+            _isBattleStateActive = false;
+            CompleteAutoBattleSkillSelectionState();
+            ResetAutoBattleBattleState();
+            return GameStateScanResult.NonBattle;
+        }
 
+        return await UpdateActiveBattleSnapshotAsync(
+            state,
+            frame,
+            isBattleChatVisible: null,
+            cancellationToken);
+    }
+
+    private async Task<GameStateScanResult> UpdateActiveBattleSnapshotAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        bool? isBattleChatVisible,
+        CancellationToken cancellationToken)
+    {
         var isSkillSelectionVisible = await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken);
         if (isSkillSelectionVisible)
         {
-            _isBattleStateActive = true;
+            _wasAutoBattlePetSwitchingVisible = false;
             var isAutoBattleSuspendedForShiny =
                 await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
             var recoveredEnergy = false;
@@ -416,9 +435,28 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return GameStateScanResult.Battle;
         }
 
-        if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
+        var isPetSwitchingVisible = await IsBattlePetSwitchingAsync(state, frame, cancellationToken);
+        if (isPetSwitchingVisible)
         {
-            _isBattleStateActive = true;
+            var isAutoBattleSuspendedForShiny =
+                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 切换精灵",
+                DateTimeOffset.Now));
+            CompleteAutoBattleSkillSelectionState();
+            if (!isAutoBattleSuspendedForShiny)
+            {
+                await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
+            }
+
+            return GameStateScanResult.Battle;
+        }
+
+        _wasAutoBattlePetSwitchingVisible = false;
+
+        var chatVisible = isBattleChatVisible ?? await IsBattleChatVisibleAsync(state, frame, cancellationToken);
+        if (chatVisible)
+        {
             var isAutoBattleSuspendedForShiny =
                 await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
             if (!isAutoBattleSuspendedForShiny)
@@ -437,26 +475,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return GameStateScanResult.Battle;
         }
 
-        if (_isBattleStateActive)
-        {
-            if (await TryUpdateMagicPointWorldSnapshotAsync(state, frame, cancellationToken))
-            {
-                _isBattleStateActive = false;
-                CompleteAutoBattleSkillSelectionState();
-                ResetAutoBattleBattleState();
-                return GameStateScanResult.NonBattle;
-            }
-
-            CompleteAutoBattleSkillSelectionState();
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                "战斗中",
-                DateTimeOffset.Now));
-            return GameStateScanResult.Battle;
-        }
-
         CompleteAutoBattleSkillSelectionState();
-        ResetAutoBattleBattleState();
-        return await UpdateMagicPointSnapshotAsync(state, frame, cancellationToken);
+        UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+            "战斗中",
+            DateTimeOffset.Now));
+        return GameStateScanResult.Battle;
     }
 
     private void UpdateRecognizedInfoOverlaySnapshot(InfoOverlaySnapshot snapshot)

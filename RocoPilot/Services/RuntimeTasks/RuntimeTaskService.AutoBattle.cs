@@ -13,6 +13,7 @@ public sealed partial class RuntimeTaskService
 {
     private const string BattleChatTemplateName = "battle-chat.png";
     private const string BattleSkillTemplateName = "battle-button-skill.png";
+    private const string BattleChangeTemplateName = "battle-button-change.png";
     private const string AutoBattleCaptureSequence = "W, 1, Space";
     private const string AutoBattleSkillPlaceholder = "{skill}";
 
@@ -38,9 +39,9 @@ public sealed partial class RuntimeTaskService
     [
         "battle-button-skill"
     ];
-    private static readonly string[] BattleMagicRegionIds =
+    private static readonly string[] BattleChangeRegionIds =
     [
-        "battle-magic"
+        "battle-button-change"
     ];
     private static readonly string[] BattleTipEnergyRegionIds =
     [
@@ -53,6 +54,12 @@ public sealed partial class RuntimeTaskService
         SearchStep = 1
     };
     private static readonly ImageMatchOptions BattleSkillMatchOptions = new()
+    {
+        MinimumScore = 0.88,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions BattleChangeMatchOptions = new()
     {
         MinimumScore = 0.88,
         AlphaThreshold = 16,
@@ -114,9 +121,9 @@ public sealed partial class RuntimeTaskService
         return await MatchRuntimeTemplateAsync(
             state,
             frame,
-            BattleMagicRegionIds,
-            MagicPointTemplateName,
-            MagicPointMatchOptions,
+            BattleChangeRegionIds,
+            BattleChangeTemplateName,
+            BattleChangeMatchOptions,
             "状态识别",
             "切换精灵界面",
             cancellationToken);

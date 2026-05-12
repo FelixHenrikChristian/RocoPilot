@@ -27,14 +27,6 @@
       "enabled": true
     },
     {
-      "id": "battle-magic",
-      "x": 122,
-      "y": 982,
-      "width": 149,
-      "height": 44,
-      "enabled": true
-    },
-    {
       "id": "battle-tip-energe",
       "x": 797,
       "y": 155,
@@ -64,6 +56,14 @@
       "y": 152,
       "width": 795,
       "height": 50,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-change",
+      "x": 1796,
+      "y": 998,
+      "width": 106,
+      "height": 128,
       "enabled": true
     }
   ]

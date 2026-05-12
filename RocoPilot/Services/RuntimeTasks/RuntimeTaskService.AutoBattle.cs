@@ -189,20 +189,7 @@ public sealed partial class RuntimeTaskService
 
         if (!_wasAutoBattleSkillSelectionVisible)
         {
-            _autoBattleTurnNumber++;
-            _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
-            _hasLoggedCurrentAutoBattleTurnAction = false;
-            _wasAutoBattleSkillSelectionVisible = true;
-            _autoBattleSkillSelectionVisibleSince = now;
-            _lastAutoBattleSkillSelectionActionAt = null;
-            _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
-            _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
-            _logger.LogDebug(
-                "自动战斗：进入第 {TurnNumber} 回合技能选择，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
-                _currentAutoBattleTurnNumber,
-                AutoBattleSkillSelectionActionDelay.TotalMilliseconds,
-                GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep),
-                _autoBattleRoundIndex);
+            BeginAutoBattleSkillSelectionTurn(settings, now);
             return;
         }
 
@@ -229,55 +216,29 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
-            var encounterRelievedAction = settings.EncounterRelievedAction;
-            var isEncounterRelievedActionActive =
-                _isAutoBattleEncounterRelieved
-                && RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction);
             var releaseStep = _currentAutoBattleReleaseStep ?? GetCurrentAutoBattleReleaseStep(settings);
-            var sequence = BuildAutoBattleReleaseSequence(settings, releaseStep);
-            var inputOptions = AutoBattleKeyboardInputOptions;
-            var action = AutoBattleSkillSelectionAction.Skill;
-            var actionText = "按技能键";
-            var pressedKey = GetAutoBattleReleaseStepDisplay(releaseStep);
-
-            if (isEncounterRelievedActionActive)
+            var plan = BuildAutoBattleSkillSelectionPlan(settings, releaseStep);
+            if (!plan.ShouldSendKeys)
             {
-                switch (encounterRelievedAction)
+                if (_autoBattleSkillSelectionAction != plan.Action)
                 {
-                    case AutoBattleEncounterRelievedAction.NoAction:
-                        if (_autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.NoAction)
-                        {
-                            LogAutoBattleTurnAction("无操作，检测到奇遇效果解除，等待手动释放技能");
-                        }
-
-                        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.NoAction;
-                        _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
-                        return;
-                    case AutoBattleEncounterRelievedAction.RecoverEnergy:
-                        sequence = "X";
-                        action = AutoBattleSkillSelectionAction.EnergyRecovery;
-                        actionText = "奇遇解除后回能";
-                        pressedKey = "X";
-                        break;
-                    case AutoBattleEncounterRelievedAction.Capture:
-                        sequence = AutoBattleCaptureSequence;
-                        inputOptions = AutoBattleCaptureKeyboardInputOptions;
-                        action = AutoBattleSkillSelectionAction.Capture;
-                        actionText = "奇遇解除后捕捉";
-                        pressedKey = "W, 1, Space";
-                        break;
+                    LogAutoBattleTurnAction(plan.Description);
                 }
+
+                _autoBattleSkillSelectionAction = plan.Action;
+                _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+                return;
             }
 
-            if (!_keyboardInputService.TryParseSequence(sequence, out var keyStrokes, out var parseError)
+            if (!_keyboardInputService.TryParseSequence(plan.Sequence, out var keyStrokes, out var parseError)
                 || keyStrokes.Count == 0)
             {
                 _logger.LogWarning(
                     "自动战斗单回合序列无效。ReleaseStep={ReleaseStep}, Sequence={Sequence}, Error={Error}",
                     GetAutoBattleReleaseStepDisplay(releaseStep),
-                    sequence,
+                    plan.Sequence,
                     parseError);
-                keyStrokes = action == AutoBattleSkillSelectionAction.Skill
+                keyStrokes = plan.Action == AutoBattleSkillSelectionAction.Skill
                     && !releaseStep.IsCustom
                     && _keyboardInputService.TryParseSequence(releaseStep.SkillKey, out var fallbackStrokes, out _)
                     ? fallbackStrokes
@@ -292,17 +253,17 @@ public sealed partial class RuntimeTaskService
             await _keyboardInputService.SendSequenceAsync(
                 state.TargetWindow.Hwnd,
                 keyStrokes,
-                inputOptions,
+                plan.InputOptions,
                 cancellationToken);
 
-            _autoBattleSkillSelectionAction = action;
+            _autoBattleSkillSelectionAction = plan.Action;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
 
-            LogAutoBattleTurnAction(BuildAutoBattleTurnActionDescription(action, releaseStep, actionText, pressedKey), sequence);
+            LogAutoBattleTurnAction(plan.Description, plan.Sequence);
             _logger.LogDebug(
                 "自动战斗按键已发送：ReleaseStep={ReleaseStep}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
-                pressedKey,
-                sequence,
+                plan.DisplayKey,
+                plan.Sequence,
                 _autoBattleSkillSelectionAction,
                 keyStrokes.Count,
                 _autoBattleRoundIndex);
@@ -411,6 +372,24 @@ public sealed partial class RuntimeTaskService
         }
     }
 
+    private void BeginAutoBattleSkillSelectionTurn(AutoBattleSettings settings, DateTimeOffset now)
+    {
+        _autoBattleTurnNumber++;
+        _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
+        _hasLoggedCurrentAutoBattleTurnAction = false;
+        _wasAutoBattleSkillSelectionVisible = true;
+        _autoBattleSkillSelectionVisibleSince = now;
+        _lastAutoBattleSkillSelectionActionAt = null;
+        _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
+        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
+        _logger.LogDebug(
+            "自动战斗：进入第 {TurnNumber} 回合技能选择，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
+            _currentAutoBattleTurnNumber,
+            AutoBattleSkillSelectionActionDelay.TotalMilliseconds,
+            GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep),
+            _autoBattleRoundIndex);
+    }
+
     private void BeginAutoBattlePetSwitchingTurn(AutoBattleSettings settings)
     {
         var releaseStep = GetCurrentAutoBattleReleaseStep(settings);
@@ -471,7 +450,7 @@ public sealed partial class RuntimeTaskService
         }
 
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
-        LogAutoBattleTurnAction("检测到能量不足，临时回能 X", "X", forceInformation: true);
+        LogAutoBattleTurnAction("检测到能量不足，临时回能 X，原技能延后", "X", forceInformation: true);
         return true;
     }
 
@@ -725,6 +704,60 @@ public sealed partial class RuntimeTaskService
         return BuildAutoBattleTurnSequence(settings, releaseStep.SkillKey);
     }
 
+    private AutoBattleSkillSelectionPlan BuildAutoBattleSkillSelectionPlan(
+        AutoBattleSettings settings,
+        AutoBattleReleaseStep releaseStep)
+    {
+        if (_isAutoBattleEncounterRelieved
+            && RequiresAutoBattleEncounterRelieveDetection(settings.EncounterRelievedAction))
+        {
+            return settings.EncounterRelievedAction switch
+            {
+                AutoBattleEncounterRelievedAction.NoAction => new AutoBattleSkillSelectionPlan(
+                    AutoBattleSkillSelectionAction.NoAction,
+                    ShouldSendKeys: false,
+                    Sequence: string.Empty,
+                    InputOptions: AutoBattleKeyboardInputOptions,
+                    Description: "无操作，检测到奇遇效果解除，等待手动释放技能",
+                    DisplayKey: "-"),
+                AutoBattleEncounterRelievedAction.RecoverEnergy => new AutoBattleSkillSelectionPlan(
+                    AutoBattleSkillSelectionAction.EnergyRecovery,
+                    ShouldSendKeys: true,
+                    Sequence: "X",
+                    InputOptions: AutoBattleKeyboardInputOptions,
+                    Description: "奇遇解除后回能 X",
+                    DisplayKey: "X"),
+                AutoBattleEncounterRelievedAction.Capture => new AutoBattleSkillSelectionPlan(
+                    AutoBattleSkillSelectionAction.Capture,
+                    ShouldSendKeys: true,
+                    Sequence: AutoBattleCaptureSequence,
+                    InputOptions: AutoBattleCaptureKeyboardInputOptions,
+                    Description: "奇遇解除后捕捉 W, 1, Space",
+                    DisplayKey: "W, 1, Space"),
+                _ => BuildAutoBattleReleaseSkillPlan(settings, releaseStep)
+            };
+        }
+
+        return BuildAutoBattleReleaseSkillPlan(settings, releaseStep);
+    }
+
+    private static AutoBattleSkillSelectionPlan BuildAutoBattleReleaseSkillPlan(
+        AutoBattleSettings settings,
+        AutoBattleReleaseStep releaseStep)
+    {
+        var sequence = BuildAutoBattleReleaseSequence(settings, releaseStep);
+        var displayKey = GetAutoBattleReleaseStepDisplay(releaseStep);
+        return new AutoBattleSkillSelectionPlan(
+            AutoBattleSkillSelectionAction.Skill,
+            ShouldSendKeys: true,
+            sequence,
+            AutoBattleKeyboardInputOptions,
+            releaseStep.IsCustom
+                ? $"执行自定义序列 {displayKey}"
+                : $"释放技能 {displayKey}",
+            displayKey);
+    }
+
     private static string GetAutoBattleReleaseStepDisplay(AutoBattleReleaseStep? releaseStep)
     {
         if (releaseStep is null)
@@ -788,31 +821,19 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private static string BuildAutoBattleTurnActionDescription(
-        AutoBattleSkillSelectionAction action,
-        AutoBattleReleaseStep releaseStep,
-        string actionText,
-        string pressedKey)
-    {
-        return action switch
-        {
-            AutoBattleSkillSelectionAction.Skill when releaseStep.IsCustom => $"执行自定义序列 {pressedKey}",
-            AutoBattleSkillSelectionAction.Skill => $"释放技能 {pressedKey}",
-            AutoBattleSkillSelectionAction.EnergyRecovery => $"{actionText} {pressedKey}",
-            AutoBattleSkillSelectionAction.Capture => $"{actionText} {pressedKey}",
-            AutoBattleSkillSelectionAction.NoAction => "无操作",
-            _ => $"{actionText} {pressedKey}"
-        };
-    }
-
     private void CompleteAutoBattleSkillSelectionState()
     {
-        if (_autoBattleSkillSelectionAction == AutoBattleSkillSelectionAction.Skill)
+        if (ShouldAdvanceAutoBattleReleaseSequence(_autoBattleSkillSelectionAction))
         {
             _autoBattleRoundIndex++;
         }
 
         ResetAutoBattleSkillSelectionState();
+    }
+
+    private static bool ShouldAdvanceAutoBattleReleaseSequence(AutoBattleSkillSelectionAction action)
+    {
+        return action == AutoBattleSkillSelectionAction.Skill;
     }
 
     private bool ShouldRunAutoBattleSkillSelectionAction(DateTimeOffset now)
@@ -1025,4 +1046,12 @@ public sealed partial class RuntimeTaskService
         NoAction,
         Capture
     }
+
+    private sealed record AutoBattleSkillSelectionPlan(
+        AutoBattleSkillSelectionAction Action,
+        bool ShouldSendKeys,
+        string Sequence,
+        KeyboardInputOptions InputOptions,
+        string Description,
+        string DisplayKey);
 }

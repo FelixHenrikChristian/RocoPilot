@@ -296,12 +296,28 @@ jobs:
           name: RocoPilot ${{ needs.build_release_assets.outputs.version }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           body: |
-            Automated release for RocoPilot ${{ needs.build_release_assets.outputs.version }}.
+            # RocoPilot ${{ needs.build_release_assets.outputs.version }}
 
-            Assets:
-            - RocoPilot.update.exe: Kachina updater / online installer
-            - RocoPilot.Install.exe: Kachina offline package used by update sources
-            - RocoPilot-Setup-v*.exe: MicaSetup installer
+            ## 🎉 特性：
+            - **待补充**：填写本次新增的主要功能。
+
+            ## ✨ 优化：
+            - **待补充**：填写体验、性能、流程、界面等优化内容。
+
+            ## 🔧 修复：
+            - **待补充**：填写本次修复的问题。
+
+            ## ⚠️ 注意：
+            - 暂无
+
+            <details>
+            <summary>📦 安装包说明</summary>
+
+            - `RocoPilot.update.exe`：在线安装器 / 更新器，推荐普通用户使用
+            - `RocoPilot.Install.exe`：离线安装包，用于更新源分发
+            - `RocoPilot-Setup-v*.exe`：完整安装程序
+
+            </details>
           files: artifacts/*
 
   upload_to_r2:

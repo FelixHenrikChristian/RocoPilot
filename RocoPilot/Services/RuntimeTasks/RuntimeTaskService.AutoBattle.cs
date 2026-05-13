@@ -65,6 +65,17 @@ public sealed partial class RuntimeTaskService
         AlphaThreshold = 16,
         SearchStep = 1
     };
+    private static readonly KeyboardInputOptions AutoBattleKeyboardInputOptions = new()
+    {
+        HoldDurationMs = 100,
+        IntervalMs = 120
+    };
+    private static readonly KeyboardInputOptions AutoBattleCaptureKeyboardInputOptions = new()
+    {
+        HoldDurationMs = 100,
+        IntervalMs = 500
+    };
+
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
     private int _autoBattleRoundIndex;
@@ -81,7 +92,6 @@ public sealed partial class RuntimeTaskService
     private DateTimeOffset _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
     private bool _isAutoBattleSuspendedForShiny;
     private DateTimeOffset _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
-    private bool _isAutoBattlePausedForForeground;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
@@ -227,11 +237,6 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
-            if (ShouldPauseAutoBattleForForegroundInput(settings, state))
-            {
-                return;
-            }
-
             if (!_keyboardInputService.TryParseSequence(plan.Sequence, out var keyStrokes, out var parseError)
                 || keyStrokes.Count == 0)
             {
@@ -263,7 +268,7 @@ public sealed partial class RuntimeTaskService
 
             LogAutoBattleTurnAction(plan.Description, plan.Sequence);
             _logger.LogDebug(
-                "自动战斗按键消息已投递：ReleaseStep={ReleaseStep}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
+                "自动战斗按键已发送：ReleaseStep={ReleaseStep}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
                 plan.DisplayKey,
                 plan.Sequence,
                 _autoBattleSkillSelectionAction,
@@ -305,6 +310,8 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        BeginAutoBattlePetSwitchingTurn(settings);
+        _wasAutoBattlePetSwitchingVisible = true;
         if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
         {
             return;
@@ -318,14 +325,6 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
-            if (ShouldPauseAutoBattleForForegroundInput(settings, state))
-            {
-                return;
-            }
-
-            BeginAutoBattlePetSwitchingTurn(settings);
-            _wasAutoBattlePetSwitchingVisible = true;
-            var inputOptions = CreateAutoBattleKeyboardInputOptions(settings);
             for (var slot = 1; slot <= 6; slot++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -335,7 +334,7 @@ public sealed partial class RuntimeTaskService
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
                     slotKey,
-                    inputOptions,
+                    AutoBattleKeyboardInputOptions,
                     cancellationToken);
 
                 await Task.Delay(AutoBattlePetSwitchConfirmDelay, cancellationToken);
@@ -343,7 +342,7 @@ public sealed partial class RuntimeTaskService
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
                     "Space",
-                    inputOptions,
+                    AutoBattleKeyboardInputOptions,
                     cancellationToken);
 
                 await Task.Delay(AutoBattlePetSwitchStateCheckDelay, cancellationToken);
@@ -640,16 +639,10 @@ public sealed partial class RuntimeTaskService
                 return false;
             }
 
-            var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-            if (ShouldPauseAutoBattleForForegroundInput(settings, state))
-            {
-                return false;
-            }
-
             await _keyboardInputService.SendSequenceAsync(
                 state.TargetWindow.Hwnd,
                 "X",
-                CreateAutoBattleKeyboardInputOptions(settings),
+                AutoBattleKeyboardInputOptions,
                 cancellationToken);
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
             return true;
@@ -722,7 +715,6 @@ public sealed partial class RuntimeTaskService
         AutoBattleSettings settings,
         AutoBattleReleaseStep releaseStep)
     {
-        var inputOptions = CreateAutoBattleKeyboardInputOptions(settings);
         if (_isAutoBattleEncounterRelieved
             && RequiresAutoBattleEncounterRelieveDetection(settings.EncounterRelievedAction))
         {
@@ -732,21 +724,21 @@ public sealed partial class RuntimeTaskService
                     AutoBattleSkillSelectionAction.NoAction,
                     ShouldSendKeys: false,
                     Sequence: string.Empty,
-                    InputOptions: inputOptions,
+                    InputOptions: AutoBattleKeyboardInputOptions,
                     Description: "无操作，检测到奇遇效果解除，等待手动释放技能",
                     DisplayKey: "-"),
                 AutoBattleEncounterRelievedAction.RecoverEnergy => new AutoBattleSkillSelectionPlan(
                     AutoBattleSkillSelectionAction.EnergyRecovery,
                     ShouldSendKeys: true,
                     Sequence: "X",
-                    InputOptions: inputOptions,
+                    InputOptions: AutoBattleKeyboardInputOptions,
                     Description: "奇遇解除后回能 X",
                     DisplayKey: "X"),
                 AutoBattleEncounterRelievedAction.Capture => new AutoBattleSkillSelectionPlan(
                     AutoBattleSkillSelectionAction.Capture,
                     ShouldSendKeys: true,
                     Sequence: AutoBattleCaptureSequence,
-                    InputOptions: CreateAutoBattleCaptureKeyboardInputOptions(settings),
+                    InputOptions: AutoBattleCaptureKeyboardInputOptions,
                     Description: "奇遇解除后捕捉 W, 1, Space",
                     DisplayKey: "W, 1, Space"),
                 _ => BuildAutoBattleReleaseSkillPlan(settings, releaseStep)
@@ -766,66 +758,11 @@ public sealed partial class RuntimeTaskService
             AutoBattleSkillSelectionAction.Skill,
             ShouldSendKeys: true,
             sequence,
-            CreateAutoBattleKeyboardInputOptions(settings),
+            AutoBattleKeyboardInputOptions,
             releaseStep.IsCustom
-                ? $"尝试执行自定义序列 {displayKey}"
-                : $"尝试释放技能 {displayKey}",
+                ? $"执行自定义序列 {displayKey}"
+                : $"释放技能 {displayKey}",
             displayKey);
-    }
-
-    private static KeyboardInputOptions CreateAutoBattleKeyboardInputOptions(AutoBattleSettings settings)
-    {
-        return new KeyboardInputOptions
-        {
-            DeliveryMode = settings.InputDeliveryMode,
-            HoldDurationMs = 100,
-            IntervalMs = 120,
-            ActivateWindowForForegroundInput = false
-        };
-    }
-
-    private static KeyboardInputOptions CreateAutoBattleCaptureKeyboardInputOptions(AutoBattleSettings settings)
-    {
-        return new KeyboardInputOptions
-        {
-            DeliveryMode = settings.InputDeliveryMode,
-            HoldDurationMs = 100,
-            IntervalMs = 500,
-            ActivateWindowForForegroundInput = false
-        };
-    }
-
-    private bool ShouldPauseAutoBattleForForegroundInput(AutoBattleSettings settings, RuntimeTaskState state)
-    {
-        if (settings.InputDeliveryMode != KeyboardInputDeliveryMode.ForegroundInput)
-        {
-            ResetAutoBattleForegroundPauseState();
-            return false;
-        }
-
-        if (_keyboardInputService.IsWindowForeground(state.TargetWindow.Hwnd))
-        {
-            if (_isAutoBattlePausedForForeground)
-            {
-                _logger.LogInformation("自动战斗恢复：目标游戏窗口已回到前台。");
-            }
-
-            ResetAutoBattleForegroundPauseState();
-            return false;
-        }
-
-        if (!_isAutoBattlePausedForForeground)
-        {
-            _logger.LogInformation("自动战斗暂停：目标游戏窗口不在前台，回到游戏窗口后继续。");
-            _isAutoBattlePausedForForeground = true;
-        }
-
-        return true;
-    }
-
-    private void ResetAutoBattleForegroundPauseState()
-    {
-        _isAutoBattlePausedForForeground = false;
     }
 
     private static string GetAutoBattleReleaseStepDisplay(AutoBattleReleaseStep? releaseStep)
@@ -946,7 +883,6 @@ public sealed partial class RuntimeTaskService
         ResetAutoBattleSkillSelectionState();
         ResetAutoBattleEncounterRelievedActionState();
         ResetAutoBattleShinySuspendState();
-        ResetAutoBattleForegroundPauseState();
         _wasAutoBattlePetSwitchingVisible = false;
     }
 
@@ -993,11 +929,6 @@ public sealed partial class RuntimeTaskService
         if (!Enum.IsDefined(normalized.EncounterRelievedAction))
         {
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
-        }
-
-        if (!Enum.IsDefined(normalized.InputDeliveryMode))
-        {
-            normalized.InputDeliveryMode = KeyboardInputDeliveryMode.ForegroundInput;
         }
 
         return normalized;

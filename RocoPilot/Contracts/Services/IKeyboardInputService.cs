@@ -6,8 +6,6 @@ public interface IKeyboardInputService
 {
     bool IsWindowAvailable(IntPtr hwnd);
 
-    bool IsWindowForeground(IntPtr hwnd);
-
     bool TryParseSequence(
         string sequence,
         out IReadOnlyList<KeyStroke> keyStrokes,

@@ -1,7 +1,7 @@
 <div align="center">
   <img src="RocoPilot/Assets/RocoPilot.png" width="112" alt="RocoPilot" />
   <h1>🧭 RocoPilot</h1>
-  <p><strong>识别画面 · 记录奇遇 · 守护异色 · 自动战斗</strong></p>
+  <p><strong>窗口捕获 · 奇遇统计 · 自动战斗</strong></p>
 
   <p>
     <a href="https://github.com/FelixHenrikChristian/RocoPilot/releases/latest"><img src="https://img.shields.io/github/v/release/FelixHenrikChristian/RocoPilot?label=version" alt="Release version" /></a>
@@ -23,7 +23,7 @@
 
 </div>
 
-RocoPilot 是一款 Windows 桌面辅助工具，面向洛克王国世界相关战斗场景，提供实时画面识别、奇遇统计、自动战斗、异色提醒和日志诊断等功能。
+RocoPilot 是一款 Windows 桌面辅助工具，面向游戏《洛克王国·世界》相关战斗场景，提供实时画面识别、奇遇统计、自动战斗、异色提醒和日志诊断等功能。
 
 <p align="center">
   <img src="RocoPilot/Assets/LaunchPageCover.png" width="820" alt="RocoPilot 启动页封面" />
@@ -51,9 +51,8 @@ RocoPilot 是一款 Windows 桌面辅助工具，面向洛克王国世界相关�
 ### 下载安装
 
 1. 打开 [Releases](https://github.com/FelixHenrikChristian/RocoPilot/releases/latest) 页面。
-2. 推荐下载 `RocoPilot.update.exe` 进行在线安装和后续更新。
-3. 如需完整安装包，可下载 `RocoPilot-Setup-v*.exe`。
-4. 安装后启动 RocoPilot，并保持目标游戏窗口处于正常可见状态。
+2. 下载 `RocoPilot-Setup-v*.exe`，参考提示进行安装。
+3. 安装后启动 RocoPilot，并保持目标游戏窗口处于正常状态。
 
 ### 启动识别
 

@@ -644,6 +644,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
         if (string.Equals(_editingPendingShinyId, pendingCapture.Id, StringComparison.OrdinalIgnoreCase))
         {
+            UpdatePendingShinyEncounterCountFromName();
             return;
         }
 

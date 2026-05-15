@@ -1,4 +1,5 @@
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.Spirits;
 
 namespace RocoPilot.Contracts.Services;
 
@@ -19,6 +20,11 @@ public interface IRuntimeTaskService
         get;
     }
 
+    SpiritEvolutionRecordMode EncounterStatisticsEvolutionRecordMode
+    {
+        get;
+    }
+
     AutoBattleSettings AutoBattleSettings
     {
         get;
@@ -31,6 +37,8 @@ public interface IRuntimeTaskService
     Task LoadSettingsAsync(CancellationToken cancellationToken = default);
 
     void SetEncounterStatisticsEnabled(bool isEnabled);
+
+    void SetEncounterStatisticsEvolutionRecordMode(SpiritEvolutionRecordMode mode);
 
     void SetAutoBattleSettings(AutoBattleSettings settings);
 

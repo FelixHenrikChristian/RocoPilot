@@ -229,6 +229,33 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return bestCandidate?.Name ?? query;
     }
 
+    public async Task<string> ResolveEvolutionRecordNameAsync(
+        string spiritName,
+        SpiritEvolutionRecordMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedName = TextMatchingHelper.NormalizeSpiritNameForMatching(spiritName);
+        if (normalizedName.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var document = await LoadAsync(cancellationToken);
+        var item = FindCatalogItemByName(document, normalizedName);
+        if (item is null)
+        {
+            return TextMatchingHelper.NormalizeSpiritNameForDisplay(spiritName);
+        }
+
+        var representativeName = mode == SpiritEvolutionRecordMode.Highest
+            ? ResolveRepresentativeName(document, item, item.FinalId, item.FinalName)
+            : ResolveRepresentativeName(document, item, item.BaseId, item.BaseName);
+
+        return string.IsNullOrWhiteSpace(representativeName)
+            ? BuildDisplayName(item)
+            : representativeName;
+    }
+
     public string? ResolveAvatarPath(string? avatarPath)
     {
         if (string.IsNullOrWhiteSpace(avatarPath))
@@ -250,6 +277,52 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         };
 
         return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static SpiritCatalogItem? FindCatalogItemByName(SpiritCatalogDocument document, string normalizedName)
+    {
+        return document.Spirits.FirstOrDefault(item => IsCatalogItemNameMatch(item, normalizedName));
+    }
+
+    private static bool IsCatalogItemNameMatch(SpiritCatalogItem item, string normalizedName)
+    {
+        return IsNameMatch(item.Name, normalizedName)
+            || IsNameMatch(item.WikiName, normalizedName)
+            || IsNameMatch(BuildDisplayName(item), normalizedName)
+            || item.Aliases.Any(alias => IsNameMatch(alias, normalizedName));
+    }
+
+    private static bool IsNameMatch(string? name, string normalizedName)
+    {
+        return string.Equals(
+            TextMatchingHelper.NormalizeSpiritNameForMatching(name),
+            normalizedName,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ResolveRepresentativeName(
+        SpiritCatalogDocument document,
+        SpiritCatalogItem item,
+        string representativeId,
+        string fallbackName)
+    {
+        var representative = document.Spirits.FirstOrDefault(candidate =>
+                string.Equals(candidate.ChainId, item.ChainId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(candidate.Id, representativeId, StringComparison.OrdinalIgnoreCase)
+                && TextMatchingHelper.AreSameSpiritName(candidate.Name, fallbackName))
+            ?? document.Spirits.FirstOrDefault(candidate =>
+                string.Equals(candidate.ChainId, item.ChainId, StringComparison.OrdinalIgnoreCase)
+                && TextMatchingHelper.AreSameSpiritName(candidate.Name, fallbackName))
+            ?? document.Spirits.FirstOrDefault(candidate =>
+                string.Equals(candidate.ChainId, item.ChainId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(candidate.Id, representativeId, StringComparison.OrdinalIgnoreCase))
+            ?? document.Spirits.FirstOrDefault(candidate =>
+                string.Equals(candidate.Id, representativeId, StringComparison.OrdinalIgnoreCase));
+
+        var representativeName = representative is null
+            ? fallbackName
+            : BuildDisplayName(representative);
+        return TextMatchingHelper.NormalizeSpiritNameForDisplay(representativeName);
     }
 
     private static HttpClient CreateHttpClient()

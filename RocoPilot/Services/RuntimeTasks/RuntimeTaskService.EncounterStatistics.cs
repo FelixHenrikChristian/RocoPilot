@@ -6,6 +6,7 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.Spirits;
 
 namespace RocoPilot.Services;
 
@@ -34,6 +35,7 @@ public sealed partial class RuntimeTaskService
     private readonly object _encounterRecordLock = new();
     private readonly object _pendingShinyRecordLock = new();
     private volatile bool _encounterStatisticsEnabled = true;
+    private volatile SpiritEvolutionRecordMode _encounterStatisticsEvolutionRecordMode = SpiritEvolutionRecordMode.Lowest;
     private bool _hasActiveEncounterRecord;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
@@ -45,11 +47,20 @@ public sealed partial class RuntimeTaskService
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
 
+    public SpiritEvolutionRecordMode EncounterStatisticsEvolutionRecordMode => _encounterStatisticsEvolutionRecordMode;
+
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
         _encounterStatisticsEnabled = isEnabled;
         _settingsLoaded = true;
         _ = SaveEncounterStatisticsEnabledAsync(isEnabled);
+    }
+
+    public void SetEncounterStatisticsEvolutionRecordMode(SpiritEvolutionRecordMode mode)
+    {
+        _encounterStatisticsEvolutionRecordMode = NormalizeEncounterStatisticsEvolutionRecordMode(mode);
+        _settingsLoaded = true;
+        _ = SaveEncounterStatisticsEvolutionRecordModeAsync(_encounterStatisticsEvolutionRecordMode);
     }
 
     private async Task SaveEncounterStatisticsEnabledAsync(bool isEnabled)
@@ -61,6 +72,18 @@ public sealed partial class RuntimeTaskService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "保存奇遇统计开关状态失败。");
+        }
+    }
+
+    private async Task SaveEncounterStatisticsEvolutionRecordModeAsync(SpiritEvolutionRecordMode mode)
+    {
+        try
+        {
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.EncounterStatisticsEvolutionRecordMode, mode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "保存奇遇统计形态归一设置失败。");
         }
     }
 
@@ -156,6 +179,12 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
+        if (string.IsNullOrWhiteSpace(enemyName))
+        {
+            return;
+        }
+
         if (!TryReserveEncounterRecord(season.Id, enemyName, DateTimeOffset.Now))
         {
             return;
@@ -225,6 +254,12 @@ public sealed partial class RuntimeTaskService
         if (string.IsNullOrWhiteSpace(enemyName))
         {
             _logger.LogDebug("已匹配异色提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}", similarity);
+            return;
+        }
+
+        enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
+        if (string.IsNullOrWhiteSpace(enemyName))
+        {
             return;
         }
 
@@ -326,6 +361,48 @@ public sealed partial class RuntimeTaskService
             _logger.LogWarning(ex, "精灵名图鉴匹配失败，已使用 OCR 原始结果。");
             return TextMatchingHelper.NormalizeSpiritNameForMatching(recognizedText);
         }
+    }
+
+    private async Task<string> ResolveEncounterStatisticsRecordNameAsync(
+        string spiritName,
+        CancellationToken cancellationToken)
+    {
+        var normalizedName = TextMatchingHelper.NormalizeSpiritNameForDisplay(spiritName);
+        if (normalizedName.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        var recordMode = _encounterStatisticsEvolutionRecordMode;
+        try
+        {
+            var resolvedName = await _spiritCatalogService.ResolveEvolutionRecordNameAsync(
+                normalizedName,
+                recordMode,
+                cancellationToken);
+            return string.IsNullOrWhiteSpace(resolvedName)
+                ? normalizedName
+                : resolvedName;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(
+                ex,
+                "精灵进化链统计名解析失败，已使用匹配精灵名。Spirit={SpiritName}, Mode={RecordMode}",
+                normalizedName,
+                recordMode);
+            return normalizedName;
+        }
+    }
+
+    private static SpiritEvolutionRecordMode NormalizeEncounterStatisticsEvolutionRecordMode(
+        SpiritEvolutionRecordMode? mode)
+    {
+        return mode switch
+        {
+            SpiritEvolutionRecordMode.Highest => SpiritEvolutionRecordMode.Highest,
+            _ => SpiritEvolutionRecordMode.Lowest
+        };
     }
 
     private static bool IsHeterochromiaTip(string tipText, out double similarity)

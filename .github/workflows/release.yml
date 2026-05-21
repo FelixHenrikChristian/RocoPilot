@@ -313,9 +313,9 @@ jobs:
             <details>
             <summary>📦 安装包说明</summary>
 
-            - `RocoPilot.update.exe`：在线安装器 / 更新器，推荐普通用户使用
-            - `RocoPilot.Install.exe`：离线安装包，用于更新源分发
-            - `RocoPilot-Setup-v*.exe`：完整安装程序
+            - `RocoPilot-Setup-v*.exe`：完整安装程序，推荐首次安装或手动安装使用。
+            - `RocoPilot.update.exe`：应用内更新器，用于自动下载并执行更新。
+            - `RocoPilot.Install.exe`：应用内更新所需的安装包，由更新器使用。
 
             </details>
           files: artifacts/*

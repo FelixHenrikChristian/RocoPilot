@@ -127,7 +127,7 @@ public partial class App : Application
             services.AddTransient<RealtimePage>();
             services.AddSingleton<StatisticsViewModel>();
             services.AddTransient<StatisticsPage>();
-            services.AddTransient<LogViewModel>();
+            services.AddSingleton<LogViewModel>();
             services.AddTransient<LogPage>();
             services.AddTransient<TestViewModel>();
             services.AddTransient<TestPage>();

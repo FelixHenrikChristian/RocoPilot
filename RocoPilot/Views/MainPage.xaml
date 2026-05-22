@@ -242,7 +242,7 @@
                             <TextBlock
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="显示当前状态、污染计数等运行信息。"
+                                Text="显示当前状态、奇遇计数等运行信息。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 

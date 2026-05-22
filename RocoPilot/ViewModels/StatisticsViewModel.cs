@@ -9,9 +9,11 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 
+using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Helpers;
+using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 using RocoPilot.Models.Spirits;
 
@@ -26,6 +28,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     };
 
     private readonly IStatisticsService _statisticsService;
+    private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly ILogger<StatisticsViewModel> _logger;
     private readonly DispatcherQueue? _dispatcherQueue;
@@ -230,10 +233,12 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public StatisticsViewModel(
         IStatisticsService statisticsService,
+        IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         ILogger<StatisticsViewModel> logger)
     {
         _statisticsService = statisticsService;
+        _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _logger = logger;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
@@ -526,8 +531,9 @@ public partial class StatisticsViewModel : ObservableRecipient
     private void RefreshSelectedAccount()
     {
         var selectedAccount = FindSelectedAccount();
+        var seasonConfig = LoadEncounterSeasonConfig();
 
-        Seasons = StatisticsProjection.BuildSeasons(selectedAccount, ResolveSpiritAvatar);
+        Seasons = StatisticsProjection.BuildSeasons(selectedAccount, seasonConfig, ResolveSpiritAvatar);
         ShinyScopes = StatisticsProjection.BuildShinyScopes(Seasons);
         AllShinyCounts = StatisticsProjection.BuildAllShinyCounts(selectedAccount, ResolveSpiritAvatar);
         PendingShinyCaptures = StatisticsProjection.BuildPendingShinyCaptures(selectedAccount, ResolveSpiritAvatar);
@@ -544,6 +550,19 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(TotalAllShiny));
         NotifyPendingShinyChanged();
         NotifySelectedShinyChanged();
+    }
+
+    private EncounterSeasonConfig LoadEncounterSeasonConfig()
+    {
+        try
+        {
+            return _encounterSeasonConfigService.Load();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取赛季奇遇配置失败，统计页将仅显示已有统计赛季。");
+            return new EncounterSeasonConfig();
+        }
     }
 
     private AccountStatisticsData? FindSelectedAccount()

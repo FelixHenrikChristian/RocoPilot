@@ -1,4 +1,5 @@
 using RocoPilot.Helpers;
+using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 
 using Microsoft.UI.Xaml;
@@ -17,13 +18,17 @@ internal static class StatisticsProjection
 
     public static IReadOnlyList<SeasonStatisticsGroup> BuildSeasons(
         AccountStatisticsData? account,
+        EncounterSeasonConfig? seasonConfig = null,
         Func<string, BitmapImage?>? avatarResolver = null)
     {
-        return (account?.Seasons ?? [])
-            .Select(season => ToSeasonStatisticsGroup(season, avatarResolver))
-            .OrderByDescending(season => season.LatestCapturedAt)
+        var seasons = MergeConfiguredSeasons(account?.Seasons ?? [], seasonConfig)
+            .Select(season => ToSeasonStatisticsGroup(season.Data, avatarResolver))
+            .OrderByDescending(season => IsCurrentSeason(season, seasonConfig))
+            .ThenBy(season => GetConfiguredSeasonOrder(season, seasonConfig))
+            .ThenByDescending(season => season.LatestCapturedAt)
             .ThenBy(season => season.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        return seasons;
     }
 
     public static IReadOnlyList<ShinyScopeOption> BuildShinyScopes(IReadOnlyList<SeasonStatisticsGroup> seasons)
@@ -165,6 +170,106 @@ internal static class StatisticsProjection
             season.EncounterTypeName,
             pollutionCounts,
             shinyCounts);
+    }
+
+    private static IReadOnlyList<(SeasonStatisticsData Data, int Order)> MergeConfiguredSeasons(
+        IEnumerable<SeasonStatisticsData> accountSeasons,
+        EncounterSeasonConfig? seasonConfig)
+    {
+        var merged = accountSeasons
+            .Where(season => !string.IsNullOrWhiteSpace(season.Id))
+            .Select((season, index) => (Data: CloneSeasonData(season), Order: seasonConfig?.Seasons.Count + index ?? index))
+            .ToDictionary(
+                item => item.Data.Id.Trim(),
+                item => item,
+                StringComparer.OrdinalIgnoreCase);
+
+        if (seasonConfig is not null)
+        {
+            for (var index = 0; index < seasonConfig.Seasons.Count; index++)
+            {
+                var configuredSeason = seasonConfig.Seasons[index];
+                if (string.IsNullOrWhiteSpace(configuredSeason.Id))
+                {
+                    continue;
+                }
+
+                if (merged.TryGetValue(configuredSeason.Id, out var existing))
+                {
+                    ApplyConfiguredSeasonMetadata(existing.Data, configuredSeason);
+                    merged[configuredSeason.Id] = (existing.Data, index);
+                    continue;
+                }
+
+                var seasonData = new SeasonStatisticsData
+                {
+                    Id = configuredSeason.Id,
+                    Name = string.IsNullOrWhiteSpace(configuredSeason.Name)
+                        ? $"{configuredSeason.Id}赛季"
+                        : configuredSeason.Name,
+                    DateRange = configuredSeason.DateRange,
+                    EncounterTypeName = configuredSeason.EncounterTypeName
+                };
+                merged[configuredSeason.Id] = (seasonData, index);
+            }
+        }
+
+        return merged.Values.ToList();
+    }
+
+    private static SeasonStatisticsData CloneSeasonData(SeasonStatisticsData season)
+    {
+        return new SeasonStatisticsData
+        {
+            Id = season.Id,
+            Name = season.Name,
+            DateRange = season.DateRange,
+            EncounterTypeName = season.EncounterTypeName,
+            Encounters = season.Encounters.ToList(),
+            ShinyCaptures = season.ShinyCaptures.ToList()
+        };
+    }
+
+    private static void ApplyConfiguredSeasonMetadata(
+        SeasonStatisticsData seasonData,
+        EncounterSeasonDefinition configuredSeason)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredSeason.Name))
+        {
+            seasonData.Name = configuredSeason.Name;
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuredSeason.DateRange))
+        {
+            seasonData.DateRange = configuredSeason.DateRange;
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuredSeason.EncounterTypeName))
+        {
+            seasonData.EncounterTypeName = configuredSeason.EncounterTypeName;
+        }
+    }
+
+    private static bool IsCurrentSeason(
+        SeasonStatisticsGroup season,
+        EncounterSeasonConfig? seasonConfig)
+    {
+        return !string.IsNullOrWhiteSpace(seasonConfig?.CurrentSeasonId)
+            && string.Equals(season.Id, seasonConfig.CurrentSeasonId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int GetConfiguredSeasonOrder(
+        SeasonStatisticsGroup season,
+        EncounterSeasonConfig? seasonConfig)
+    {
+        if (seasonConfig is null)
+        {
+            return int.MaxValue;
+        }
+
+        var index = seasonConfig.Seasons.FindIndex(configuredSeason =>
+            string.Equals(configuredSeason.Id, season.Id, StringComparison.OrdinalIgnoreCase));
+        return index < 0 ? int.MaxValue : index;
     }
 
     private static IReadOnlyList<SpiritCountItem> BuildShinyCounts(

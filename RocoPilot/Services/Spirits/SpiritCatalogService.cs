@@ -190,7 +190,15 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         }
     }
 
-    public async Task<string> MatchSpiritNameAsync(string recognizedText, CancellationToken cancellationToken = default)
+    public Task<string> MatchSpiritNameAsync(string recognizedText, CancellationToken cancellationToken = default)
+    {
+        return MatchSpiritNameAsync(recognizedText, 0, cancellationToken);
+    }
+
+    public async Task<string> MatchSpiritNameAsync(
+        string recognizedText,
+        double minimumSimilarity,
+        CancellationToken cancellationToken = default)
     {
         var query = TextMatchingHelper.NormalizeSpiritNameForMatching(recognizedText);
         if (query.Length == 0)
@@ -198,11 +206,12 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             return string.Empty;
         }
 
+        var threshold = Math.Clamp(minimumSimilarity, 0, 1);
         var document = await LoadAsync(cancellationToken);
         var candidates = _nameMatchCandidates ??= BuildNameMatchCandidates(document);
         if (candidates.Count == 0)
         {
-            return query;
+            return threshold <= 0 ? query : string.Empty;
         }
 
         SpiritNameMatchCandidate? bestCandidate = null;
@@ -226,7 +235,14 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             }
         }
 
-        return bestCandidate?.Name ?? query;
+        if (bestCandidate is null)
+        {
+            return threshold <= 0 ? query : string.Empty;
+        }
+
+        return threshold <= 0 || bestSimilarity >= threshold
+            ? bestCandidate.Name
+            : string.Empty;
     }
 
     public async Task<string> ResolveEvolutionRecordNameAsync(

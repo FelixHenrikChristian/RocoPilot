@@ -129,8 +129,8 @@ flowchart TD
 
 奇遇解除有两条入口：
 
-1. 自动战斗路径：技能选择或战斗聊天画面中，每 1 秒 OCR `battle-tip-relieve`，与当前赛季 `tipText` 做相似度匹配。
-2. 奇遇统计路径：每 1 秒统计识别时，也会 OCR 同一区域；匹配成功后会调用自动战斗的 `ApplyAutoBattleEncounterRelievedDetection`。
+1. 自动战斗路径：技能选择或战斗聊天画面中，每 1 秒按当前赛季 `detectionMode` 检测奇遇解除。S1 使用 `battle-tip-relieve` 与 `tipText` 做相似度匹配；S2 优先使用 `battle-enemy-name` 的“幸运惊喜盒 -> 真实精灵名”变化，未命中时继续用 `tipText` 识别 S2 中低概率刷出的污染解除。
+2. 奇遇统计路径：每 1 秒统计识别时，也会按当前赛季 `detectionMode` 检测；匹配成功后会调用自动战斗的 `ApplyAutoBattleEncounterRelievedDetection`。
 
 这形成了当前较隐蔽的耦合：奇遇统计模块会直接改自动战斗状态。重构时建议改为事件，例如 `EncounterRelievedDetected`，由自动战斗控制器消费。
 

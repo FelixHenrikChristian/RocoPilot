@@ -193,6 +193,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             CurrentState = state;
             _isBattleStateActive = false;
             _unrecognizedStateDetectedAt = null;
+            ResetDeduplicatedDebugLogs();
             ResetAutoBattleBattleState();
             ResetEncounterRecordSuppression();
             _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
@@ -389,6 +390,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
             {
                 _isBattleStateActive = true;
+                ResetDeduplicatedDebugLogs();
                 return await UpdateActiveBattleSnapshotAsync(
                     state,
                     frame,
@@ -565,7 +567,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             }
         }
 
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("game-state-magic-point-active", magicPointRegion.Id),
+            $"{magicPointCount}/{MagicPointSlotCount}",
             "状态识别目标结果：Target=大世界魔力点 Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
             magicPointRegion.Id,
             magicPointCount,
@@ -643,7 +647,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             }
         }
 
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("game-state-magic-point-world", magicPointRegion.Id),
+            $"{magicPointCount}/{MagicPointSlotCount}",
             "状态识别目标结果：Target=魔力点, Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
             magicPointRegion.Id,
             magicPointCount,
@@ -677,7 +683,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         if (region is null)
         {
-            _logger.LogDebug(
+            LogDebugOncePerValue(
+                CreateDebugLogKey("ocr-skip-missing-region", taskName, string.Join("|", regionAliases)),
+                "missing-region",
                 "{TaskName} OCR跳过：未找到识别区域。Aliases={RegionAliases}",
                 taskName,
                 string.Join("|", regionAliases));
@@ -691,7 +699,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            _logger.LogDebug(
+            LogDebugOncePerValue(
+                CreateDebugLogKey("ocr-skip-outside-frame", taskName, region.Id),
+                $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
                 "{TaskName} OCR跳过：识别区域不在截图内。Region={RegionId}, Aliases={RegionAliases}",
                 taskName,
                 region.Id,
@@ -704,7 +714,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             .FirstOrDefault(method => method.Method == state.Options.TextRecognitionMethod && method.IsAvailable);
         if (recognitionMethod is null)
         {
-            _logger.LogDebug(
+            LogDebugOncePerValue(
+                CreateDebugLogKey("ocr-skip-method-unavailable", taskName, region.Id, state.Options.TextRecognitionMethod),
+                "method-unavailable",
                 "{TaskName} OCR跳过：OCR 方法不可用。Method={TextRecognitionMethod}, Region={RegionId}",
                 taskName,
                 state.Options.TextRecognitionMethod,
@@ -717,7 +729,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             imageBytes,
             recognitionMethod.Method,
             cancellationToken);
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("ocr-result", taskName, region.Id, recognitionMethod.Method),
+            CreateTextDebugFingerprint(result.Text),
             "{TaskName} OCR结果：Region={RegionId}, Method={TextRecognitionMethod}, FrameRegion={X},{Y},{Width}x{Height}, Text={Text}",
             taskName,
             region.Id,
@@ -743,7 +757,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         if (region is null)
         {
-            _logger.LogDebug(
+            LogDebugOncePerValue(
+                CreateDebugLogKey("template-skip-missing-region", taskName, targetName, string.Join("|", regionAliases), templateName),
+                "missing-region",
                 "{TaskName} 目标识别跳过：未找到识别区域。Target={Target}, Aliases={RegionAliases}, Template={Template}",
                 taskName,
                 targetName,
@@ -754,7 +770,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
         if (!TemplateExists(templateName))
         {
-            _logger.LogDebug(
+            LogDebugOncePerValue(
+                CreateDebugLogKey("template-skip-missing-template", taskName, targetName, region.Id, templateName),
+                "missing-template",
                 "{TaskName} 目标识别跳过：未找到模板。Target={Target}, Region={RegionId}, Template={Template}",
                 taskName,
                 targetName,
@@ -770,7 +788,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            _logger.LogDebug(
+            LogDebugOncePerValue(
+                CreateDebugLogKey("template-skip-outside-frame", taskName, targetName, region.Id, templateName),
+                $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
                 "{TaskName} 目标识别跳过：识别区域不在截图内。Target={Target}, Region={RegionId}, Template={Template}",
                 taskName,
                 targetName,
@@ -790,7 +810,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             templateName,
             matchOptions,
             cancellationToken);
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("template-result", taskName, targetName, region.Id, templateName),
+            CreateBooleanDebugFingerprint(result.IsMatch),
             "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}",
             taskName,
             targetName,

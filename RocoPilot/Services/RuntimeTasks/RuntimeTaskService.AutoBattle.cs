@@ -442,7 +442,12 @@ public sealed partial class RuntimeTaskService
             cancellationToken,
             "自动战斗");
         var isEnergyShortage = IsEnergyShortageTip(tipText);
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("auto-battle-energy-shortage-filter"),
+            string.Join(
+                "|",
+                CreateTextDebugFingerprint(tipText),
+                CreateBooleanDebugFingerprint(isEnergyShortage)),
             "自动战斗回能筛选：TipText={TipText}, IsEnergyShortage={IsEnergyShortage}",
             FormatLogText(tipText),
             isEnergyShortage);
@@ -492,7 +497,36 @@ public sealed partial class RuntimeTaskService
         _nextAutoBattleEncounterRelieveScanAt = now + AutoBattleEncounterRelieveScanInterval;
 
         var season = _encounterSeasonConfigService.GetCurrentSeason();
-        if (season is null || string.IsNullOrWhiteSpace(season.TipText))
+        if (season is null)
+        {
+            return false;
+        }
+
+        if (UsesEnemyNameTransitionDetection(season))
+        {
+            var enemyName = await TryDetectEncounterNameTransitionAsync(
+                state,
+                frame,
+                season,
+                cancellationToken,
+                "自动战斗");
+            if (!string.IsNullOrWhiteSpace(enemyName))
+            {
+                LogDebugOncePerValue(
+                    CreateDebugLogKey("auto-battle-encounter-relieved-transition-filter", season.Id),
+                    string.Join(
+                        "|",
+                        season.DetectionMode,
+                        CreateTextDebugFingerprint(enemyName),
+                        "true"),
+                    "自动战斗奇遇解除操作筛选：DetectionMode={DetectionMode}, Spirit={SpiritName}, IsMatch=True",
+                    season.DetectionMode,
+                    enemyName);
+                return ApplyAutoBattleEncounterRelievedDetection("自动战斗");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(season.TipText))
         {
             return false;
         }
@@ -508,7 +542,9 @@ public sealed partial class RuntimeTaskService
             season.TipText,
             season.MatchThreshold,
             out var similarity);
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("auto-battle-encounter-relieved-tip-filter", season.Id),
+            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
             "自动战斗奇遇解除操作筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
             FormatLogText(tipText),
             FormatLogText(season.TipText),
@@ -555,7 +591,9 @@ public sealed partial class RuntimeTaskService
             cancellationToken,
             "自动战斗异色保护");
         var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
-        _logger.LogDebug(
+        LogDebugOncePerValue(
+            CreateDebugLogKey("auto-battle-shiny-filter"),
+            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
             "自动战斗异色保护筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
             FormatLogText(tipText),
             HeterochromiaTipText,

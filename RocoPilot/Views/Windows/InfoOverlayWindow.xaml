@@ -106,7 +106,7 @@
                                     Height="26"
                                     Background="#E0F7F2"
                                     CornerRadius="13"
-                                    ToolTipService.ToolTip="污染计数">
+                                    ToolTipService.ToolTip="奇遇计数">
                                     <FontIcon
                                         x:Name="PollutionCounterIcon"
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"

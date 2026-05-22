@@ -89,8 +89,22 @@ public sealed class EncounterSeasonConfigService : IEncounterSeasonConfigService
             : season.Name.Trim();
         season.DateRange = season.DateRange?.Trim() ?? string.Empty;
         season.EncounterTypeName = season.EncounterTypeName?.Trim() ?? string.Empty;
+        season.DetectionMode = NormalizeDetectionMode(season.DetectionMode);
         season.TipText = season.TipText?.Trim() ?? string.Empty;
         season.MatchThreshold = Math.Clamp(season.MatchThreshold, 0.5, 1);
+        season.PlaceholderName = season.PlaceholderName?.Trim() ?? string.Empty;
+        season.PlaceholderMatchThreshold = Math.Clamp(season.PlaceholderMatchThreshold, 0.5, 1);
+        season.SpiritNameMatchThreshold = Math.Clamp(season.SpiritNameMatchThreshold, 0.1, 1);
         return season;
+    }
+
+    private static string NormalizeDetectionMode(string? detectionMode)
+    {
+        return string.Equals(
+            detectionMode?.Trim(),
+            EncounterDetectionModes.EnemyNameTransition,
+            StringComparison.OrdinalIgnoreCase)
+            ? EncounterDetectionModes.EnemyNameTransition
+            : EncounterDetectionModes.TipText;
     }
 }

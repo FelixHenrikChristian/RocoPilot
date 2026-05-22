@@ -12,6 +12,11 @@ public interface ISpiritCatalogService
 
     Task<string> MatchSpiritNameAsync(string recognizedText, CancellationToken cancellationToken = default);
 
+    Task<string> MatchSpiritNameAsync(
+        string recognizedText,
+        double minimumSimilarity,
+        CancellationToken cancellationToken = default);
+
     Task<string> ResolveEvolutionRecordNameAsync(
         string spiritName,
         SpiritEvolutionRecordMode mode,

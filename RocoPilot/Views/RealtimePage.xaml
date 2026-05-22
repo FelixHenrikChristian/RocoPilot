@@ -70,41 +70,6 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE8D7;" />
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="统计形态归一" TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,2,0,0"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="{x:Bind ViewModel.EncounterStatisticsEvolutionRecordModeDescription, Mode=OneWay}"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ComboBox
-                            Grid.Column="2"
-                            MinWidth="120"
-                            VerticalAlignment="Center"
-                            DisplayMemberPath="Name"
-                            ItemsSource="{x:Bind ViewModel.EncounterStatisticsEvolutionRecordModeOptions, Mode=OneWay}"
-                            SelectedItem="{x:Bind ViewModel.SelectedEncounterStatisticsEvolutionRecordModeOption, Mode=TwoWay}" />
-                    </Grid>
-
-                    <Border
-                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0" />
-
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="18"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE8D2;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="精灵图鉴数据" TextWrapping="Wrap" />

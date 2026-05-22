@@ -19,7 +19,6 @@ using RocoPilot.Models.Input;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
-using RocoPilot.Models.Spirits;
 using RocoPilot.Models.TextRecognition;
 
 using Windows.Graphics.Imaging;
@@ -120,12 +119,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.EncounterStatisticsEnabled);
             _encounterStatisticsEnabled = savedEncounterStatisticsEnabled ?? true;
 
-            var savedEncounterStatisticsEvolutionRecordMode =
-                await _localSettingsService.ReadSettingAsync<SpiritEvolutionRecordMode?>(
-                    SettingsKeys.EncounterStatisticsEvolutionRecordMode);
-            _encounterStatisticsEvolutionRecordMode =
-                NormalizeEncounterStatisticsEvolutionRecordMode(savedEncounterStatisticsEvolutionRecordMode);
-
             var savedAutoBattleSettings =
                 await _localSettingsService.ReadSettingAsync<AutoBattleSettings>(SettingsKeys.AutoBattleSettings);
             _autoBattleSettings = NormalizeAutoBattleSettings(savedAutoBattleSettings);
@@ -197,8 +190,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             ResetAutoBattleBattleState();
             ResetEncounterRecordSuppression();
             _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
-            _encounterStatisticsEvolutionRecordMode =
-                NormalizeEncounterStatisticsEvolutionRecordMode(options.EncounterStatisticsEvolutionRecordMode);
             _autoBattleSettings = NormalizeAutoBattleSettings(options.AutoBattleSettings);
             _recognitionOverlayService.Show(state);
             _infoOverlayService.Show(state);

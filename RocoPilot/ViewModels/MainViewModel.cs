@@ -141,7 +141,6 @@ public partial class MainViewModel : ObservableRecipient
             InfoOverlayLocked = IsInfoOverlayLocked,
             PollutionCounterEnabled = true,
             EncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled,
-            EncounterStatisticsEvolutionRecordMode = _runtimeTaskService.EncounterStatisticsEvolutionRecordMode,
             AutoBattleSettings = _runtimeTaskService.AutoBattleSettings
         });
 

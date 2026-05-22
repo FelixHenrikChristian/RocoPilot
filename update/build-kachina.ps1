@@ -20,7 +20,9 @@ param(
 
     [switch]$SkipPublish,
 
-    [switch]$UpdaterOnly
+    [switch]$UpdaterOnly,
+
+    [switch]$SkipUpdaterBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -165,18 +167,28 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 Ensure-KachinaBuilder
 $config = New-EffectiveConfig
 
-Remove-Item $updater -Force -ErrorAction SilentlyContinue
-Invoke-KachinaBuilder "Building Kachina updater..." @(
-    "pack",
-    "-c",
-    $config,
-    "-o",
-    $updater,
-    "--icon",
-    $icon
-)
-if (-not (Test-Path $updater)) {
-    throw "kachina-builder pack for updater completed but '$updater' was not created."
+if ($SkipUpdaterBuild) {
+    if (-not (Test-Path $updater)) {
+        throw "Updater was not found at '$updater'. Run without -SkipUpdaterBuild first."
+    }
+
+    Unblock-Executable $updater
+    Write-Host "Using existing Kachina updater: $updater"
+}
+else {
+    Remove-Item $updater -Force -ErrorAction SilentlyContinue
+    Invoke-KachinaBuilder "Building Kachina updater..." @(
+        "pack",
+        "-c",
+        $config,
+        "-o",
+        $updater,
+        "--icon",
+        $icon
+    )
+    if (-not (Test-Path $updater)) {
+        throw "kachina-builder pack for updater completed but '$updater' was not created."
+    }
 }
 
 if ($UpdaterOnly) {

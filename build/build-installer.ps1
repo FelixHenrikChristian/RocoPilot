@@ -3,7 +3,11 @@ param(
     [string]$Runtime = "win-x64",
 
     [ValidateSet("x64")]
-    [string]$Platform = "x64"
+    [string]$Platform = "x64",
+
+    [string]$UpdaterPath,
+
+    [switch]$RequireUpdater
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +23,9 @@ $templateDir = Join-Path $buildDir ".template"
 $templateWorkDir = Join-Path $templateDir "default"
 $templateArchive = Join-Path $templateDir "default.7z"
 $distDir = Join-Path $buildDir ".dist"
+if ([string]::IsNullOrWhiteSpace($UpdaterPath)) {
+    $UpdaterPath = Join-Path $repoRoot "update\RocoPilot.update.exe"
+}
 
 function ConvertTo-CSharpStringLiteral {
     param([string]$Value)
@@ -117,6 +124,18 @@ dotnet publish $project `
     -o $publishDir
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
+}
+
+$resolvedUpdaterPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($UpdaterPath)
+if (Test-Path $resolvedUpdaterPath) {
+    Copy-Item -LiteralPath $resolvedUpdaterPath -Destination (Join-Path $publishDir "RocoPilot.update.exe") -Force
+    Write-Host "Included updater: $resolvedUpdaterPath"
+}
+elseif ($RequireUpdater) {
+    throw "Updater was not found at '$resolvedUpdaterPath'. Build it before creating the installer."
+}
+else {
+    Write-Warning "Updater was not found at '$resolvedUpdaterPath'. The installer will not include in-app update support."
 }
 
 Write-Host "Packing publish directory..."

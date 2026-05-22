@@ -22,10 +22,23 @@ Build only the updater:
 .\update\build-kachina.ps1 -UpdaterOnly
 ```
 
+Build the MicaSetup installer with in-app update support:
+
+```powershell
+.\update\build-kachina.ps1 -UpdaterOnly
+.\build\build-installer.ps1 -RequireUpdater
+```
+
 Use an existing publish directory:
 
 ```powershell
 .\update\build-kachina.ps1 -SkipPublish -PublishDir .\build\publish
+```
+
+Reuse an already built updater when packing the offline installer:
+
+```powershell
+.\update\build-kachina.ps1 -SkipPublish -PublishDir .\build\publish -SkipUpdaterBuild
 ```
 
 Add a Cloudflare/R2 source when you have the final URL:

@@ -202,11 +202,7 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile "update/kachina-builder.exe"
           Unblock-File -LiteralPath "update/kachina-builder.exe" -ErrorAction SilentlyContinue
 
-      - name: Build MicaSetup installer and publish app
-        shell: pwsh
-        run: .\build\build-installer.ps1
-
-      - name: Build Kachina updater and offline installer
+      - name: Configure Kachina Cloudflare source
         shell: pwsh
         env:
           ROCO_R2_PUBLIC_URL: ${{ vars.ROCO_R2_PUBLIC_URL }}
@@ -214,14 +210,28 @@ jobs:
           $ErrorActionPreference = "Stop"
           if (-not [string]::IsNullOrWhiteSpace($env:ROCO_R2_PUBLIC_URL)) {
             $r2PublicUrl = ($env:ROCO_R2_PUBLIC_URL).TrimEnd("/")
-            $env:ROCO_KACHINA_CLOUDFLARE_URL = "$r2PublicUrl/RocoPilot.Install.exe"
-            Write-Host "Kachina R2 source: $env:ROCO_KACHINA_CLOUDFLARE_URL"
+            $cloudflareUrl = "$r2PublicUrl/RocoPilot.Install.exe"
+            "ROCO_KACHINA_CLOUDFLARE_URL=$cloudflareUrl" >> $env:GITHUB_ENV
+            Write-Host "Kachina R2 source: $cloudflareUrl"
           }
 
+      - name: Build Kachina updater
+        shell: pwsh
+        run: .\update\build-kachina.ps1 -Version "$env:APP_VERSION" -UpdaterOnly
+
+      - name: Build MicaSetup installer and publish app
+        shell: pwsh
+        run: .\build\build-installer.ps1 -RequireUpdater
+
+      - name: Build Kachina offline installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
           .\update\build-kachina.ps1 `
             -Version "$env:APP_VERSION" `
             -SkipPublish `
-            -PublishDir ".\build\publish"
+            -PublishDir ".\build\publish" `
+            -SkipUpdaterBuild
 
       - name: Collect release assets
         shell: pwsh

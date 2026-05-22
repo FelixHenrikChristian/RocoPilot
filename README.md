@@ -4,10 +4,10 @@
   <p><strong>窗口捕获 · 奇遇统计 · 自动战斗</strong></p>
 
   <p>
+    <img src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows" alt="Windows" />
     <a href="https://github.com/FelixHenrikChristian/RocoPilot/releases/latest"><img src="https://img.shields.io/github/v/release/FelixHenrikChristian/RocoPilot?label=version" alt="Release version" /></a>
     <a href="https://github.com/FelixHenrikChristian/RocoPilot/releases"><img src="https://img.shields.io/github/downloads/FelixHenrikChristian/RocoPilot/total?label=downloads" alt="Downloads" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/github/license/FelixHenrikChristian/RocoPilot" alt="License" /></a>
-    <img src="https://img.shields.io/badge/platform-Windows-0078D4?logo=windows" alt="Windows" />
   </p>
   <p>
     <a href="https://github.com/FelixHenrikChristian/RocoPilot/releases/latest">⬇️ 下载</a>

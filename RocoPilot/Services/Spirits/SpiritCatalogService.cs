@@ -247,7 +247,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     public async Task<string> ResolveEvolutionRecordNameAsync(
         string spiritName,
-        SpiritEvolutionRecordMode mode,
         CancellationToken cancellationToken = default)
     {
         var normalizedName = TextMatchingHelper.NormalizeSpiritNameForMatching(spiritName);
@@ -263,9 +262,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             return TextMatchingHelper.NormalizeSpiritNameForDisplay(spiritName);
         }
 
-        var representativeName = mode == SpiritEvolutionRecordMode.Highest
-            ? ResolveRepresentativeName(document, item, item.FinalId, item.FinalName)
-            : ResolveRepresentativeName(document, item, item.BaseId, item.BaseName);
+        var representativeName = ResolveRepresentativeName(document, item, item.BaseId, item.BaseName);
 
         return string.IsNullOrWhiteSpace(representativeName)
             ? BuildDisplayName(item)

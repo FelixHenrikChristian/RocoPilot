@@ -6,7 +6,5 @@ internal static class SettingsKeys
 
     public const string EncounterStatisticsEnabled = "EncounterStatisticsEnabled";
 
-    public const string EncounterStatisticsEvolutionRecordMode = "EncounterStatisticsEvolutionRecordMode";
-
     public const string AutoBattleSettings = "AutoBattleSettings";
 }

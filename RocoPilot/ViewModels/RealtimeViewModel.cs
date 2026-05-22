@@ -17,7 +17,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     private readonly ISpiritCatalogService _spiritCatalogService;
 
     private bool _isEncounterStatisticsEnabled = true;
-    private SpiritEvolutionRecordModeOption? _selectedEncounterStatisticsEvolutionRecordModeOption;
     private bool _isSpiritCatalogSyncing;
     private string _spiritCatalogSummary = "图鉴数据待加载";
     private string _spiritCatalogSyncStatus = "可手动同步 wiki 图鉴";
@@ -32,11 +31,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         get;
     } = AutoBattleEncounterRelievedActionOption.CreateDefaultOptions();
-
-    public IReadOnlyList<SpiritEvolutionRecordModeOption> EncounterStatisticsEvolutionRecordModeOptions
-    {
-        get;
-    } = SpiritEvolutionRecordModeOption.CreateDefaultOptions();
 
     public bool IsEncounterStatisticsEnabled
     {
@@ -70,23 +64,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             return string.Join(" · ", parts);
         }
     }
-
-    public SpiritEvolutionRecordModeOption? SelectedEncounterStatisticsEvolutionRecordModeOption
-    {
-        get => _selectedEncounterStatisticsEvolutionRecordModeOption;
-        set
-        {
-            if (value is not null
-                && SetProperty(ref _selectedEncounterStatisticsEvolutionRecordModeOption, value))
-            {
-                _runtimeTaskService.SetEncounterStatisticsEvolutionRecordMode(value.Mode);
-                OnPropertyChanged(nameof(EncounterStatisticsEvolutionRecordModeDescription));
-            }
-        }
-    }
-
-    public string EncounterStatisticsEvolutionRecordModeDescription =>
-        SelectedEncounterStatisticsEvolutionRecordModeOption?.Description ?? string.Empty;
 
     public string SpiritCatalogSummary
     {
@@ -191,7 +168,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _isEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
-        ApplyEncounterStatisticsEvolutionRecordMode(_runtimeTaskService.EncounterStatisticsEvolutionRecordMode);
         ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
     }
 
@@ -199,7 +175,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         await _runtimeTaskService.LoadSettingsAsync();
         IsEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
-        ApplyEncounterStatisticsEvolutionRecordMode(_runtimeTaskService.EncounterStatisticsEvolutionRecordMode);
         ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
         await LoadSpiritCatalogSummaryAsync();
     }
@@ -247,15 +222,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     private void ApplySpiritCatalogSummary(SpiritCatalogDocument document)
     {
         SpiritCatalogSummary = $"{document.Count} 个图鉴编号";
-    }
-
-    private void ApplyEncounterStatisticsEvolutionRecordMode(SpiritEvolutionRecordMode mode)
-    {
-        _selectedEncounterStatisticsEvolutionRecordModeOption =
-            FindEncounterStatisticsEvolutionRecordModeOption(mode);
-
-        OnPropertyChanged(nameof(SelectedEncounterStatisticsEvolutionRecordModeOption));
-        OnPropertyChanged(nameof(EncounterStatisticsEvolutionRecordModeDescription));
     }
 
     private void UpdateSpiritCatalogSyncProgress(SpiritCatalogSyncProgress progress)
@@ -339,13 +305,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             ?? AutoBattleEncounterRelievedActionOptions.First(option => option.Action == AutoBattleEncounterRelievedAction.RecoverEnergy);
     }
 
-    private SpiritEvolutionRecordModeOption FindEncounterStatisticsEvolutionRecordModeOption(
-        SpiritEvolutionRecordMode mode)
-    {
-        return EncounterStatisticsEvolutionRecordModeOptions.FirstOrDefault(option => option.Mode == mode)
-            ?? EncounterStatisticsEvolutionRecordModeOptions.First(option => option.Mode == SpiritEvolutionRecordMode.Lowest);
-    }
-
     private static string GetAutoBattleEncounterRelievedActionSummary(AutoBattleEncounterRelievedAction action)
     {
         return action switch
@@ -356,27 +315,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             AutoBattleEncounterRelievedAction.Capture => "奇遇解除后捕捉",
             _ => "奇遇解除后回能"
         };
-    }
-}
-
-public sealed record SpiritEvolutionRecordModeOption(
-    SpiritEvolutionRecordMode Mode,
-    string Name,
-    string Description)
-{
-    public static IReadOnlyList<SpiritEvolutionRecordModeOption> CreateDefaultOptions()
-    {
-        return
-        [
-            new(
-                SpiritEvolutionRecordMode.Lowest,
-                "最低阶",
-                "奇遇和异色统计按进化链最低形态记录，例如格兰花记为格兰种子。"),
-            new(
-                SpiritEvolutionRecordMode.Highest,
-                "最高阶",
-                "奇遇和异色统计按进化链最高形态记录，例如格兰花记为格兰球。")
-        ];
     }
 }
 

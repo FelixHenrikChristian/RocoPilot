@@ -17,10 +17,7 @@ public interface ISpiritCatalogService
         double minimumSimilarity,
         CancellationToken cancellationToken = default);
 
-    Task<string> ResolveEvolutionRecordNameAsync(
-        string spiritName,
-        SpiritEvolutionRecordMode mode,
-        CancellationToken cancellationToken = default);
+    Task<string> ResolveEvolutionRecordNameAsync(string spiritName, CancellationToken cancellationToken = default);
 
     string? ResolveAvatarPath(string? avatarPath);
 }

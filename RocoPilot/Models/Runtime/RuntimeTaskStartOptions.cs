@@ -1,5 +1,4 @@
 using RocoPilot.Models.Capture;
-using RocoPilot.Models.Spirits;
 using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.Models.Runtime;
@@ -47,12 +46,6 @@ public sealed class RuntimeTaskStartOptions
         get;
         init;
     }
-
-    public SpiritEvolutionRecordMode EncounterStatisticsEvolutionRecordMode
-    {
-        get;
-        init;
-    } = SpiritEvolutionRecordMode.Lowest;
 
     public AutoBattleSettings AutoBattleSettings
     {

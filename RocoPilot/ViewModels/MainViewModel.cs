@@ -88,6 +88,12 @@ public partial class MainViewModel : ObservableRecipient
         SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
+        if (_runtimeTaskService.CurrentState is { } currentState)
+        {
+            _isMaskOverlayEnabled = currentState.Options.RecognitionOverlayEnabled;
+            _isInfoOverlayEnabled = currentState.Options.InfoOverlayEnabled;
+            _isInfoOverlayLocked = currentState.Options.InfoOverlayLocked;
+        }
     }
 
     [RelayCommand]
@@ -182,9 +188,19 @@ public partial class MainViewModel : ObservableRecipient
         ShowLaunchNotification(InfoBarSeverity.Informational, "位置已重置", "信息遮罩窗口将回到默认位置。");
     }
 
+    partial void OnIsMaskOverlayEnabledChanged(bool value)
+    {
+        _runtimeTaskService.SetRecognitionOverlayEnabled(value);
+    }
+
+    partial void OnIsInfoOverlayEnabledChanged(bool value)
+    {
+        _runtimeTaskService.SetInfoOverlayEnabled(value);
+    }
+
     partial void OnIsInfoOverlayLockedChanged(bool value)
     {
-        _infoOverlayService.SetLocked(value);
+        _runtimeTaskService.SetInfoOverlayLocked(value);
     }
 
     private void ShowLaunchNotification(InfoBarSeverity severity, string title, string message)

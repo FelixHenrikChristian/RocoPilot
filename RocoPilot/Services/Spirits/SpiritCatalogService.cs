@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -22,6 +23,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private const string ListUrl = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
     private const string SourceName = "Biligame 洛克王国:手游 Wiki 精灵图鉴";
     private const string DataFileName = "spirits.json";
+    private const string BundledCatalogMarkerFileName = "bundled-spirits.marker";
     private const string DefaultApplicationDataFolder = "RocoPilot/ApplicationData";
     private const int RequestDelayMilliseconds = 30;
 
@@ -82,6 +84,12 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                 return _document;
             }
 
+            var bundledPath = GetBundledDataPath();
+            if (File.Exists(bundledPath))
+            {
+                await ApplyBundledCatalogUpdateAsync(bundledPath, cancellationToken);
+            }
+
             var localPath = GetLocalDataPath();
             if (File.Exists(localPath))
             {
@@ -90,7 +98,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                 return _document;
             }
 
-            var bundledPath = GetBundledDataPath();
             if (File.Exists(bundledPath))
             {
                 _document = await ReadDocumentAsync(bundledPath, cancellationToken);
@@ -370,9 +377,58 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return Path.Combine(_localDataRoot, "Spirits", DataFileName);
     }
 
+    private string GetBundledCatalogMarkerPath()
+    {
+        return Path.Combine(_localDataRoot, "Spirits", BundledCatalogMarkerFileName);
+    }
+
     private static string GetBundledDataPath()
     {
         return Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", DataFileName);
+    }
+
+    private async Task ApplyBundledCatalogUpdateAsync(
+        string bundledPath,
+        CancellationToken cancellationToken)
+    {
+        var localPath = GetLocalDataPath();
+        var markerPath = GetBundledCatalogMarkerPath();
+        var bundledMarker = await BuildBundledCatalogMarkerAsync(bundledPath, cancellationToken);
+        var currentMarker = File.Exists(markerPath)
+            ? (await File.ReadAllTextAsync(markerPath, cancellationToken)).Trim()
+            : string.Empty;
+
+        if (File.Exists(localPath)
+            && string.Equals(currentMarker, bundledMarker, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        File.Copy(bundledPath, localPath, overwrite: true);
+        await File.WriteAllTextAsync(markerPath, bundledMarker + Environment.NewLine, cancellationToken);
+        _document = null;
+        _nameMatchCandidates = null;
+    }
+
+    private static async Task<string> BuildBundledCatalogMarkerAsync(
+        string bundledPath,
+        CancellationToken cancellationToken)
+    {
+        var version = GetCurrentApplicationVersion();
+        await using var stream = File.OpenRead(bundledPath);
+        var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken);
+        var hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        return $"{version}|{hash}";
+    }
+
+    private static string GetCurrentApplicationVersion()
+    {
+        var assembly = typeof(SpiritCatalogService).Assembly;
+        var informationalVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        return string.IsNullOrWhiteSpace(informationalVersion)
+            ? assembly.GetName().Version?.ToString() ?? "unknown"
+            : informationalVersion.Trim();
     }
 
     private static async Task<SpiritCatalogDocument> ReadDocumentAsync(

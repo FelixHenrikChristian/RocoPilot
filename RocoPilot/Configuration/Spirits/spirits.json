@@ -4,7 +4,7 @@
     "listUrl": "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4",
     "scrapedAt": "2026-05-10T08:14:04+00:00"
   },
-  "count": 347,
+  "count": 375,
   "spirits": [
     {
       "id": "001",
@@ -25783,6 +25783,1302 @@
         "暮星辰"
       ],
       "avatarPath": "Configuration/Spirits/Avatars/347_d0615f1cc4.png"
+    },
+    {
+      "id": "348",
+      "name": "钨丝贝贝",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=348",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "钨丝贝贝",
+      "baseName": "钨丝贝贝",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "机械",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "钨丝贝贝"
+      ],
+      "chainId": "348-钨丝贝贝",
+      "baseId": "348",
+      "finalId": "350",
+      "finalName": "机墓方舟",
+      "evolutionChain": [
+        {
+          "id": "348",
+          "name": "钨丝贝贝",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "349",
+          "name": "辉光幕机",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "350",
+          "name": "机墓方舟",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "钨丝贝贝",
+        "辉光幕机",
+        "机墓方舟"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "349",
+      "name": "辉光幕机",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=349",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "辉光幕机",
+      "baseName": "钨丝贝贝",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "机械",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "辉光幕机"
+      ],
+      "chainId": "348-钨丝贝贝",
+      "baseId": "348",
+      "finalId": "350",
+      "finalName": "机墓方舟",
+      "evolutionChain": [
+        {
+          "id": "348",
+          "name": "钨丝贝贝",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "349",
+          "name": "辉光幕机",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "350",
+          "name": "机墓方舟",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "钨丝贝贝",
+        "辉光幕机",
+        "机墓方舟"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "350",
+      "name": "机墓方舟",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=350",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "机墓方舟",
+      "baseName": "钨丝贝贝",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "机械",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "机墓方舟"
+      ],
+      "chainId": "348-钨丝贝贝",
+      "baseId": "348",
+      "finalId": "350",
+      "finalName": "机墓方舟",
+      "evolutionChain": [
+        {
+          "id": "348",
+          "name": "钨丝贝贝",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "349",
+          "name": "辉光幕机",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "350",
+          "name": "机墓方舟",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "钨丝贝贝",
+        "辉光幕机",
+        "机墓方舟"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "351",
+      "name": "凡雀",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=351",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "凡雀",
+      "baseName": "凡雀",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "翼",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "凡雀"
+      ],
+      "chainId": "351-凡雀",
+      "baseId": "351",
+      "finalId": "353",
+      "finalName": "凡鹰",
+      "evolutionChain": [
+        {
+          "id": "351",
+          "name": "凡雀",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "352",
+          "name": "紫翎鹰",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "353",
+          "name": "凡鹰",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "凡雀",
+        "紫翎鹰",
+        "凡鹰"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "352",
+      "name": "紫翎鹰",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=352",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "紫翎鹰",
+      "baseName": "凡雀",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "翼",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "紫翎鹰"
+      ],
+      "chainId": "351-凡雀",
+      "baseId": "351",
+      "finalId": "353",
+      "finalName": "凡鹰",
+      "evolutionChain": [
+        {
+          "id": "351",
+          "name": "凡雀",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "352",
+          "name": "紫翎鹰",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "353",
+          "name": "凡鹰",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "凡雀",
+        "紫翎鹰",
+        "凡鹰"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "353",
+      "name": "凡鹰",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=353",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "凡鹰",
+      "baseName": "凡雀",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "翼",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "凡鹰"
+      ],
+      "chainId": "351-凡雀",
+      "baseId": "351",
+      "finalId": "353",
+      "finalName": "凡鹰",
+      "evolutionChain": [
+        {
+          "id": "351",
+          "name": "凡雀",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "352",
+          "name": "紫翎鹰",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "353",
+          "name": "凡鹰",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "凡雀",
+        "紫翎鹰",
+        "凡鹰"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "354",
+      "name": "小雪人",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=354",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "小雪人",
+      "baseName": "小雪人",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "冰",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "小雪人"
+      ],
+      "chainId": "354-小雪人",
+      "baseId": "354",
+      "finalId": "355",
+      "finalName": "雪怪",
+      "evolutionChain": [
+        {
+          "id": "354",
+          "name": "小雪人",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "355",
+          "name": "雪怪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小雪人",
+        "雪怪"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "355",
+      "name": "雪怪",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=355",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "雪怪",
+      "baseName": "小雪人",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "冰",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "雪怪"
+      ],
+      "chainId": "354-小雪人",
+      "baseId": "354",
+      "finalId": "355",
+      "finalName": "雪怪",
+      "evolutionChain": [
+        {
+          "id": "354",
+          "name": "小雪人",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "355",
+          "name": "雪怪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小雪人",
+        "雪怪"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "356",
+      "name": "爆焰仔",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=356",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "爆焰仔",
+      "baseName": "爆焰仔",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "火",
+      "secondaryAttribute": "龙",
+      "updateVersion": "S2",
+      "aliases": [
+        "爆焰仔"
+      ],
+      "chainId": "356-爆焰仔",
+      "baseId": "356",
+      "finalId": "357",
+      "finalName": "爆焰喷喷",
+      "evolutionChain": [
+        {
+          "id": "356",
+          "name": "爆焰仔",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "357",
+          "name": "爆焰喷喷",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "爆焰仔",
+        "爆焰喷喷"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "357",
+      "name": "爆焰喷喷",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=357",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "爆焰喷喷",
+      "baseName": "爆焰仔",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "火",
+      "secondaryAttribute": "龙",
+      "updateVersion": "S2",
+      "aliases": [
+        "爆焰喷喷"
+      ],
+      "chainId": "356-爆焰仔",
+      "baseId": "356",
+      "finalId": "357",
+      "finalName": "爆焰喷喷",
+      "evolutionChain": [
+        {
+          "id": "356",
+          "name": "爆焰仔",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "357",
+          "name": "爆焰喷喷",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "爆焰仔",
+        "爆焰喷喷"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "358",
+      "name": "猴麦仔",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=358",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "猴麦仔",
+      "baseName": "猴麦仔",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "普通",
+      "secondaryAttribute": "机械",
+      "updateVersion": "S2",
+      "aliases": [
+        "猴麦仔"
+      ],
+      "chainId": "358-猴麦仔",
+      "baseId": "358",
+      "finalId": "359",
+      "finalName": "音碟吼",
+      "evolutionChain": [
+        {
+          "id": "358",
+          "name": "猴麦仔",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "359",
+          "name": "音碟吼",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "猴麦仔",
+        "音碟吼"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "359",
+      "name": "音碟吼",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=359",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "音碟吼",
+      "baseName": "猴麦仔",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "普通",
+      "secondaryAttribute": "机械",
+      "updateVersion": "S2",
+      "aliases": [
+        "音碟吼"
+      ],
+      "chainId": "358-猴麦仔",
+      "baseId": "358",
+      "finalId": "359",
+      "finalName": "音碟吼",
+      "evolutionChain": [
+        {
+          "id": "358",
+          "name": "猴麦仔",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "359",
+          "name": "音碟吼",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "猴麦仔",
+        "音碟吼"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "360",
+      "name": "加油海葵",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=360",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "加油海葵",
+      "baseName": "加油海葵",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "萌",
+      "updateVersion": "S2",
+      "aliases": [
+        "加油海葵"
+      ],
+      "chainId": "360-加油海葵",
+      "baseId": "360",
+      "finalId": "361",
+      "finalName": "加油蟹",
+      "evolutionChain": [
+        {
+          "id": "360",
+          "name": "加油海葵",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "361",
+          "name": "加油蟹",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "加油海葵",
+        "加油蟹"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "361",
+      "name": "加油蟹",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=361",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "加油蟹",
+      "baseName": "加油海葵",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "萌",
+      "updateVersion": "S2",
+      "aliases": [
+        "加油蟹"
+      ],
+      "chainId": "360-加油海葵",
+      "baseId": "360",
+      "finalId": "361",
+      "finalName": "加油蟹",
+      "evolutionChain": [
+        {
+          "id": "360",
+          "name": "加油海葵",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "361",
+          "name": "加油蟹",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "加油海葵",
+        "加油蟹"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "362",
+      "name": "小丑豆豆",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=362",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "小丑豆豆",
+      "baseName": "小丑豆豆",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "恶",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "小丑豆豆"
+      ],
+      "chainId": "362-小丑豆豆",
+      "baseId": "362",
+      "finalId": "364",
+      "finalName": "小丑公爵",
+      "evolutionChain": [
+        {
+          "id": "362",
+          "name": "小丑豆豆",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "363",
+          "name": "小丑兔",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "364",
+          "name": "小丑公爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小丑豆豆",
+        "小丑兔",
+        "小丑公爵"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "363",
+      "name": "小丑兔",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=363",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "小丑兔",
+      "baseName": "小丑豆豆",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "恶",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "小丑兔"
+      ],
+      "chainId": "362-小丑豆豆",
+      "baseId": "362",
+      "finalId": "364",
+      "finalName": "小丑公爵",
+      "evolutionChain": [
+        {
+          "id": "362",
+          "name": "小丑豆豆",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "363",
+          "name": "小丑兔",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "364",
+          "name": "小丑公爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小丑豆豆",
+        "小丑兔",
+        "小丑公爵"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "364",
+      "name": "小丑公爵",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=364",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "小丑公爵",
+      "baseName": "小丑豆豆",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "恶",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "小丑公爵"
+      ],
+      "chainId": "362-小丑豆豆",
+      "baseId": "362",
+      "finalId": "364",
+      "finalName": "小丑公爵",
+      "evolutionChain": [
+        {
+          "id": "362",
+          "name": "小丑豆豆",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "363",
+          "name": "小丑兔",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "364",
+          "name": "小丑公爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小丑豆豆",
+        "小丑兔",
+        "小丑公爵"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "365",
+      "name": "烟花团",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=365",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "烟花团",
+      "baseName": "烟花团",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "火",
+      "secondaryAttribute": "毒",
+      "updateVersion": "S2",
+      "aliases": [
+        "烟花团"
+      ],
+      "chainId": "365-烟花团",
+      "baseId": "365",
+      "finalId": "366",
+      "finalName": "烟花伯爵",
+      "evolutionChain": [
+        {
+          "id": "365",
+          "name": "烟花团",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "366",
+          "name": "烟花伯爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "烟花团",
+        "烟花伯爵"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "366",
+      "name": "烟花伯爵",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=366",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "烟花伯爵",
+      "baseName": "烟花团",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "火",
+      "secondaryAttribute": "毒",
+      "updateVersion": "S2",
+      "aliases": [
+        "烟花伯爵"
+      ],
+      "chainId": "365-烟花团",
+      "baseId": "365",
+      "finalId": "366",
+      "finalName": "烟花伯爵",
+      "evolutionChain": [
+        {
+          "id": "365",
+          "name": "烟花团",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "366",
+          "name": "烟花伯爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "烟花团",
+        "烟花伯爵"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "367",
+      "name": "咕咕帽",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=367",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "咕咕帽",
+      "baseName": "咕咕帽",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "幽",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "咕咕帽"
+      ],
+      "chainId": "367-咕咕帽",
+      "baseId": "367",
+      "finalId": "368",
+      "finalName": "咕德帽帽",
+      "evolutionChain": [
+        {
+          "id": "367",
+          "name": "咕咕帽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "368",
+          "name": "咕德帽帽",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "咕咕帽",
+        "咕德帽帽"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "368",
+      "name": "咕德帽帽",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=368",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "咕德帽帽",
+      "baseName": "咕咕帽",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "幽",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "咕德帽帽"
+      ],
+      "chainId": "367-咕咕帽",
+      "baseId": "367",
+      "finalId": "368",
+      "finalName": "咕德帽帽",
+      "evolutionChain": [
+        {
+          "id": "367",
+          "name": "咕咕帽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "368",
+          "name": "咕德帽帽",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "咕咕帽",
+        "咕德帽帽"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "369",
+      "name": "炫光迪迪",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=369",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "炫光迪迪",
+      "baseName": "炫光迪迪",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "电",
+      "secondaryAttribute": "光",
+      "updateVersion": "S2",
+      "aliases": [
+        "炫光迪迪"
+      ],
+      "chainId": "369-炫光迪迪",
+      "baseId": "369",
+      "finalId": "370",
+      "finalName": "霹雳迪迪",
+      "evolutionChain": [
+        {
+          "id": "369",
+          "name": "炫光迪迪",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "370",
+          "name": "霹雳迪迪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "炫光迪迪",
+        "霹雳迪迪"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "370",
+      "name": "霹雳迪迪",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=370",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "霹雳迪迪",
+      "baseName": "炫光迪迪",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "电",
+      "secondaryAttribute": "光",
+      "updateVersion": "S2",
+      "aliases": [
+        "霹雳迪迪"
+      ],
+      "chainId": "369-炫光迪迪",
+      "baseId": "369",
+      "finalId": "370",
+      "finalName": "霹雳迪迪",
+      "evolutionChain": [
+        {
+          "id": "369",
+          "name": "炫光迪迪",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "370",
+          "name": "霹雳迪迪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "炫光迪迪",
+        "霹雳迪迪"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "371",
+      "name": "小鼓象",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=371",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "小鼓象",
+      "baseName": "小鼓象",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "机械",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "小鼓象"
+      ],
+      "chainId": "371-小鼓象",
+      "baseId": "371",
+      "finalId": "372",
+      "finalName": "巨鼓象",
+      "evolutionChain": [
+        {
+          "id": "371",
+          "name": "小鼓象",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "372",
+          "name": "巨鼓象",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小鼓象",
+        "巨鼓象"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "372",
+      "name": "巨鼓象",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=372",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "巨鼓象",
+      "baseName": "小鼓象",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "机械",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "巨鼓象"
+      ],
+      "chainId": "371-小鼓象",
+      "baseId": "371",
+      "finalId": "372",
+      "finalName": "巨鼓象",
+      "evolutionChain": [
+        {
+          "id": "371",
+          "name": "小鼓象",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "372",
+          "name": "巨鼓象",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小鼓象",
+        "巨鼓象"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "373",
+      "name": "牵线木偶",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=373",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "牵线木偶",
+      "baseName": "牵线木偶",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "幻",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "牵线木偶"
+      ],
+      "chainId": "373-牵线木偶",
+      "baseId": "373",
+      "finalId": "374",
+      "finalName": "帅帅魔偶",
+      "evolutionChain": [
+        {
+          "id": "373",
+          "name": "牵线木偶",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "374",
+          "name": "帅帅魔偶",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "牵线木偶",
+        "帅帅魔偶"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "374",
+      "name": "帅帅魔偶",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=374",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "帅帅魔偶",
+      "baseName": "牵线木偶",
+      "stage": "最终形态",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "幻",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "帅帅魔偶"
+      ],
+      "chainId": "373-牵线木偶",
+      "baseId": "373",
+      "finalId": "374",
+      "finalName": "帅帅魔偶",
+      "evolutionChain": [
+        {
+          "id": "373",
+          "name": "牵线木偶",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "374",
+          "name": "帅帅魔偶",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "牵线木偶",
+        "帅帅魔偶"
+      ],
+      "avatarPath": ""
+    },
+    {
+      "id": "375",
+      "name": "学院呱呱",
+      "pageUrl": "https://wiki.lcx.cab/lk/detail.php?t_id=375",
+      "avatarUrl": "",
+      "originalImageUrl": "",
+      "wikiName": "学院呱呱",
+      "baseName": "学院呱呱",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "武",
+      "secondaryAttribute": "",
+      "updateVersion": "S2",
+      "aliases": [
+        "学院呱呱"
+      ],
+      "chainId": "375-学院呱呱",
+      "baseId": "375",
+      "finalId": "375",
+      "finalName": "学院呱呱",
+      "evolutionChain": [
+        {
+          "id": "375",
+          "name": "学院呱呱",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "学院呱呱"
+      ],
+      "avatarPath": ""
     }
   ],
   "evolutionChains": [
@@ -33070,6 +34366,490 @@
         "幽星光",
         "曜星光",
         "暮星辰"
+      ]
+    },
+    {
+      "id": "348-钨丝贝贝",
+      "baseId": "348",
+      "baseName": "钨丝贝贝",
+      "highestId": "350",
+      "highestName": "机墓方舟",
+      "highestCandidates": [
+        {
+          "id": "350",
+          "name": "机墓方舟",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "348",
+          "name": "钨丝贝贝",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "349",
+          "name": "辉光幕机",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "350",
+          "name": "机墓方舟",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "钨丝贝贝",
+        "辉光幕机",
+        "机墓方舟"
+      ]
+    },
+    {
+      "id": "351-凡雀",
+      "baseId": "351",
+      "baseName": "凡雀",
+      "highestId": "353",
+      "highestName": "凡鹰",
+      "highestCandidates": [
+        {
+          "id": "353",
+          "name": "凡鹰",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "351",
+          "name": "凡雀",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "352",
+          "name": "紫翎鹰",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "353",
+          "name": "凡鹰",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "凡雀",
+        "紫翎鹰",
+        "凡鹰"
+      ]
+    },
+    {
+      "id": "354-小雪人",
+      "baseId": "354",
+      "baseName": "小雪人",
+      "highestId": "355",
+      "highestName": "雪怪",
+      "highestCandidates": [
+        {
+          "id": "355",
+          "name": "雪怪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "354",
+          "name": "小雪人",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "355",
+          "name": "雪怪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "小雪人",
+        "雪怪"
+      ]
+    },
+    {
+      "id": "356-爆焰仔",
+      "baseId": "356",
+      "baseName": "爆焰仔",
+      "highestId": "357",
+      "highestName": "爆焰喷喷",
+      "highestCandidates": [
+        {
+          "id": "357",
+          "name": "爆焰喷喷",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "356",
+          "name": "爆焰仔",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "357",
+          "name": "爆焰喷喷",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "爆焰仔",
+        "爆焰喷喷"
+      ]
+    },
+    {
+      "id": "358-猴麦仔",
+      "baseId": "358",
+      "baseName": "猴麦仔",
+      "highestId": "359",
+      "highestName": "音碟吼",
+      "highestCandidates": [
+        {
+          "id": "359",
+          "name": "音碟吼",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "358",
+          "name": "猴麦仔",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "359",
+          "name": "音碟吼",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "猴麦仔",
+        "音碟吼"
+      ]
+    },
+    {
+      "id": "360-加油海葵",
+      "baseId": "360",
+      "baseName": "加油海葵",
+      "highestId": "361",
+      "highestName": "加油蟹",
+      "highestCandidates": [
+        {
+          "id": "361",
+          "name": "加油蟹",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "360",
+          "name": "加油海葵",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "361",
+          "name": "加油蟹",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "加油海葵",
+        "加油蟹"
+      ]
+    },
+    {
+      "id": "362-小丑豆豆",
+      "baseId": "362",
+      "baseName": "小丑豆豆",
+      "highestId": "364",
+      "highestName": "小丑公爵",
+      "highestCandidates": [
+        {
+          "id": "364",
+          "name": "小丑公爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "362",
+          "name": "小丑豆豆",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "363",
+          "name": "小丑兔",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "364",
+          "name": "小丑公爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "小丑豆豆",
+        "小丑兔",
+        "小丑公爵"
+      ]
+    },
+    {
+      "id": "365-烟花团",
+      "baseId": "365",
+      "baseName": "烟花团",
+      "highestId": "366",
+      "highestName": "烟花伯爵",
+      "highestCandidates": [
+        {
+          "id": "366",
+          "name": "烟花伯爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "365",
+          "name": "烟花团",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "366",
+          "name": "烟花伯爵",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "烟花团",
+        "烟花伯爵"
+      ]
+    },
+    {
+      "id": "367-咕咕帽",
+      "baseId": "367",
+      "baseName": "咕咕帽",
+      "highestId": "368",
+      "highestName": "咕德帽帽",
+      "highestCandidates": [
+        {
+          "id": "368",
+          "name": "咕德帽帽",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "367",
+          "name": "咕咕帽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "368",
+          "name": "咕德帽帽",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "咕咕帽",
+        "咕德帽帽"
+      ]
+    },
+    {
+      "id": "369-炫光迪迪",
+      "baseId": "369",
+      "baseName": "炫光迪迪",
+      "highestId": "370",
+      "highestName": "霹雳迪迪",
+      "highestCandidates": [
+        {
+          "id": "370",
+          "name": "霹雳迪迪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "369",
+          "name": "炫光迪迪",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "370",
+          "name": "霹雳迪迪",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "炫光迪迪",
+        "霹雳迪迪"
+      ]
+    },
+    {
+      "id": "371-小鼓象",
+      "baseId": "371",
+      "baseName": "小鼓象",
+      "highestId": "372",
+      "highestName": "巨鼓象",
+      "highestCandidates": [
+        {
+          "id": "372",
+          "name": "巨鼓象",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "371",
+          "name": "小鼓象",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "372",
+          "name": "巨鼓象",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "小鼓象",
+        "巨鼓象"
+      ]
+    },
+    {
+      "id": "373-牵线木偶",
+      "baseId": "373",
+      "baseName": "牵线木偶",
+      "highestId": "374",
+      "highestName": "帅帅魔偶",
+      "highestCandidates": [
+        {
+          "id": "374",
+          "name": "帅帅魔偶",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "373",
+          "name": "牵线木偶",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "374",
+          "name": "帅帅魔偶",
+          "stage": "最终形态",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "牵线木偶",
+        "帅帅魔偶"
+      ]
+    },
+    {
+      "id": "375-学院呱呱",
+      "baseId": "375",
+      "baseName": "学院呱呱",
+      "highestId": "375",
+      "highestName": "学院呱呱",
+      "highestCandidates": [
+        {
+          "id": "375",
+          "name": "学院呱呱",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "375",
+          "name": "学院呱呱",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "学院呱呱"
       ]
     }
   ]

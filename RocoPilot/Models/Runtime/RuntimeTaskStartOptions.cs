@@ -20,19 +20,19 @@ public sealed class RuntimeTaskStartOptions
     public bool RecognitionOverlayEnabled
     {
         get;
-        init;
+        set;
     }
 
     public bool InfoOverlayEnabled
     {
         get;
-        init;
+        set;
     }
 
     public bool InfoOverlayLocked
     {
         get;
-        init;
+        set;
     }
 
     public bool PollutionCounterEnabled

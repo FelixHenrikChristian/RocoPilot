@@ -32,6 +32,12 @@ public interface IRuntimeTaskService
 
     void SetEncounterStatisticsEnabled(bool isEnabled);
 
+    void SetRecognitionOverlayEnabled(bool isEnabled);
+
+    void SetInfoOverlayEnabled(bool isEnabled);
+
+    void SetInfoOverlayLocked(bool isLocked);
+
     void SetAutoBattleSettings(AutoBattleSettings settings);
 
     Task StopAsync();

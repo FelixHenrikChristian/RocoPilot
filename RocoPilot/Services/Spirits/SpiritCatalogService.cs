@@ -22,6 +22,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private const string ListUrl = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
     private const string SourceName = "Biligame 洛克王国:手游 Wiki 精灵图鉴";
     private const string DataFileName = "spirits.json";
+    private const string NameWhitelistFileName = "spirit-name-whitelist.json";
     private const string DefaultApplicationDataFolder = "RocoPilot/ApplicationData";
     private const int RequestDelayMilliseconds = 30;
 
@@ -62,6 +63,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _localDataRoot;
     private SpiritCatalogDocument? _document;
+    private IReadOnlyList<SpiritNameWhitelistItem>? _nameWhitelist;
     private IReadOnlyList<SpiritNameMatchCandidate>? _nameMatchCandidates;
 
     public SpiritCatalogService(
@@ -208,7 +210,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
         var threshold = Math.Clamp(minimumSimilarity, 0, 1);
         var document = await LoadAsync(cancellationToken);
-        var candidates = _nameMatchCandidates ??= BuildNameMatchCandidates(document);
+        var candidates = _nameMatchCandidates ??= BuildNameMatchCandidates(document, LoadNameWhitelist());
         if (candidates.Count == 0)
         {
             return threshold <= 0 ? query : string.Empty;
@@ -259,7 +261,10 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         var item = FindCatalogItemByName(document, normalizedName);
         if (item is null)
         {
-            return TextMatchingHelper.NormalizeSpiritNameForDisplay(spiritName);
+            var whitelistRecordName = ResolveWhitelistRecordName(normalizedName);
+            return whitelistRecordName.Length == 0
+                ? TextMatchingHelper.NormalizeSpiritNameForDisplay(spiritName)
+                : whitelistRecordName;
         }
 
         var representativeName = ResolveRepresentativeName(document, item, item.BaseId, item.BaseName);
@@ -302,6 +307,31 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return IsNameMatch(item.Name, normalizedName)
             || IsNameMatch(item.WikiName, normalizedName)
             || IsNameMatch(BuildDisplayName(item), normalizedName)
+            || item.Aliases.Any(alias => IsNameMatch(alias, normalizedName));
+    }
+
+    private string ResolveWhitelistRecordName(string normalizedName)
+    {
+        foreach (var item in LoadNameWhitelist())
+        {
+            if (!IsWhitelistItemNameMatch(item, normalizedName))
+            {
+                continue;
+            }
+
+            var recordName = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.RecordName);
+            return recordName.Length == 0
+                ? TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name)
+                : recordName;
+        }
+
+        return string.Empty;
+    }
+
+    private static bool IsWhitelistItemNameMatch(SpiritNameWhitelistItem item, string normalizedName)
+    {
+        return IsNameMatch(item.Name, normalizedName)
+            || IsNameMatch(item.RecordName, normalizedName)
             || item.Aliases.Any(alias => IsNameMatch(alias, normalizedName));
     }
 
@@ -373,6 +403,105 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private static string GetBundledDataPath()
     {
         return Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", DataFileName);
+    }
+
+    private string GetLocalNameWhitelistPath()
+    {
+        return Path.Combine(_localDataRoot, "Spirits", NameWhitelistFileName);
+    }
+
+    private static string GetBundledNameWhitelistPath()
+    {
+        return Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", NameWhitelistFileName);
+    }
+
+    private IReadOnlyList<SpiritNameWhitelistItem> LoadNameWhitelist()
+    {
+        if (_nameWhitelist is not null)
+        {
+            return _nameWhitelist;
+        }
+
+        var items = new Dictionary<string, SpiritNameWhitelistItem>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in GetNameWhitelistPaths())
+        {
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                foreach (var item in ReadNameWhitelist(path))
+                {
+                    var normalizedItem = NormalizeWhitelistItem(item);
+                    if (normalizedItem is null)
+                    {
+                        continue;
+                    }
+
+                    var key = TextMatchingHelper.NormalizeSpiritNameForMatching(normalizedItem.Name);
+                    items[key] = normalizedItem;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "读取精灵名白名单失败。Path={Path}", path);
+            }
+        }
+
+        _nameWhitelist = items.Values
+            .OrderBy(item => ParseId(item.Id))
+            .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        return _nameWhitelist;
+    }
+
+    private IEnumerable<string> GetNameWhitelistPaths()
+    {
+        var bundledPath = GetBundledNameWhitelistPath();
+        yield return bundledPath;
+
+        var localPath = GetLocalNameWhitelistPath();
+        if (!string.Equals(
+                Path.GetFullPath(localPath),
+                Path.GetFullPath(bundledPath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            yield return localPath;
+        }
+    }
+
+    private static IReadOnlyList<SpiritNameWhitelistItem> ReadNameWhitelist(string path)
+    {
+        using var stream = File.OpenRead(path);
+        var document = JsonSerializer.Deserialize<SpiritNameWhitelistDocument>(stream, JsonOptions)
+            ?? new SpiritNameWhitelistDocument();
+        return document.Spirits ?? [];
+    }
+
+    private static SpiritNameWhitelistItem? NormalizeWhitelistItem(SpiritNameWhitelistItem item)
+    {
+        var name = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name);
+        if (name.Length == 0)
+        {
+            return null;
+        }
+
+        var aliases = (item.Aliases ?? [])
+            .Select(TextMatchingHelper.NormalizeSpiritNameForDisplay)
+            .Where(alias => alias.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(alias => alias, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return new SpiritNameWhitelistItem
+        {
+            Id = item.Id?.Trim() ?? string.Empty,
+            Name = name,
+            RecordName = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.RecordName),
+            Aliases = aliases
+        };
     }
 
     private static async Task<SpiritCatalogDocument> ReadDocumentAsync(
@@ -622,7 +751,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             .ToList();
     }
 
-    private static IReadOnlyList<SpiritNameMatchCandidate> BuildNameMatchCandidates(SpiritCatalogDocument document)
+    private static IReadOnlyList<SpiritNameMatchCandidate> BuildNameMatchCandidates(
+        SpiritCatalogDocument document,
+        IReadOnlyList<SpiritNameWhitelistItem> whitelist)
     {
         var candidates = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -642,6 +773,30 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
             AddSearchName(searchNames, item.Name);
             AddSearchName(searchNames, item.WikiName);
+            foreach (var alias in item.Aliases)
+            {
+                AddSearchName(searchNames, alias);
+            }
+
+            searchNames.Add(displayName);
+        }
+
+        foreach (var item in whitelist)
+        {
+            var displayName = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name);
+            if (displayName.Length == 0)
+            {
+                continue;
+            }
+
+            if (!candidates.TryGetValue(displayName, out var searchNames))
+            {
+                searchNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                candidates[displayName] = searchNames;
+            }
+
+            AddSearchName(searchNames, item.Name);
+            AddSearchName(searchNames, item.RecordName);
             foreach (var alias in item.Aliases)
             {
                 AddSearchName(searchNames, alias);

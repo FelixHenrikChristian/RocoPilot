@@ -68,6 +68,15 @@
             </NavigationView.MenuItems>
             <Grid>
                 <Frame x:Name="NavigationFrame" />
+                <InfoBar
+                    x:Name="StartupUpdateInfoBar"
+                    Canvas.ZIndex="10"
+                    Margin="{StaticResource NavigationViewPageContentPadding}"
+                    HorizontalAlignment="Stretch"
+                    VerticalAlignment="Bottom"
+                    helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+                    IsClosable="False"
+                    IsOpen="False" />
             </Grid>
         </NavigationView>
     </Grid>

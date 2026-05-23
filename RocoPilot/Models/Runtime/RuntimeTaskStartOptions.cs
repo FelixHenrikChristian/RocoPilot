@@ -35,12 +35,6 @@ public sealed class RuntimeTaskStartOptions
         set;
     }
 
-    public bool PollutionCounterEnabled
-    {
-        get;
-        init;
-    } = true;
-
     public bool EncounterStatisticsEnabled
     {
         get;

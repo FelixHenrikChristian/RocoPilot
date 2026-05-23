@@ -110,9 +110,9 @@
                                     <FontIcon
                                         x:Name="PollutionCounterIcon"
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                        FontSize="12"
+                                        FontSize="15"
                                         Foreground="#10B981"
-                                        Glyph="&#xE8EF;" />
+                                        Glyph="&#xE9A3;" />
                                 </Border>
                                 <Border
                                     x:Name="AutoBattleIndicator"
@@ -125,9 +125,9 @@
                                     <FontIcon
                                         x:Name="AutoBattleIcon"
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                        FontSize="12"
+                                        FontSize="15"
                                         Foreground="#8A95A3"
-                                        Glyph="&#xE7FC;" />
+                                        Glyph="&#xF272;" />
                                 </Border>
                             </StackPanel>
                         </Grid>

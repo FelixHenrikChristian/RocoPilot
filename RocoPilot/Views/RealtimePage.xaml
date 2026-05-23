@@ -26,7 +26,7 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="20"
                             Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE9D2;" />
+                            Glyph="&#xE9A3;" />
 
                         <StackPanel
                             Grid.Column="1"
@@ -164,7 +164,7 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="20"
                             Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE768;" />
+                            Glyph="&#xF272;" />
 
                         <StackPanel
                             Grid.Column="1"

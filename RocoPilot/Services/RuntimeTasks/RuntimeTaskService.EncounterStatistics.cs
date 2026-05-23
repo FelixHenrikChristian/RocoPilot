@@ -52,6 +52,7 @@ public sealed partial class RuntimeTaskService
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
         _encounterStatisticsEnabled = isEnabled;
+        UpdateInfoOverlayTaskIndicators();
         _ = SaveEncounterStatisticsEnabledAsync(isEnabled);
     }
 

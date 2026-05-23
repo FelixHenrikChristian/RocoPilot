@@ -104,6 +104,7 @@ public sealed partial class RuntimeTaskService
             ResetAutoBattleEncounterRelievedActionState();
         }
 
+        UpdateInfoOverlayTaskIndicators();
         _ = SaveAutoBattleSettingsAsync(_autoBattleSettings);
     }
 

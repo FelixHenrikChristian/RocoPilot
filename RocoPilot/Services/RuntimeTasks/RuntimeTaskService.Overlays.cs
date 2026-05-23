@@ -32,6 +32,7 @@ public sealed partial class RuntimeTaskService
         if (isEnabled)
         {
             _infoOverlayService.Show(state);
+            UpdateInfoOverlayTaskIndicators();
             return;
         }
 
@@ -46,5 +47,10 @@ public sealed partial class RuntimeTaskService
         }
 
         _infoOverlayService.SetLocked(isLocked);
+    }
+
+    private void UpdateInfoOverlayTaskIndicators()
+    {
+        _infoOverlayService.UpdateTaskIndicators(EncounterStatisticsEnabled, _autoBattleSettings.IsEnabled);
     }
 }

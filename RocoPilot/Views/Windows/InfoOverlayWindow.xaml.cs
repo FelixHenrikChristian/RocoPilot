@@ -27,6 +27,8 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private const int MaxVisibleCounters = 5;
 
     private static readonly TimeSpan FollowInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly Color ActiveTaskIndicatorForeground = Color.FromArgb(0xFF, 0x10, 0xB9, 0x81);
+    private static readonly Color ActiveTaskIndicatorBackground = Color.FromArgb(0xFF, 0xE0, 0xF7, 0xF2);
 
     private readonly CaptureTargetWindow _targetWindow;
     private readonly DispatcherQueueTimer _followTimer;
@@ -49,14 +51,14 @@ public sealed partial class InfoOverlayWindow : WindowEx
     public InfoOverlayWindow(
         CaptureTargetWindow targetWindow,
         bool isLocked,
-        bool isPollutionCounterEnabled,
+        bool isEncounterStatisticsEnabled,
         bool isAutoBattleEnabled)
     {
         _targetWindow = targetWindow;
         _isLocked = isLocked;
 
         InitializeComponent();
-        ConfigureTaskIndicators(isPollutionCounterEnabled, isAutoBattleEnabled);
+        UpdateTaskIndicators(isEncounterStatisticsEnabled, isAutoBattleEnabled);
 
         SystemBackdrop = new TransparentTintBackdrop(Color.FromArgb(0, 0, 0, 0));
         Title = "RocoPilot Info Overlay";
@@ -158,21 +160,21 @@ public sealed partial class InfoOverlayWindow : WindowEx
         RenderCounters(visibleCounters.Skip(1).ToList());
     }
 
-    private void ConfigureTaskIndicators(bool isPollutionCounterEnabled, bool isAutoBattleEnabled)
+    public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
     {
         SetTaskIndicator(
             PollutionCounterIndicator,
             PollutionCounterIcon,
-            isPollutionCounterEnabled,
-            Color.FromArgb(0xFF, 0x10, 0xB9, 0x81),
-            Color.FromArgb(0xFF, 0xE0, 0xF7, 0xF2));
+            isEncounterStatisticsEnabled,
+            ActiveTaskIndicatorForeground,
+            ActiveTaskIndicatorBackground);
 
         SetTaskIndicator(
             AutoBattleIndicator,
             AutoBattleIcon,
             isAutoBattleEnabled,
-            Color.FromArgb(0xFF, 0x3B, 0x82, 0xF6),
-            Color.FromArgb(0xFF, 0xE4, 0xEE, 0xFF));
+            ActiveTaskIndicatorForeground,
+            ActiveTaskIndicatorBackground);
     }
 
     private static void SetTaskIndicator(

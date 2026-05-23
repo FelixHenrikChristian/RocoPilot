@@ -47,6 +47,11 @@ public sealed class InfoOverlayService : IInfoOverlayService
         RunOnDispatcher(() => _overlayWindow?.SetLocked(isLocked));
     }
 
+    public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
+    {
+        RunOnDispatcher(() => _overlayWindow?.UpdateTaskIndicators(isEncounterStatisticsEnabled, isAutoBattleEnabled));
+    }
+
     public void UpdateSnapshot(InfoOverlaySnapshot snapshot)
     {
         RunOnDispatcher(() => _overlayWindow?.UpdateSnapshot(snapshot));
@@ -61,7 +66,7 @@ public sealed class InfoOverlayService : IInfoOverlayService
             _overlayWindow = new InfoOverlayWindow(
                 state.TargetWindow,
                 state.Options.InfoOverlayLocked,
-                state.Options.PollutionCounterEnabled,
+                state.Options.EncounterStatisticsEnabled,
                 state.Options.AutoBattleSettings.IsEnabled);
             _overlayWindow.Closed += (_, _) => _overlayWindow = null;
             _overlayWindow.UpdateSnapshot(InfoOverlaySnapshot.CreateInitial(state.StartedAt));

@@ -193,6 +193,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             _autoBattleSettings = NormalizeAutoBattleSettings(options.AutoBattleSettings);
             _recognitionOverlayService.Show(state);
             _infoOverlayService.Show(state);
+            UpdateInfoOverlayTaskIndicators();
             _captureTask = Task.Run(
                 () => CaptureLoopAsync(state, cancellationTokenSource.Token),
                 cancellationTokenSource.Token);

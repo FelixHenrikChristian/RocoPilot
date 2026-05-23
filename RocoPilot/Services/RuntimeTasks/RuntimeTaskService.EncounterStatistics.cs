@@ -19,9 +19,9 @@ public sealed partial class RuntimeTaskService
     private const double HeterochromiaTipMatchThreshold = 0.78;
     private const int HeterochromiaTipMinimumTextLength = 4;
 
-    private static readonly string[] BattleTipRelieveRegionIds =
+    private static readonly string[] BattleTipRegionIds =
     [
-        "battle-tip-relieve"
+        "battle-tip"
     ];
     private static readonly string[] BattleTipHeterochromiaRegionIds =
     [
@@ -134,7 +134,7 @@ public sealed partial class RuntimeTaskService
         var tipText = await RecognizeRegionTextAsync(
             state,
             frame,
-            BattleTipRelieveRegionIds,
+            BattleTipRegionIds,
             cancellationToken,
             "奇遇统计");
 

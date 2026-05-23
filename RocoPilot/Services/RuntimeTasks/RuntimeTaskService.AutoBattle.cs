@@ -16,9 +16,9 @@ public sealed partial class RuntimeTaskService
     private const string BattleChangeTemplateName = "battle-button-change.png";
     private const string AutoBattleCaptureSequence = "W, 1, Space";
     private const string AutoBattleSkillPlaceholder = "{skill}";
-    private const string AutoBattleEnergyShortageTipText = "能量不足";
 
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan AutoBattleSkillReleaseFailureCheckDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattleShinySuspendScanInterval = TimeSpan.FromSeconds(1);
@@ -43,10 +43,6 @@ public sealed partial class RuntimeTaskService
     private static readonly string[] BattleChangeRegionIds =
     [
         "battle-button-change"
-    ];
-    private static readonly string[] BattleTipEnergyRegionIds =
-    [
-        "battle-tip-energe"
     ];
     private static readonly ImageMatchOptions BattleChatMatchOptions = new()
     {
@@ -415,7 +411,7 @@ public sealed partial class RuntimeTaskService
             _autoBattleRoundIndex);
     }
 
-    private async Task<bool> TryDetectAutoBattleEnergyShortageAsync(
+    private async Task<bool> TryHandleAutoBattleSkillReleaseFailureAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
@@ -428,31 +424,13 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        var encounterRelievedAction = settings.EncounterRelievedAction;
-        if (_isAutoBattleEncounterRelieved
-            && RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction)
-            && encounterRelievedAction is AutoBattleEncounterRelievedAction.NoAction or AutoBattleEncounterRelievedAction.Capture)
+        if (!_lastAutoBattleSkillSelectionActionAt.HasValue)
         {
             return false;
         }
 
-        var tipText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleTipEnergyRegionIds,
-            cancellationToken,
-            "自动战斗");
-        var isEnergyShortage = IsEnergyShortageTip(tipText);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("auto-battle-energy-shortage-filter"),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(tipText),
-                CreateBooleanDebugFingerprint(isEnergyShortage)),
-            "自动战斗回能筛选：TipText={TipText}, IsEnergyShortage={IsEnergyShortage}",
-            FormatLogText(tipText),
-            isEnergyShortage);
-        if (!isEnergyShortage)
+        var now = DateTimeOffset.Now;
+        if (now - _lastAutoBattleSkillSelectionActionAt.Value < AutoBattleSkillReleaseFailureCheckDelay)
         {
             return false;
         }
@@ -463,7 +441,20 @@ public sealed partial class RuntimeTaskService
         }
 
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
-        LogAutoBattleTurnAction("检测到能量不足，临时回能 X，原技能延后", "X", forceInformation: true);
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipRegionIds,
+            cancellationToken,
+            "自动战斗技能失败");
+        var failureReason = string.IsNullOrWhiteSpace(tipText)
+            ? "未识别到提示"
+            : FormatLogText(tipText);
+
+        LogAutoBattleTurnAction(
+            $"技能未释放成功，原因：{failureReason}，临时回能 X，原技能延后",
+            "X",
+            forceInformation: true);
         return true;
     }
 
@@ -535,7 +526,7 @@ public sealed partial class RuntimeTaskService
         var tipText = await RecognizeRegionTextAsync(
             state,
             frame,
-            BattleTipRelieveRegionIds,
+            BattleTipRegionIds,
             cancellationToken,
             "自动战斗");
         var isTipMatch = TextMatchingHelper.IsSimilar(
@@ -901,55 +892,6 @@ public sealed partial class RuntimeTaskService
         }
 
         return now - _lastAutoBattleSkillSelectionActionAt.Value >= AutoBattleSkillSelectionRetryDelay;
-    }
-
-    private static bool IsEnergyShortageTip(string tipText)
-    {
-        if (string.IsNullOrWhiteSpace(tipText))
-        {
-            return false;
-        }
-
-        var normalized = new string(TextMatchingHelper
-            .CleanRecognizedText(tipText)
-            .Where(char.IsLetterOrDigit)
-            .ToArray());
-        if (normalized.Length == 0)
-        {
-            return false;
-        }
-
-        if (normalized.Contains(AutoBattleEnergyShortageTipText, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return CalculateBestEnergyShortageWindowSimilarity(normalized) >= 0.74;
-    }
-
-    private static double CalculateBestEnergyShortageWindowSimilarity(string text)
-    {
-        if (text.Length == 0)
-        {
-            return 0;
-        }
-
-        const int minimumWindowLength = 3;
-        const int maximumWindowLength = 6;
-        var bestSimilarity = 0d;
-        for (var start = 0; start < text.Length; start++)
-        {
-            var maximumLength = Math.Min(maximumWindowLength, text.Length - start);
-            for (var length = minimumWindowLength; length <= maximumLength; length++)
-            {
-                var window = text.Substring(start, length);
-                bestSimilarity = Math.Max(
-                    bestSimilarity,
-                    TextMatchingHelper.CalculateSimilarity(window, AutoBattleEnergyShortageTipText));
-            }
-        }
-
-        return bestSimilarity;
     }
 
     private void ResetAutoBattleBattleState()

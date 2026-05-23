@@ -419,17 +419,20 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             _wasAutoBattlePetSwitchingVisible = false;
             var isAutoBattleSuspendedForShiny =
                 await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
-            var recoveredEnergy = false;
+            var handledSkillFailure = false;
             if (!isAutoBattleSuspendedForShiny)
             {
                 await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
-                recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
+                handledSkillFailure = await TryHandleAutoBattleSkillReleaseFailureAsync(
+                    state,
+                    frame,
+                    cancellationToken);
             }
 
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 技能选择",
                 DateTimeOffset.Now));
-            if (!isAutoBattleSuspendedForShiny && !recoveredEnergy)
+            if (!isAutoBattleSuspendedForShiny && !handledSkillFailure)
             {
                 await HandleAutoBattleSkillSelectionAsync(state, cancellationToken);
             }
@@ -464,11 +467,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             if (!isAutoBattleSuspendedForShiny)
             {
                 await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
-                var recoveredEnergy = await TryDetectAutoBattleEnergyShortageAsync(state, frame, cancellationToken);
-                if (!recoveredEnergy)
-                {
-                    CompleteAutoBattleSkillSelectionState();
-                }
+                CompleteAutoBattleSkillSelectionState();
             }
 
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
@@ -523,7 +522,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CancellationToken cancellationToken)
     {
         var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
-        if (magicPointRegion is null || !TemplateExists(MagicPointTemplateName))
+        if (!TemplateExists(MagicPointTemplateName))
         {
             return false;
         }
@@ -589,14 +588,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CancellationToken cancellationToken)
     {
         var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
-        if (magicPointRegion is null)
-        {
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                "等待 magic-point 区域",
-                DateTimeOffset.Now));
-            return GameStateScanResult.NonBattle;
-        }
-
         if (!TemplateExists(MagicPointTemplateName))
         {
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
@@ -672,17 +663,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         string taskName)
     {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
-        if (region is null)
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("ocr-skip-missing-region", taskName, string.Join("|", regionAliases)),
-                "missing-region",
-                "{TaskName} OCR跳过：未找到识别区域。Aliases={RegionAliases}",
-                taskName,
-                string.Join("|", regionAliases));
-            return string.Empty;
-        }
-
         var frameRegion = ToFrameRegion(
             region,
             frame,
@@ -746,19 +726,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CancellationToken cancellationToken)
     {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
-        if (region is null)
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("template-skip-missing-region", taskName, targetName, string.Join("|", regionAliases), templateName),
-                "missing-region",
-                "{TaskName} 目标识别跳过：未找到识别区域。Target={Target}, Aliases={RegionAliases}, Template={Template}",
-                taskName,
-                targetName,
-                string.Join("|", regionAliases),
-                templateName);
-            return false;
-        }
-
         if (!TemplateExists(templateName))
         {
             LogDebugOncePerValue(
@@ -895,11 +862,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         return File.Exists(Path.Combine(_imageMatchingService.TemplateDirectory, templateName));
     }
 
-    private static RecognitionRegion? FindRegion(
+    private static RecognitionRegion FindRegion(
         RecognitionRegionConfig config,
         IReadOnlyList<string> aliases)
     {
-        return config.Regions.FirstOrDefault(region => IsRegionMatch(region, aliases));
+        return config.Regions.FirstOrDefault(region => IsRegionMatch(region, aliases))
+            ?? throw new InvalidOperationException(
+                $"识别区域配置缺少启用区域：{string.Join(", ", aliases)}。配置文件：{config.SourcePath}");
     }
 
     private static bool IsRegionMatch(RecognitionRegion region, IReadOnlyList<string> aliases)
@@ -910,9 +879,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
 
         var id = region.Id.Trim();
-        return aliases.Any(alias =>
-            string.Equals(id, alias, StringComparison.OrdinalIgnoreCase)
-            || id.StartsWith($"{alias}-", StringComparison.OrdinalIgnoreCase));
+        return aliases.Any(alias => string.Equals(id, alias, StringComparison.OrdinalIgnoreCase));
     }
 
     private static IEnumerable<RecognitionRegion> SplitMagicPointSlots(RecognitionRegion region)

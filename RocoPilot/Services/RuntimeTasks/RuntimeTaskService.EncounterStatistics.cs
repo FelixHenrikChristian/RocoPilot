@@ -52,7 +52,6 @@ public sealed partial class RuntimeTaskService
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
         _encounterStatisticsEnabled = isEnabled;
-        _settingsLoaded = true;
         _ = SaveEncounterStatisticsEnabledAsync(isEnabled);
     }
 

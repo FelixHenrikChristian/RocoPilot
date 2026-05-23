@@ -16,6 +16,8 @@ public partial class RealtimeViewModel : ObservableRecipient
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
 
+    private bool _hasLoadedSettings;
+    private bool _isApplyingSettings;
     private bool _isEncounterStatisticsEnabled = true;
     private bool _isSpiritCatalogSyncing;
     private string _spiritCatalogSummary = "图鉴数据待加载";
@@ -39,7 +41,10 @@ public partial class RealtimeViewModel : ObservableRecipient
         {
             if (SetProperty(ref _isEncounterStatisticsEnabled, value))
             {
-                _runtimeTaskService.SetEncounterStatisticsEnabled(value);
+                if (CanPersistSettings)
+                {
+                    _runtimeTaskService.SetEncounterStatisticsEnabled(value);
+                }
             }
         }
     }
@@ -174,8 +179,8 @@ public partial class RealtimeViewModel : ObservableRecipient
     public async Task LoadAsync()
     {
         await _runtimeTaskService.LoadSettingsAsync();
-        IsEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
-        ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
+        ApplyRuntimeTaskSettings();
+        _hasLoadedSettings = true;
         await LoadSpiritCatalogSummaryAsync();
     }
 
@@ -231,6 +236,23 @@ public partial class RealtimeViewModel : ObservableRecipient
             : progress.Message;
     }
 
+    private bool CanPersistSettings => _hasLoadedSettings && !_isApplyingSettings;
+
+    private void ApplyRuntimeTaskSettings()
+    {
+        _isApplyingSettings = true;
+        try
+        {
+            _isEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
+            OnPropertyChanged(nameof(IsEncounterStatisticsEnabled));
+            ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
+        }
+        finally
+        {
+            _isApplyingSettings = false;
+        }
+    }
+
     private void ApplyAutoBattleSettings(AutoBattleSettings settings)
     {
         _isAutoBattleEnabled = settings.IsEnabled;
@@ -258,7 +280,11 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     private void SaveAutoBattleSettings()
     {
-        _runtimeTaskService.SetAutoBattleSettings(BuildAutoBattleSettings());
+        if (CanPersistSettings)
+        {
+            _runtimeTaskService.SetAutoBattleSettings(BuildAutoBattleSettings());
+        }
+
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }

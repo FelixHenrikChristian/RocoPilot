@@ -23,7 +23,7 @@
 ### 识别方式
 
 - 配置项：`detectionMode = "TipText"`。
-- RocoPilot 每秒 OCR `battle-tip-relieve` 区域。
+- RocoPilot 每秒 OCR `battle-tip` 区域。
 - OCR 文本与当前赛季 `tipText` 的相似度达到 `matchThreshold` 后，判定为本场奇遇已解除。
 - 判定成功后 OCR `battle-enemy-name` 区域，并用图鉴匹配出的精灵名计数 +1。
 
@@ -47,7 +47,7 @@ S2 仍可能低概率刷出 S1 形式的污染精灵。虽然解除流程与 S1 
 - RocoPilot 每秒 OCR `battle-enemy-name` 区域，优先识别幸运惊喜盒流程。
 - 当 OCR 名称与 `placeholderName`（默认“幸运惊喜盒”）达到 `placeholderMatchThreshold` 时，记录“本场战斗已见到惊喜盒”。
 - 后续同一场战斗中，如果敌方名称不再匹配“幸运惊喜盒”，且能通过图鉴匹配到相似度不低于 `spiritNameMatchThreshold` 的真实精灵名，则判定 S2 奇遇解除，并给该精灵计数 +1。
-- 如果未命中幸运惊喜盒名称变化，会继续 OCR `battle-tip-relieve` 区域；当污染解除提示与 `tipText` 达到 `matchThreshold` 时，也按 S2 赛季计数 +1。
+- 如果未命中幸运惊喜盒名称变化，会继续 OCR `battle-tip` 区域；当污染解除提示与 `tipText` 达到 `matchThreshold` 时，也按 S2 赛季计数 +1。
 - 该判定也会触发自动战斗的“奇遇解除后操作”状态。
 
 ### 暂不支持

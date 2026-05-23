@@ -27,14 +27,6 @@
       "enabled": true
     },
     {
-      "id": "battle-tip-energe",
-      "x": 797,
-      "y": 155,
-      "width": 456,
-      "height": 48,
-      "enabled": true
-    },
-    {
       "id": "battle-button-skill",
       "x": 1903,
       "y": 1004,
@@ -51,7 +43,7 @@
       "enabled": true
     },
     {
-      "id": "battle-tip-relieve",
+      "id": "battle-tip",
       "x": 627,
       "y": 152,
       "width": 795,

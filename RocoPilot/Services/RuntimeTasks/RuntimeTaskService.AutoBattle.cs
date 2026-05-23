@@ -16,6 +16,7 @@ public sealed partial class RuntimeTaskService
     private const string BattleChangeTemplateName = "battle-button-change.png";
     private const string AutoBattleCaptureSequence = "W, 1, Space";
     private const string AutoBattleSkillPlaceholder = "{skill}";
+    private const string AutoBattleEnergyShortageTipText = "能量不足";
 
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
@@ -909,9 +910,46 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        var normalized = new string(tipText.Where(character => !char.IsWhiteSpace(character)).ToArray());
-        return normalized.Contains("能量不足", StringComparison.Ordinal)
-            || TextMatchingHelper.IsSimilar(tipText, "能量不足", 0.65, out _);
+        var normalized = new string(TextMatchingHelper
+            .CleanRecognizedText(tipText)
+            .Where(char.IsLetterOrDigit)
+            .ToArray());
+        if (normalized.Length == 0)
+        {
+            return false;
+        }
+
+        if (normalized.Contains(AutoBattleEnergyShortageTipText, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return CalculateBestEnergyShortageWindowSimilarity(normalized) >= 0.74;
+    }
+
+    private static double CalculateBestEnergyShortageWindowSimilarity(string text)
+    {
+        if (text.Length == 0)
+        {
+            return 0;
+        }
+
+        const int minimumWindowLength = 3;
+        const int maximumWindowLength = 6;
+        var bestSimilarity = 0d;
+        for (var start = 0; start < text.Length; start++)
+        {
+            var maximumLength = Math.Min(maximumWindowLength, text.Length - start);
+            for (var length = minimumWindowLength; length <= maximumLength; length++)
+            {
+                var window = text.Substring(start, length);
+                bestSimilarity = Math.Max(
+                    bestSimilarity,
+                    TextMatchingHelper.CalculateSimilarity(window, AutoBattleEnergyShortageTipText));
+            }
+        }
+
+        return bestSimilarity;
     }
 
     private void ResetAutoBattleBattleState()

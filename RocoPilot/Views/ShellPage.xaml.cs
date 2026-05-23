@@ -1,4 +1,5 @@
 ﻿using Microsoft.UI.Xaml;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -6,6 +7,7 @@ using Microsoft.UI.Xaml.Media;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
+using RocoPilot.Models;
 using RocoPilot.ViewModels;
 
 using Windows.System;
@@ -20,9 +22,18 @@ public sealed partial class ShellPage : Page
         get;
     }
 
-    public ShellPage(ShellViewModel viewModel)
+    private readonly IUpdateService _updateService;
+    private readonly ILogger<ShellPage> _logger;
+    private bool _isStartupUpdateCheckStarted;
+
+    public ShellPage(
+        ShellViewModel viewModel,
+        IUpdateService updateService,
+        ILogger<ShellPage> logger)
     {
         ViewModel = viewModel;
+        _updateService = updateService;
+        _logger = logger;
         InitializeComponent();
 
         ViewModel.NavigationService.Frame = NavigationFrame;
@@ -48,6 +59,8 @@ public sealed partial class ShellPage : Page
             settingsItem.Content = "设置";
             AutomationProperties.SetName(settingsItem, "设置");
         }
+
+        _ = CheckForUpdatesOnStartupAsync();
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -95,5 +108,50 @@ public sealed partial class ShellPage : Page
         var result = navigationService.GoBack();
 
         args.Handled = result;
+    }
+
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
+        if (_isStartupUpdateCheckStarted)
+        {
+            return;
+        }
+
+        _isStartupUpdateCheckStarted = true;
+
+        try
+        {
+            var result = await _updateService.CheckUpdateAsync(new UpdateOption { Trigger = UpdateTrigger.Auto });
+            switch (result.Status)
+            {
+                case UpdateCheckStatus.UpToDate:
+                    ShowStartupUpdateInfoBar(
+                        InfoBarSeverity.Success,
+                        "已是最新版本",
+                        string.IsNullOrWhiteSpace(result.Message) ? "当前已是最新版本。" : result.Message);
+                    break;
+
+                case UpdateCheckStatus.Failed:
+                    ShowStartupUpdateInfoBar(
+                        InfoBarSeverity.Warning,
+                        "检查更新失败",
+                        string.IsNullOrWhiteSpace(result.Message) ? "请检查网络连接后重试。" : result.Message);
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "启动时自动检查更新失败");
+            ShowStartupUpdateInfoBar(InfoBarSeverity.Warning, "检查更新失败", "请检查网络连接后重试。");
+        }
+    }
+
+    private void ShowStartupUpdateInfoBar(InfoBarSeverity severity, string title, string message)
+    {
+        StartupUpdateInfoBar.Severity = severity;
+        StartupUpdateInfoBar.Title = title;
+        StartupUpdateInfoBar.Message = message;
+        StartupUpdateInfoBar.IsOpen = false;
+        StartupUpdateInfoBar.IsOpen = true;
     }
 }

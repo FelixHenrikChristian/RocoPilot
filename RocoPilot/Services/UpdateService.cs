@@ -198,7 +198,6 @@ public sealed class UpdateService : IUpdateService
             Process.Start(new ProcessStartInfo
             {
                 FileName = updaterExePath,
-                Arguments = "-I",
                 UseShellExecute = true,
             });
             Application.Current.Exit();

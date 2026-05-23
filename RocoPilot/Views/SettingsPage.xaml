@@ -380,7 +380,7 @@
                 HorizontalAlignment="Center"
                 FontSize="12"
                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                Text="© 2024-2026 Felix Christian. 开源许可：MIT License" />
+                Text="© 2024-2026 Felix Christian. 开源许可：GPL-3.0 许可证" />
         </StackPanel>
     </ScrollViewer>
 </Page>

@@ -47,7 +47,7 @@
                 </NavigationViewItem>
                 <NavigationViewItem Content="统计" helpers:NavigationHelper.NavigateTo="RocoPilot.ViewModels.StatisticsViewModel">
                     <NavigationViewItem.Icon>
-                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE9D2;"/>
+                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE9F9;"/>
                     </NavigationViewItem.Icon>
                     <NavigationViewItem.InfoBadge>
                         <InfoBadge

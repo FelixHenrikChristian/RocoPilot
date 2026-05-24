@@ -136,7 +136,7 @@
                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                 FontSize="12"
                                 Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                Glyph="&#xE734;"
+                                Glyph="&#xE77B;"
                                 Visibility="{Binding AvatarFallbackVisibility}" />
                         </Grid>
                     </Border>
@@ -214,7 +214,7 @@
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                                         FontSize="20"
                                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                        Glyph="&#xE734;"
+                                        Glyph="&#xE77B;"
                                         Visibility="{Binding AvatarFallbackVisibility}" />
                                 </Grid>
                             </Border>
@@ -426,7 +426,7 @@
                     FontFamily="{StaticResource SymbolThemeFontFamily}"
                     FontSize="17"
                     Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                    Glyph="&#xE9D2;" />
+                    Glyph="&#xE9F9;" />
                 <TextBlock
                     VerticalAlignment="Center"
                     FontSize="18"
@@ -574,7 +574,7 @@
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
                                     FontSize="19"
                                     Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                    Glyph="&#xE734;" />
+                                    Glyph="&#xE794;" />
                             </Border>
 
                             <TextBlock
@@ -690,7 +690,7 @@
                                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                 FontSize="19"
                                                 Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                                Glyph="&#xE9D2;" />
+                                                Glyph="&#xE728;" />
                                         </Border>
 
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">

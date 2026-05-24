@@ -23,6 +23,14 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <Compile Remove="ViewModels\TestViewModel.cs" />
+    <Compile Remove="Views\TestPage.xaml.cs" />
+    <Compile Remove="Views\Test\**\*.xaml.cs" />
+    <Page Remove="Views\TestPage.xaml" />
+    <Page Remove="Views\Test\**\*.xaml" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.7" />

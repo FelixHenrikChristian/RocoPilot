@@ -7,4 +7,6 @@ internal static class SettingsKeys
     public const string EncounterStatisticsEnabled = "EncounterStatisticsEnabled";
 
     public const string AutoBattleSettings = "AutoBattleSettings";
+
+    public const string HotkeySettings = "HotkeySettings";
 }

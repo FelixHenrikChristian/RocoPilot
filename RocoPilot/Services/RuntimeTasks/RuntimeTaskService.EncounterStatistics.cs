@@ -53,6 +53,7 @@ public sealed partial class RuntimeTaskService
     {
         _encounterStatisticsEnabled = isEnabled;
         UpdateInfoOverlayTaskIndicators();
+        NotifySettingsChanged();
         _ = SaveEncounterStatisticsEnabledAsync(isEnabled);
     }
 

@@ -10,14 +10,21 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        if (state.Options.RecognitionOverlayEnabled == isEnabled)
+        {
+            return;
+        }
+
         state.Options.RecognitionOverlayEnabled = isEnabled;
         if (isEnabled)
         {
             _recognitionOverlayService.Show(state);
+            NotifySettingsChanged();
             return;
         }
 
         _recognitionOverlayService.Hide();
+        NotifySettingsChanged();
     }
 
     public void SetInfoOverlayEnabled(bool isEnabled)
@@ -28,25 +35,38 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        if (state.Options.InfoOverlayEnabled == isEnabled)
+        {
+            return;
+        }
+
         state.Options.InfoOverlayEnabled = isEnabled;
         if (isEnabled)
         {
             _infoOverlayService.Show(state);
             UpdateInfoOverlayTaskIndicators();
+            NotifySettingsChanged();
             return;
         }
 
         _infoOverlayService.Hide();
+        NotifySettingsChanged();
     }
 
     public void SetInfoOverlayLocked(bool isLocked)
     {
-        if (CurrentState is { } state)
+        var changed = false;
+        if (CurrentState is { } state && state.Options.InfoOverlayLocked != isLocked)
         {
             state.Options.InfoOverlayLocked = isLocked;
+            changed = true;
         }
 
         _infoOverlayService.SetLocked(isLocked);
+        if (changed)
+        {
+            NotifySettingsChanged();
+        }
     }
 
     private void UpdateInfoOverlayTaskIndicators()

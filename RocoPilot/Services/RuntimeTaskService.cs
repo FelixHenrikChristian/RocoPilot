@@ -55,6 +55,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly IStatisticsService _statisticsService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly IHotkeyService _hotkeyService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ILogger<RuntimeTaskService> _logger;
@@ -66,6 +67,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private bool _settingsLoaded;
     private bool _isBattleStateActive;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
+
+    public event EventHandler? SettingsChanged;
 
     public RuntimeTaskState? CurrentState
     {
@@ -86,6 +89,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         ISpiritCatalogService spiritCatalogService,
         IStatisticsService statisticsService,
         ILocalSettingsService localSettingsService,
+        IHotkeyService hotkeyService,
         IRecognitionOverlayService recognitionOverlayService,
         IInfoOverlayService infoOverlayService,
         ILogger<RuntimeTaskService> logger)
@@ -100,6 +104,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         _spiritCatalogService = spiritCatalogService;
         _statisticsService = statisticsService;
         _localSettingsService = localSettingsService;
+        _hotkeyService = hotkeyService;
+        _hotkeyService.HotkeyTriggered += HotkeyService_HotkeyTriggered;
         _recognitionOverlayService = recognitionOverlayService;
         _infoOverlayService = infoOverlayService;
         _logger = logger;
@@ -122,6 +128,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var savedAutoBattleSettings =
                 await _localSettingsService.ReadSettingAsync<AutoBattleSettings>(SettingsKeys.AutoBattleSettings);
             _autoBattleSettings = NormalizeAutoBattleSettings(savedAutoBattleSettings);
+            await _hotkeyService.LoadSettingsAsync(cancellationToken);
             _settingsLoaded = true;
         }
         catch (Exception ex)
@@ -1079,6 +1086,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         catch (OperationCanceledException)
         {
         }
+    }
+
+    private void NotifySettingsChanged()
+    {
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private enum GameStateScanResult

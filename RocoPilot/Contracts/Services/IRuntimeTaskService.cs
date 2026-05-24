@@ -4,6 +4,8 @@ namespace RocoPilot.Contracts.Services;
 
 public interface IRuntimeTaskService
 {
+    event EventHandler? SettingsChanged;
+
     bool IsRunning
     {
         get;

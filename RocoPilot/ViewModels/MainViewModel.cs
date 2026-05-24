@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
@@ -18,6 +19,8 @@ public partial class MainViewModel : ObservableRecipient
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ITextRecognitionService _textRecognitionService;
     private readonly ILogger<MainViewModel> _logger;
+    private readonly DispatcherQueue? _dispatcherQueue;
+    private bool _isApplyingRuntimeTaskSettings;
 
     public IReadOnlyList<CaptureMethodOption> CaptureMethods
     {
@@ -83,6 +86,8 @@ public partial class MainViewModel : ObservableRecipient
         _infoOverlayService = infoOverlayService;
         _textRecognitionService = textRecognitionService;
         _logger = logger;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _runtimeTaskService.SettingsChanged += RuntimeTaskService_SettingsChanged;
         TextRecognitionMethods = _textRecognitionService.GetMethods();
         SelectedCaptureMethod = CaptureMethods[0];
         SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
@@ -189,17 +194,58 @@ public partial class MainViewModel : ObservableRecipient
 
     partial void OnIsMaskOverlayEnabledChanged(bool value)
     {
-        _runtimeTaskService.SetRecognitionOverlayEnabled(value);
+        if (!_isApplyingRuntimeTaskSettings)
+        {
+            _runtimeTaskService.SetRecognitionOverlayEnabled(value);
+        }
     }
 
     partial void OnIsInfoOverlayEnabledChanged(bool value)
     {
-        _runtimeTaskService.SetInfoOverlayEnabled(value);
+        if (!_isApplyingRuntimeTaskSettings)
+        {
+            _runtimeTaskService.SetInfoOverlayEnabled(value);
+        }
     }
 
     partial void OnIsInfoOverlayLockedChanged(bool value)
     {
-        _runtimeTaskService.SetInfoOverlayLocked(value);
+        if (!_isApplyingRuntimeTaskSettings)
+        {
+            _runtimeTaskService.SetInfoOverlayLocked(value);
+        }
+    }
+
+    private void RuntimeTaskService_SettingsChanged(object? sender, EventArgs e)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            ApplyRuntimeTaskSettings();
+            return;
+        }
+
+        _dispatcherQueue.TryEnqueue(ApplyRuntimeTaskSettings);
+    }
+
+    private void ApplyRuntimeTaskSettings()
+    {
+        var state = _runtimeTaskService.CurrentState;
+        if (state is null)
+        {
+            return;
+        }
+
+        _isApplyingRuntimeTaskSettings = true;
+        try
+        {
+            IsMaskOverlayEnabled = state.Options.RecognitionOverlayEnabled;
+            IsInfoOverlayEnabled = state.Options.InfoOverlayEnabled;
+            IsInfoOverlayLocked = state.Options.InfoOverlayLocked;
+        }
+        finally
+        {
+            _isApplyingRuntimeTaskSettings = false;
+        }
     }
 
     private void ShowLaunchNotification(InfoBarSeverity severity, string title, string message)

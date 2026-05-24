@@ -35,6 +35,9 @@ public sealed partial class ShellPage : Page
         _updateService = updateService;
         _logger = logger;
         InitializeComponent();
+#if DEBUG
+        AddDebugNavigationItems();
+#endif
 
         ViewModel.NavigationService.Frame = NavigationFrame;
         ViewModel.NavigationViewService.Initialize(NavigationViewControl);
@@ -49,6 +52,20 @@ public sealed partial class ShellPage : Page
 
         NavigationViewControl.Loaded += NavigationViewControl_Loaded;
     }
+
+#if DEBUG
+    private void AddDebugNavigationItems()
+    {
+        var testItem = new NavigationViewItem
+        {
+            Content = "测试",
+            Icon = new FontIcon { Glyph = "\uF196" }
+        };
+        NavigationHelper.SetNavigateTo(testItem, typeof(TestViewModel).FullName!);
+
+        NavigationViewControl.MenuItems.Add(testItem);
+    }
+#endif
 
     private void NavigationViewControl_Loaded(object sender, RoutedEventArgs e)
     {

@@ -132,8 +132,10 @@ public partial class App : Application
             services.AddTransient<LogPage>();
             services.AddSingleton<HotkeyViewModel>();
             services.AddTransient<HotkeyPage>();
+#if DEBUG
             services.AddTransient<TestViewModel>();
             services.AddTransient<TestPage>();
+#endif
             services.AddTransient<ShellPage>();
             services.AddTransient<ShellViewModel>();
 

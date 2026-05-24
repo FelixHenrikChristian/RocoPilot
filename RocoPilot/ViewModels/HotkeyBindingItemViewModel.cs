@@ -37,7 +37,6 @@ public class HotkeyBindingItemViewModel : ObservableObject
             if (SetProperty(ref _binding, value))
             {
                 OnPropertyChanged(nameof(DisplayText));
-                OnPropertyChanged(nameof(SecondaryText));
             }
         }
     }
@@ -50,7 +49,6 @@ public class HotkeyBindingItemViewModel : ObservableObject
             if (SetProperty(ref _isCapturing, value))
             {
                 OnPropertyChanged(nameof(DisplayText));
-                OnPropertyChanged(nameof(SecondaryText));
             }
         }
     }
@@ -58,12 +56,6 @@ public class HotkeyBindingItemViewModel : ObservableObject
     public string DisplayText => IsCapturing
         ? "按下快捷键..."
         : Binding?.DisplayText ?? "未绑定";
-
-    public string SecondaryText => IsCapturing
-        ? "按 Esc 取消并清除当前绑定"
-        : Binding is null
-            ? "点击后设置热键"
-            : "点击后重新设置，Esc 可清除";
 
     public HotkeyBindingItemViewModel(HotkeyActionDescriptor descriptor)
     {

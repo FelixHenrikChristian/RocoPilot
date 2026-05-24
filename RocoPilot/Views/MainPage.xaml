@@ -195,7 +195,7 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE890;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="识别区域遮罩" TextWrapping="Wrap" />
+                            <TextBlock Text="显示识别区域" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
                                 FontSize="12"

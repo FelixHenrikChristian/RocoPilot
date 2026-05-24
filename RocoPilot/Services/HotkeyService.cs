@@ -464,7 +464,6 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
         return action switch
         {
             HotkeyAction.ToggleInfoOverlay => "信息遮罩窗口",
-            HotkeyAction.ToggleRecognitionOverlay => "识别区域遮罩",
             HotkeyAction.ToggleEncounterStatistics => "奇遇统计",
             HotkeyAction.ToggleAutoBattle => "自动战斗",
             _ => action.ToString()

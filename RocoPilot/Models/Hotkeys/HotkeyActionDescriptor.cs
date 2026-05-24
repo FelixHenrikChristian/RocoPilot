@@ -16,11 +16,6 @@ public sealed record HotkeyActionDescriptor(
                 "切换运行状态、计数和识别结果遮罩。",
                 "\uE946"),
             new(
-                HotkeyAction.ToggleRecognitionOverlay,
-                "识别区域遮罩",
-                "切换截图识别区域框遮罩。",
-                "\uE890"),
-            new(
                 HotkeyAction.ToggleEncounterStatistics,
                 "奇遇统计",
                 "切换当前赛季奇遇统计识别。",

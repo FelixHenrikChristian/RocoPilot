@@ -19,9 +19,6 @@ public sealed partial class RuntimeTaskService
             case HotkeyAction.ToggleInfoOverlay:
                 ToggleInfoOverlayByHotkey();
                 break;
-            case HotkeyAction.ToggleRecognitionOverlay:
-                ToggleRecognitionOverlayByHotkey();
-                break;
             case HotkeyAction.ToggleEncounterStatistics:
                 ToggleEncounterStatisticsByHotkey();
                 break;
@@ -42,19 +39,6 @@ public sealed partial class RuntimeTaskService
         var nextValue = !state.Options.InfoOverlayEnabled;
         SetInfoOverlayEnabled(nextValue);
         _logger.LogInformation("热键：{State}信息遮罩窗口。", FormatEnabledState(nextValue));
-    }
-
-    private void ToggleRecognitionOverlayByHotkey()
-    {
-        if (CurrentState is not { } state)
-        {
-            _logger.LogInformation("热键：实时任务未运行，识别区域遮罩开关已忽略。");
-            return;
-        }
-
-        var nextValue = !state.Options.RecognitionOverlayEnabled;
-        SetRecognitionOverlayEnabled(nextValue);
-        _logger.LogInformation("热键：{State}识别区域遮罩。", FormatEnabledState(nextValue));
     }
 
     private void ToggleEncounterStatisticsByHotkey()

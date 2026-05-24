@@ -6,6 +6,7 @@ using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.Spirits;
 
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
 namespace RocoPilot.ViewModels;
@@ -15,6 +16,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
+    private readonly DispatcherQueue? _dispatcherQueue;
 
     private bool _hasLoadedSettings;
     private bool _isApplyingSettings;
@@ -172,6 +174,8 @@ public partial class RealtimeViewModel : ObservableRecipient
         _runtimeTaskService = runtimeTaskService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
+        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+        _runtimeTaskService.SettingsChanged += RuntimeTaskService_SettingsChanged;
         _isEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
         ApplyAutoBattleSettings(_runtimeTaskService.AutoBattleSettings);
     }
@@ -251,6 +255,17 @@ public partial class RealtimeViewModel : ObservableRecipient
         {
             _isApplyingSettings = false;
         }
+    }
+
+    private void RuntimeTaskService_SettingsChanged(object? sender, EventArgs e)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            ApplyRuntimeTaskSettings();
+            return;
+        }
+
+        _dispatcherQueue.TryEnqueue(ApplyRuntimeTaskSettings);
     }
 
     private void ApplyAutoBattleSettings(AutoBattleSettings settings)

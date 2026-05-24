@@ -18,6 +18,7 @@ public class PageService : IPageService
         Configure<RealtimeViewModel, RealtimePage>();
         Configure<StatisticsViewModel, StatisticsPage>();
         Configure<LogViewModel, LogPage>();
+        Configure<HotkeyViewModel, HotkeyPage>();
         Configure<TestViewModel, TestPage>();
         Configure<SettingsViewModel, SettingsPage>();
     }

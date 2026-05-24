@@ -94,6 +94,7 @@ public sealed partial class RuntimeTaskService
 
     public void SetAutoBattleSettings(AutoBattleSettings settings)
     {
+        var previousIsEnabled = _autoBattleSettings.IsEnabled;
         _autoBattleSettings = NormalizeAutoBattleSettings(settings);
         if (!_autoBattleSettings.IsEnabled)
         {
@@ -106,6 +107,10 @@ public sealed partial class RuntimeTaskService
 
         UpdateInfoOverlayTaskIndicators();
         _ = SaveAutoBattleSettingsAsync(_autoBattleSettings);
+        if (previousIsEnabled != _autoBattleSettings.IsEnabled)
+        {
+            NotifySettingsChanged();
+        }
     }
 
     private async Task SaveAutoBattleSettingsAsync(AutoBattleSettings settings)

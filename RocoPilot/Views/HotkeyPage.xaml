@@ -1,0 +1,130 @@
+<Page
+    x:Class="RocoPilot.Views.HotkeyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="using:RocoPilot.Helpers"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="using:RocoPilot.ViewModels"
+    KeyDown="HotkeyPage_KeyDown"
+    mc:Ignorable="d">
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+            <StackPanel
+                Padding="{StaticResource NavigationViewPageContentPadding}"
+                Spacing="16">
+
+                <Expander IsExpanded="True" Style="{StaticResource CardExpanderStyle}">
+                    <Expander.Header>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <FontIcon
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="20"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE765;" />
+
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="3">
+                                <TextBlock
+                                    FontWeight="SemiBold"
+                                    Text="热键"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="仅在实时任务运行且目标游戏窗口为焦点时触发。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+                    </Expander.Header>
+
+                    <StackPanel Spacing="0">
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <ListView
+                            Background="Transparent"
+                            IsItemClickEnabled="False"
+                            ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
+                            SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="viewModels:HotkeyBindingItemViewModel">
+                                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="190" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <FontIcon
+                                            Grid.Column="0"
+                                            VerticalAlignment="Center"
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="18"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Glyph="{x:Bind Glyph}" />
+
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Name}" TextWrapping="Wrap" />
+                                            <TextBlock
+                                                Margin="0,2,0,0"
+                                                FontSize="12"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Text="{x:Bind Description}"
+                                                TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <Button
+                                            Grid.Column="2"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Center"
+                                            Click="BindingButton_Click">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock
+                                                    HorizontalAlignment="Center"
+                                                    Text="{x:Bind DisplayText, Mode=OneWay}"
+                                                    TextAlignment="Center"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="NoWrap" />
+                                                <TextBlock
+                                                    HorizontalAlignment="Center"
+                                                    FontSize="11"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Text="{x:Bind SecondaryText, Mode=OneWay}"
+                                                    TextAlignment="Center"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="NoWrap" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+
+        <InfoBar
+            Margin="{StaticResource NavigationViewPageContentPadding}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsClosable="False"
+            IsOpen="{x:Bind ViewModel.IsNotificationOpen, Mode=TwoWay}"
+            Message="{x:Bind ViewModel.NotificationMessage, Mode=OneWay}"
+            Severity="{x:Bind ViewModel.NotificationSeverity, Mode=OneWay}"
+            Title="{x:Bind ViewModel.NotificationTitle, Mode=OneWay}" />
+    </Grid>
+</Page>

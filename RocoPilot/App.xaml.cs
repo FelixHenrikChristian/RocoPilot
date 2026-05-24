@@ -97,6 +97,7 @@ public partial class App : Application
             services.AddSingleton<IGameWindowService, GameWindowService>();
             services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
             services.AddSingleton<IRuntimeTaskService, RuntimeTaskService>();
+            services.AddSingleton<IHotkeyService, HotkeyService>();
             services.AddSingleton<IRecognitionOverlayService, RecognitionOverlayService>();
             services.AddSingleton<IInfoOverlayService, InfoOverlayService>();
             services.AddSingleton<IRecognitionRegionConfigService, RecognitionRegionConfigService>();
@@ -129,6 +130,8 @@ public partial class App : Application
             services.AddTransient<StatisticsPage>();
             services.AddSingleton<LogViewModel>();
             services.AddTransient<LogPage>();
+            services.AddSingleton<HotkeyViewModel>();
+            services.AddTransient<HotkeyPage>();
             services.AddTransient<TestViewModel>();
             services.AddTransient<TestPage>();
             services.AddTransient<ShellPage>();

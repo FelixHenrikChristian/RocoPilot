@@ -24,7 +24,12 @@ public class HotkeyViewModel : ObservableRecipient
     public ObservableCollection<HotkeyBindingItemViewModel> Items
     {
         get;
-    } = new(HotkeyActionDescriptor.CreateDefault().Select(descriptor => new HotkeyBindingItemViewModel(descriptor)));
+    }
+
+    public IReadOnlyList<HotkeyGroupViewModel> Groups
+    {
+        get;
+    }
 
     public bool IsNotificationOpen
     {
@@ -54,6 +59,27 @@ public class HotkeyViewModel : ObservableRecipient
 
     public HotkeyViewModel(IHotkeyService hotkeyService)
     {
+        var items = HotkeyActionDescriptor.CreateDefault()
+            .Select(descriptor => new HotkeyBindingItemViewModel(descriptor))
+            .ToList();
+
+        Items = new(items);
+        Groups =
+        [
+            new(
+                "遮罩窗口",
+                "\uE7FC",
+                items.Where(item => item.Action
+                    is HotkeyAction.ToggleInfoOverlay
+                    or HotkeyAction.ToggleRecognitionOverlay).ToList()),
+            new(
+                "实时任务",
+                "\uE768",
+                items.Where(item => item.Action
+                    is HotkeyAction.ToggleEncounterStatistics
+                    or HotkeyAction.ToggleAutoBattle).ToList())
+        ];
+
         _hotkeyService = hotkeyService;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _hotkeyService.SettingsChanged += HotkeyService_SettingsChanged;

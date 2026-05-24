@@ -23,6 +23,12 @@ public sealed partial class HotkeyPage : Page
     {
         ViewModel = App.GetService<HotkeyViewModel>();
         InitializeComponent();
+        HotkeyTreeView.ItemTemplateSelector = new HotkeyTreeItemTemplateSelector
+        {
+            GroupTemplate = (DataTemplate)Resources["HotkeyGroupTemplate"],
+            BindingTemplate = (DataTemplate)Resources["HotkeyBindingTemplate"]
+        };
+        InitializeHotkeyTree();
         Loaded += HotkeyPage_Loaded;
     }
 
@@ -41,6 +47,30 @@ public sealed partial class HotkeyPage : Page
 
         ViewModel.BeginCapture(item);
         button.Focus(FocusState.Programmatic);
+    }
+
+    private void InitializeHotkeyTree()
+    {
+        HotkeyTreeView.RootNodes.Clear();
+
+        foreach (var group in ViewModel.Groups)
+        {
+            var groupNode = new TreeViewNode
+            {
+                Content = group,
+                IsExpanded = true
+            };
+
+            foreach (var item in group.Items)
+            {
+                groupNode.Children.Add(new TreeViewNode
+                {
+                    Content = item
+                });
+            }
+
+            HotkeyTreeView.RootNodes.Add(groupNode);
+        }
     }
 
     private async void HotkeyPage_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -117,4 +147,41 @@ public sealed partial class HotkeyPage : Page
 
     [DllImport("user32.dll")]
     private static extern short GetKeyState(int nVirtKey);
+
+    private sealed class HotkeyTreeItemTemplateSelector : DataTemplateSelector
+    {
+        public DataTemplate? GroupTemplate
+        {
+            get;
+            init;
+        }
+
+        public DataTemplate? BindingTemplate
+        {
+            get;
+            init;
+        }
+
+        protected override DataTemplate? SelectTemplateCore(object item)
+        {
+            return item is TreeViewNode { Content: var content }
+                ? SelectTemplateForContent(content)
+                : SelectTemplateForContent(item);
+        }
+
+        protected override DataTemplate? SelectTemplateCore(object item, DependencyObject container)
+        {
+            return SelectTemplateCore(item);
+        }
+
+        private DataTemplate? SelectTemplateForContent(object? content)
+        {
+            return content switch
+            {
+                HotkeyGroupViewModel => GroupTemplate,
+                HotkeyBindingItemViewModel => BindingTemplate,
+                _ => base.SelectTemplateCore(content ?? string.Empty)
+            };
+        }
+    }
 }

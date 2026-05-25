@@ -19,16 +19,23 @@ namespace RocoPilot.Views.Windows;
 
 public sealed partial class InfoOverlayWindow : WindowEx
 {
-    private const int OverlayWidth = 320;
-    private const int OverlayHeight = 336;
-    private const int MinOverlayWidth = 260;
-    private const int MinOverlayHeight = 240;
+    private const int OverlayWidth = 344;
+    private const int OverlayHeight = 316;
+    private const int MinOverlayWidth = 286;
+    private const int MinOverlayHeight = 252;
     private const int DefaultMargin = 16;
     private const int MaxVisibleCounters = 5;
 
     private static readonly TimeSpan FollowInterval = TimeSpan.FromMilliseconds(250);
-    private static readonly Color ActiveTaskIndicatorForeground = Color.FromArgb(0xFF, 0x10, 0xB9, 0x81);
-    private static readonly Color ActiveTaskIndicatorBackground = Color.FromArgb(0xFF, 0xE0, 0xF7, 0xF2);
+    private static readonly Color ActiveTaskIndicatorForeground = Color.FromArgb(0xFF, 0x34, 0xD3, 0x99);
+    private static readonly Color ActiveTaskIndicatorBackground = Color.FromArgb(0x29, 0x34, 0xD3, 0x99);
+    private static readonly Color DisabledIndicatorForeground = Color.FromArgb(0xFF, 0x8B, 0x95, 0xA1);
+    private static readonly Color DisabledIndicatorBackground = Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF);
+    private static readonly Color DisabledIndicatorBorder = Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF);
+    private static readonly Color CounterPrimaryForeground = Color.FromArgb(0xFF, 0xF8, 0xFA, 0xFC);
+    private static readonly Color CounterSecondaryForeground = Color.FromArgb(0xFF, 0x93, 0x9D, 0xAA);
+    private static readonly Color CounterAccentForeground = Color.FromArgb(0xFF, 0x7D, 0xD3, 0xFC);
+    private static readonly Color CounterRowBorder = Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF);
 
     private readonly CaptureTargetWindow _targetWindow;
     private readonly DispatcherQueueTimer _followTimer;
@@ -41,6 +48,8 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private RectInt32 _dragStartOverlayBounds;
     private int _overlayOffsetX;
     private int _overlayOffsetY;
+    private int _lastMagicPointCount;
+    private int _lastMagicPointMaximum = 6;
     private bool _hasActivated;
     private bool _hasUserPositioned;
     private bool _isLocked;
@@ -134,11 +143,13 @@ public sealed partial class InfoOverlayWindow : WindowEx
         if (snapshot.MagicPointCount.HasValue)
         {
             var magicPointMaximum = Math.Max(1, snapshot.MagicPointMaximum);
-            var magicPointCount = Math.Clamp(snapshot.MagicPointCount.Value, 0, magicPointMaximum);
-            statusText = $"{statusText} · 魔力值 {magicPointCount}/{magicPointMaximum}";
+            _lastMagicPointMaximum = magicPointMaximum;
+            _lastMagicPointCount = Math.Clamp(snapshot.MagicPointCount.Value, 0, magicPointMaximum);
         }
 
         StatusText.Text = statusText;
+        StatusText.Foreground = new SolidColorBrush(ActiveTaskIndicatorForeground);
+        MagicPointText.Text = $"{_lastMagicPointCount}/{_lastMagicPointMaximum}";
         UpdatedAtText.Text = snapshot.UpdatedAt.ToLocalTime().ToString("HH:mm:ss");
 
         var visibleCounters = snapshot.Counters
@@ -149,15 +160,11 @@ public sealed partial class InfoOverlayWindow : WindowEx
         var latestCounter = visibleCounters.FirstOrDefault();
         if (latestCounter is null)
         {
-            LatestPollutionCountText.Text = "0";
-            LatestCreatureNameText.Text = "暂无记录";
             RenderCounters([]);
             return;
         }
 
-        LatestPollutionCountText.Text = latestCounter.PollutionCount.ToString();
-        LatestCreatureNameText.Text = latestCounter.CreatureName;
-        RenderCounters(visibleCounters.Skip(1).ToList());
+        RenderCounters(visibleCounters);
     }
 
     public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
@@ -184,13 +191,21 @@ public sealed partial class InfoOverlayWindow : WindowEx
         Color activeForeground,
         Color activeBackground)
     {
-        indicator.Opacity = isEnabled ? 1d : 0.52d;
+        indicator.Opacity = isEnabled ? 1d : 0.72d;
         indicator.Background = new SolidColorBrush(isEnabled
             ? activeBackground
-            : Color.FromArgb(0xFF, 0xEE, 0xF1, 0xF5));
+            : DisabledIndicatorBackground);
+        indicator.BorderBrush = new SolidColorBrush(isEnabled
+            ? WithAlpha(activeForeground, 0x66)
+            : DisabledIndicatorBorder);
         icon.Foreground = new SolidColorBrush(isEnabled
             ? activeForeground
-            : Color.FromArgb(0xFF, 0x8A, 0x95, 0xA3));
+            : DisabledIndicatorForeground);
+    }
+
+    private static Color WithAlpha(Color color, byte alpha)
+    {
+        return Color.FromArgb(alpha, color.R, color.G, color.B);
     }
 
     private void ConfigurePresenter()
@@ -328,30 +343,33 @@ public sealed partial class InfoOverlayWindow : WindowEx
         {
             CounterList.Children.Add(new TextBlock
             {
-                Text = "暂无其他奇遇记录",
+                Text = "暂无其他记录",
                 FontSize = 12,
-                Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x66, 0x70, 0x85))
+                Foreground = new SolidColorBrush(CounterSecondaryForeground)
             });
             return;
         }
 
         for (var index = 0; index < counters.Count; index++)
         {
-            CounterList.Children.Add(CreateCounterRow(counters[index], index + 2));
+            var rank = index + 1;
+            CounterList.Children.Add(rank == 1
+                ? CreateFeaturedCounterRow(counters[index])
+                : CreateCounterRow(counters[index], rank));
         }
     }
 
-    private static Border CreateCounterRow(InfoOverlayCounter counter, int rank)
+    private static Border CreateFeaturedCounterRow(InfoOverlayCounter counter)
     {
         var rowContent = new Grid
         {
             ColumnSpacing = 10,
-            MinHeight = 28
+            MinHeight = 58
         };
 
         rowContent.ColumnDefinitions.Add(new ColumnDefinition
         {
-            Width = GridLength.Auto
+            Width = new GridLength(30)
         });
         rowContent.ColumnDefinitions.Add(new ColumnDefinition
         {
@@ -364,63 +382,140 @@ public sealed partial class InfoOverlayWindow : WindowEx
 
         var row = new Border
         {
-            Padding = new Thickness(9, 5, 9, 5),
-            Background = new SolidColorBrush(Color.FromArgb(0xB8, 0xFF, 0xFF, 0xFF)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x45, 0xD8, 0xDE, 0xE8)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(0, 7, 0, 8),
+            BorderBrush = new SolidColorBrush(CounterRowBorder),
+            BorderThickness = new Thickness(0, 0, 0, 1),
             Child = rowContent
         };
 
-        var rankBadge = new Border
+        var rankText = new TextBlock
         {
-            Width = 22,
-            Height = 22,
-            Background = new SolidColorBrush(Color.FromArgb(0xFF, 0xF2, 0xF4, 0xF7)),
-            CornerRadius = new CornerRadius(11),
-            Child = new TextBlock
-            {
-                Text = rank.ToString(),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x66, 0x70, 0x85))
-            }
+            Text = "#1",
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(CounterSecondaryForeground)
+        };
+
+        var nameStack = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Spacing = 2
+        };
+        nameStack.Children.Add(new TextBlock
+        {
+            Text = "最近捕捉精灵",
+            FontSize = 11,
+            Foreground = new SolidColorBrush(CounterSecondaryForeground)
+        });
+        nameStack.Children.Add(new TextBlock
+        {
+            Text = counter.CreatureName,
+            FontSize = 20,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(CounterPrimaryForeground),
+            MaxLines = 1,
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+
+        var countText = new TextBlock
+        {
+            Text = counter.PollutionCount.ToString(),
+            MinWidth = 46,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = GetFeaturedCounterFontSize(counter.PollutionCount),
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(CounterAccentForeground),
+            TextAlignment = TextAlignment.Right
+        };
+
+        Grid.SetColumn(rankText, 0);
+        Grid.SetColumn(nameStack, 1);
+        Grid.SetColumn(countText, 2);
+        rowContent.Children.Add(rankText);
+        rowContent.Children.Add(nameStack);
+        rowContent.Children.Add(countText);
+        return row;
+    }
+
+    private static Border CreateCounterRow(InfoOverlayCounter counter, int rank)
+    {
+        var rowContent = new Grid
+        {
+            ColumnSpacing = 10,
+            MinHeight = 30
+        };
+
+        rowContent.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(30)
+        });
+        rowContent.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star)
+        });
+        rowContent.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto
+        });
+
+        var row = new Border
+        {
+            Padding = new Thickness(0, 5, 0, 6),
+            BorderBrush = new SolidColorBrush(CounterRowBorder),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = rowContent
+        };
+
+        var rankText = new TextBlock
+        {
+            Text = $"#{rank}",
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(CounterSecondaryForeground)
         };
 
         var name = new TextBlock
         {
             Text = counter.CreatureName,
             FontSize = 13,
-            Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x1F, 0x29, 0x37)),
+            Foreground = new SolidColorBrush(CounterPrimaryForeground),
             TextTrimming = TextTrimming.CharacterEllipsis,
             VerticalAlignment = VerticalAlignment.Center
         };
 
-        var countBadge = new Border
+        var countText = new TextBlock
         {
-            MinWidth = 44,
-            Padding = new Thickness(8, 3, 8, 3),
-            Background = new SolidColorBrush(Color.FromArgb(0xFF, 0xEC, 0xFD, 0xF7)),
-            CornerRadius = new CornerRadius(10),
-            Child = new TextBlock
-            {
-                Text = counter.PollutionCount.ToString(),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x0F, 0x76, 0x6E))
-            }
+            Text = counter.PollutionCount.ToString(),
+            MinWidth = 36,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 13,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(CounterAccentForeground),
+            TextAlignment = TextAlignment.Right
         };
 
-        Grid.SetColumn(rankBadge, 0);
+        Grid.SetColumn(rankText, 0);
         Grid.SetColumn(name, 1);
-        Grid.SetColumn(countBadge, 2);
-        rowContent.Children.Add(rankBadge);
+        Grid.SetColumn(countText, 2);
+        rowContent.Children.Add(rankText);
         rowContent.Children.Add(name);
-        rowContent.Children.Add(countBadge);
+        rowContent.Children.Add(countText);
         return row;
+    }
+
+    private static double GetFeaturedCounterFontSize(int count)
+    {
+        return count switch
+        {
+            >= 10000 => 20,
+            >= 1000 => 22,
+            >= 100 => 24,
+            _ => 28
+        };
     }
 
     private void OverlayRoot_PointerPressed(object sender, PointerRoutedEventArgs e)

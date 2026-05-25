@@ -4,6 +4,8 @@ internal static class SettingsKeys
 {
     public const string StatisticsData = "StatisticsData";
 
+    public const string StatisticsSyncSettings = "StatisticsSyncSettings";
+
     public const string EncounterStatisticsEnabled = "EncounterStatisticsEnabled";
 
     public const string SpiritCatalogSourceId = "SpiritCatalogSourceId";

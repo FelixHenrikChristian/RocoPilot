@@ -434,6 +434,26 @@
                     Text="统计" />
             </StackPanel>
 
+            <Grid
+                Grid.Column="1"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center">
+                <FontIcon
+                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontSize="16"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Glyph="&#xE753;"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.SyncDisabledIconVisibility, Mode=OneWay}" />
+                <FontIcon
+                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontSize="16"
+                    Foreground="#FF107C10"
+                    Glyph="&#xE753;"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                    Visibility="{x:Bind ViewModel.SyncEnabledIconVisibility, Mode=OneWay}" />
+            </Grid>
+
             <Button
                 Grid.Column="2"
                 Width="220"
@@ -524,6 +544,8 @@
                 </StackPanel>
                 <Button.Flyout>
                     <MenuFlyout>
+                        <MenuFlyoutItem Click="OpenStatisticsSyncWindowMenuFlyoutItem_Click" Text="云同步" />
+                        <MenuFlyoutSeparator />
                         <MenuFlyoutItem Click="ImportStatisticsMenuFlyoutItem_Click" Text="导入数据" />
                         <MenuFlyoutItem Click="ExportStatisticsMenuFlyoutItem_Click" Text="导出数据" />
                         <MenuFlyoutSeparator />

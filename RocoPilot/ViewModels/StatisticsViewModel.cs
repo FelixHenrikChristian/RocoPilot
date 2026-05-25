@@ -28,6 +28,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     };
 
     private readonly IStatisticsService _statisticsService;
+    private readonly IStatisticsSyncService _statisticsSyncService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly ILogger<StatisticsViewModel> _logger;
@@ -206,6 +207,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     private InfoBarSeverity _notificationSeverity = InfoBarSeverity.Informational;
     private string _notificationTitle = string.Empty;
     private string _notificationMessage = string.Empty;
+    private StatisticsSyncStatus _syncStatus = new();
 
     public bool IsNotificationOpen
     {
@@ -231,20 +233,42 @@ public partial class StatisticsViewModel : ObservableRecipient
         private set => SetProperty(ref _notificationMessage, value);
     }
 
+    public string SyncStatusSummary => BuildSyncStatusSummary(_syncStatus);
+
+    public string SyncStatusToolTip => string.IsNullOrWhiteSpace(_syncStatus.Message)
+        ? SyncStatusSummary
+        : $"{SyncStatusSummary}\n{_syncStatus.Message}";
+
+    public Visibility SyncEnabledIconVisibility => _syncStatus.IsEnabled
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public Visibility SyncDisabledIconVisibility => _syncStatus.IsEnabled
+        ? Visibility.Collapsed
+        : Visibility.Visible;
+
+    public bool IsSyncBusy => _syncStatus.IsBusy;
+
+    public IReadOnlyList<StatisticsSyncProviderOption> SyncProviders => _statisticsSyncService.GetProviders();
+
     public StatisticsViewModel(
         IStatisticsService statisticsService,
+        IStatisticsSyncService statisticsSyncService,
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         ILogger<StatisticsViewModel> logger)
     {
         _statisticsService = statisticsService;
+        _statisticsSyncService = statisticsSyncService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _logger = logger;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _document = _statisticsService.CurrentDocument;
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
+        _statisticsSyncService.StatusChanged += StatisticsSyncService_StatusChanged;
         ApplyDocument(_document);
+        ApplySyncStatus(_statisticsSyncService.CurrentStatus);
     }
 
     public async Task LoadAsync()
@@ -266,6 +290,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
 
         await LoadSpiritAvatarPathsAsync();
+        ApplySyncStatus(await _statisticsSyncService.LoadStatusAsync());
     }
 
     public string ExportToJson()
@@ -494,10 +519,61 @@ public partial class StatisticsViewModel : ObservableRecipient
         ShowNotification(InfoBarSeverity.Success, "导出完成", path);
     }
 
+    public async Task<StatisticsSyncSettings> LoadSyncSettingsAsync()
+    {
+        var settings = await _statisticsSyncService.LoadSettingsAsync();
+        ApplySyncStatus(await _statisticsSyncService.LoadStatusAsync());
+        return settings;
+    }
+
+    public async Task SaveSyncSettingsAsync(StatisticsSyncSettings settings, string? password)
+    {
+        ApplySyncStatus(await _statisticsSyncService.SaveSettingsAsync(settings, password));
+        ShowNotification(InfoBarSeverity.Success, "云同步设置已保存", SyncStatusSummary);
+    }
+
+    public async Task TestSyncConnectionAsync()
+    {
+        await _statisticsSyncService.TestConnectionAsync();
+        ShowNotification(InfoBarSeverity.Success, "云同步连接成功", SyncStatusSummary);
+    }
+
+    public async Task RefreshSyncRemoteInfoAsync()
+    {
+        var info = await _statisticsSyncService.RefreshRemoteInfoAsync();
+        var message = info.Exists
+            ? $"云端更新时间：{FormatSyncDate(info.LastModifiedAt)}"
+            : "云端暂无统计数据。";
+        ShowNotification(InfoBarSeverity.Success, "已刷新云端时间", message);
+    }
+
+    public async Task UploadStatisticsToCloudAsync()
+    {
+        await _statisticsSyncService.UploadAsync();
+        ShowNotification(InfoBarSeverity.Success, "上传完成", SyncStatusSummary);
+    }
+
+    public async Task DownloadStatisticsFromCloudAsync()
+    {
+        await _statisticsSyncService.DownloadAsync();
+        ShowNotification(InfoBarSeverity.Success, "下载完成", "已使用云端统计数据覆盖本地记录。");
+    }
+
     public void ShowOperationFailed(string title, Exception exception)
     {
         _logger.LogWarning(exception, "{Title}", title);
         ShowNotification(InfoBarSeverity.Error, title, exception.Message);
+    }
+
+    private void StatisticsSyncService_StatusChanged(object? sender, StatisticsSyncStatusChangedEventArgs e)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            ApplySyncStatus(e.Status);
+            return;
+        }
+
+        _dispatcherQueue.TryEnqueue(() => ApplySyncStatus(e.Status));
     }
 
     private void StatisticsService_DocumentChanged(object? sender, StatisticsDocumentChangedEventArgs e)
@@ -526,6 +602,16 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SelectedAccount));
         OnPropertyChanged(nameof(SelectedAccountDisplayName));
         RefreshSelectedAccount();
+    }
+
+    private void ApplySyncStatus(StatisticsSyncStatus status)
+    {
+        _syncStatus = status;
+        OnPropertyChanged(nameof(SyncStatusSummary));
+        OnPropertyChanged(nameof(SyncStatusToolTip));
+        OnPropertyChanged(nameof(SyncEnabledIconVisibility));
+        OnPropertyChanged(nameof(SyncDisabledIconVisibility));
+        OnPropertyChanged(nameof(IsSyncBusy));
     }
 
     private void RefreshSelectedAccount()
@@ -732,6 +818,33 @@ public partial class StatisticsViewModel : ObservableRecipient
         NotificationMessage = message;
         IsNotificationOpen = false;
         IsNotificationOpen = true;
+    }
+
+    private static string BuildSyncStatusSummary(StatisticsSyncStatus status)
+    {
+        if (!status.IsEnabled)
+        {
+            return "云同步：未启用";
+        }
+
+        if (!status.IsConfigured)
+        {
+            return "云同步：配置不完整";
+        }
+
+        if (status.RemoteLastModifiedAt is not null)
+        {
+            return $"{status.ProviderName} · 云端 {FormatSyncDate(status.RemoteLastModifiedAt)}";
+        }
+
+        return $"{status.ProviderName} · {status.Message}";
+    }
+
+    private static string FormatSyncDate(DateTimeOffset? value)
+    {
+        return value is null
+            ? "未同步"
+            : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
     }
 
     private static StatisticsDocument CloneDocument(StatisticsDocument document)

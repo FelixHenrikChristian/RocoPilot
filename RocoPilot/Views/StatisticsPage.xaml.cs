@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.Helpers;
 using RocoPilot.ViewModels;
+using RocoPilot.Views.Windows;
 
 using Windows.UI;
 
@@ -19,6 +20,7 @@ public sealed partial class StatisticsPage : Page
     private ContentDialog? _activeShinyDetailDialog;
     private StatisticDetailAction _requestedShinyDetailAction = StatisticDetailAction.None;
     private ShinyCaptureDetailItem? _requestedShinyDetailItem;
+    private StatisticsSyncWindow? _statisticsSyncWindow;
 
     public StatisticsViewModel ViewModel
     {
@@ -879,6 +881,20 @@ public sealed partial class StatisticsPage : Page
         {
             ViewModel.ShowOperationFailed("导出失败", ex);
         }
+    }
+
+    private void OpenStatisticsSyncWindowMenuFlyoutItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_statisticsSyncWindow is not null)
+        {
+            _statisticsSyncWindow.Activate();
+            return;
+        }
+
+        _statisticsSyncWindow = new StatisticsSyncWindow(ViewModel);
+        _statisticsSyncWindow.Closed += (_, _) => _statisticsSyncWindow = null;
+        WindowPlacementHelper.CenterOnParent(_statisticsSyncWindow, App.MainWindow);
+        _statisticsSyncWindow.Activate();
     }
 
     private async void ClearStatisticsMenuFlyoutItem_Click(object sender, RoutedEventArgs e)

@@ -166,17 +166,17 @@
 
         <StackPanel
             Grid.Row="2"
+            Orientation="Horizontal"
             Spacing="4">
-            <RichTextBlock
+            <TextBlock
                 FontSize="12"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}">
-                <Paragraph>
-                    <Run Text="来源：" />
-                    <Hyperlink NavigateUri="https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4">
-                        <Run Text="Biligame 洛克王国:手游 Wiki 精灵图鉴" />
-                    </Hyperlink>
-                </Paragraph>
-            </RichTextBlock>
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="来源：" />
+            <HyperlinkButton
+                Padding="0"
+                Content="{x:Bind SourceDisplayName, Mode=OneWay}"
+                FontSize="12"
+                NavigateUri="{x:Bind SourceUri, Mode=OneWay}" />
         </StackPanel>
     </Grid>
 </windowex:WindowEx>

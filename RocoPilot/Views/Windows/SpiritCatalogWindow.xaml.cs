@@ -18,6 +18,7 @@ public sealed partial class SpiritCatalogWindow : WindowEx
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly IThemeSelectorService _themeSelectorService;
     private Dictionary<string, List<SpiritCatalogItem>> _variantsById = new(StringComparer.OrdinalIgnoreCase);
+    private string? _sourceId;
     private bool _isLoaded;
 
     public ObservableCollection<SpiritCatalogDisplayItem> Items { get; } = [];
@@ -26,10 +27,15 @@ public sealed partial class SpiritCatalogWindow : WindowEx
 
     public string UpdatedAtDisplay { get; private set; } = string.Empty;
 
-    public SpiritCatalogWindow()
+    public string SourceDisplayName { get; private set; } = string.Empty;
+
+    public Uri? SourceUri { get; private set; }
+
+    public SpiritCatalogWindow(string? sourceId = null)
     {
         _spiritCatalogService = App.GetService<ISpiritCatalogService>();
         _themeSelectorService = App.GetService<IThemeSelectorService>();
+        _sourceId = string.IsNullOrWhiteSpace(sourceId) ? null : sourceId;
 
         InitializeComponent();
 
@@ -57,7 +63,9 @@ public sealed partial class SpiritCatalogWindow : WindowEx
     {
         try
         {
-            var document = await _spiritCatalogService.LoadAsync();
+            var document = string.IsNullOrWhiteSpace(_sourceId)
+                ? await _spiritCatalogService.LoadAsync()
+                : await _spiritCatalogService.LoadAsync(_sourceId);
             _variantsById = document.Spirits
                 .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(group => group.Key, group => SortVariants(group).ToList(), StringComparer.OrdinalIgnoreCase);
@@ -82,16 +90,37 @@ public sealed partial class SpiritCatalogWindow : WindowEx
 
             Summary = BuildSummary(document);
             UpdatedAtDisplay = BuildUpdatedAtDisplay(document);
+            SourceDisplayName = document.Source.Name;
+            SourceUri = Uri.TryCreate(document.Source.ListUrl, UriKind.Absolute, out var sourceUri)
+                ? sourceUri
+                : null;
             EmptyState.Visibility = Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception ex)
         {
             Summary = $"图鉴数据加载失败：{ex.Message}";
             UpdatedAtDisplay = string.Empty;
+            SourceDisplayName = string.Empty;
+            SourceUri = null;
             EmptyState.Visibility = Visibility.Visible;
         }
 
         Bindings.Update();
+    }
+
+    public async Task SetSourceAsync(string? sourceId)
+    {
+        var normalizedSourceId = string.IsNullOrWhiteSpace(sourceId) ? null : sourceId;
+        if (string.Equals(_sourceId, normalizedSourceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _sourceId = normalizedSourceId;
+        if (_isLoaded)
+        {
+            await ReloadAsync();
+        }
     }
 
     private void VariantButton_Click(object sender, RoutedEventArgs e)
@@ -114,7 +143,9 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             $"NO.{item.Id} 变种",
             $"{item.Name} · {items.Count} 个变种",
             items,
-            _spiritCatalogService);
+            _spiritCatalogService,
+            SourceDisplayName,
+            SourceUri);
         window.Activate();
     }
 
@@ -138,7 +169,9 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             $"进化链 - {item.Name}",
             string.Join(" -> ", items.Select(chainItem => chainItem.IdDisplay)),
             items,
-            _spiritCatalogService);
+            _spiritCatalogService,
+            SourceDisplayName,
+            SourceUri);
         window.Activate();
     }
 

@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.Spirits;
@@ -16,12 +17,15 @@ public partial class RealtimeViewModel : ObservableRecipient
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
+    private readonly ILocalSettingsService _localSettingsService;
     private readonly DispatcherQueue? _dispatcherQueue;
 
     private bool _hasLoadedSettings;
     private bool _isApplyingSettings;
     private bool _isEncounterStatisticsEnabled = true;
     private bool _isSpiritCatalogSyncing;
+    private SpiritCatalogSourceOption? _selectedSpiritCatalogSource;
+    private string _spiritCatalogSourceSummary = string.Empty;
     private string _spiritCatalogSummary = "图鉴数据待加载";
     private string _spiritCatalogSyncStatus = "可手动同步 wiki 图鉴";
     private bool _isAutoBattleEnabled;
@@ -35,6 +39,11 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         get;
     } = AutoBattleEncounterRelievedActionOption.CreateDefaultOptions();
+
+    public IReadOnlyList<SpiritCatalogSourceOption> SpiritCatalogSources
+    {
+        get;
+    }
 
     public bool IsEncounterStatisticsEnabled
     {
@@ -78,11 +87,25 @@ public partial class RealtimeViewModel : ObservableRecipient
         private set => SetProperty(ref _spiritCatalogSummary, value);
     }
 
+    public string SpiritCatalogSourceSummary
+    {
+        get => _spiritCatalogSourceSummary;
+        private set => SetProperty(ref _spiritCatalogSourceSummary, value);
+    }
+
     public string SpiritCatalogSyncStatus
     {
         get => _spiritCatalogSyncStatus;
         private set => SetProperty(ref _spiritCatalogSyncStatus, value);
     }
+
+    public SpiritCatalogSourceOption? SelectedSpiritCatalogSource
+    {
+        get => _selectedSpiritCatalogSource;
+        set => ApplySelectedSpiritCatalogSource(value, reloadSummary: true);
+    }
+
+    public string SelectedSpiritCatalogSourceId => SelectedSpiritCatalogSource?.Id ?? string.Empty;
 
     public bool IsSpiritCatalogSyncing
     {
@@ -169,11 +192,21 @@ public partial class RealtimeViewModel : ObservableRecipient
     public RealtimeViewModel(
         IRuntimeTaskService runtimeTaskService,
         IEncounterSeasonConfigService encounterSeasonConfigService,
-        ISpiritCatalogService spiritCatalogService)
+        ISpiritCatalogService spiritCatalogService,
+        ILocalSettingsService localSettingsService)
     {
         _runtimeTaskService = runtimeTaskService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
+        _localSettingsService = localSettingsService;
+        SpiritCatalogSources = _spiritCatalogService.GetSources();
+        _selectedSpiritCatalogSource = SpiritCatalogSources.FirstOrDefault();
+        if (_selectedSpiritCatalogSource is not null)
+        {
+            _spiritCatalogSourceSummary = $"当前：{_selectedSpiritCatalogSource.Name}";
+            _spiritCatalogSyncStatus = $"可手动同步 {_selectedSpiritCatalogSource.Name}";
+        }
+
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _runtimeTaskService.SettingsChanged += RuntimeTaskService_SettingsChanged;
         _isEncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled;
@@ -184,6 +217,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         await _runtimeTaskService.LoadSettingsAsync();
         ApplyRuntimeTaskSettings();
+        await LoadSpiritCatalogSourceSelectionAsync();
         _hasLoadedSettings = true;
         await LoadSpiritCatalogSummaryAsync();
     }
@@ -196,13 +230,21 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
 
         IsSpiritCatalogSyncing = true;
-        SpiritCatalogSyncStatus = "正在同步 wiki 图鉴";
+        var source = SelectedSpiritCatalogSource ?? SpiritCatalogSources.FirstOrDefault();
+        if (source is null)
+        {
+            SpiritCatalogSyncStatus = "同步失败：未配置图鉴源";
+            IsSpiritCatalogSyncing = false;
+            return;
+        }
+
+        SpiritCatalogSyncStatus = $"正在同步 {source.Name}";
         try
         {
             var progress = new Progress<SpiritCatalogSyncProgress>(UpdateSpiritCatalogSyncProgress);
-            var document = await _spiritCatalogService.SyncAsync(progress);
+            var document = await _spiritCatalogService.SyncAsync(source.Id, progress);
             ApplySpiritCatalogSummary(document);
-            SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号";
+            SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号 · {document.Source.Name}";
         }
         catch (Exception ex)
         {
@@ -218,7 +260,14 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         try
         {
-            var document = await _spiritCatalogService.LoadAsync();
+            var source = SelectedSpiritCatalogSource ?? SpiritCatalogSources.FirstOrDefault();
+            if (source is null)
+            {
+                SpiritCatalogSummary = "未配置图鉴源";
+                return;
+            }
+
+            var document = await _spiritCatalogService.LoadAsync(source.Id);
             ApplySpiritCatalogSummary(document);
         }
         catch (Exception ex)
@@ -230,7 +279,68 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     private void ApplySpiritCatalogSummary(SpiritCatalogDocument document)
     {
-        SpiritCatalogSummary = $"{document.Count} 个图鉴编号";
+        SpiritCatalogSummary = document.Source.ScrapedAt == default
+            ? $"{document.Count} 个图鉴编号 · 未同步"
+            : $"{document.Count} 个图鉴编号 · {document.Source.ScrapedAt.ToLocalTime():yyyy-MM-dd HH:mm}";
+    }
+
+    private async Task LoadSpiritCatalogSourceSelectionAsync()
+    {
+        try
+        {
+            var savedSourceId = await _localSettingsService.ReadSettingAsync<string>(SettingsKeys.SpiritCatalogSourceId);
+            var source = ResolveSpiritCatalogSource(savedSourceId) ?? SpiritCatalogSources.FirstOrDefault();
+            ApplySelectedSpiritCatalogSource(source, reloadSummary: false);
+        }
+        catch
+        {
+            ApplySelectedSpiritCatalogSource(SpiritCatalogSources.FirstOrDefault(), reloadSummary: false);
+        }
+    }
+
+    private SpiritCatalogSourceOption? ResolveSpiritCatalogSource(string? sourceId)
+    {
+        return SpiritCatalogSources.FirstOrDefault(source =>
+            string.Equals(source.Id, sourceId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void ApplySelectedSpiritCatalogSource(
+        SpiritCatalogSourceOption? source,
+        bool reloadSummary)
+    {
+        if (source is null || !SetProperty(ref _selectedSpiritCatalogSource, source, nameof(SelectedSpiritCatalogSource)))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(SelectedSpiritCatalogSourceId));
+        SpiritCatalogSourceSummary = $"当前：{source.Name}";
+        if (!IsSpiritCatalogSyncing)
+        {
+            SpiritCatalogSyncStatus = $"可手动同步 {source.Name}";
+        }
+
+        if (CanPersistSettings)
+        {
+            _ = SaveSpiritCatalogSourceSelectionAsync(source.Id);
+        }
+
+        if (reloadSummary && _hasLoadedSettings)
+        {
+            _ = LoadSpiritCatalogSummaryAsync();
+        }
+    }
+
+    private async Task SaveSpiritCatalogSourceSelectionAsync(string sourceId)
+    {
+        try
+        {
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.SpiritCatalogSourceId, sourceId);
+        }
+        catch
+        {
+            // 选择源失败不影响当前会话的图鉴查看。
+        }
     }
 
     private void UpdateSpiritCatalogSyncProgress(SpiritCatalogSyncProgress progress)

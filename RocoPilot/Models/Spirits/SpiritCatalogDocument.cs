@@ -13,12 +13,16 @@ public sealed class SpiritCatalogDocument
 
 public sealed class SpiritCatalogSource
 {
+    public string Id { get; set; } = string.Empty;
+
     public string Name { get; set; } = string.Empty;
 
     public string ListUrl { get; set; } = string.Empty;
 
     public DateTimeOffset ScrapedAt { get; set; }
 }
+
+public sealed record SpiritCatalogSourceOption(string Id, string Name, string ListUrl);
 
 public sealed class SpiritCatalogItem
 {

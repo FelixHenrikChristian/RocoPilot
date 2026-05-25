@@ -22,14 +22,22 @@ public sealed partial class SpiritCatalogDetailWindow : WindowEx
 
     public string Summary { get; }
 
+    public string SourceDisplayName { get; }
+
+    public Uri? SourceUri { get; }
+
     public SpiritCatalogDetailWindow(
         string title,
         string summary,
         IReadOnlyList<SpiritCatalogDisplayItem> items,
-        ISpiritCatalogService spiritCatalogService)
+        ISpiritCatalogService spiritCatalogService,
+        string sourceDisplayName,
+        Uri? sourceUri)
     {
         HeaderTitle = title;
         Summary = summary;
+        SourceDisplayName = sourceDisplayName;
+        SourceUri = sourceUri;
         _spiritCatalogService = spiritCatalogService;
         _themeSelectorService = App.GetService<IThemeSelectorService>();
 
@@ -70,7 +78,9 @@ public sealed partial class SpiritCatalogDetailWindow : WindowEx
             $"NO.{item.Id} 变种",
             $"{item.Name} · {items.Count} 个变种",
             items,
-            _spiritCatalogService);
+            _spiritCatalogService,
+            SourceDisplayName,
+            SourceUri);
         window.Activate();
     }
 }

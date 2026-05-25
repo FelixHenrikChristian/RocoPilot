@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+
 namespace RocoPilot.Models.Runtime;
 
 public sealed class AutoBattleSettings
@@ -23,12 +25,14 @@ public sealed class AutoBattleSettings
         set;
     } = DefaultTurnSequence;
 
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<AutoBattleReleaseStep> ReleaseSequence
     {
         get;
         set;
     } = CreateDefaultReleaseSequence();
 
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<AutoBattleTurnSequencePreset> TurnSequencePresets
     {
         get;

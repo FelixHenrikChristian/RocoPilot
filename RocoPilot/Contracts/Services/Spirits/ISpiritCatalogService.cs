@@ -4,9 +4,20 @@ namespace RocoPilot.Contracts.Services.Spirits;
 
 public interface ISpiritCatalogService
 {
+    IReadOnlyList<SpiritCatalogSourceOption> GetSources();
+
     Task<SpiritCatalogDocument> LoadAsync(CancellationToken cancellationToken = default);
 
+    Task<SpiritCatalogDocument> LoadAsync(
+        string sourceId,
+        CancellationToken cancellationToken = default);
+
     Task<SpiritCatalogDocument> SyncAsync(
+        IProgress<SpiritCatalogSyncProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    Task<SpiritCatalogDocument> SyncAsync(
+        string sourceId,
         IProgress<SpiritCatalogSyncProgress>? progress = null,
         CancellationToken cancellationToken = default);
 

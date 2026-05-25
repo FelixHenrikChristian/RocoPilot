@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
@@ -21,6 +23,7 @@ public sealed partial class RealtimePage : Page
         ViewModel = App.GetService<RealtimeViewModel>();
         InitializeComponent();
         Loaded += RealtimePage_Loaded;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
     }
 
     private async void RealtimePage_Loaded(object sender, RoutedEventArgs e)
@@ -42,15 +45,16 @@ public sealed partial class RealtimePage : Page
         _autoBattleConfigWindow.Activate();
     }
 
-    private void ViewSpiritCatalogButton_Click(object sender, RoutedEventArgs e)
+    private async void ViewSpiritCatalogButton_Click(object sender, RoutedEventArgs e)
     {
         if (_spiritCatalogWindow is not null)
         {
+            await _spiritCatalogWindow.SetSourceAsync(ViewModel.SelectedSpiritCatalogSourceId);
             _spiritCatalogWindow.Activate();
             return;
         }
 
-        _spiritCatalogWindow = new SpiritCatalogWindow();
+        _spiritCatalogWindow = new SpiritCatalogWindow(ViewModel.SelectedSpiritCatalogSourceId);
         _spiritCatalogWindow.Closed += (_, _) => _spiritCatalogWindow = null;
         _spiritCatalogWindow.Activate();
     }
@@ -60,7 +64,17 @@ public sealed partial class RealtimePage : Page
         await ViewModel.SyncSpiritCatalogAsync();
         if (_spiritCatalogWindow is not null)
         {
+            await _spiritCatalogWindow.SetSourceAsync(ViewModel.SelectedSpiritCatalogSourceId);
             await _spiritCatalogWindow.ReloadAsync();
+        }
+    }
+
+    private async void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(RealtimeViewModel.SelectedSpiritCatalogSource)
+            && _spiritCatalogWindow is not null)
+        {
+            await _spiritCatalogWindow.SetSourceAsync(ViewModel.SelectedSpiritCatalogSourceId);
         }
     }
 }

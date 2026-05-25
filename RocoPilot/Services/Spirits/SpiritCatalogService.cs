@@ -1,10 +1,8 @@
-using System.Net;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -42,34 +40,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
         WriteIndented = true
     };
-
-    private static readonly Regex DivSortRegex = new(
-        "<div class=\"divsort\"(?<attrs>[^>]*)>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex AttributeRegex = new(
-        "([a-zA-Z0-9_-]+)=\"([^\"]*)\"",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex IdRegex = new(
-        ">\\s*NO\\.\\s*(?<id>\\d+)\\s*<",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-
-    private static readonly Regex NameRegex = new(
-        "block_2\"[^>]*>\\s*<a\\s+href=\"(?<href>[^\"]+)\"\\s+title=\"(?<title>[^\"]+)\"",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
-
-    private static readonly Regex IconRegex = new(
-        "<img\\s+alt=\"(?<alt>[^\"]*)\"\\s+src=\"(?<src>[^\"]+)\"[^>]*class=\"rocom_prop_icon\"",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
-
-    private static readonly Regex FallbackImageRegex = new(
-        "<img\\s+alt=\"(?<alt>[^\"]*)\"\\s+src=\"(?<src>[^\"]+)\"",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     private readonly HttpClient _httpClient = CreateHttpClient();
     private readonly ILogger<SpiritCatalogService> _logger;
@@ -424,7 +399,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     {
         progress?.Report(new SpiritCatalogSyncProgress(0, 0, $"正在读取{source.Name}列表"));
         var listMarkup = await GetStringAsync(source.ListUrl, source, "text/html", cancellationToken);
-        var states = ParseBiligameListPage(listMarkup, source.ListUrl);
+        var states = BiligameSpiritCatalogParser.ParseListPage(listMarkup, source.ListUrl);
 
         for (var index = 0; index < states.Count; index++)
         {
@@ -432,8 +407,13 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             var state = states[index];
             progress?.Report(new SpiritCatalogSyncProgress(index + 1, states.Count, "正在读取精灵详情"));
 
-            var fields = ParseWikitextFields(await GetStringAsync(RawUrl(state.Item.PageUrl), source, "text/plain", cancellationToken));
-            EnrichWithFields(state, fields);
+            var fields = BiligameSpiritCatalogParser.ParseWikitextFields(
+                await GetStringAsync(
+                    BiligameSpiritCatalogParser.BuildRawPageUrl(state.Item.PageUrl),
+                    source,
+                    "text/plain",
+                    cancellationToken));
+            BiligameSpiritCatalogParser.EnrichWithFields(state, fields);
             await ThrottleAsync(cancellationToken);
         }
 
@@ -463,7 +443,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             await ThrottleAsync(cancellationToken);
         }
 
-        var states = BuildLcxStates(records);
+        var states = LcxSpiritCatalogParser.BuildStates(records, LcxBaseUrl);
         return BuildDocument(source, states);
     }
 
@@ -474,7 +454,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         var chains = BuildChains(states);
         var spirits = states
             .Select(state => state.Item)
-            .OrderBy(item => ParseId(item.Id))
+            .OrderBy(item => SpiritCatalogParsingHelpers.ParseCatalogId(item.Id))
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -501,6 +481,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     {
         EnsureDocumentSource(document, source);
         var avatarDirectory = GetLocalAvatarDirectory(source);
+        var avatarPathPrefix = GetLocalAvatarPathPrefix(source);
         Directory.CreateDirectory(avatarDirectory);
 
         for (var index = 0; index < document.Spirits.Count; index++)
@@ -510,62 +491,16 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             await DownloadAvatarAsync(
                 document.Spirits[index],
                 avatarDirectory,
-                GetLocalAvatarPathPrefix(source),
+                avatarPathPrefix,
                 cancellationToken);
             await ThrottleAsync(cancellationToken);
         }
 
+        await NormalizeAvatarFilesAsync(document, avatarDirectory, avatarPathPrefix, cancellationToken);
+
         progress?.Report(new SpiritCatalogSyncProgress(0, 0, "正在写入图鉴数据"));
         await WriteDocumentAsync(GetLocalDataPath(source), document, cancellationToken);
-        await TryWriteBundledCatalogsAsync(source, document, cancellationToken);
         await UpdateBundledCatalogMarkerAsync(source, cancellationToken);
-    }
-
-    private async Task TryWriteBundledCatalogsAsync(
-        SpiritCatalogSourceOption source,
-        SpiritCatalogDocument document,
-        CancellationToken cancellationToken)
-    {
-        foreach (var directory in GetBundledCatalogDirectories(source))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                var avatarsDirectory = Path.Combine(directory, "Avatars");
-                Directory.CreateDirectory(avatarsDirectory);
-                CopyAvatarsToBundledDirectory(document, avatarsDirectory);
-
-                var bundledDocument = CloneDocument(document);
-                RewriteAvatarPathsForBundledCatalog(source, bundledDocument);
-                await WriteDocumentAsync(Path.Combine(directory, DataFileName), bundledDocument, cancellationToken);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _logger.LogWarning(ex, "写入内置精灵图鉴数据失败：{Directory}", directory);
-            }
-        }
-    }
-
-    private void CopyAvatarsToBundledDirectory(
-        SpiritCatalogDocument document,
-        string avatarsDirectory)
-    {
-        foreach (var item in document.Spirits)
-        {
-            var sourcePath = ResolveAvatarPath(item.AvatarPath);
-            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
-            {
-                continue;
-            }
-
-            var targetPath = Path.Combine(avatarsDirectory, Path.GetFileName(sourcePath));
-            if (string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            File.Copy(sourcePath, targetPath, overwrite: true);
-        }
     }
 
     private async Task UpdateBundledCatalogMarkerAsync(
@@ -582,73 +517,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         var markerPath = GetBundledCatalogMarkerPath(source);
         Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
         await File.WriteAllTextAsync(markerPath, marker + Environment.NewLine, cancellationToken);
-    }
-
-    private static IReadOnlyList<string> GetBundledCatalogDirectories(SpiritCatalogSourceOption source)
-    {
-        var directories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var outputDirectory = GetBundledSourceDirectory(AppContext.BaseDirectory, source.Id);
-        if (Directory.Exists(outputDirectory))
-        {
-            directories.Add(outputDirectory);
-        }
-
-        foreach (var searchRoot in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
-        {
-            var projectDirectory = FindProjectDirectory(searchRoot);
-            if (!string.IsNullOrWhiteSpace(projectDirectory))
-            {
-                directories.Add(GetBundledSourceDirectory(projectDirectory, source.Id));
-            }
-        }
-
-        return directories.ToList();
-    }
-
-    private static string? FindProjectDirectory(string startPath)
-    {
-        var directory = new DirectoryInfo(startPath);
-        while (directory is not null)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "RocoPilot.csproj")))
-            {
-                return directory.FullName;
-            }
-
-            var nestedProjectPath = Path.Combine(directory.FullName, "RocoPilot", "RocoPilot.csproj");
-            if (File.Exists(nestedProjectPath))
-            {
-                return Path.Combine(directory.FullName, "RocoPilot");
-            }
-
-            directory = directory.Parent;
-        }
-
-        return null;
-    }
-
-    private static SpiritCatalogDocument CloneDocument(SpiritCatalogDocument document)
-    {
-        return JsonSerializer.Deserialize<SpiritCatalogDocument>(
-                JsonSerializer.Serialize(document, JsonOptions),
-                JsonOptions)
-            ?? new SpiritCatalogDocument();
-    }
-
-    private static void RewriteAvatarPathsForBundledCatalog(
-        SpiritCatalogSourceOption source,
-        SpiritCatalogDocument document)
-    {
-        foreach (var item in document.Spirits)
-        {
-            if (string.IsNullOrWhiteSpace(item.AvatarPath))
-            {
-                continue;
-            }
-
-            item.AvatarPath = ToJsonPath(
-                Path.Combine("Configuration", "Spirits", SourcesDirectoryName, source.Id, "Avatars", Path.GetFileName(item.AvatarPath)));
-        }
     }
 
     private static async Task WriteDocumentAsync(
@@ -810,342 +678,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return document;
     }
 
-    private static List<ScrapedSpiritState> ParseBiligameListPage(string markup, string listUrl)
-    {
-        var divs = DivSortRegex.Matches(markup).Cast<Match>().ToList();
-        var states = new List<ScrapedSpiritState>();
-        var listUri = new Uri(listUrl);
-
-        for (var index = 0; index < divs.Count; index++)
-        {
-            var start = divs[index].Index;
-            var end = index + 1 < divs.Count ? divs[index + 1].Index : markup.Length;
-            var block = markup[start..end];
-            var attributes = ParseAttributes(divs[index].Value);
-
-            var idMatch = IdRegex.Match(block);
-            var nameMatch = NameRegex.Match(block);
-            if (!idMatch.Success || !nameMatch.Success)
-            {
-                continue;
-            }
-
-            var imageMatch = IconRegex.Match(block);
-            if (!imageMatch.Success)
-            {
-                imageMatch = FallbackImageRegex.Match(block);
-            }
-
-            var avatarUrl = imageMatch.Success
-                ? new Uri(listUri, Decode(imageMatch.Groups["src"].Value).Trim()).ToString()
-                : string.Empty;
-
-            var item = new SpiritCatalogItem
-            {
-                Id = idMatch.Groups["id"].Value,
-                Name = Decode(nameMatch.Groups["title"].Value).Trim(),
-                PageUrl = new Uri(listUri, Decode(nameMatch.Groups["href"].Value).Trim()).ToString(),
-                AvatarUrl = avatarUrl,
-                OriginalImageUrl = ToOriginalImageUrl(avatarUrl)
-            };
-
-            states.Add(new ScrapedSpiritState(
-                item,
-                index,
-                attributes.GetValueOrDefault("data-param1", string.Empty).Trim(),
-                attributes.GetValueOrDefault("data-param2", string.Empty).Trim(),
-                attributes.GetValueOrDefault("data-param3", string.Empty).Trim(),
-                attributes.GetValueOrDefault("data-param4", string.Empty).Trim(),
-                attributes.GetValueOrDefault("data-param6", string.Empty).Trim()));
-        }
-
-        return states;
-    }
-
-    private static Dictionary<string, string> ParseAttributes(string tag)
-    {
-        return AttributeRegex.Matches(tag)
-            .Cast<Match>()
-            .ToDictionary(
-                match => match.Groups[1].Value,
-                match => Decode(match.Groups[2].Value),
-                StringComparer.OrdinalIgnoreCase);
-    }
-
-    private static Dictionary<string, string> ParseWikitextFields(string wikitext)
-    {
-        var fields = new Dictionary<string, string>(StringComparer.Ordinal);
-        string? currentKey = null;
-
-        foreach (var rawLine in wikitext.Split('\n'))
-        {
-            var line = rawLine.TrimEnd('\r');
-            if (line.StartsWith('|') && line.Contains('=', StringComparison.Ordinal))
-            {
-                var separatorIndex = line.IndexOf('=');
-                currentKey = line[1..separatorIndex].Trim();
-                fields[currentKey] = line[(separatorIndex + 1)..].Trim();
-                continue;
-            }
-
-            if (currentKey is not null && !line.StartsWith("}}", StringComparison.Ordinal))
-            {
-                fields[currentKey] = $"{fields[currentKey]}{Environment.NewLine}{line}".Trim();
-            }
-        }
-
-        return fields;
-    }
-
-    private static void EnrichWithFields(
-        ScrapedSpiritState state,
-        IReadOnlyDictionary<string, string> fields)
-    {
-        var item = state.Item;
-        item.WikiName = GetField(fields, "精灵名称", item.Name);
-        item.BaseName = GetField(fields, "精灵初阶名称", item.Name);
-        item.Stage = GetField(fields, "精灵阶段", state.ListStage);
-        item.Form = GetField(fields, "精灵形态", state.ListForm);
-        item.RegionalForm = GetField(fields, "地区形态名称", string.Empty);
-        item.HasShiny = string.Equals(GetField(fields, "是否有异色", state.ListHasShiny), "是", StringComparison.Ordinal);
-        item.PrimaryAttribute = GetField(fields, "主属性", state.ListPrimaryAttribute);
-        item.SecondaryAttribute = GetField(fields, "2属性", state.ListSecondaryAttribute);
-        item.UpdateVersion = GetField(fields, "更新版本", string.Empty);
-        item.Aliases = BuildAliases(item);
-        state.StageRank = StageRank(item.Stage);
-    }
-
-    private static List<ScrapedSpiritState> BuildLcxStates(IReadOnlyList<LcxPokemonDto> records)
-    {
-        var validRecords = records
-            .Where(record => !string.IsNullOrWhiteSpace(record.CatalogId)
-                && !string.IsNullOrWhiteSpace(record.Name))
-            .ToList();
-
-        var chainMetadata = validRecords
-            .GroupBy(BuildLcxChainKey, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => BuildLcxChainMetadata(group),
-                StringComparer.OrdinalIgnoreCase);
-
-        var shinyKeys = validRecords
-            .Where(IsLcxShiny)
-            .Select(BuildLcxShinyKey)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var states = new List<ScrapedSpiritState>();
-        for (var index = 0; index < validRecords.Count; index++)
-        {
-            var record = validRecords[index];
-            var displayName = GetLcxDisplayName(record);
-            var attributes = SplitLcxAttributes(record.Attributes);
-            var primaryAttribute = attributes.ElementAtOrDefault(0) ?? string.Empty;
-            var secondaryAttribute = attributes.ElementAtOrDefault(1) ?? string.Empty;
-            var metadata = chainMetadata[BuildLcxChainKey(record)];
-            var stageNumber = ParseLcxEvolutionStage(record.EvolutionStage);
-            var stage = stageNumber >= metadata.MaxStage
-                ? "最终形态"
-                : ToStageName(stageNumber);
-            var form = GetLcxForm(record);
-            var regionalForm = GetLcxRegionalForm(record);
-            var imageUrl = BuildLcxImageUrl(record, displayName);
-            var hasShiny = IsLcxShiny(record) || shinyKeys.Contains(BuildLcxShinyKey(record));
-
-            var item = new SpiritCatalogItem
-            {
-                Id = NormalizeLcxCatalogId(record.CatalogId),
-                Name = displayName,
-                WikiName = displayName,
-                BaseName = metadata.BaseName,
-                PageUrl = BuildLcxPageUrl(record),
-                AvatarUrl = imageUrl,
-                OriginalImageUrl = imageUrl,
-                Stage = stage,
-                Form = form,
-                RegionalForm = regionalForm,
-                HasShiny = hasShiny,
-                PrimaryAttribute = primaryAttribute,
-                SecondaryAttribute = secondaryAttribute,
-                UpdateVersion = record.UpdatedAt?.Trim() ?? string.Empty
-            };
-            var additionalAliases = new List<string>();
-            if (!string.IsNullOrWhiteSpace(record.Name))
-            {
-                additionalAliases.Add(record.Name);
-            }
-
-            if (!string.IsNullOrWhiteSpace(record.FormDisplayName))
-            {
-                additionalAliases.Add(record.FormDisplayName);
-            }
-
-            item.Aliases = BuildAliases(item, additionalAliases);
-
-            states.Add(new ScrapedSpiritState(
-                item,
-                index,
-                stage,
-                primaryAttribute,
-                secondaryAttribute,
-                form,
-                hasShiny ? "是" : string.Empty)
-            {
-                StageRank = StageRank(stage)
-            });
-        }
-
-        return states;
-    }
-
-    private static LcxChainMetadata BuildLcxChainMetadata(IEnumerable<LcxPokemonDto> records)
-    {
-        var orderedRecords = records
-            .OrderBy(record => ParseLcxEvolutionStage(record.EvolutionStage))
-            .ThenBy(record => ParseId(NormalizeLcxCatalogId(record.CatalogId)))
-            .ThenBy(record => GetLcxDisplayName(record), StringComparer.Ordinal)
-            .ToList();
-        var maxStage = orderedRecords.Max(record => ParseLcxEvolutionStage(record.EvolutionStage));
-        return new LcxChainMetadata(GetLcxDisplayName(orderedRecords[0]), maxStage);
-    }
-
-    private static string BuildLcxChainKey(LcxPokemonDto record)
-    {
-        var chainGroup = string.IsNullOrWhiteSpace(record.ChainGroup)
-            ? NormalizeLcxCatalogId(record.CatalogId)
-            : record.ChainGroup.Trim();
-        return $"{chainGroup}|{GetLcxChainFormKey(record)}";
-    }
-
-    private static string GetLcxChainFormKey(LcxPokemonDto record)
-    {
-        var formName = record.FormName?.Trim();
-        if (!record.IsForm
-            || string.IsNullOrWhiteSpace(formName)
-            || string.Equals(formName, "首领形态", StringComparison.Ordinal))
-        {
-            return "default";
-        }
-
-        return string.Equals(formName, "异色", StringComparison.Ordinal)
-            ? "shiny"
-            : formName;
-    }
-
-    private static string GetLcxDisplayName(LcxPokemonDto record)
-    {
-        var name = record.Name?.Trim() ?? string.Empty;
-        var formName = record.FormName?.Trim() ?? string.Empty;
-        if (record.IsForm && !string.IsNullOrWhiteSpace(record.FormDisplayName))
-        {
-            return record.FormDisplayName.Trim();
-        }
-
-        if (record.IsForm
-            && !string.IsNullOrWhiteSpace(formName)
-            && !string.Equals(formName, "首领形态", StringComparison.Ordinal)
-            && !string.Equals(formName, "异色", StringComparison.Ordinal)
-            && !name.Contains(formName, StringComparison.Ordinal))
-        {
-            return $"{name}（{formName}）";
-        }
-
-        return name;
-    }
-
-    private static string GetLcxForm(LcxPokemonDto record)
-    {
-        var formName = record.FormName?.Trim();
-        if (!record.IsForm || string.IsNullOrWhiteSpace(formName))
-        {
-            return "原始形态";
-        }
-
-        if (string.Equals(formName, "首领形态", StringComparison.Ordinal))
-        {
-            return "首领形态";
-        }
-
-        return string.Equals(formName, "异色", StringComparison.Ordinal)
-            ? "异色形态"
-            : "地区形态";
-    }
-
-    private static string GetLcxRegionalForm(LcxPokemonDto record)
-    {
-        var formName = record.FormName?.Trim();
-        if (string.IsNullOrWhiteSpace(formName)
-            || string.Equals(formName, "首领形态", StringComparison.Ordinal)
-            || string.Equals(formName, "异色", StringComparison.Ordinal))
-        {
-            return string.Empty;
-        }
-
-        return formName;
-    }
-
-    private static bool IsLcxShiny(LcxPokemonDto record)
-    {
-        return string.Equals(record.FormName?.Trim(), "异色", StringComparison.Ordinal);
-    }
-
-    private static string BuildLcxShinyKey(LcxPokemonDto record)
-    {
-        return $"{NormalizeLcxCatalogId(record.CatalogId)}|{record.Name?.Trim()}";
-    }
-
-    private static string BuildLcxPageUrl(LcxPokemonDto record)
-    {
-        var url = $"{LcxBaseUrl}detail.php?name={Uri.EscapeDataString(record.Name?.Trim() ?? string.Empty)}";
-        return string.IsNullOrWhiteSpace(record.FormId)
-            ? url
-            : $"{url}&form_id={Uri.EscapeDataString(record.FormId.Trim())}";
-    }
-
-    private static string BuildLcxImageUrl(LcxPokemonDto record, string displayName)
-    {
-        var imageName = record.IsForm && !string.IsNullOrWhiteSpace(record.FormImagePath)
-            ? record.FormImagePath.Trim()
-            : string.IsNullOrWhiteSpace(record.Name)
-                ? displayName
-                : record.Name.Trim();
-        return $"{LcxBaseUrl}imgs/{Uri.EscapeDataString(imageName)}.webp";
-    }
-
-    private static IReadOnlyList<string> SplitLcxAttributes(string? attributes)
-    {
-        return (attributes ?? string.Empty)
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(attribute => !string.IsNullOrWhiteSpace(attribute))
-            .ToList();
-    }
-
-    private static string NormalizeLcxCatalogId(string? id)
-    {
-        var normalized = (id ?? string.Empty).Trim();
-        return int.TryParse(normalized, out var value)
-            ? value.ToString("000")
-            : normalized;
-    }
-
-    private static int ParseLcxEvolutionStage(string? stage)
-    {
-        return int.TryParse(stage, out var value) && value > 0 ? value : 1;
-    }
-
-    private static string ToStageName(int stage)
-    {
-        return stage switch
-        {
-            <= 1 => "Ⅰ阶",
-            2 => "Ⅱ阶",
-            3 => "Ⅲ阶",
-            4 => "Ⅳ阶",
-            5 => "Ⅴ阶",
-            _ => $"{stage}阶"
-        };
-    }
-
     private static List<SpiritEvolutionChain> BuildChains(List<ScrapedSpiritState> states)
     {
         var chains = new List<SpiritEvolutionChain>();
@@ -1197,7 +729,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         }
 
         return chains
-            .OrderBy(chain => ParseId(chain.BaseId))
+            .OrderBy(chain => SpiritCatalogParsingHelpers.ParseCatalogId(chain.BaseId))
             .ThenBy(chain => chain.BaseName, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
@@ -1232,66 +764,68 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         item.AvatarPath = ToJsonPath(Path.Combine(avatarPathPrefix, fileName));
     }
 
-    private static string RawUrl(string pageUrl)
+    private async Task NormalizeAvatarFilesAsync(
+        SpiritCatalogDocument document,
+        string avatarDirectory,
+        string avatarPathPrefix,
+        CancellationToken cancellationToken)
     {
-        return $"{pageUrl}{(pageUrl.Contains('?', StringComparison.Ordinal) ? '&' : '?')}action=raw";
-    }
+        var canonicalFileNamesByHash = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-    private static string ToOriginalImageUrl(string url)
-    {
-        if (string.IsNullOrWhiteSpace(url) || !url.Contains("/thumb/", StringComparison.Ordinal))
+        foreach (var item in document.Spirits)
         {
-            return url;
-        }
-
-        var parts = url.Split("/thumb/", 2, StringSplitOptions.None);
-        var imageParts = parts[1].Split('/');
-        if (imageParts.Length < 3)
-        {
-            return url;
-        }
-
-        return $"{parts[0]}/{imageParts[0]}/{imageParts[1]}/{imageParts[2]}";
-    }
-
-    private static string GetField(
-        IReadOnlyDictionary<string, string> fields,
-        string key,
-        string fallback)
-    {
-        return fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
-            ? value.Trim()
-            : fallback.Trim();
-    }
-
-    private static List<string> BuildAliases(
-        SpiritCatalogItem item,
-        IEnumerable<string>? additionalAliases = null)
-    {
-        var aliases = new HashSet<string>(StringComparer.Ordinal)
-        {
-            item.Name,
-            item.WikiName
-        };
-
-        if (additionalAliases is not null)
-        {
-            foreach (var alias in additionalAliases)
+            cancellationToken.ThrowIfCancellationRequested();
+            var fileName = GetAvatarFileName(item.AvatarPath);
+            if (fileName.Length == 0)
             {
-                aliases.Add(alias);
+                continue;
+            }
+
+            var filePath = Path.Combine(avatarDirectory, fileName);
+            if (!File.Exists(filePath))
+            {
+                continue;
+            }
+
+            await using var stream = File.OpenRead(filePath);
+            var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken);
+            var hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+            if (canonicalFileNamesByHash.TryGetValue(hash, out var canonicalFileName))
+            {
+                item.AvatarPath = ToJsonPath(Path.Combine(avatarPathPrefix, canonicalFileName));
+                continue;
+            }
+
+            canonicalFileNamesByHash[hash] = fileName;
+        }
+
+        PruneUnreferencedAvatarFiles(document, avatarDirectory);
+    }
+
+    private void PruneUnreferencedAvatarFiles(SpiritCatalogDocument document, string avatarDirectory)
+    {
+        var referencedFileNames = document.Spirits
+            .Select(item => GetAvatarFileName(item.AvatarPath))
+            .Where(fileName => fileName.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in Directory.EnumerateFiles(avatarDirectory))
+        {
+            var fileName = Path.GetFileName(file);
+            if (referencedFileNames.Contains(fileName))
+            {
+                continue;
+            }
+
+            try
+            {
+                File.Delete(file);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(ex, "清理未引用精灵头像失败：{AvatarPath}", file);
             }
         }
-
-        if (!string.IsNullOrWhiteSpace(item.RegionalForm) && !string.IsNullOrWhiteSpace(item.WikiName))
-        {
-            aliases.Add($"{item.WikiName}（{item.RegionalForm}）");
-            aliases.Add($"{item.WikiName}({item.RegionalForm})");
-        }
-
-        return aliases
-            .Where(alias => !string.IsNullOrWhiteSpace(alias))
-            .OrderBy(alias => alias, StringComparer.Ordinal)
-            .ToList();
     }
 
     private static IReadOnlyList<SpiritNameMatchCandidate> BuildNameMatchCandidates(SpiritCatalogDocument document)
@@ -1345,46 +879,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         }
     }
 
-    private static int StageRank(string stage)
-    {
-        if (string.IsNullOrWhiteSpace(stage))
-        {
-            return 0;
-        }
-
-        if (stage.Contains('Ⅴ') || stage.Contains("V", StringComparison.Ordinal))
-        {
-            return 5;
-        }
-
-        if (stage.Contains('Ⅳ') || stage.Contains("IV", StringComparison.Ordinal))
-        {
-            return 4;
-        }
-
-        if (stage.Contains('Ⅲ') || stage.Contains("III", StringComparison.Ordinal))
-        {
-            return 3;
-        }
-
-        if (stage.Contains('Ⅱ') || stage.Contains("II", StringComparison.Ordinal))
-        {
-            return 2;
-        }
-
-        if (stage.Contains('Ⅰ') || stage.Contains("I", StringComparison.Ordinal))
-        {
-            return 1;
-        }
-
-        return stage.Contains("最终", StringComparison.Ordinal) ? 90 : 10;
-    }
-
     private static (int IsBase, int Id, int SourceIndex, string Name) ChainSortKey(ScrapedSpiritState state)
     {
         return (
             string.Equals(state.Item.Name, state.Item.BaseName, StringComparison.Ordinal) ? 0 : 1,
-            ParseId(state.Item.Id),
+            SpiritCatalogParsingHelpers.ParseCatalogId(state.Item.Id),
             state.SourceIndex,
             state.Item.Name);
     }
@@ -1399,11 +898,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             Form = state.Item.Form,
             RegionalForm = state.Item.RegionalForm
         };
-    }
-
-    private static int ParseId(string id)
-    {
-        return int.TryParse(id, out var value) ? value : int.MaxValue;
     }
 
     private static int CountCatalogIds(IEnumerable<SpiritCatalogItem> spirits)
@@ -1423,6 +917,13 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return $"{id}_{hash}{extension}";
     }
 
+    private static string GetAvatarFileName(string? avatarPath)
+    {
+        return string.IsNullOrWhiteSpace(avatarPath)
+            ? string.Empty
+            : Path.GetFileName(avatarPath.Trim().Replace('/', Path.DirectorySeparatorChar));
+    }
+
     private static string GetImageExtension(string url)
     {
         if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
@@ -1437,87 +938,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return ".png";
     }
 
-    private static string Decode(string value)
-    {
-        return WebUtility.HtmlDecode(value);
-    }
-
     private static string ToJsonPath(string path)
     {
         return path.Replace(Path.DirectorySeparatorChar, '/');
-    }
-
-    private sealed record LcxChainMetadata(string BaseName, int MaxStage);
-
-    private sealed class LcxPokemonDto
-    {
-        [JsonPropertyName("t_id")]
-        public string? CatalogId { get; set; }
-
-        public string? Name { get; set; }
-
-        public string? Attributes { get; set; }
-
-        [JsonPropertyName("chain_group")]
-        public string? ChainGroup { get; set; }
-
-        [JsonPropertyName("evolution_stage")]
-        public string? EvolutionStage { get; set; }
-
-        [JsonPropertyName("form_id")]
-        public string? FormId { get; set; }
-
-        [JsonPropertyName("form_name")]
-        public string? FormName { get; set; }
-
-        [JsonPropertyName("form_display_name")]
-        public string? FormDisplayName { get; set; }
-
-        [JsonPropertyName("is_form")]
-        public bool IsForm { get; set; }
-
-        [JsonPropertyName("form_image_path")]
-        public string? FormImagePath { get; set; }
-
-        [JsonPropertyName("updated_at")]
-        public string? UpdatedAt { get; set; }
-    }
-
-    private sealed class ScrapedSpiritState
-    {
-        public ScrapedSpiritState(
-            SpiritCatalogItem item,
-            int sourceIndex,
-            string listStage,
-            string listPrimaryAttribute,
-            string listSecondaryAttribute,
-            string listForm,
-            string listHasShiny)
-        {
-            Item = item;
-            SourceIndex = sourceIndex;
-            ListStage = listStage;
-            ListPrimaryAttribute = listPrimaryAttribute;
-            ListSecondaryAttribute = listSecondaryAttribute;
-            ListForm = listForm;
-            ListHasShiny = listHasShiny;
-        }
-
-        public SpiritCatalogItem Item { get; }
-
-        public int SourceIndex { get; }
-
-        public string ListStage { get; }
-
-        public string ListPrimaryAttribute { get; }
-
-        public string ListSecondaryAttribute { get; }
-
-        public string ListForm { get; }
-
-        public string ListHasShiny { get; }
-
-        public int StageRank { get; set; }
     }
 
     private sealed record SpiritNameMatchCandidate(string Name, IReadOnlyList<string> SearchNames);

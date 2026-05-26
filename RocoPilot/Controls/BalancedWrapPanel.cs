@@ -73,16 +73,15 @@ public sealed class BalancedWrapPanel : Panel
             return finalSize;
         }
 
+        var gap = columns > 1
+            ? Math.Max(0, (layoutWidth - (columns * ItemWidth)) / (columns - 1))
+            : 0;
+
         for (var index = 0; index < Children.Count; index++)
         {
             var row = index / columns;
             var column = index % columns;
-            var rowStart = row * columns;
-            var rowCount = Math.Min(columns, Children.Count - rowStart);
-            var gap = rowCount > 1
-                ? Math.Max(0, (layoutWidth - (rowCount * ItemWidth)) / (rowCount - 1))
-                : 0;
-            var x = rowCount == 1
+            var x = columns == 1
                 ? horizontalInset + Math.Max(0, (layoutWidth - ItemWidth) / 2)
                 : horizontalInset + (column * (ItemWidth + gap));
             var y = row * ItemHeight;

@@ -275,6 +275,8 @@ public partial class StatisticsViewModel : ObservableRecipient
     {
         if (_isLoaded)
         {
+            await LoadSpiritAvatarPathsAsync();
+            ApplySyncStatus(await _statisticsSyncService.LoadStatusAsync());
             return;
         }
 

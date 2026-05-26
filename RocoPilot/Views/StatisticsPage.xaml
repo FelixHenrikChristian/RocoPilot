@@ -426,7 +426,7 @@
                     FontFamily="{StaticResource SymbolThemeFontFamily}"
                     FontSize="17"
                     Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                    Glyph="&#xE9F9;" />
+                    Glyph="&#xE9D2;" />
                 <TextBlock
                     VerticalAlignment="Center"
                     FontSize="18"

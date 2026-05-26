@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using RocoPilot.Contracts.Services.Spirits;
+using RocoPilot.Configuration;
+using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 using RocoPilot.Models.Spirits;
@@ -48,6 +50,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     private readonly HttpClient _httpClient = CreateHttpClient();
     private readonly ILogger<SpiritCatalogService> _logger;
+    private readonly ILocalSettingsService _localSettingsService;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _localDataRoot;
     private readonly Dictionary<string, SpiritCatalogDocument> _documents = new(StringComparer.OrdinalIgnoreCase);
@@ -56,9 +59,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     public SpiritCatalogService(
         IOptions<LocalSettingsOptions> options,
-        ILogger<SpiritCatalogService> logger)
+        ILogger<SpiritCatalogService> logger,
+        ILocalSettingsService localSettingsService)
     {
         _logger = logger;
+        _localSettingsService = localSettingsService;
         _localDataRoot = ResolveLocalDataRoot(options.Value);
     }
 
@@ -69,7 +74,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     public async Task<SpiritCatalogDocument> LoadAsync(CancellationToken cancellationToken = default)
     {
-        return await LoadAsync(BiligameSourceId, cancellationToken);
+        return await LoadAsync(await ResolvePreferredSourceIdAsync(), cancellationToken);
     }
 
     public async Task<SpiritCatalogDocument> LoadAsync(
@@ -134,7 +139,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         IProgress<SpiritCatalogSyncProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        return await SyncAsync(BiligameSourceId, progress, cancellationToken);
+        return await SyncAsync(await ResolvePreferredSourceIdAsync(), progress, cancellationToken);
     }
 
     public async Task<SpiritCatalogDocument> SyncAsync(
@@ -328,6 +333,20 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return SourceOptions.FirstOrDefault(source =>
                 string.Equals(source.Id, sourceId, StringComparison.OrdinalIgnoreCase))
             ?? SourceOptions[0];
+    }
+
+    private async Task<string> ResolvePreferredSourceIdAsync()
+    {
+        try
+        {
+            var sourceId = await _localSettingsService.ReadSettingAsync<string>(SettingsKeys.SpiritCatalogSourceId);
+            return ResolveSource(sourceId).Id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取精灵图鉴来源设置失败，已使用默认图鉴源。");
+            return BiligameSourceId;
+        }
     }
 
     private static SpiritCatalogSourceOption? ResolveDocumentSource(SpiritCatalogDocument document)

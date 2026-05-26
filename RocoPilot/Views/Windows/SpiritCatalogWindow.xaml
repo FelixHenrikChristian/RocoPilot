@@ -43,7 +43,7 @@
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                         FontSize="20"
                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                        Glyph="&#xE8D2;" />
+                        Glyph="&#xE8F1;" />
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
@@ -196,7 +196,7 @@
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                         FontSize="36"
                         Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                        Glyph="&#xE8D2;" />
+                        Glyph="&#xE8F1;" />
                     <TextBlock
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="暂无图鉴数据" />

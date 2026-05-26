@@ -15,7 +15,7 @@
   <Identity
     Name="88efb6ea-9b2d-4c5c-b075-fcd9ba681757"
     Publisher="CN=wangyuefei"
-    Version="0.2.1.0" />
+    Version="0.2.2.0" />
     
   <mp:PhoneIdentity PhoneProductId="88efb6ea-9b2d-4c5c-b075-fcd9ba681757" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
     

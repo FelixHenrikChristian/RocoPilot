@@ -558,7 +558,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     public async Task DownloadStatisticsFromCloudAsync()
     {
         await _statisticsSyncService.DownloadAsync();
-        ShowNotification(InfoBarSeverity.Success, "下载完成", "已使用云端统计数据覆盖本地记录。");
+        ShowNotification(InfoBarSeverity.Success, "合并完成", "已将云端统计数据合并到本地记录。");
     }
 
     public void ShowOperationFailed(string title, Exception exception)

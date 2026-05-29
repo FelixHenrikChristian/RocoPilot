@@ -41,6 +41,12 @@ public sealed class StatisticsSyncSettings
     public DateTimeOffset? LastRemoteCheckedAt { get; set; }
 
     public DateTimeOffset? LastRemoteModifiedAt { get; set; }
+
+    public string? LastRemoteEntityTag { get; set; }
+
+    public DateTimeOffset? LastSyncedRemoteModifiedAt { get; set; }
+
+    public string? LastSyncedRemoteEntityTag { get; set; }
 }
 
 public sealed class StatisticsSyncStatus
@@ -64,6 +70,8 @@ public sealed class StatisticsSyncStatus
     public DateTimeOffset? LastDownloadedAt { get; set; }
 
     public DateTimeOffset? LastRemoteCheckedAt { get; set; }
+
+    public string? RemoteEntityTag { get; set; }
 }
 
 public sealed class StatisticsSyncRemoteInfo
@@ -73,6 +81,8 @@ public sealed class StatisticsSyncRemoteInfo
     public DateTimeOffset? LastModifiedAt { get; set; }
 
     public long? ContentLength { get; set; }
+
+    public string? EntityTag { get; set; }
 
     public DateTimeOffset CheckedAt { get; set; } = DateTimeOffset.Now;
 }
@@ -84,4 +94,6 @@ public sealed class StatisticsSyncResult
     public DateTimeOffset? RemoteLastModifiedAt { get; set; }
 
     public long? ContentLength { get; set; }
+
+    public string? EntityTag { get; set; }
 }

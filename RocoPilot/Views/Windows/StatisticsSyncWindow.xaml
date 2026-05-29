@@ -310,7 +310,7 @@
                                 Text="云端数据" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="查看时间，或迁移时下载。"
+                                Text="查看时间，或合并其他设备的数据。"
                                 TextWrapping="WrapWholeWords" />
                         </StackPanel>
 
@@ -351,13 +351,13 @@
                                 MinWidth="0"
                                 Padding="10,5"
                                 Click="DownloadButton_Click"
-                                ToolTipService.ToolTip="下载云端数据">
+                                ToolTipService.ToolTip="合并云端数据">
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                                         FontSize="14"
                                         Glyph="&#xE896;" />
-                                    <TextBlock Text="下载" />
+                                    <TextBlock Text="合并" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>

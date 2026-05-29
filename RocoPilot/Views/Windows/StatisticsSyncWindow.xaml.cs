@@ -158,9 +158,9 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         var dialog = new ContentDialog
         {
             XamlRoot = ContentRoot.XamlRoot,
-            Title = "下载云端数据",
-            Content = "将使用云端统计数据覆盖本地记录。建议先导出一份本地备份。",
-            PrimaryButtonText = "下载",
+            Title = "合并云端数据",
+            Content = "将把云端统计数据合并到本地记录，不会直接覆盖本地。若两台设备同时修改了同一精灵的聚合计数，将保留较大的计数。",
+            PrimaryButtonText = "合并",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close
         };
@@ -170,10 +170,10 @@ public sealed partial class StatisticsSyncWindow : WindowEx
             return;
         }
 
-        await RunOperationAsync("下载云端数据失败", async () =>
+        await RunOperationAsync("合并云端数据失败", async () =>
         {
             await _viewModel.DownloadStatisticsFromCloudAsync();
-            ShowMessage("下载完成", "已使用云端统计数据覆盖本地记录。", InfoBarSeverity.Success);
+            ShowMessage("合并完成", "已将云端统计数据合并到本地记录。", InfoBarSeverity.Success);
         });
     }
 
@@ -230,7 +230,10 @@ public sealed partial class StatisticsSyncWindow : WindowEx
             LastUploadedAt = _settings.LastUploadedAt,
             LastDownloadedAt = _settings.LastDownloadedAt,
             LastRemoteCheckedAt = _settings.LastRemoteCheckedAt,
-            LastRemoteModifiedAt = _settings.LastRemoteModifiedAt
+            LastRemoteModifiedAt = _settings.LastRemoteModifiedAt,
+            LastRemoteEntityTag = _settings.LastRemoteEntityTag,
+            LastSyncedRemoteModifiedAt = _settings.LastSyncedRemoteModifiedAt,
+            LastSyncedRemoteEntityTag = _settings.LastSyncedRemoteEntityTag
         };
     }
 

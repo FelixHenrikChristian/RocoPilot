@@ -199,11 +199,11 @@
                                 Text="同步行为" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="RocoPilot 会把统计文件保存为 RocoPilot/statistics.json。启用同步后，本地统计变化会延迟约 8 秒自动上传。"
+                                Text="RocoPilot 会把统计文件保存为 RocoPilot/statistics.json。启用同步后，本地统计变化会延迟约 8 秒自动上传，上传前会检查云端是否已被其他设备更新。"
                                 TextWrapping="WrapWholeWords" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="下载云端数据需要手动点击下载，避免误覆盖本地记录。"
+                                Text="云端已更新时需要手动点击合并，把云端统计并入本地记录，避免误覆盖本地数据。"
                                 TextWrapping="WrapWholeWords" />
                         </StackPanel>
                     </Grid>

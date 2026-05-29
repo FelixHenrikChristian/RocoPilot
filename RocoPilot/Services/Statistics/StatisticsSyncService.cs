@@ -165,7 +165,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             {
                 CompletedAt = DateTimeOffset.Now,
                 RemoteLastModifiedAt = info.LastModifiedAt,
-                ContentLength = info.ContentLength
+                ContentLength = info.ContentLength,
+                EntityTag = info.EntityTag
             };
 
             ApplyStatusFromSettings(settings, info.Exists ? "连接成功，已读取云端文件" : "连接成功，云端暂无统计数据");
@@ -194,15 +195,17 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         try
         {
             var (settings, password) = await LoadConfiguredSettingsAsync(cancellationToken);
-            SetBusy(true, "正在下载云端统计数据");
+            SetBusy(true, "正在合并云端统计数据");
             using var response = await SendDownloadRequestAsync(settings, password, cancellationToken);
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var document = DeserializeDocument(json);
+            var remoteDocument = DeserializeDocument(json);
+            var localDocument = await _statisticsService.LoadAsync();
+            var mergedDocument = StatisticsDocumentMerger.Merge(localDocument, remoteDocument);
 
             _suspendAutoUpload = true;
             try
             {
-                await _statisticsService.ReplaceAsync(document);
+                await _statisticsService.ReplaceAsync(mergedDocument);
             }
             finally
             {
@@ -214,19 +217,23 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             {
                 CompletedAt = completedAt,
                 RemoteLastModifiedAt = ReadLastModified(response),
-                ContentLength = response.Content.Headers.ContentLength
+                ContentLength = response.Content.Headers.ContentLength,
+                EntityTag = ReadEntityTag(response)
             };
 
             settings.LastDownloadedAt = completedAt;
             settings.LastRemoteCheckedAt = completedAt;
             settings.LastRemoteModifiedAt = result.RemoteLastModifiedAt;
+            settings.LastRemoteEntityTag = result.EntityTag;
+            settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
+            settings.LastSyncedRemoteEntityTag = result.EntityTag;
             await SaveSettingsCoreAsync(settings, cancellationToken);
-            ApplyStatusFromSettings(settings, "已下载云端统计数据");
+            ApplyStatusFromSettings(settings, "已合并云端统计数据");
             return result;
         }
         catch (Exception ex)
         {
-            SetFailureStatus("下载云端统计失败", ex);
+            SetFailureStatus("合并云端统计失败", ex);
             throw;
         }
         finally
@@ -243,6 +250,12 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         {
             var (settings, password) = await LoadConfiguredSettingsAsync(cancellationToken);
             SetBusy(true, automatic ? "正在自动上传统计数据" : "正在上传统计数据");
+            var currentRemoteInfo = await ReadRemoteInfoCoreAsync(settings, password, cancellationToken);
+            if (HasRemoteChangedSinceLastSync(settings, currentRemoteInfo))
+            {
+                throw new InvalidOperationException("云端统计数据已在其他设备更新，请先下载合并后再上传。");
+            }
+
             var document = await _statisticsService.LoadAsync();
             var json = SerializeDocument(document);
             using var response = await SendUploadRequestAsync(settings, password, json, cancellationToken);
@@ -254,12 +267,16 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             {
                 CompletedAt = completedAt,
                 RemoteLastModifiedAt = info.LastModifiedAt ?? ReadLastModified(response) ?? completedAt,
-                ContentLength = info.ContentLength
+                ContentLength = info.ContentLength,
+                EntityTag = info.EntityTag ?? ReadEntityTag(response)
             };
 
             settings.LastUploadedAt = completedAt;
             settings.LastRemoteCheckedAt = completedAt;
             settings.LastRemoteModifiedAt = result.RemoteLastModifiedAt;
+            settings.LastRemoteEntityTag = result.EntityTag;
+            settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
+            settings.LastSyncedRemoteEntityTag = result.EntityTag;
             await SaveSettingsCoreAsync(settings, cancellationToken);
             ApplyStatusFromSettings(settings, automatic ? "已自动上传统计数据" : "已上传统计数据");
             return result;
@@ -385,6 +402,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
     {
         settings.LastRemoteCheckedAt = info.CheckedAt;
         settings.LastRemoteModifiedAt = info.LastModifiedAt;
+        settings.LastRemoteEntityTag = info.EntityTag;
         await SaveSettingsCoreAsync(settings, cancellationToken);
     }
 
@@ -402,6 +420,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
                 Exists = true,
                 LastModifiedAt = ReadLastModified(response),
                 ContentLength = response.Content.Headers.ContentLength,
+                EntityTag = ReadEntityTag(response),
                 CheckedAt = DateTimeOffset.Now
             };
         }
@@ -692,7 +711,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             RemoteLastModifiedAt = settings.LastRemoteModifiedAt,
             LastUploadedAt = settings.LastUploadedAt,
             LastDownloadedAt = settings.LastDownloadedAt,
-            LastRemoteCheckedAt = settings.LastRemoteCheckedAt
+            LastRemoteCheckedAt = settings.LastRemoteCheckedAt,
+            RemoteEntityTag = settings.LastRemoteEntityTag
         };
         RaiseStatusChanged();
     }
@@ -771,6 +791,9 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         var lastDownloadedAt = isSameProvider ? settings.LastDownloadedAt : null;
         var lastRemoteCheckedAt = isSameProvider ? settings.LastRemoteCheckedAt : null;
         var lastRemoteModifiedAt = isSameProvider ? settings.LastRemoteModifiedAt : null;
+        var lastRemoteEntityTag = isSameProvider ? NormalizeEntityTag(settings.LastRemoteEntityTag) : null;
+        var lastSyncedRemoteModifiedAt = isSameProvider ? settings.LastSyncedRemoteModifiedAt : null;
+        var lastSyncedRemoteEntityTag = isSameProvider ? NormalizeEntityTag(settings.LastSyncedRemoteEntityTag) : null;
         var isEnabled = isSameProvider && settings.IsEnabled;
 
         remotePath = string.IsNullOrWhiteSpace(remotePath)
@@ -789,7 +812,10 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             LastUploadedAt = lastUploadedAt,
             LastDownloadedAt = lastDownloadedAt,
             LastRemoteCheckedAt = lastRemoteCheckedAt,
-            LastRemoteModifiedAt = lastRemoteModifiedAt
+            LastRemoteModifiedAt = lastRemoteModifiedAt,
+            LastRemoteEntityTag = lastRemoteEntityTag,
+            LastSyncedRemoteModifiedAt = lastSyncedRemoteModifiedAt,
+            LastSyncedRemoteEntityTag = lastSyncedRemoteEntityTag
         };
     }
 
@@ -838,6 +864,89 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             ?? response.Headers.Date;
     }
 
+    private static string? ReadEntityTag(HttpResponseMessage response)
+    {
+        var tag = response.Headers.ETag?.Tag;
+        if (string.IsNullOrWhiteSpace(tag)
+            && response.Headers.TryGetValues("ETag", out var values))
+        {
+            tag = values.FirstOrDefault();
+        }
+
+        return NormalizeEntityTag(tag);
+    }
+
+    private static bool HasRemoteChangedSinceLastSync(
+        StatisticsSyncSettings settings,
+        StatisticsSyncRemoteInfo remoteInfo)
+    {
+        if (!remoteInfo.Exists)
+        {
+            return false;
+        }
+
+        var syncedEntityTag = NormalizeEntityTag(settings.LastSyncedRemoteEntityTag);
+        var remoteEntityTag = NormalizeEntityTag(remoteInfo.EntityTag);
+        if (!string.IsNullOrWhiteSpace(syncedEntityTag)
+            && !string.IsNullOrWhiteSpace(remoteEntityTag))
+        {
+            return !string.Equals(syncedEntityTag, remoteEntityTag, StringComparison.Ordinal);
+        }
+
+        var syncedModifiedAt = settings.LastSyncedRemoteModifiedAt ?? ResolveLegacySyncedRemoteModifiedAt(settings);
+        if (syncedModifiedAt is null || remoteInfo.LastModifiedAt is null)
+        {
+            return true;
+        }
+
+        return !AreSameRemoteTimestamp(syncedModifiedAt.Value, remoteInfo.LastModifiedAt.Value);
+    }
+
+    private static DateTimeOffset? ResolveLegacySyncedRemoteModifiedAt(StatisticsSyncSettings settings)
+    {
+        var lastSyncAt = Max(settings.LastUploadedAt, settings.LastDownloadedAt);
+        if (lastSyncAt is null || settings.LastRemoteModifiedAt is null)
+        {
+            return null;
+        }
+
+        return settings.LastRemoteCheckedAt is null
+            || settings.LastRemoteCheckedAt.Value.ToUniversalTime() <= lastSyncAt.Value.ToUniversalTime().AddSeconds(1)
+            ? settings.LastRemoteModifiedAt
+            : null;
+    }
+
+    private static DateTimeOffset? Max(DateTimeOffset? left, DateTimeOffset? right)
+    {
+        if (left is null)
+        {
+            return right;
+        }
+
+        if (right is null)
+        {
+            return left;
+        }
+
+        return left >= right ? left : right;
+    }
+
+    private static bool AreSameRemoteTimestamp(DateTimeOffset left, DateTimeOffset right)
+    {
+        return Math.Abs((left.ToUniversalTime() - right.ToUniversalTime()).TotalSeconds) <= 1;
+    }
+
+    private static string? NormalizeEntityTag(string? entityTag)
+    {
+        entityTag = entityTag?.Trim();
+        if (string.IsNullOrWhiteSpace(entityTag))
+        {
+            return null;
+        }
+
+        return entityTag.Trim('"');
+    }
+
     private static StatisticsSyncProviderOption CloneProvider(StatisticsSyncProviderOption provider)
     {
         return new StatisticsSyncProviderOption
@@ -864,7 +973,10 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             LastUploadedAt = settings.LastUploadedAt,
             LastDownloadedAt = settings.LastDownloadedAt,
             LastRemoteCheckedAt = settings.LastRemoteCheckedAt,
-            LastRemoteModifiedAt = settings.LastRemoteModifiedAt
+            LastRemoteModifiedAt = settings.LastRemoteModifiedAt,
+            LastRemoteEntityTag = settings.LastRemoteEntityTag,
+            LastSyncedRemoteModifiedAt = settings.LastSyncedRemoteModifiedAt,
+            LastSyncedRemoteEntityTag = settings.LastSyncedRemoteEntityTag
         };
     }
 
@@ -881,7 +993,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             RemoteLastModifiedAt = status.RemoteLastModifiedAt,
             LastUploadedAt = status.LastUploadedAt,
             LastDownloadedAt = status.LastDownloadedAt,
-            LastRemoteCheckedAt = status.LastRemoteCheckedAt
+            LastRemoteCheckedAt = status.LastRemoteCheckedAt,
+            RemoteEntityTag = status.RemoteEntityTag
         };
     }
 }

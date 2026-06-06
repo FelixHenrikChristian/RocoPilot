@@ -31,7 +31,8 @@ public sealed partial class InputSimulationTestPage : Page
     private readonly ObservableCollection<KeyboardInputMethodOption> _inputMethodOptions =
     [
         new(KeyboardInputMethod.PostMessage, "PostMessage"),
-        new(KeyboardInputMethod.SendInput, "SendInput")
+        new(KeyboardInputMethod.SendInput, "SendInput"),
+        new(KeyboardInputMethod.Interception, "Interception")
     ];
     private CancellationTokenSource? _sendCancellationTokenSource;
     private CaptureTargetWindow? _targetWindow;
@@ -498,6 +499,7 @@ public sealed partial class InputSimulationTestPage : Page
     {
         return inputMethod switch
         {
+            KeyboardInputMethod.Interception => "Interception",
             KeyboardInputMethod.SendInput => "SendInput",
             KeyboardInputMethod.PostMessage => "PostMessage",
             _ => "未知"

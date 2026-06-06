@@ -3,7 +3,8 @@ namespace RocoPilot.Models.Input;
 public enum KeyboardInputMethod
 {
     PostMessage = 0,
-    SendInput = 1
+    SendInput = 1,
+    Interception = 2
 }
 
 public sealed class KeyboardInputOptions

@@ -252,6 +252,11 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            if (ShouldSkipAutoBattleKeyboardInput(state, settings))
+            {
+                return;
+            }
+
             await _keyboardInputService.SendSequenceAsync(
                 state.TargetWindow.Hwnd,
                 keyStrokes,
@@ -305,8 +310,6 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        BeginAutoBattlePetSwitchingTurn(settings);
-        _wasAutoBattlePetSwitchingVisible = true;
         if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
         {
             return;
@@ -320,10 +323,24 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            if (ShouldSkipAutoBattleKeyboardInput(state, settings))
+            {
+                return;
+            }
+
+            BeginAutoBattlePetSwitchingTurn(settings);
+            _wasAutoBattlePetSwitchingVisible = true;
+
             var keyboardInputOptions = CreateAutoBattleKeyboardInputOptions(settings);
             for (var slot = 1; slot <= 6; slot++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
+                if (ShouldSkipAutoBattleKeyboardInput(state, settings))
+                {
+                    _wasAutoBattlePetSwitchingVisible = false;
+                    return;
+                }
 
                 var slotKey = slot.ToString();
                 _logger.LogDebug("自动战斗换精灵：尝试按 {SlotKey}", slotKey);
@@ -334,6 +351,12 @@ public sealed partial class RuntimeTaskService
                     cancellationToken);
 
                 await Task.Delay(AutoBattlePetSwitchConfirmDelay, cancellationToken);
+
+                if (ShouldSkipAutoBattleKeyboardInput(state, settings))
+                {
+                    _wasAutoBattlePetSwitchingVisible = false;
+                    return;
+                }
 
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
@@ -646,6 +669,30 @@ public sealed partial class RuntimeTaskService
         return true;
     }
 
+    private bool ShouldSkipAutoBattleKeyboardInput(RuntimeTaskState state, AutoBattleSettings settings)
+    {
+        if (!settings.IsEnabled
+            || !_keyboardInputService.RequiresForeground(settings.KeyboardInputMethod))
+        {
+            return false;
+        }
+
+        if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
+        {
+            return false;
+        }
+
+        if (_keyboardInputService.IsWindowForeground(state.TargetWindow.Hwnd))
+        {
+            return false;
+        }
+
+        _logger.LogDebug(
+            "自动战斗按键未发送：{InputMethod} 需要游戏窗口处于前台。",
+            settings.KeyboardInputMethod);
+        return true;
+    }
+
     private async Task<bool> TrySendAutoBattleEnergyRecoveryAsync(
         RuntimeTaskState state,
         CancellationToken cancellationToken)
@@ -669,6 +716,11 @@ public sealed partial class RuntimeTaskService
             }
 
             var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+            if (ShouldSkipAutoBattleKeyboardInput(state, settings))
+            {
+                return false;
+            }
+
             await _keyboardInputService.SendSequenceAsync(
                 state.TargetWindow.Hwnd,
                 "X",

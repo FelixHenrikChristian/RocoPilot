@@ -4,6 +4,7 @@ using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.Spirits;
+using RocoPilot.Models.Input;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.Spirits;
 
@@ -34,11 +35,17 @@ public partial class RealtimeViewModel : ObservableRecipient
     private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
     private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
+    private AutoBattleKeyboardInputMethodOption? _selectedAutoBattleKeyboardInputMethodOption;
 
     public IReadOnlyList<AutoBattleEncounterRelievedActionOption> AutoBattleEncounterRelievedActionOptions
     {
         get;
     } = AutoBattleEncounterRelievedActionOption.CreateDefaultOptions();
+
+    public IReadOnlyList<AutoBattleKeyboardInputMethodOption> AutoBattleKeyboardInputMethodOptions
+    {
+        get;
+    } = AutoBattleKeyboardInputMethodOption.CreateDefaultOptions();
 
     public IReadOnlyList<SpiritCatalogSourceOption> SpiritCatalogSources
     {
@@ -164,7 +171,8 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(
         _autoBattleReleaseSequence,
-        SelectedAutoBattleEncounterRelievedAction);
+        SelectedAutoBattleEncounterRelievedAction,
+        SelectedAutoBattleKeyboardInputMethod);
 
     public AutoBattleEncounterRelievedActionOption? SelectedAutoBattleEncounterRelievedActionOption
     {
@@ -184,10 +192,31 @@ public partial class RealtimeViewModel : ObservableRecipient
     public string AutoBattleEncounterRelievedActionDescription =>
         SelectedAutoBattleEncounterRelievedActionOption?.Description ?? string.Empty;
 
+    public AutoBattleKeyboardInputMethodOption? SelectedAutoBattleKeyboardInputMethodOption
+    {
+        get => _selectedAutoBattleKeyboardInputMethodOption;
+        set
+        {
+            if (value is not null
+                && SetProperty(ref _selectedAutoBattleKeyboardInputMethodOption, value))
+            {
+                SaveAutoBattleSettings();
+                OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+                OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
+            }
+        }
+    }
+
+    public string AutoBattleKeyboardInputMethodDescription =>
+        SelectedAutoBattleKeyboardInputMethodOption?.Description ?? string.Empty;
+
     public AutoBattleSettings AutoBattleSettings => BuildAutoBattleSettings();
 
     private AutoBattleEncounterRelievedAction SelectedAutoBattleEncounterRelievedAction =>
         SelectedAutoBattleEncounterRelievedActionOption?.Action ?? AutoBattleEncounterRelievedAction.RecoverEnergy;
+
+    private KeyboardInputMethod SelectedAutoBattleKeyboardInputMethod =>
+        SelectedAutoBattleKeyboardInputMethodOption?.Method ?? KeyboardInputMethod.PostMessage;
 
     public RealtimeViewModel(
         IRuntimeTaskService runtimeTaskService,
@@ -387,12 +416,16 @@ public partial class RealtimeViewModel : ObservableRecipient
         _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
         _selectedAutoBattleEncounterRelievedActionOption =
             FindAutoBattleEncounterRelievedActionOption(settings.EncounterRelievedAction);
+        _selectedAutoBattleKeyboardInputMethodOption =
+            FindAutoBattleKeyboardInputMethodOption(settings.KeyboardInputMethod);
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(AutoBattleRoundOrder));
         OnPropertyChanged(nameof(AutoBattleTurnSequence));
         OnPropertyChanged(nameof(SelectedAutoBattleEncounterRelievedActionOption));
         OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
+        OnPropertyChanged(nameof(SelectedAutoBattleKeyboardInputMethodOption));
+        OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }
@@ -423,18 +456,21 @@ public partial class RealtimeViewModel : ObservableRecipient
             TurnSequence = AutoBattleTurnSequence,
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
             TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
-            EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction
+            EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,
+            KeyboardInputMethod = SelectedAutoBattleKeyboardInputMethod
         };
     }
 
     private static string BuildAutoBattleConfigurationSummary(
         IReadOnlyList<AutoBattleReleaseStep> releaseSequence,
-        AutoBattleEncounterRelievedAction encounterRelievedAction)
+        AutoBattleEncounterRelievedAction encounterRelievedAction,
+        KeyboardInputMethod inputMethod)
     {
         var encounterRelievedActionText = GetAutoBattleEncounterRelievedActionSummary(encounterRelievedAction);
+        var inputMethodText = GetAutoBattleKeyboardInputMethodSummary(inputMethod);
         if (releaseSequence.Count == 0)
         {
-            return $"未配置释放顺序 · {encounterRelievedActionText}";
+            return $"未配置释放顺序 · {encounterRelievedActionText} · {inputMethodText}";
         }
 
         var previewItems = releaseSequence
@@ -446,7 +482,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         var suffix = releaseSequence.Count > 6
             ? $"等 {releaseSequence.Count} 步"
             : $"{releaseSequence.Count} 步";
-        return $"{preview} · {suffix} · {encounterRelievedActionText}";
+        return $"{preview} · {suffix} · {encounterRelievedActionText} · {inputMethodText}";
     }
 
     private AutoBattleEncounterRelievedActionOption FindAutoBattleEncounterRelievedActionOption(
@@ -454,6 +490,13 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         return AutoBattleEncounterRelievedActionOptions.FirstOrDefault(option => option.Action == action)
             ?? AutoBattleEncounterRelievedActionOptions.First(option => option.Action == AutoBattleEncounterRelievedAction.RecoverEnergy);
+    }
+
+    private AutoBattleKeyboardInputMethodOption FindAutoBattleKeyboardInputMethodOption(
+        KeyboardInputMethod method)
+    {
+        return AutoBattleKeyboardInputMethodOptions.FirstOrDefault(option => option.Method == method)
+            ?? AutoBattleKeyboardInputMethodOptions.First(option => option.Method == KeyboardInputMethod.PostMessage);
     }
 
     private static string GetAutoBattleEncounterRelievedActionSummary(AutoBattleEncounterRelievedAction action)
@@ -465,6 +508,16 @@ public partial class RealtimeViewModel : ObservableRecipient
             AutoBattleEncounterRelievedAction.ReleaseSkill => "始终战技",
             AutoBattleEncounterRelievedAction.Capture => "奇遇解除后捕捉",
             _ => "奇遇解除后回能"
+        };
+    }
+
+    private static string GetAutoBattleKeyboardInputMethodSummary(KeyboardInputMethod method)
+    {
+        return method switch
+        {
+            KeyboardInputMethod.PostMessage => "PostMessage",
+            KeyboardInputMethod.SendInput => "SendInput",
+            _ => "PostMessage"
         };
     }
 }
@@ -494,6 +547,27 @@ public sealed record AutoBattleEncounterRelievedActionOption(
                 AutoBattleEncounterRelievedAction.Capture,
                 "捕捉",
                 "识别到奇遇解除后进入技能选择界面会依次按 W、1、Space。")
+        ];
+    }
+}
+
+public sealed record AutoBattleKeyboardInputMethodOption(
+    KeyboardInputMethod Method,
+    string Name,
+    string Description)
+{
+    public static IReadOnlyList<AutoBattleKeyboardInputMethodOption> CreateDefaultOptions()
+    {
+        return
+        [
+            new(
+                KeyboardInputMethod.PostMessage,
+                "PostMessage",
+                "旧的后台窗口消息方式；不要求游戏前台，但可能被游戏屏蔽。"),
+            new(
+                KeyboardInputMethod.SendInput,
+                "SendInput",
+                "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。")
         ];
     }
 }

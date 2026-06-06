@@ -278,6 +278,41 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE765;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="按键输入方式" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.AutoBattleKeyboardInputMethodDescription, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox
+                            Grid.Column="2"
+                            MinWidth="140"
+                            VerticalAlignment="Center"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{x:Bind ViewModel.AutoBattleKeyboardInputMethodOptions, Mode=OneWay}"
+                            SelectedItem="{x:Bind ViewModel.SelectedAutoBattleKeyboardInputMethodOption, Mode=TwoWay}" />
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE9F5;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="战斗配置" TextWrapping="Wrap" />

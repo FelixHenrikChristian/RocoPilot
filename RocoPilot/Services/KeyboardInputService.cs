@@ -8,11 +8,17 @@ namespace RocoPilot.Services;
 
 public sealed class KeyboardInputService : IKeyboardInputService
 {
+    private const uint InputKeyboard = 1;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
     private const uint WmSysKeyDown = 0x0104;
     private const uint WmSysKeyUp = 0x0105;
     private const uint MapVkToVsc = 0;
+    private const uint KeyEventFExtendedKey = 0x0001;
+    private const uint KeyEventFKeyUp = 0x0002;
+    private const uint KeyEventFScanCode = 0x0008;
+    private const int SwRestore = 9;
+    private static readonly TimeSpan ForegroundActivationDelay = TimeSpan.FromMilliseconds(80);
 
     public bool IsWindowAvailable(IntPtr hwnd)
     {
@@ -81,10 +87,20 @@ public sealed class KeyboardInputService : IKeyboardInputService
         }
 
         var normalizedOptions = options ?? new KeyboardInputOptions();
+        if (!Enum.IsDefined(normalizedOptions.Method))
+        {
+            throw new InvalidOperationException($"不支持的键盘输入方式：{normalizedOptions.Method}");
+        }
+
+        if (normalizedOptions.Method == KeyboardInputMethod.SendInput)
+        {
+            await EnsureTargetWindowForegroundAsync(hwnd, cancellationToken);
+        }
+
         foreach (var keyStroke in keyStrokes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            await SendKeyStrokeAsync(hwnd, keyStroke, normalizedOptions.HoldDurationMs, cancellationToken);
+            await SendKeyStrokeAsync(hwnd, keyStroke, normalizedOptions, cancellationToken);
 
             if (normalizedOptions.IntervalMs > 0 && !ReferenceEquals(keyStroke, keyStrokes[^1]))
             {
@@ -161,7 +177,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
     private static async Task SendKeyStrokeAsync(
         IntPtr hwnd,
         KeyStroke keyStroke,
-        int holdDurationMs,
+        KeyboardInputOptions options,
         CancellationToken cancellationToken)
     {
         var pressedKeys = new List<KeyDefinition>();
@@ -172,22 +188,24 @@ public sealed class KeyboardInputService : IKeyboardInputService
         {
             foreach (var modifier in keyStroke.Modifiers)
             {
-                PostKeyboardMessage(
+                SendKeyboardMessage(
                     hwnd,
+                    options.Method,
                     modifier.VirtualKey == 0x12 ? WmSysKeyDown : WmKeyDown,
                     modifier,
                     isKeyUp: false);
                 pressedKeys.Add(modifier);
             }
 
-            PostKeyboardMessage(
+            SendKeyboardMessage(
                 hwnd,
+                options.Method,
                 useSystemMessage ? WmSysKeyDown : WmKeyDown,
                 keyStroke.Key,
                 isKeyUp: false);
             pressedKeys.Add(keyStroke.Key);
 
-            await Task.Delay(holdDurationMs, cancellationToken);
+            await Task.Delay(options.HoldDurationMs, cancellationToken);
         }
         finally
         {
@@ -195,12 +213,99 @@ public sealed class KeyboardInputService : IKeyboardInputService
             {
                 var key = pressedKeys[index];
                 var isSystemKey = useSystemMessage || key.VirtualKey == 0x12;
-                PostKeyboardMessage(
+                SendKeyboardMessage(
                     hwnd,
+                    options.Method,
                     isSystemKey ? WmSysKeyUp : WmKeyUp,
                     key,
                     isKeyUp: true);
             }
+        }
+    }
+
+    private static async Task EnsureTargetWindowForegroundAsync(IntPtr hwnd, CancellationToken cancellationToken)
+    {
+        if (GetForegroundWindow() == hwnd)
+        {
+            return;
+        }
+
+        if (IsIconic(hwnd))
+        {
+            _ = ShowWindow(hwnd, SwRestore);
+        }
+
+        if (!SetForegroundWindow(hwnd))
+        {
+            throw new InvalidOperationException("无法将目标游戏窗口切到前台，SendInput 可能会发送到错误窗口。");
+        }
+
+        await Task.Delay(ForegroundActivationDelay, cancellationToken);
+        if (GetForegroundWindow() != hwnd)
+        {
+            throw new InvalidOperationException("目标游戏窗口未处于前台，SendInput 已取消。");
+        }
+    }
+
+    private static void SendKeyboardMessage(
+        IntPtr hwnd,
+        KeyboardInputMethod method,
+        uint postMessage,
+        KeyDefinition key,
+        bool isKeyUp)
+    {
+        switch (method)
+        {
+            case KeyboardInputMethod.SendInput:
+                SendKeyboardInput(key, isKeyUp);
+                break;
+            case KeyboardInputMethod.PostMessage:
+                PostKeyboardMessage(hwnd, postMessage, key, isKeyUp);
+                break;
+            default:
+                throw new InvalidOperationException($"不支持的键盘输入方式：{method}");
+        }
+    }
+
+    private static void SendKeyboardInput(KeyDefinition key, bool isKeyUp)
+    {
+        var scanCode = (ushort)(MapVirtualKey((uint)key.VirtualKey, MapVkToVsc) & 0xFF);
+        if (scanCode == 0)
+        {
+            throw new InvalidOperationException($"无法解析按键扫描码：{key.DisplayName}");
+        }
+
+        var flags = KeyEventFScanCode;
+        if (key.IsExtended)
+        {
+            flags |= KeyEventFExtendedKey;
+        }
+
+        if (isKeyUp)
+        {
+            flags |= KeyEventFKeyUp;
+        }
+
+        var inputs = new[]
+        {
+            new KeyboardInputEnvelope
+            {
+                Type = InputKeyboard,
+                Data = new KeyboardInputUnion
+                {
+                    Keyboard = new KeyboardInput
+                    {
+                        ScanCode = scanCode,
+                        Flags = flags
+                    }
+                }
+            }
+        };
+
+        var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<KeyboardInputEnvelope>());
+        if (sent != (uint)inputs.Length)
+        {
+            throw new Win32Exception(Marshal.GetLastWin32Error());
         }
     }
 
@@ -241,6 +346,70 @@ public sealed class KeyboardInputService : IKeyboardInputService
     [DllImport("user32.dll", EntryPoint = "MapVirtualKeyW")]
     private static extern uint MapVirtualKey(uint uCode, uint uMapType);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint SendInput(uint numberOfInputs, KeyboardInputEnvelope[] inputs, int sizeOfInputStructure);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr hWnd, int command);
+
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInputEnvelope
+    {
+        public uint Type;
+        public KeyboardInputUnion Data;
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct KeyboardInputUnion
+    {
+        [FieldOffset(0)]
+        public MouseInput Mouse;
+
+        [FieldOffset(0)]
+        public KeyboardInput Keyboard;
+
+        [FieldOffset(0)]
+        public HardwareInput Hardware;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MouseInput
+    {
+        public int X;
+        public int Y;
+        public uint MouseData;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KeyboardInput
+    {
+        public ushort VirtualKey;
+        public ushort ScanCode;
+        public uint Flags;
+        public uint Time;
+        public IntPtr ExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HardwareInput
+    {
+        public uint Message;
+        public ushort ParameterLow;
+        public ushort ParameterHigh;
+    }
 }

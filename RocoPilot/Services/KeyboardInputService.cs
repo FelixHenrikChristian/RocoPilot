@@ -4,9 +4,15 @@ using System.Runtime.InteropServices;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Input;
 
+using InterceptionInput = InputInterceptorNS.InputInterceptor;
+using InterceptionKeyboardFilter = InputInterceptorNS.KeyboardFilter;
+using InterceptionKeyboardHook = InputInterceptorNS.KeyboardHook;
+using InterceptionKeyCode = InputInterceptorNS.KeyCode;
+using InterceptionKeyState = InputInterceptorNS.KeyState;
+
 namespace RocoPilot.Services;
 
-public sealed class KeyboardInputService : IKeyboardInputService
+public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
 {
     private const uint InputKeyboard = 1;
     private const uint WmKeyDown = 0x0100;
@@ -17,6 +23,9 @@ public sealed class KeyboardInputService : IKeyboardInputService
     private const uint KeyEventFExtendedKey = 0x0001;
     private const uint KeyEventFKeyUp = 0x0002;
     private const uint KeyEventFScanCode = 0x0008;
+
+    private readonly object _interceptionSyncRoot = new();
+    private InterceptionKeyboardHook? _interceptionKeyboardHook;
 
     public bool IsWindowAvailable(IntPtr hwnd)
     {
@@ -57,8 +66,23 @@ public sealed class KeyboardInputService : IKeyboardInputService
         {
             KeyboardInputMethod.PostMessage => false,
             KeyboardInputMethod.SendInput => true,
+            KeyboardInputMethod.Interception => true,
             _ => throw new InvalidOperationException($"不支持的键盘输入方式：{method}")
         };
+    }
+
+    public void Dispose()
+    {
+        lock (_interceptionSyncRoot)
+        {
+            _interceptionKeyboardHook?.Dispose();
+            _interceptionKeyboardHook = null;
+
+            if (!InterceptionInput.Disposed)
+            {
+                InterceptionInput.Dispose();
+            }
+        }
     }
 
     public bool TryParseSequence(
@@ -135,7 +159,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
             cancellationToken.ThrowIfCancellationRequested();
             if (requiresForeground)
             {
-                EnsureTargetWindowForeground(hwnd);
+                EnsureTargetWindowForeground(hwnd, normalizedOptions.Method);
             }
 
             await SendKeyStrokeAsync(hwnd, keyStroke, normalizedOptions, cancellationToken);
@@ -212,7 +236,7 @@ public sealed class KeyboardInputService : IKeyboardInputService
         return false;
     }
 
-    private static async Task SendKeyStrokeAsync(
+    private async Task SendKeyStrokeAsync(
         IntPtr hwnd,
         KeyStroke keyStroke,
         KeyboardInputOptions options,
@@ -261,17 +285,17 @@ public sealed class KeyboardInputService : IKeyboardInputService
         }
     }
 
-    private void EnsureTargetWindowForeground(IntPtr hwnd)
+    private void EnsureTargetWindowForeground(IntPtr hwnd, KeyboardInputMethod method)
     {
         if (IsWindowForeground(hwnd))
         {
             return;
         }
 
-        throw new InvalidOperationException("目标游戏窗口未处于前台，SendInput 已取消。");
+        throw new InvalidOperationException($"目标游戏窗口未处于前台，{method} 已取消。");
     }
 
-    private static void SendKeyboardMessage(
+    private void SendKeyboardMessage(
         IntPtr hwnd,
         KeyboardInputMethod method,
         uint postMessage,
@@ -286,9 +310,124 @@ public sealed class KeyboardInputService : IKeyboardInputService
             case KeyboardInputMethod.PostMessage:
                 PostKeyboardMessage(hwnd, postMessage, key, isKeyUp);
                 break;
+            case KeyboardInputMethod.Interception:
+                SendInterceptionKeyboardInput(key, isKeyUp);
+                break;
             default:
                 throw new InvalidOperationException($"不支持的键盘输入方式：{method}");
         }
+    }
+
+    private void SendInterceptionKeyboardInput(KeyDefinition key, bool isKeyUp)
+    {
+        var keyboardHook = GetInterceptionKeyboardHook();
+        var keyCode = GetInterceptionKeyCode(key);
+        var keyState = isKeyUp ? InterceptionKeyState.Up : InterceptionKeyState.Down;
+        if (key.IsExtended)
+        {
+            keyState |= InterceptionKeyState.E0;
+        }
+
+        bool isSent;
+        lock (_interceptionSyncRoot)
+        {
+            isSent = keyboardHook.SetKeyState(keyCode, keyState);
+        }
+
+        if (!isSent)
+        {
+            throw new InvalidOperationException($"Interception 按键发送失败：{key.DisplayName}。");
+        }
+    }
+
+    private InterceptionKeyboardHook GetInterceptionKeyboardHook()
+    {
+        lock (_interceptionSyncRoot)
+        {
+            if (_interceptionKeyboardHook?.CanSimulateInput == true)
+            {
+                return _interceptionKeyboardHook;
+            }
+
+            _interceptionKeyboardHook?.Dispose();
+            _interceptionKeyboardHook = null;
+
+            if (!InterceptionInput.CheckDriverInstalled())
+            {
+                throw new InvalidOperationException("Interception 驱动未安装或尚未重启。请先安装 Interception 驱动并重启电脑。");
+            }
+
+            if (InterceptionInput.Disposed && !InterceptionInput.Initialize())
+            {
+                throw new InvalidOperationException("Interception 初始化失败。请确认驱动已安装，并以管理员身份启动 RocoPilot。");
+            }
+
+            var keyboardHook = new InterceptionKeyboardHook(InterceptionKeyboardFilter.None);
+            if (!keyboardHook.CanSimulateInput)
+            {
+                keyboardHook.Dispose();
+                throw new InvalidOperationException("Interception 未找到可用键盘设备。请确认驱动已安装，并在键盘上按任意键后重试。");
+            }
+
+            _interceptionKeyboardHook = keyboardHook;
+            return keyboardHook;
+        }
+    }
+
+    private static InterceptionKeyCode GetInterceptionKeyCode(KeyDefinition key)
+    {
+        return key.VirtualKey switch
+        {
+            >= 0x41 and <= 0x5A => (InterceptionKeyCode)(key.VirtualKey - 0x41 + (int)InterceptionKeyCode.A),
+            0x30 => InterceptionKeyCode.Zero,
+            0x31 => InterceptionKeyCode.One,
+            0x32 => InterceptionKeyCode.Two,
+            0x33 => InterceptionKeyCode.Three,
+            0x34 => InterceptionKeyCode.Four,
+            0x35 => InterceptionKeyCode.Five,
+            0x36 => InterceptionKeyCode.Six,
+            0x37 => InterceptionKeyCode.Seven,
+            0x38 => InterceptionKeyCode.Eight,
+            0x39 => InterceptionKeyCode.Nine,
+            0x60 => InterceptionKeyCode.Numpad0,
+            0x61 => InterceptionKeyCode.Numpad1,
+            0x62 => InterceptionKeyCode.Numpad2,
+            0x63 => InterceptionKeyCode.Numpad3,
+            0x64 => InterceptionKeyCode.Numpad4,
+            0x65 => InterceptionKeyCode.Numpad5,
+            0x66 => InterceptionKeyCode.Numpad6,
+            0x67 => InterceptionKeyCode.Numpad7,
+            0x68 => InterceptionKeyCode.Numpad8,
+            0x69 => InterceptionKeyCode.Numpad9,
+            >= 0x70 and <= 0x7B => (InterceptionKeyCode)(key.VirtualKey - 0x70 + (int)InterceptionKeyCode.F1),
+            0x08 => InterceptionKeyCode.Backspace,
+            0x09 => InterceptionKeyCode.Tab,
+            0x0D => InterceptionKeyCode.Enter,
+            0x10 => InterceptionKeyCode.LeftShift,
+            0x11 => InterceptionKeyCode.Control,
+            0x12 => InterceptionKeyCode.Alt,
+            0x14 => InterceptionKeyCode.CapsLock,
+            0x1B => InterceptionKeyCode.Escape,
+            0x20 => InterceptionKeyCode.Space,
+            0x21 => InterceptionKeyCode.PageUp,
+            0x22 => InterceptionKeyCode.PageDown,
+            0x23 => InterceptionKeyCode.End,
+            0x24 => InterceptionKeyCode.Home,
+            0x25 => InterceptionKeyCode.Left,
+            0x26 => InterceptionKeyCode.Up,
+            0x27 => InterceptionKeyCode.Right,
+            0x28 => InterceptionKeyCode.Down,
+            0x2D => InterceptionKeyCode.Insert,
+            0x2E => InterceptionKeyCode.Delete,
+            0x5B => InterceptionKeyCode.LeftWindowsKey,
+            0x5C => InterceptionKeyCode.RightWindowsKey,
+            0x6A => InterceptionKeyCode.NumpadAsterisk,
+            0x6B => InterceptionKeyCode.NumpadPlus,
+            0x6D => InterceptionKeyCode.NumpadMinus,
+            0x6E => InterceptionKeyCode.NumpadDelete,
+            0x6F => InterceptionKeyCode.NumpadDivide,
+            _ => throw new InvalidOperationException($"Interception 暂不支持按键：{key.DisplayName}。")
+        };
     }
 
     private static void SendKeyboardInput(KeyDefinition key, bool isKeyUp)

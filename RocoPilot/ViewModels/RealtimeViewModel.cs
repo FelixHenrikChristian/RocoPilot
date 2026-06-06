@@ -517,6 +517,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         {
             KeyboardInputMethod.PostMessage => "PostMessage",
             KeyboardInputMethod.SendInput => "SendInput",
+            KeyboardInputMethod.Interception => "Interception",
             _ => "PostMessage"
         };
     }
@@ -567,7 +568,11 @@ public sealed record AutoBattleKeyboardInputMethodOption(
             new(
                 KeyboardInputMethod.SendInput,
                 "SendInput",
-                "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。")
+                "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。"),
+            new(
+                KeyboardInputMethod.Interception,
+                "Interception",
+                "驱动级键盘输入；需要安装 Interception 驱动并重启，游戏窗口需处于前台。")
         ];
     }
 }

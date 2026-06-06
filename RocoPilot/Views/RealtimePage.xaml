@@ -289,12 +289,14 @@
                                 TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox
+                            x:Name="AutoBattleKeyboardInputMethodComboBox"
                             Grid.Column="2"
                             MinWidth="140"
                             VerticalAlignment="Center"
                             DisplayMemberPath="Name"
                             ItemsSource="{x:Bind ViewModel.AutoBattleKeyboardInputMethodOptions, Mode=OneWay}"
-                            SelectedItem="{x:Bind ViewModel.SelectedAutoBattleKeyboardInputMethodOption, Mode=TwoWay}" />
+                            SelectedItem="{x:Bind ViewModel.SelectedAutoBattleKeyboardInputMethodOption, Mode=TwoWay}"
+                            SelectionChanged="AutoBattleKeyboardInputMethodComboBox_SelectionChanged" />
                     </Grid>
 
                     <Border

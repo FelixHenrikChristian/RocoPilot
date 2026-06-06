@@ -17,12 +17,48 @@ public sealed class KeyboardInputService : IKeyboardInputService
     private const uint KeyEventFExtendedKey = 0x0001;
     private const uint KeyEventFKeyUp = 0x0002;
     private const uint KeyEventFScanCode = 0x0008;
-    private const int SwRestore = 9;
-    private static readonly TimeSpan ForegroundActivationDelay = TimeSpan.FromMilliseconds(80);
 
     public bool IsWindowAvailable(IntPtr hwnd)
     {
         return hwnd != IntPtr.Zero && IsWindow(hwnd);
+    }
+
+    public bool IsWindowForeground(IntPtr hwnd)
+    {
+        if (!IsWindowAvailable(hwnd))
+        {
+            return false;
+        }
+
+        var foregroundWindow = GetForegroundWindow();
+        if (foregroundWindow == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (foregroundWindow == hwnd)
+        {
+            return true;
+        }
+
+        _ = GetWindowThreadProcessId(hwnd, out var targetProcessId);
+        if (targetProcessId == 0)
+        {
+            return false;
+        }
+
+        _ = GetWindowThreadProcessId(foregroundWindow, out var foregroundProcessId);
+        return foregroundProcessId != 0 && foregroundProcessId == targetProcessId;
+    }
+
+    public bool RequiresForeground(KeyboardInputMethod method)
+    {
+        return method switch
+        {
+            KeyboardInputMethod.PostMessage => false,
+            KeyboardInputMethod.SendInput => true,
+            _ => throw new InvalidOperationException($"不支持的键盘输入方式：{method}")
+        };
     }
 
     public bool TryParseSequence(
@@ -92,14 +128,16 @@ public sealed class KeyboardInputService : IKeyboardInputService
             throw new InvalidOperationException($"不支持的键盘输入方式：{normalizedOptions.Method}");
         }
 
-        if (normalizedOptions.Method == KeyboardInputMethod.SendInput)
-        {
-            await EnsureTargetWindowForegroundAsync(hwnd, cancellationToken);
-        }
+        var requiresForeground = RequiresForeground(normalizedOptions.Method);
 
         foreach (var keyStroke in keyStrokes)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (requiresForeground)
+            {
+                EnsureTargetWindowForeground(hwnd);
+            }
+
             await SendKeyStrokeAsync(hwnd, keyStroke, normalizedOptions, cancellationToken);
 
             if (normalizedOptions.IntervalMs > 0 && !ReferenceEquals(keyStroke, keyStrokes[^1]))
@@ -223,28 +261,14 @@ public sealed class KeyboardInputService : IKeyboardInputService
         }
     }
 
-    private static async Task EnsureTargetWindowForegroundAsync(IntPtr hwnd, CancellationToken cancellationToken)
+    private void EnsureTargetWindowForeground(IntPtr hwnd)
     {
-        if (GetForegroundWindow() == hwnd)
+        if (IsWindowForeground(hwnd))
         {
             return;
         }
 
-        if (IsIconic(hwnd))
-        {
-            _ = ShowWindow(hwnd, SwRestore);
-        }
-
-        if (!SetForegroundWindow(hwnd))
-        {
-            throw new InvalidOperationException("无法将目标游戏窗口切到前台，SendInput 可能会发送到错误窗口。");
-        }
-
-        await Task.Delay(ForegroundActivationDelay, cancellationToken);
-        if (GetForegroundWindow() != hwnd)
-        {
-            throw new InvalidOperationException("目标游戏窗口未处于前台，SendInput 已取消。");
-        }
+        throw new InvalidOperationException("目标游戏窗口未处于前台，SendInput 已取消。");
     }
 
     private static void SendKeyboardMessage(
@@ -352,14 +376,8 @@ public sealed class KeyboardInputService : IKeyboardInputService
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
     [DllImport("user32.dll")]
-    private static extern bool IsIconic(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int command);
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     [DllImport("user32.dll")]
     private static extern bool IsWindow(IntPtr hWnd);

@@ -90,9 +90,19 @@ RocoPilot 是一款 Windows 桌面辅助工具，面向游戏《洛克王国·�
 
 ### 安装 Interception 驱动
 
-`Interception` 输入方式依赖系统级键盘驱动，RocoPilot 不会自动安装或卸载该驱动。首次使用前需要手动完成安装：
+`Interception` 输入方式依赖系统级键盘驱动。首次切换到 `Interception` 时，RocoPilot 会自动检查驱动是否已安装：
 
-1. 打开 [Interception 官方仓库](https://github.com/oblitum/Interception)，进入 [Releases](https://github.com/oblitum/Interception/releases/tag/v1.0.1) 下载 `Interception.zip`。
+1. 如果已安装，会直接使用该输入方式。
+2. 如果未安装，会弹出安装引导窗口。
+3. 点击“下载并安装”后，RocoPilot 会从 [Interception 最新 Release](https://github.com/oblitum/Interception/releases/latest) 下载 `Interception.zip`，解压并执行官方安装程序。
+4. 按 Windows 提示允许管理员权限。
+5. 安装命令完成后重启电脑。驱动通常需要重启后才会生效。
+6. 重启后启动 RocoPilot，在“实时”页的自动战斗设置中选择 `Interception`。
+7. 保持目标游戏窗口处于前台后再启动实时任务和自动战斗。
+
+如果自动下载或安装失败，可以在安装引导窗口中打开官方下载页并手动安装：
+
+1. 打开 [Interception 最新 Release](https://github.com/oblitum/Interception/releases/latest) 下载 `Interception.zip`。
 2. 解压压缩包，进入 `command line installer` 目录。
 3. 以管理员身份打开终端或命令提示符。
 4. 执行安装命令：
@@ -102,8 +112,6 @@ RocoPilot 是一款 Windows 桌面辅助工具，面向游戏《洛克王国·�
    ```
 
 5. 重启电脑。驱动安装后通常需要重启才能生效。
-6. 启动 RocoPilot，在“实时”页的自动战斗设置中把“按键输入方式”切换为 `Interception`。
-7. 保持目标游戏窗口处于前台后再启动实时任务和自动战斗。
 
 如果日志提示 `Interception 未找到可用键盘设备`，先在键盘上按任意键，再重新发送测试按键或重启 RocoPilot。需要卸载驱动时，在同一目录用管理员终端执行：
 

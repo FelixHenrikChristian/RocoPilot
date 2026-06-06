@@ -86,6 +86,7 @@ RocoPilot 是一款 Windows 桌面辅助工具，面向游戏《洛克王国·�
    - `PostMessage`：后台窗口消息方式，不要求游戏前台，但可能被游戏屏蔽。
    - `SendInput`：Windows 扫描码输入，要求游戏窗口处于前台。
    - `Interception`：驱动级键盘输入，要求先安装 Interception 驱动并重启电脑，游戏窗口也需要处于前台。
+   - 当前版本只有 `Interception` 已确认可正常生效，`PostMessage` 和 `SendInput` 暂作为兼容选项保留。
 5. 自动战斗会在识别到合适的战斗界面后发送按键；识别到异色提示后会暂停本场自动操作。
 
 ### 安装 Interception 驱动

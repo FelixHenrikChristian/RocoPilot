@@ -8,30 +8,30 @@ using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Capture;
+using RocoPilot.Models.Input;
 
 namespace RocoPilot.Views.Test;
 
 public sealed partial class InputSimulationTestPage : Page
 {
-    private const uint WmKeyDown = 0x0100;
-    private const uint WmKeyUp = 0x0101;
-    private const uint WmSysKeyDown = 0x0104;
-    private const uint WmSysKeyUp = 0x0105;
-    private const uint MapVkToVsc = 0;
     private const int ErrorAccessDenied = 5;
     private const int TokenIntegrityLevelClass = 25;
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint TokenQuery = 0x0008;
 
-    private static readonly IReadOnlyDictionary<string, KeyDefinition> KeyDefinitions = BuildKeyDefinitions();
-
     private readonly IGameWindowService _gameWindowService;
+    private readonly IKeyboardInputService _keyboardInputService;
     private readonly ObservableCollection<KeySequencePreset> _presets =
     [
         new("技能键 1-6", "1, 2, 3, 4, 5, 6", 45, 120, "顺序发送数字键 1 到 6。"),
         new("移动键 WASD", "W, A, S, D", 60, 150, "顺序发送移动方向键。"),
         new("确认返回", "Enter, Escape", 45, 160, "顺序发送确认和返回。"),
         new("方向键", "Up, Right, Down, Left", 45, 140, "顺序发送键盘方向键。")
+    ];
+    private readonly ObservableCollection<KeyboardInputMethodOption> _inputMethodOptions =
+    [
+        new(KeyboardInputMethod.PostMessage, "PostMessage"),
+        new(KeyboardInputMethod.SendInput, "SendInput")
     ];
     private CancellationTokenSource? _sendCancellationTokenSource;
     private CaptureTargetWindow? _targetWindow;
@@ -45,12 +45,15 @@ public sealed partial class InputSimulationTestPage : Page
     public InputSimulationTestPage()
     {
         _gameWindowService = App.GetService<IGameWindowService>();
+        _keyboardInputService = App.GetService<IKeyboardInputService>();
 
         InitializeComponent();
 
         PresetComboBox.ItemsSource = _presets;
+        InputMethodComboBox.ItemsSource = _inputMethodOptions;
         PreviewListView.ItemsSource = KeyPreviewItems;
         PresetComboBox.SelectedIndex = 0;
+        InputMethodComboBox.SelectedIndex = 0;
 
         Loaded += InputSimulationTestPage_Loaded;
         Unloaded += InputSimulationTestPage_Unloaded;
@@ -94,6 +97,11 @@ public sealed partial class InputSimulationTestPage : Page
         UpdatePreview();
     }
 
+    private void InputMethodComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        UpdatePreview();
+    }
+
     private async void RunSequenceButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isSending)
@@ -104,6 +112,7 @@ public sealed partial class InputSimulationTestPage : Page
         if (!TryBuildSendRequest(
             out var targetWindow,
             out var keyStrokes,
+            out var inputMethod,
             out var holdDurationMs,
             out var intervalMs))
         {
@@ -124,7 +133,16 @@ public sealed partial class InputSimulationTestPage : Page
 
                 var keyStroke = keyStrokes[index];
                 ExecutionStatusText.Text = $"发送中 {index + 1}/{keyStrokes.Count}：{keyStroke.DisplayText}";
-                await SendKeyStrokeAsync(targetWindow.Hwnd, keyStroke, holdDurationMs, cancellationToken);
+                await _keyboardInputService.SendSequenceAsync(
+                    targetWindow.Hwnd,
+                    [keyStroke],
+                    new KeyboardInputOptions
+                    {
+                        Method = inputMethod,
+                        HoldDurationMs = holdDurationMs,
+                        IntervalMs = 0
+                    },
+                    cancellationToken);
 
                 if (index < keyStrokes.Count - 1 && intervalMs > 0)
                 {
@@ -143,7 +161,7 @@ public sealed partial class InputSimulationTestPage : Page
         catch (Win32Exception ex) when (ex.NativeErrorCode == ErrorAccessDenied)
         {
             ExecutionStatusText.Text = "发送失败";
-            ShowMessage(BuildPostMessageAccessDeniedMessage(targetWindow), InfoBarSeverity.Error);
+            ShowMessage(BuildKeyboardInputAccessDeniedMessage(targetWindow, inputMethod), InfoBarSeverity.Error);
         }
         catch (Exception ex)
         {
@@ -191,7 +209,7 @@ public sealed partial class InputSimulationTestPage : Page
 
         KeyPreviewItems.Clear();
 
-        if (!TryParseSequence(KeySequenceTextBox.Text, out var keyStrokes, out var parseError))
+        if (!_keyboardInputService.TryParseSequence(KeySequenceTextBox.Text, out var keyStrokes, out var parseError))
         {
             if (ExecutionStatusText is not null)
             {
@@ -223,12 +241,14 @@ public sealed partial class InputSimulationTestPage : Page
 
     private bool TryBuildSendRequest(
         out CaptureTargetWindow targetWindow,
-        out IReadOnlyList<KeyStroke> keyStrokes,
+        out IReadOnlyList<RocoPilot.Models.Input.KeyStroke> keyStrokes,
+        out KeyboardInputMethod inputMethod,
         out int holdDurationMs,
         out int intervalMs)
     {
         targetWindow = null!;
         keyStrokes = [];
+        inputMethod = GetSelectedInputMethod();
         holdDurationMs = 0;
         intervalMs = 0;
 
@@ -243,21 +263,21 @@ public sealed partial class InputSimulationTestPage : Page
         TargetWindowText.Text = currentWindow.DisplayName;
         TargetWindowHandleText.Text = $"{currentWindow.HandleText} · PID {currentWindow.ProcessId}";
 
-        if (!IsWindow(currentWindow.Hwnd))
+        if (!_keyboardInputService.IsWindowAvailable(currentWindow.Hwnd))
         {
             ShowMessage("目标游戏窗口句柄已失效，请刷新后重试。", InfoBarSeverity.Warning);
             UpdateRunState();
             return false;
         }
 
-        if (TryGetIntegrityMismatchMessage(currentWindow, out var integrityMismatchMessage))
+        if (TryGetIntegrityMismatchMessage(currentWindow, inputMethod, out var integrityMismatchMessage))
         {
             ShowMessage(integrityMismatchMessage, InfoBarSeverity.Warning);
             UpdateRunState();
             return false;
         }
 
-        if (!TryParseSequence(KeySequenceTextBox.Text, out keyStrokes, out var parseError))
+        if (!_keyboardInputService.TryParseSequence(KeySequenceTextBox.Text, out keyStrokes, out var parseError))
         {
             ShowMessage(parseError, InfoBarSeverity.Warning);
             UpdateRunState();
@@ -297,6 +317,7 @@ public sealed partial class InputSimulationTestPage : Page
 
     private static bool TryGetIntegrityMismatchMessage(
         CaptureTargetWindow targetWindow,
+        KeyboardInputMethod inputMethod,
         out string message)
     {
         message = string.Empty;
@@ -308,27 +329,31 @@ public sealed partial class InputSimulationTestPage : Page
             return false;
         }
 
+        var methodName = FormatInputMethodName(inputMethod);
         message = $"权限不足：RocoPilot 当前权限为 {currentIntegrity.Name}，目标游戏为 {targetIntegrity.Name}。"
-            + "Windows 会拒绝低权限进程向高权限窗口 PostMessage。请以管理员身份启动 RocoPilot，或关闭游戏的管理员运行。";
+            + $"Windows 可能会拒绝低权限进程向高权限窗口发送 {methodName} 输入；请以管理员身份启动 RocoPilot，或关闭游戏的管理员运行。";
         return true;
     }
 
-    private static string BuildPostMessageAccessDeniedMessage(CaptureTargetWindow targetWindow)
+    private static string BuildKeyboardInputAccessDeniedMessage(
+        CaptureTargetWindow targetWindow,
+        KeyboardInputMethod inputMethod)
     {
+        var methodName = FormatInputMethodName(inputMethod);
         if (TryGetProcessIntegrityLevel(Environment.ProcessId, out var currentIntegrity, out _)
             && TryGetProcessIntegrityLevel(targetWindow.ProcessId, out var targetIntegrity, out _))
         {
             if (targetIntegrity.Rid > currentIntegrity.Rid)
             {
-                return $"Windows 拒绝向目标窗口 PostMessage：RocoPilot 当前权限为 {currentIntegrity.Name}，目标游戏为 {targetIntegrity.Name}。"
+                return $"Windows 拒绝向目标窗口发送 {methodName} 输入：RocoPilot 当前权限为 {currentIntegrity.Name}，目标游戏为 {targetIntegrity.Name}。"
                     + "请以管理员身份启动 RocoPilot，或关闭游戏的管理员运行。";
             }
 
-            return $"Windows 拒绝向目标窗口 PostMessage。当前 RocoPilot 权限为 {currentIntegrity.Name}，目标游戏为 {targetIntegrity.Name}；"
-                + "如果两者权限一致，可能是游戏或反作弊拦截后台窗口消息。";
+            return $"Windows 拒绝向目标窗口发送 {methodName} 输入。当前 RocoPilot 权限为 {currentIntegrity.Name}，目标游戏为 {targetIntegrity.Name}；"
+                + "如果两者权限一致，可能是游戏或反作弊拦截该输入方式。";
         }
 
-        return "Windows 拒绝向目标窗口 PostMessage。通常是 RocoPilot 权限低于游戏窗口；请以管理员身份启动 RocoPilot，或关闭游戏的管理员运行。";
+        return $"Windows 拒绝向目标窗口发送 {methodName} 输入。通常是 RocoPilot 权限低于游戏窗口；请以管理员身份启动 RocoPilot，或关闭游戏的管理员运行。";
     }
 
     private static bool TryGetProcessIntegrityLevel(
@@ -462,178 +487,21 @@ public sealed partial class InputSimulationTestPage : Page
         return true;
     }
 
-    private static bool TryParseSequence(
-        string sequence,
-        out IReadOnlyList<KeyStroke> keyStrokes,
-        out string error)
+    private KeyboardInputMethod GetSelectedInputMethod()
     {
-        keyStrokes = [];
-        error = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(sequence))
-        {
-            return true;
-        }
-
-        var tokens = SplitSequenceTokens(sequence).ToArray();
-        var parsedStrokes = new List<KeyStroke>(tokens.Length);
-
-        foreach (var token in tokens)
-        {
-            if (!TryParseKeyStroke(token, out var keyStroke, out error))
-            {
-                keyStrokes = [];
-                return false;
-            }
-
-            parsedStrokes.Add(keyStroke);
-        }
-
-        keyStrokes = parsedStrokes;
-        return true;
+        return InputMethodComboBox?.SelectedItem is KeyboardInputMethodOption option
+            ? option.Method
+            : KeyboardInputMethod.PostMessage;
     }
 
-    private static IEnumerable<string> SplitSequenceTokens(string sequence)
+    private static string FormatInputMethodName(KeyboardInputMethod inputMethod)
     {
-        var normalized = sequence
-            .Replace("\r", "\n", StringComparison.Ordinal)
-            .Replace(';', ',');
-
-        foreach (var group in normalized.Split([',', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        return inputMethod switch
         {
-            if (group.Contains('+', StringComparison.Ordinal))
-            {
-                yield return group;
-                continue;
-            }
-
-            foreach (var token in group.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                yield return token;
-            }
-        }
-    }
-
-    private static bool TryParseKeyStroke(
-        string token,
-        out KeyStroke keyStroke,
-        out string error)
-    {
-        keyStroke = null!;
-        error = string.Empty;
-
-        var parts = token.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length == 0)
-        {
-            error = "按键列表中存在空按键。";
-            return false;
-        }
-
-        var modifiers = new List<KeyDefinition>();
-        for (var index = 0; index < parts.Length; index++)
-        {
-            var keyName = NormalizeKeyName(parts[index]);
-            if (!KeyDefinitions.TryGetValue(keyName, out var keyDefinition))
-            {
-                error = $"不支持的按键：{parts[index]}";
-                return false;
-            }
-
-            var isLast = index == parts.Length - 1;
-            if (!isLast && !keyDefinition.IsModifier)
-            {
-                error = $"组合键前缀必须是 Ctrl、Alt 或 Shift：{parts[index]}";
-                return false;
-            }
-
-            if (isLast)
-            {
-                keyStroke = new KeyStroke(modifiers, keyDefinition);
-                return true;
-            }
-
-            modifiers.Add(keyDefinition);
-        }
-
-        error = $"无效按键：{token}";
-        return false;
-    }
-
-    private async Task SendKeyStrokeAsync(
-        IntPtr hwnd,
-        KeyStroke keyStroke,
-        int holdDurationMs,
-        CancellationToken cancellationToken)
-    {
-        var pressedKeys = new List<KeyDefinition>();
-        var useSystemMessage = keyStroke.Modifiers.Any(modifier => modifier.VirtualKey == 0x12)
-            || keyStroke.Key.VirtualKey == 0x12;
-
-        try
-        {
-            foreach (var modifier in keyStroke.Modifiers)
-            {
-                PostKeyboardMessage(
-                    hwnd,
-                    modifier.VirtualKey == 0x12 ? WmSysKeyDown : WmKeyDown,
-                    modifier,
-                    isKeyUp: false);
-                pressedKeys.Add(modifier);
-            }
-
-            PostKeyboardMessage(
-                hwnd,
-                useSystemMessage ? WmSysKeyDown : WmKeyDown,
-                keyStroke.Key,
-                isKeyUp: false);
-            pressedKeys.Add(keyStroke.Key);
-
-            await Task.Delay(holdDurationMs, cancellationToken);
-        }
-        finally
-        {
-            for (var index = pressedKeys.Count - 1; index >= 0; index--)
-            {
-                var key = pressedKeys[index];
-                var isSystemKey = useSystemMessage || key.VirtualKey == 0x12;
-                PostKeyboardMessage(
-                    hwnd,
-                    isSystemKey ? WmSysKeyUp : WmKeyUp,
-                    key,
-                    isKeyUp: true);
-            }
-        }
-    }
-
-    private static void PostKeyboardMessage(
-        IntPtr hwnd,
-        uint message,
-        KeyDefinition key,
-        bool isKeyUp)
-    {
-        var lParam = BuildKeyboardLParam(key, isKeyUp);
-        if (!PostMessage(hwnd, message, new IntPtr(key.VirtualKey), new IntPtr(lParam)))
-        {
-            throw new Win32Exception(Marshal.GetLastWin32Error());
-        }
-    }
-
-    private static int BuildKeyboardLParam(KeyDefinition key, bool isKeyUp)
-    {
-        var scanCode = (int)(MapVirtualKey((uint)key.VirtualKey, MapVkToVsc) & 0xFF);
-        var lParam = 1 | (scanCode << 16);
-        if (key.IsExtended)
-        {
-            lParam |= 1 << 24;
-        }
-
-        if (isKeyUp)
-        {
-            lParam |= 1 << 30;
-            lParam |= 1 << 31;
-        }
-
-        return lParam;
+            KeyboardInputMethod.SendInput => "SendInput",
+            KeyboardInputMethod.PostMessage => "PostMessage",
+            _ => "未知"
+        };
     }
 
     private void SetSendingState(bool isSending)
@@ -641,6 +509,7 @@ public sealed partial class InputSimulationTestPage : Page
         _isSending = isSending;
 
         PresetComboBox.IsEnabled = !isSending;
+        InputMethodComboBox.IsEnabled = !isSending;
         KeySequenceTextBox.IsEnabled = !isSending;
         HoldDurationTextBox.IsEnabled = !isSending;
         KeyIntervalTextBox.IsEnabled = !isSending;
@@ -672,85 +541,6 @@ public sealed partial class InputSimulationTestPage : Page
     {
         InputSimulationInfoBar.IsOpen = false;
     }
-
-    private static string NormalizeKeyName(string keyName)
-    {
-        return keyName.Trim().Replace(" ", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
-    }
-
-    private static IReadOnlyDictionary<string, KeyDefinition> BuildKeyDefinitions()
-    {
-        var definitions = new Dictionary<string, KeyDefinition>(StringComparer.OrdinalIgnoreCase);
-
-        void Add(string displayName, int virtualKey, bool isExtended = false, bool isModifier = false, params string[] aliases)
-        {
-            var key = new KeyDefinition(displayName, virtualKey, isExtended, isModifier);
-            definitions[NormalizeKeyName(displayName)] = key;
-            foreach (var alias in aliases)
-            {
-                definitions[NormalizeKeyName(alias)] = key;
-            }
-        }
-
-        for (var key = 'A'; key <= 'Z'; key++)
-        {
-            Add(key.ToString(), key);
-        }
-
-        for (var number = 0; number <= 9; number++)
-        {
-            Add(number.ToString(), 0x30 + number, aliases: [$"D{number}", $"Digit{number}"]);
-        }
-
-        for (var number = 0; number <= 9; number++)
-        {
-            Add($"Numpad{number}", 0x60 + number, aliases: [$"Num{number}"]);
-        }
-
-        for (var number = 1; number <= 24; number++)
-        {
-            Add($"F{number}", 0x70 + number - 1);
-        }
-
-        Add("Backspace", 0x08, aliases: ["Back"]);
-        Add("Tab", 0x09);
-        Add("Enter", 0x0D, aliases: ["Return"]);
-        Add("Shift", 0x10, isModifier: true);
-        Add("Ctrl", 0x11, isModifier: true, aliases: ["Control"]);
-        Add("Alt", 0x12, isModifier: true, aliases: ["Menu"]);
-        Add("Pause", 0x13);
-        Add("CapsLock", 0x14, aliases: ["Caps"]);
-        Add("Escape", 0x1B, aliases: ["Esc"]);
-        Add("Space", 0x20, aliases: ["Spacebar"]);
-        Add("PageUp", 0x21, isExtended: true, aliases: ["PgUp"]);
-        Add("PageDown", 0x22, isExtended: true, aliases: ["PgDn"]);
-        Add("End", 0x23, isExtended: true);
-        Add("Home", 0x24, isExtended: true);
-        Add("Left", 0x25, isExtended: true, aliases: ["ArrowLeft"]);
-        Add("Up", 0x26, isExtended: true, aliases: ["ArrowUp"]);
-        Add("Right", 0x27, isExtended: true, aliases: ["ArrowRight"]);
-        Add("Down", 0x28, isExtended: true, aliases: ["ArrowDown"]);
-        Add("Insert", 0x2D, isExtended: true, aliases: ["Ins"]);
-        Add("Delete", 0x2E, isExtended: true, aliases: ["Del"]);
-        Add("LeftWin", 0x5B, isExtended: true, isModifier: true, aliases: ["LWin", "Win"]);
-        Add("RightWin", 0x5C, isExtended: true, isModifier: true, aliases: ["RWin"]);
-        Add("Multiply", 0x6A, aliases: ["NumpadMultiply"]);
-        Add("Add", 0x6B, aliases: ["NumpadAdd"]);
-        Add("Subtract", 0x6D, aliases: ["NumpadSubtract"]);
-        Add("Decimal", 0x6E, aliases: ["NumpadDecimal"]);
-        Add("Divide", 0x6F, isExtended: true, aliases: ["NumpadDivide"]);
-
-        return definitions;
-    }
-
-    [DllImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
-    private static extern bool PostMessage(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("user32.dll", EntryPoint = "MapVirtualKeyW")]
-    private static extern uint MapVirtualKey(uint uCode, uint uMapType);
-
-    [DllImport("user32.dll")]
-    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr OpenProcess(uint dwDesiredAccess, bool bInheritHandle, uint dwProcessId);
@@ -797,29 +587,9 @@ public sealed partial class InputSimulationTestPage : Page
         int IntervalMs,
         string Description);
 
-    private sealed record KeyStroke(
-        IReadOnlyList<KeyDefinition> Modifiers,
-        KeyDefinition Key)
-    {
-        public string DisplayText
-        {
-            get
-            {
-                if (Modifiers.Count == 0)
-                {
-                    return Key.DisplayName;
-                }
-
-                return $"{string.Join("+", Modifiers.Select(modifier => modifier.DisplayName))}+{Key.DisplayName}";
-            }
-        }
-    }
-
-    private sealed record KeyDefinition(
-        string DisplayName,
-        int VirtualKey,
-        bool IsExtended = false,
-        bool IsModifier = false);
+    private sealed record KeyboardInputMethodOption(
+        KeyboardInputMethod Method,
+        string Name);
 
     public sealed class KeyStrokePreview
     {

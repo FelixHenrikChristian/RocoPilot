@@ -62,16 +62,9 @@ public sealed partial class RuntimeTaskService
         AlphaThreshold = 16,
         SearchStep = 1
     };
-    private static readonly KeyboardInputOptions AutoBattleKeyboardInputOptions = new()
-    {
-        HoldDurationMs = 100,
-        IntervalMs = 120
-    };
-    private static readonly KeyboardInputOptions AutoBattleCaptureKeyboardInputOptions = new()
-    {
-        HoldDurationMs = 100,
-        IntervalMs = 500
-    };
+    private const int AutoBattleKeyboardHoldDurationMs = 100;
+    private const int AutoBattleKeyboardIntervalMs = 120;
+    private const int AutoBattleCaptureKeyboardIntervalMs = 500;
 
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
@@ -327,6 +320,7 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            var keyboardInputOptions = CreateAutoBattleKeyboardInputOptions(settings);
             for (var slot = 1; slot <= 6; slot++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -336,7 +330,7 @@ public sealed partial class RuntimeTaskService
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
                     slotKey,
-                    AutoBattleKeyboardInputOptions,
+                    keyboardInputOptions,
                     cancellationToken);
 
                 await Task.Delay(AutoBattlePetSwitchConfirmDelay, cancellationToken);
@@ -344,7 +338,7 @@ public sealed partial class RuntimeTaskService
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
                     "Space",
-                    AutoBattleKeyboardInputOptions,
+                    keyboardInputOptions,
                     cancellationToken);
 
                 await Task.Delay(AutoBattlePetSwitchStateCheckDelay, cancellationToken);
@@ -674,10 +668,11 @@ public sealed partial class RuntimeTaskService
                 return false;
             }
 
+            var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
             await _keyboardInputService.SendSequenceAsync(
                 state.TargetWindow.Hwnd,
                 "X",
-                AutoBattleKeyboardInputOptions,
+                CreateAutoBattleKeyboardInputOptions(settings),
                 cancellationToken);
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
             return true;
@@ -759,21 +754,21 @@ public sealed partial class RuntimeTaskService
                     AutoBattleSkillSelectionAction.NoAction,
                     ShouldSendKeys: false,
                     Sequence: string.Empty,
-                    InputOptions: AutoBattleKeyboardInputOptions,
+                    InputOptions: CreateAutoBattleKeyboardInputOptions(settings),
                     Description: "无操作，检测到奇遇效果解除，等待手动释放技能",
                     DisplayKey: "-"),
                 AutoBattleEncounterRelievedAction.RecoverEnergy => new AutoBattleSkillSelectionPlan(
                     AutoBattleSkillSelectionAction.EnergyRecovery,
                     ShouldSendKeys: true,
                     Sequence: "X",
-                    InputOptions: AutoBattleKeyboardInputOptions,
+                    InputOptions: CreateAutoBattleKeyboardInputOptions(settings),
                     Description: "奇遇解除后回能 X",
                     DisplayKey: "X"),
                 AutoBattleEncounterRelievedAction.Capture => new AutoBattleSkillSelectionPlan(
                     AutoBattleSkillSelectionAction.Capture,
                     ShouldSendKeys: true,
                     Sequence: AutoBattleCaptureSequence,
-                    InputOptions: AutoBattleCaptureKeyboardInputOptions,
+                    InputOptions: CreateAutoBattleCaptureKeyboardInputOptions(settings),
                     Description: "奇遇解除后捕捉 W, 1, Space",
                     DisplayKey: "W, 1, Space"),
                 _ => BuildAutoBattleReleaseSkillPlan(settings, releaseStep)
@@ -793,7 +788,7 @@ public sealed partial class RuntimeTaskService
             AutoBattleSkillSelectionAction.Skill,
             ShouldSendKeys: true,
             sequence,
-            AutoBattleKeyboardInputOptions,
+            CreateAutoBattleKeyboardInputOptions(settings),
             releaseStep.IsCustom
                 ? $"执行自定义序列 {displayKey}"
                 : $"释放技能 {displayKey}",
@@ -954,7 +949,32 @@ public sealed partial class RuntimeTaskService
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
         }
 
+        if (!Enum.IsDefined(normalized.KeyboardInputMethod))
+        {
+            normalized.KeyboardInputMethod = KeyboardInputMethod.PostMessage;
+        }
+
         return normalized;
+    }
+
+    private static KeyboardInputOptions CreateAutoBattleKeyboardInputOptions(AutoBattleSettings settings)
+    {
+        return new KeyboardInputOptions
+        {
+            Method = settings.KeyboardInputMethod,
+            HoldDurationMs = AutoBattleKeyboardHoldDurationMs,
+            IntervalMs = AutoBattleKeyboardIntervalMs
+        };
+    }
+
+    private static KeyboardInputOptions CreateAutoBattleCaptureKeyboardInputOptions(AutoBattleSettings settings)
+    {
+        return new KeyboardInputOptions
+        {
+            Method = settings.KeyboardInputMethod,
+            HoldDurationMs = AutoBattleKeyboardHoldDurationMs,
+            IntervalMs = AutoBattleCaptureKeyboardIntervalMs
+        };
     }
 
     private static IReadOnlyList<AutoBattleReleaseStep> NormalizeAutoBattleReleaseSequence(AutoBattleSettings settings)

@@ -1,5 +1,7 @@
 using Newtonsoft.Json;
 
+using RocoPilot.Models.Input;
+
 namespace RocoPilot.Models.Runtime;
 
 public sealed class AutoBattleSettings
@@ -45,6 +47,12 @@ public sealed class AutoBattleSettings
         set;
     } = AutoBattleEncounterRelievedAction.RecoverEnergy;
 
+    public KeyboardInputMethod KeyboardInputMethod
+    {
+        get;
+        set;
+    } = KeyboardInputMethod.PostMessage;
+
     public static AutoBattleSettings CreateDefault()
     {
         return new AutoBattleSettings
@@ -54,7 +62,8 @@ public sealed class AutoBattleSettings
             TurnSequence = DefaultTurnSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
-            EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy
+            EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
+            KeyboardInputMethod = KeyboardInputMethod.PostMessage
         };
     }
 
@@ -79,7 +88,8 @@ public sealed class AutoBattleSettings
             TurnSequence = TurnSequence,
             ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
-            EncounterRelievedAction = EncounterRelievedAction
+            EncounterRelievedAction = EncounterRelievedAction,
+            KeyboardInputMethod = KeyboardInputMethod
         };
     }
 }

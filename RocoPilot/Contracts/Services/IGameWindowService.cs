@@ -10,4 +10,6 @@ public interface IGameWindowService
     }
 
     CaptureTargetWindow? FindGameWindow();
+
+    bool TryBringGameWindowToForeground(CaptureTargetWindow window);
 }

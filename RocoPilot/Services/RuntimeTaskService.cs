@@ -157,12 +157,35 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 return RuntimeTaskStartResult.Started(CurrentState);
             }
 
+            var autoBattleSettings = NormalizeAutoBattleSettings(options.AutoBattleSettings);
             var targetWindow = _gameWindowService.FindGameWindow();
             if (targetWindow is null)
             {
                 var missingWindowMessage = $"未找到目标游戏窗口：{_gameWindowService.TargetProcessName}";
                 _logger.LogWarning("{Message}", missingWindowMessage);
                 return RuntimeTaskStartResult.Failed(missingWindowMessage);
+            }
+
+            var shouldBringGameWindowToForeground =
+                ShouldBringGameWindowToForegroundOnStart(autoBattleSettings);
+            var broughtGameWindowToForeground = false;
+            if (shouldBringGameWindowToForeground)
+            {
+                broughtGameWindowToForeground = _gameWindowService.TryBringGameWindowToForeground(targetWindow);
+                if (broughtGameWindowToForeground)
+                {
+                    _logger.LogInformation(
+                        "自动战斗启动：已将游戏窗口切换到前台。InputMethod={InputMethod}, Window={Window}",
+                        autoBattleSettings.KeyboardInputMethod,
+                        targetWindow.DisplayName);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "自动战斗启动：尝试将游戏窗口切换到前台失败，实时任务继续启动。InputMethod={InputMethod}, Window={Window}",
+                        autoBattleSettings.KeyboardInputMethod,
+                        targetWindow.DisplayName);
+                }
             }
 
             using var firstFrame = await CaptureFrameAsync(targetWindow, options.CaptureMethod, cancellationToken);
@@ -197,7 +220,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             ResetAutoBattleBattleState();
             ResetEncounterRecordSuppression();
             _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
-            _autoBattleSettings = NormalizeAutoBattleSettings(options.AutoBattleSettings);
+            _autoBattleSettings = autoBattleSettings;
             _recognitionOverlayService.Show(state);
             _infoOverlayService.Show(state);
             UpdateInfoOverlayTaskIndicators();
@@ -224,7 +247,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 configResolutionWidth,
                 configResolutionHeight);
 
-            var message = "实时任务已启动。";
+            var message = shouldBringGameWindowToForeground
+                ? broughtGameWindowToForeground
+                    ? "实时任务已启动，已将游戏窗口切换到前台。"
+                    : "实时任务已启动，但未能自动切换游戏窗口到前台。"
+                : "实时任务已启动。";
 
             return RuntimeTaskStartResult.Started(state, message);
         }
@@ -241,6 +268,12 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         {
             _lifecycleLock.Release();
         }
+    }
+
+    private bool ShouldBringGameWindowToForegroundOnStart(AutoBattleSettings settings)
+    {
+        return settings.IsEnabled
+            && _keyboardInputService.RequiresForeground(settings.KeyboardInputMethod);
     }
 
     public async Task StopAsync()

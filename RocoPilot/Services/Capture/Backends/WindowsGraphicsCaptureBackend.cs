@@ -328,13 +328,13 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
         {
             try
             {
-                if (!IsBorderlessCaptureApiPresent())
+                if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 18362)
+                    || !IsBorderlessCaptureApiPresent())
                 {
                     return;
                 }
 
-                var accessStatus = GetBorderlessAccessStatus();
-                if (accessStatus == AppCapabilityAccessStatus.Allowed)
+                if (IsBorderlessAccessAllowed())
                 {
                     session.IsBorderRequired = false;
                 }
@@ -355,13 +355,18 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
                     nameof(GraphicsCaptureSession.IsBorderRequired));
         }
 
-        private static AppCapabilityAccessStatus GetBorderlessAccessStatus()
+        private static bool IsBorderlessAccessAllowed()
         {
+            if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 18362))
+            {
+                return false;
+            }
+
             lock (BorderlessAccessLock)
             {
                 if (_borderlessAccessStatus.HasValue)
                 {
-                    return _borderlessAccessStatus.Value;
+                    return _borderlessAccessStatus.Value == AppCapabilityAccessStatus.Allowed;
                 }
 
                 _borderlessAccessStatus = GraphicsCaptureAccess
@@ -370,7 +375,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
                     .GetAwaiter()
                     .GetResult();
 
-                return _borderlessAccessStatus.Value;
+                return _borderlessAccessStatus.Value == AppCapabilityAccessStatus.Allowed;
             }
         }
     }

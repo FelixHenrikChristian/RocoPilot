@@ -28,24 +28,28 @@ public partial class LogViewModel : ObservableRecipient
     public LogViewModel(ILogger<LogViewModel> logger)
     {
         _logger = logger;
+        ShowInformation = true;
+        ShowWarning = true;
+        ShowError = true;
+        SearchText = string.Empty;
     }
 
     public ObservableCollection<LogEntry> Entries { get; } = new();
 
     [ObservableProperty]
-    private bool _showDebug;
+    public partial bool ShowDebug { get; set; }
 
     [ObservableProperty]
-    private bool _showInformation = true;
+    public partial bool ShowInformation { get; set; }
 
     [ObservableProperty]
-    private bool _showWarning = true;
+    public partial bool ShowWarning { get; set; }
 
     [ObservableProperty]
-    private bool _showError = true;
+    public partial bool ShowError { get; set; }
 
     [ObservableProperty]
-    private string _searchText = string.Empty;
+    public partial string SearchText { get; set; }
 
     public void Attach(DispatcherQueue dispatcher)
     {

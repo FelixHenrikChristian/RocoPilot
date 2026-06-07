@@ -38,39 +38,39 @@ public partial class MainViewModel : ObservableRecipient
     }
 
     [ObservableProperty]
-    private CaptureMethodOption? _selectedCaptureMethod;
+    public partial CaptureMethodOption? SelectedCaptureMethod { get; set; }
 
     [ObservableProperty]
-    private TextRecognitionMethodOption? _selectedTextRecognitionMethod;
+    public partial TextRecognitionMethodOption? SelectedTextRecognitionMethod { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StartStopButtonText))]
     [NotifyPropertyChangedFor(nameof(StartStopButtonGlyph))]
-    private bool _isRealtimeCaptureRunning;
+    public partial bool IsRealtimeCaptureRunning { get; set; }
 
     [ObservableProperty]
-    private bool _isMaskOverlayEnabled;
+    public partial bool IsMaskOverlayEnabled { get; set; }
 
     [ObservableProperty]
-    private bool _isInfoOverlayEnabled = true;
+    public partial bool IsInfoOverlayEnabled { get; set; }
 
     [ObservableProperty]
-    private bool _isInfoOverlayLocked = true;
+    public partial bool IsInfoOverlayLocked { get; set; }
 
     [ObservableProperty]
-    private CaptureTargetWindow? _targetGameWindow;
+    public partial CaptureTargetWindow? TargetGameWindow { get; set; }
 
     [ObservableProperty]
-    private bool _isLaunchNotificationOpen;
+    public partial bool IsLaunchNotificationOpen { get; set; }
 
     [ObservableProperty]
-    private InfoBarSeverity _launchNotificationSeverity = InfoBarSeverity.Informational;
+    public partial InfoBarSeverity LaunchNotificationSeverity { get; set; }
 
     [ObservableProperty]
-    private string _launchNotificationTitle = string.Empty;
+    public partial string LaunchNotificationTitle { get; set; }
 
     [ObservableProperty]
-    private string _launchNotificationMessage = string.Empty;
+    public partial string LaunchNotificationMessage { get; set; }
 
     public string StartStopButtonText => IsRealtimeCaptureRunning ? "停止" : "启动";
 
@@ -89,16 +89,24 @@ public partial class MainViewModel : ObservableRecipient
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _runtimeTaskService.SettingsChanged += RuntimeTaskService_SettingsChanged;
         TextRecognitionMethods = _textRecognitionService.GetMethods();
+        _isApplyingRuntimeTaskSettings = true;
+        IsInfoOverlayEnabled = true;
+        IsInfoOverlayLocked = true;
+        LaunchNotificationSeverity = InfoBarSeverity.Informational;
+        LaunchNotificationTitle = string.Empty;
+        LaunchNotificationMessage = string.Empty;
         SelectedCaptureMethod = CaptureMethods[0];
         SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
         if (_runtimeTaskService.CurrentState is { } currentState)
         {
-            _isMaskOverlayEnabled = currentState.Options.RecognitionOverlayEnabled;
-            _isInfoOverlayEnabled = currentState.Options.InfoOverlayEnabled;
-            _isInfoOverlayLocked = currentState.Options.InfoOverlayLocked;
+            IsMaskOverlayEnabled = currentState.Options.RecognitionOverlayEnabled;
+            IsInfoOverlayEnabled = currentState.Options.InfoOverlayEnabled;
+            IsInfoOverlayLocked = currentState.Options.InfoOverlayLocked;
         }
+
+        _isApplyingRuntimeTaskSettings = false;
     }
 
     [RelayCommand]

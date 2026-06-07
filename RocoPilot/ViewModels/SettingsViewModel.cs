@@ -35,15 +35,15 @@ public partial class SettingsViewModel : ObservableRecipient
     };
 
     [ObservableProperty]
-    private ThemeOption? _selectedThemeOption;
+    public partial ThemeOption? SelectedThemeOption { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsUpdateCheckEnabled))]
     [NotifyPropertyChangedFor(nameof(UpdateButtonText))]
-    private bool _isCheckingUpdate;
+    public partial bool IsCheckingUpdate { get; set; }
 
     [ObservableProperty]
-    private string _updateStatusText = "从 GitHub Releases 获取最新版本信息";
+    public partial string UpdateStatusText { get; set; }
 
     public bool IsUpdateCheckEnabled => !IsCheckingUpdate;
 
@@ -62,6 +62,7 @@ public partial class SettingsViewModel : ObservableRecipient
         _updateService = updateService;
         _logger = logger;
         AppVersion = GetShortAppVersion();
+        UpdateStatusText = "从 GitHub Releases 获取最新版本信息";
     }
 
     public async Task LoadAsync()

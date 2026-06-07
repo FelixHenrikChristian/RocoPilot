@@ -28,7 +28,7 @@ internal static class Direct3D11DeviceFactory
         try
         {
             var dxgiDeviceGuid = DxgiDeviceGuid;
-            result = Marshal.QueryInterface(d3dDevice, ref dxgiDeviceGuid, out var dxgiDevice);
+            result = Marshal.QueryInterface(d3dDevice, in dxgiDeviceGuid, out var dxgiDevice);
             Marshal.ThrowExceptionForHR(result);
 
             try

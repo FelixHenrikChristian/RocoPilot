@@ -132,15 +132,9 @@
                         BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                         BorderThickness="1"
                         CornerRadius="6">
-                        <ScrollViewer
-                            Padding="14"
-                            VerticalScrollBarVisibility="Auto">
-                            <TextBlock
-                                x:Name="ReleaseNotesText"
-                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                                IsTextSelectionEnabled="True"
-                                TextWrapping="WrapWholeWords" />
-                        </ScrollViewer>
+                        <WebView2
+                            x:Name="ReleaseNotesWebView"
+                            MinHeight="120" />
                     </Border>
                 </Grid>
             </Border>

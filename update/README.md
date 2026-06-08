@@ -51,6 +51,20 @@ You can also set `ROCO_KACHINA_CLOUDFLARE_URL` instead of passing the parameter.
 
 In GitHub Actions, set the repository variable `ROCO_R2_PUBLIC_URL` to the R2 public URL prefix. The workflow appends `/RocoPilot.Install.exe` and adds that as the R2 source automatically.
 
+When `ROCO_UPLOAD_TO_R2` is `true`, the workflow also uploads `/latest.json` to the same R2 public URL and injects that URL into `RocoPilot/appsettings.json` for release builds. The app still checks GitHub Releases first; it only reads this metadata file after the GitHub API request fails.
+
+`latest.json` uses the same fields consumed from the GitHub release API:
+
+```json
+{
+  "tag_name": "v0.2.4",
+  "name": "RocoPilot 0.2.4",
+  "body": "Release notes in Markdown",
+  "published_at": "2026-06-08T00:00:00Z",
+  "html_url": "https://github.com/FelixHenrikChristian/RocoPilot/releases/tag/v0.2.4"
+}
+```
+
 Generated files are intentionally ignored by git:
 
 - `RocoPilot.update.exe`

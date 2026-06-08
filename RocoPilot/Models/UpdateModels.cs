@@ -2,6 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace RocoPilot.Models;
 
+public sealed class UpdateSourceOptions
+{
+    public string ReleaseMetadataUrl { get; set; } = string.Empty;
+}
+
 public sealed class GitHubRelease
 {
     [JsonPropertyName("tag_name")]

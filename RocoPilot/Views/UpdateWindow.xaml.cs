@@ -38,7 +38,6 @@ public sealed partial class UpdateWindow : WindowEx
 
         VersionTitleText.Text = $"发现新版本 {_release.TagName}";
         PublishDateText.Text = $"发布时间：{_release.PublishedAt:yyyy年MM月dd日}";
-        ReleaseNotesText.Text = NormalizeReleaseNotes(_release.Body);
 
         RootHost.ActualThemeChanged += OnRootHostActualThemeChanged;
         RootHost.Loaded += OnRootHostLoaded;
@@ -68,24 +67,20 @@ public sealed partial class UpdateWindow : WindowEx
     {
         RootHost.Loaded -= OnRootHostLoaded;
         TitleBarHelper.UpdateTitleBar(this, RootHost.ActualTheme);
+        RenderReleaseNotes();
     }
 
     private void OnRootHostActualThemeChanged(FrameworkElement sender, object args)
     {
         TitleBarHelper.UpdateTitleBar(this, RootHost.ActualTheme);
+        RenderReleaseNotes();
     }
 
-    private static string NormalizeReleaseNotes(string? releaseNotes)
+    private void RenderReleaseNotes()
     {
-        if (string.IsNullOrWhiteSpace(releaseNotes))
-        {
-            return "此版本没有提供更新日志。";
-        }
-
-        return releaseNotes
-            .Replace("\r\n", "\n", StringComparison.Ordinal)
-            .Replace('\r', '\n')
-            .Trim();
+        var isDarkTheme = ReleaseNotesHtmlHelper.ResolveIsDarkTheme(RootHost);
+        var html = ReleaseNotesHtmlHelper.GenerateReleaseNotesHtml(_release.Body, isDarkTheme);
+        ReleaseNotesWebView.NavigateToString(html);
     }
 
     private void Complete(UpdateResult result)

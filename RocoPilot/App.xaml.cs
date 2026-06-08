@@ -143,6 +143,7 @@ public partial class App : Application
 
             // Configuration
             services.Configure<LocalSettingsOptions>(context.Configuration.GetSection(nameof(LocalSettingsOptions)));
+            services.Configure<UpdateSourceOptions>(context.Configuration.GetSection(nameof(UpdateSourceOptions)));
         }).
         Build();
 

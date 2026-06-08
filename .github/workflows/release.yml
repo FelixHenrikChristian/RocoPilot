@@ -206,6 +206,7 @@ jobs:
         shell: pwsh
         env:
           ROCO_R2_PUBLIC_URL: ${{ vars.ROCO_R2_PUBLIC_URL }}
+          ROCO_UPLOAD_TO_R2: ${{ vars.ROCO_UPLOAD_TO_R2 }}
         run: |
           $ErrorActionPreference = "Stop"
           if (-not [string]::IsNullOrWhiteSpace($env:ROCO_R2_PUBLIC_URL)) {
@@ -213,6 +214,21 @@ jobs:
             $cloudflareUrl = "$r2PublicUrl/RocoPilot.Install.exe"
             "ROCO_KACHINA_CLOUDFLARE_URL=$cloudflareUrl" >> $env:GITHUB_ENV
             Write-Host "Kachina R2 source: $cloudflareUrl"
+
+            if ($env:ROCO_UPLOAD_TO_R2 -eq "true") {
+              $metadataUrl = "$r2PublicUrl/latest.json"
+              $appSettingsPath = "RocoPilot/appsettings.json"
+              $appSettings = Get-Content $appSettingsPath -Raw | ConvertFrom-Json
+              if ($null -eq $appSettings.UpdateSourceOptions) {
+                $appSettings | Add-Member -MemberType NoteProperty -Name "UpdateSourceOptions" -Value ([pscustomobject]@{})
+              }
+
+              $appSettings.UpdateSourceOptions.ReleaseMetadataUrl = $metadataUrl
+              $json = $appSettings | ConvertTo-Json -Depth 8
+              $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+              [System.IO.File]::WriteAllText((Resolve-Path $appSettingsPath), $json, $utf8NoBom)
+              Write-Host "Update metadata R2 source: $metadataUrl"
+            }
           }
 
       - name: Build Kachina updater
@@ -348,6 +364,57 @@ jobs:
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
+      - name: Generate update metadata
+        env:
+          RELEASE_TAG: ${{ needs.build_release_assets.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.build_release_assets.outputs.version }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+
+          tag = os.environ["RELEASE_TAG"]
+          version = os.environ["RELEASE_VERSION"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          body = f"""# RocoPilot {version}
+
+          ## 🎉 特性：
+          - **待补充**：填写本次新增的主要功能。
+
+          ## ✨ 优化：
+          - **待补充**：填写体验、性能、流程、界面等优化内容。
+
+          ## 🔧 修复：
+          - **待补充**：填写本次修复的问题。
+
+          ## ⚠️ 注意：
+          - 暂无
+
+          <details>
+          <summary>📦 安装包说明</summary>
+
+          - `RocoPilot-Setup-v*.exe`：完整安装程序，推荐首次安装或手动安装使用。
+          - `RocoPilot.update.exe`：应用内更新器，用于自动下载并执行更新。
+          - `RocoPilot.Install.exe`：应用内更新所需的安装包，由更新器使用。
+
+          </details>
+          """
+
+          metadata = {
+              "tag_name": tag,
+              "name": f"RocoPilot {version}",
+              "body": body,
+              "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+              "html_url": f"https://github.com/{repo}/releases/tag/{tag}",
+          }
+
+          with open("artifacts/latest.json", "w", encoding="utf-8") as file:
+              json.dump(metadata, file, ensure_ascii=False, indent=2)
+              file.write("\n")
+          PY
+
       - name: Upload RocoPilot.Install.exe
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
@@ -356,6 +423,18 @@ jobs:
         run: |
           aws s3 cp artifacts/RocoPilot.Install.exe \
             s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/RocoPilot.Install.exe \
+            --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+
+      - name: Upload update metadata
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp artifacts/latest.json \
+            s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/latest.json \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "no-cache" \
             --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
 
       - name: Upload MicaSetup installer

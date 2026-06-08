@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.UI.Xaml;
 
 using RocoPilot.Contracts.Services;
@@ -22,10 +23,12 @@ public sealed class UpdateService : IUpdateService
     private static readonly HttpClient HttpClient = CreateHttpClient();
 
     private readonly ILogger<UpdateService> _logger;
+    private readonly UpdateSourceOptions _sourceOptions;
 
-    public UpdateService(ILogger<UpdateService> logger)
+    public UpdateService(ILogger<UpdateService> logger, IOptions<UpdateSourceOptions> sourceOptions)
     {
         _logger = logger;
+        _sourceOptions = sourceOptions.Value;
     }
 
     public async Task<UpdateCheckResult> CheckUpdateAsync(UpdateOption option)
@@ -122,6 +125,17 @@ public sealed class UpdateService : IUpdateService
 
     private async Task<GitHubRelease?> GetLatestReleaseAsync()
     {
+        var githubRelease = await GetLatestReleaseFromGitHubAsync();
+        if (githubRelease != null)
+        {
+            return githubRelease;
+        }
+
+        return await GetLatestReleaseFromFallbackAsync();
+    }
+
+    private async Task<GitHubRelease?> GetLatestReleaseFromGitHubAsync()
+    {
         try
         {
             using var response = await HttpClient.GetAsync(GitHubApiUrl);
@@ -151,6 +165,48 @@ public sealed class UpdateService : IUpdateService
         catch (JsonException ex)
         {
             _logger.LogWarning(ex, "解析 GitHub API 返回的 JSON 失败");
+            return null;
+        }
+    }
+
+    private async Task<GitHubRelease?> GetLatestReleaseFromFallbackAsync()
+    {
+        var metadataUrl = _sourceOptions.ReleaseMetadataUrl;
+        if (string.IsNullOrWhiteSpace(metadataUrl))
+        {
+            return null;
+        }
+
+        try
+        {
+            _logger.LogInformation("GitHub API 不可用，尝试从备用源获取更新元数据: {Url}", metadataUrl);
+            using var response = await HttpClient.GetAsync(metadataUrl);
+            var json = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "备用更新元数据请求失败: {StatusCode} {Reason} Body: {Body}",
+                    (int)response.StatusCode,
+                    response.ReasonPhrase,
+                    json);
+                return null;
+            }
+
+            return JsonSerializer.Deserialize<GitHubRelease>(json);
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "请求备用更新元数据失败");
+            return null;
+        }
+        catch (TaskCanceledException ex)
+        {
+            _logger.LogWarning(ex, "请求备用更新元数据超时");
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "解析备用更新元数据 JSON 失败");
             return null;
         }
     }

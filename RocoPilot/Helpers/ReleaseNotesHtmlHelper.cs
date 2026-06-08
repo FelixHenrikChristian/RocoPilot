@@ -1,24 +1,16 @@
 using System.Net;
-using System.Net.Http.Json;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
+
+using Markdig;
 
 namespace RocoPilot.Helpers;
 
 internal static class ReleaseNotesHtmlHelper
 {
-    private const string DefaultGithubRepoContext = "FelixHenrikChristian/RocoPilot";
-
-    private static readonly HttpClient MarkdownHttpClient = CreateMarkdownHttpClient();
-
-    private static HttpClient CreateMarkdownHttpClient()
-    {
-        var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("RocoPilot");
-        client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-        return client;
-    }
+    private static readonly MarkdownPipeline MarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .Build();
 
     public static bool ResolveIsDarkTheme(FrameworkElement element)
     {
@@ -30,58 +22,30 @@ internal static class ReleaseNotesHtmlHelper
         };
     }
 
-    public static async Task<string> GenerateReleaseNotesHtmlAsync(
-        string markdown,
-        bool isDarkTheme,
-        ILogger? logger = null,
-        CancellationToken cancellationToken = default)
+    public static string GenerateReleaseNotesHtml(string markdown, bool isDarkTheme)
     {
         if (string.IsNullOrWhiteSpace(markdown))
         {
             return GenerateFallbackHtml(isDarkTheme);
         }
 
-        try
-        {
-            using var content = JsonContent.Create(new
-            {
-                text = markdown,
-                mode = "gfm",
-                context = DefaultGithubRepoContext,
-            });
-
-            using var response = await MarkdownHttpClient
-                .PostAsync("https://api.github.com/markdown", content, cancellationToken)
-                .ConfigureAwait(false);
-
-            response.EnsureSuccessStatusCode();
-            var innerHtml = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            return WrapHtml(isDarkTheme, $"<div class='markdown-body'>{innerHtml}</div>", "更新日志");
-        }
-        catch (HttpRequestException ex)
-        {
-            logger?.LogWarning(ex, "GitHub Markdown API 请求失败，降级为纯文本显示");
-            return GeneratePlainTextFallbackHtml(markdown, isDarkTheme);
-        }
-        catch (TaskCanceledException ex)
-        {
-            logger?.LogWarning(ex, "GitHub Markdown API 请求超时，降级为纯文本显示");
-            return GeneratePlainTextFallbackHtml(markdown, isDarkTheme);
-        }
+        var normalized = NormalizeMarkdown(markdown);
+        var innerHtml = Markdown.ToHtml(normalized, MarkdownPipeline);
+        return WrapHtml(isDarkTheme, $"<div class='markdown-body'>{innerHtml}</div>", "更新日志");
     }
 
     public static string GenerateFallbackHtml(bool isDarkTheme) =>
         WrapHtml(
             isDarkTheme,
-            "<div class='message'>无法加载更新日志，请前往 GitHub 查看详细信息</div>",
+            "<div class='message'>此版本没有提供更新日志。</div>",
             "更新日志",
             centered: true);
 
-    private static string GeneratePlainTextFallbackHtml(string markdown, bool isDarkTheme)
-    {
-        var encoded = WebUtility.HtmlEncode(markdown);
-        return WrapHtml(isDarkTheme, $"<pre class='plain-fallback'>{encoded}</pre>", "更新日志");
-    }
+    private static string NormalizeMarkdown(string markdown) =>
+        markdown
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n')
+            .Trim();
 
     private static string WrapHtml(bool isDarkTheme, string bodyInner, string pageTitle, bool centered = false)
     {
@@ -106,6 +70,7 @@ internal static class ReleaseNotesHtmlHelper
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <meta http-equiv='Content-Security-Policy' content=""default-src 'none'; img-src https: data:; style-src 'unsafe-inline';"">
     <title>{titleSafe}</title>
     <style>
         body {{
@@ -183,6 +148,13 @@ internal static class ReleaseNotesHtmlHelper
             margin: 12px 0;
             padding-left: 12px;
             color: {secondary};
+        }}
+        details {{
+            margin: 12px 0;
+        }}
+        summary {{
+            cursor: pointer;
+            font-weight: 600;
         }}
         hr {{
             border: none;

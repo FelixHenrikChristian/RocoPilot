@@ -407,27 +407,69 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
+        QueueAutoBattleSkillFailureTipRecognition(state, frame, _currentAutoBattleTurnNumber, cancellationToken);
+
         if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken))
         {
             return false;
         }
 
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
-        var tipText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleTipRegionIds,
-            cancellationToken,
-            "自动战斗技能失败");
-        var failureReason = string.IsNullOrWhiteSpace(tipText)
-            ? "未识别到提示"
-            : FormatLogText(tipText);
 
         LogAutoBattleTurnAction(
-            $"技能未释放成功，原因：{failureReason}，临时回能 X，原技能延后",
+            "技能未离开选择界面，临时回能 X，原技能延后",
             "X",
             forceInformation: true);
         return true;
+    }
+
+    private void QueueAutoBattleSkillFailureTipRecognition(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        int turnNumber,
+        CancellationToken cancellationToken)
+    {
+        CapturedFrame frameReference;
+        try
+        {
+            frameReference = frame.AddReference();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
+        _ = Task.Run(
+            async () =>
+            {
+                using (frameReference)
+                {
+                    try
+                    {
+                        var tipText = await RecognizeRegionTextAsync(
+                            state,
+                            frameReference,
+                            BattleTipRegionIds,
+                            cancellationToken,
+                            "自动战斗技能失败");
+                        var failureReason = string.IsNullOrWhiteSpace(tipText)
+                            ? "未识别到提示"
+                            : FormatLogText(tipText);
+
+                        _logger.LogInformation(
+                            "自动战斗：第 {TurnNumber} 回合，技能失败提示：{FailureReason}",
+                            turnNumber > 0 ? turnNumber : 1,
+                            failureReason);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "自动战斗技能失败提示 OCR 失败");
+                    }
+                }
+            });
     }
 
     private bool ShouldSkipAutoBattleKeyboardInput(RuntimeTaskState state, AutoBattleSettings settings)

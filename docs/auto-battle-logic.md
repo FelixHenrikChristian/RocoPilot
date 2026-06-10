@@ -58,7 +58,7 @@ OCR 调度使用单个执行门：固定频率 OCR 如果发现上一次 OCR 仍
 战斗子状态：
 
 1. 优先判断技能选择界面：在 `battle-button-skill` 区域匹配 `battle-button-skill.png`。
-2. 如果不是技能选择，再判断换精灵界面：在 `battle-button-change` 区域匹配 `battle-button-change.png`。
+2. 如果不是技能选择，再判断换精灵界面：先在 `battle-button-change` 区域匹配 `battle-button-change.png`；未命中时，再在 `battle-button-skill` 区域匹配同一个更换图标，用于处理技能释放后被动切换精灵的场景。
 3. 如果不是上述两个子状态，再判断 `battle-chat`，用于普通战斗态和奇遇/异色提示扫描。
 4. 如果战斗中这些子状态都未识别到，仍保持“战斗中”，并结束当前技能选择态。
 

@@ -125,17 +125,27 @@
                         Height="1"
                         Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
-                    <Border
+                    <Grid
                         Grid.Row="2"
                         MinHeight="120"
-                        Background="{ThemeResource ControlFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                        BorderThickness="1"
-                        CornerRadius="6">
+                        Background="{ThemeResource ControlFillColorDefaultBrush}">
                         <WebView2
                             x:Name="ReleaseNotesWebView"
-                            MinHeight="120" />
-                    </Border>
+                            MinHeight="120"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch" />
+                        <ScrollViewer
+                            x:Name="ReleaseNotesFallbackHost"
+                            Padding="12"
+                            VerticalScrollBarVisibility="Auto"
+                            Visibility="Collapsed">
+                            <TextBlock
+                                x:Name="ReleaseNotesFallbackText"
+                                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
+                                IsTextSelectionEnabled="True"
+                                TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Grid>
                 </Grid>
             </Border>
 

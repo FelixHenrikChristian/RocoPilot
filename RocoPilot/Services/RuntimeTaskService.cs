@@ -32,7 +32,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private const int MagicPointSlotCount = 6;
     private const string MagicPointTemplateName = "magic-point.png";
     private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
-    private static readonly TimeSpan EncounterScanInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan RuntimeOcrScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan UnrecognizedStateConfirmDelay = TimeSpan.FromSeconds(2);
     private static readonly string[] MagicPointRegionIds =
     [
@@ -61,9 +61,12 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
+    private readonly object _latestRuntimeOcrFrameLock = new();
 
     private CancellationTokenSource? _captureCancellationTokenSource;
     private Task? _captureTask;
+    private Task? _runtimeOcrTask;
+    private CapturedFrame? _latestRuntimeOcrFrame;
     private bool _settingsLoaded;
     private bool _isBattleStateActive;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
@@ -227,6 +230,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             _captureTask = Task.Run(
                 () => CaptureLoopAsync(state, cancellationTokenSource.Token),
                 cancellationTokenSource.Token);
+            _runtimeOcrTask = Task.Run(
+                () => RuntimeOcrLoopAsync(state, cancellationTokenSource.Token),
+                cancellationTokenSource.Token);
 
             _logger.LogInformation("实时任务：已启动（窗口 {Window}）", targetWindow.DisplayName);
             _logger.LogDebug(
@@ -280,6 +286,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     {
         CancellationTokenSource? cancellationTokenSource = null;
         Task? captureTask = null;
+        Task? runtimeOcrTask = null;
         RuntimeTaskState? state = null;
 
         await _lifecycleLock.WaitAsync();
@@ -292,9 +299,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
             cancellationTokenSource = _captureCancellationTokenSource;
             captureTask = _captureTask;
+            runtimeOcrTask = _runtimeOcrTask;
             state = CurrentState;
             _captureCancellationTokenSource = null;
             _captureTask = null;
+            _runtimeOcrTask = null;
             CurrentState = null;
             cancellationTokenSource?.Cancel();
             _recognitionOverlayService.Hide();
@@ -307,9 +316,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
         try
         {
-            if (captureTask is not null)
+            var runningTasks = new[] { captureTask, runtimeOcrTask }
+                .Where(task => task is not null)
+                .Cast<Task>()
+                .ToArray();
+            if (runningTasks.Length > 0)
             {
-                await captureTask;
+                await Task.WhenAll(runningTasks);
             }
         }
         catch (OperationCanceledException)
@@ -317,6 +330,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
         finally
         {
+            ClearLatestRuntimeOcrFrame();
             if (state is not null)
             {
                 _screenCaptureService.Release(state.TargetWindow, state.Options.CaptureMethod);
@@ -330,7 +344,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private async Task CaptureLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
         var nextGameStateScanAt = DateTimeOffset.MinValue;
-        var nextEncounterScanAt = DateTimeOffset.MinValue;
 
         try
         {
@@ -356,6 +369,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                             || EncounterStatisticsEnabled
                             || _autoBattleSettings.IsEnabled))
                     {
+                        PublishLatestRuntimeOcrFrame(frame);
+
                         var now = DateTimeOffset.Now;
                         if (now >= nextGameStateScanAt)
                         {
@@ -371,22 +386,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                                 _logger.LogWarning(ex, "状态图像匹配失败");
                             }
 
-                            if (gameStateScanResult == GameStateScanResult.Battle
-                                && EncounterStatisticsEnabled
-                                && now >= nextEncounterScanAt)
-                            {
-                                nextEncounterScanAt = now + EncounterScanInterval;
-
-                                try
-                                {
-                                    await TryUpdateEncounterStatisticsAsync(state, frame, cancellationToken);
-                                }
-                                catch (Exception ex) when (ex is not OperationCanceledException)
-                                {
-                                    _logger.LogWarning(ex, "奇遇统计识别失败");
-                                }
-                            }
-                            else if (gameStateScanResult == GameStateScanResult.NonBattle)
+                            if (gameStateScanResult == GameStateScanResult.NonBattle)
                             {
                                 ResetEncounterRecordSuppression();
                             }
@@ -407,6 +407,115 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         {
             _screenCaptureService.Release(state.TargetWindow, state.Options.CaptureMethod);
         }
+    }
+
+    private async Task RuntimeOcrLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                var scanStart = Stopwatch.GetTimestamp();
+
+                try
+                {
+                    using var frame = RentLatestRuntimeOcrFrame();
+                    if (frame is not null && _isBattleStateActive)
+                    {
+                        await UpdateRuntimeOcrSignalsAsync(state, frame, cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Runtime OCR scan failed.");
+                }
+
+                var elapsedMilliseconds = Stopwatch.GetElapsedTime(scanStart).TotalMilliseconds;
+                var delay = Math.Max(1, RuntimeOcrScanInterval.TotalMilliseconds - elapsedMilliseconds);
+                await DelayAsync((int)delay, cancellationToken);
+            }
+        }
+        finally
+        {
+            ClearLatestRuntimeOcrFrame();
+        }
+    }
+
+    private async Task UpdateRuntimeOcrSignalsAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (EncounterStatisticsEnabled)
+        {
+            await TryUpdateEncounterStatisticsAsync(state, frame, cancellationToken);
+            return;
+        }
+
+        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        if (!settings.IsEnabled)
+        {
+            return;
+        }
+
+        var isAutoBattleSuspendedForShiny =
+            await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+        if (!isAutoBattleSuspendedForShiny)
+        {
+            await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
+        }
+    }
+
+    private void PublishLatestRuntimeOcrFrame(CapturedFrame frame)
+    {
+        CapturedFrame frameReference;
+        try
+        {
+            frameReference = frame.AddReference();
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
+
+        CapturedFrame? previousFrame;
+        lock (_latestRuntimeOcrFrameLock)
+        {
+            previousFrame = _latestRuntimeOcrFrame;
+            _latestRuntimeOcrFrame = frameReference;
+        }
+
+        previousFrame?.Dispose();
+    }
+
+    private CapturedFrame? RentLatestRuntimeOcrFrame()
+    {
+        lock (_latestRuntimeOcrFrameLock)
+        {
+            try
+            {
+                return _latestRuntimeOcrFrame?.AddReference();
+            }
+            catch (ObjectDisposedException)
+            {
+                return null;
+            }
+        }
+    }
+
+    private void ClearLatestRuntimeOcrFrame()
+    {
+        CapturedFrame? frame;
+        lock (_latestRuntimeOcrFrameLock)
+        {
+            frame = _latestRuntimeOcrFrame;
+            _latestRuntimeOcrFrame = null;
+        }
+
+        frame?.Dispose();
     }
 
     private async Task<GameStateScanResult> UpdateGameStateSnapshotAsync(
@@ -458,12 +567,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         if (isSkillSelectionVisible)
         {
             _wasAutoBattlePetSwitchingVisible = false;
-            var isAutoBattleSuspendedForShiny =
-                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+            var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
             var handledSkillFailure = false;
             if (!isAutoBattleSuspendedForShiny)
             {
-                await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
                 handledSkillFailure = await TryHandleAutoBattleSkillReleaseFailureAsync(
                     state,
                     frame,
@@ -484,8 +591,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var isPetSwitchingVisible = await IsBattlePetSwitchingAsync(state, frame, cancellationToken);
         if (isPetSwitchingVisible)
         {
-            var isAutoBattleSuspendedForShiny =
-                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+            var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 切换精灵",
                 DateTimeOffset.Now));
@@ -503,11 +609,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var chatVisible = isBattleChatVisible ?? await IsBattleChatVisibleAsync(state, frame, cancellationToken);
         if (chatVisible)
         {
-            var isAutoBattleSuspendedForShiny =
-                await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
+            var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
             if (!isAutoBattleSuspendedForShiny)
             {
-                await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
                 CompleteAutoBattleSkillSelectionState();
             }
 

@@ -429,6 +429,12 @@ public sealed partial class RuntimeTaskService
         int turnNumber,
         CancellationToken cancellationToken)
     {
+        if (Interlocked.Exchange(ref _queuedAutoBattleSkillFailureTipRecognition, 1) != 0)
+        {
+            _logger.LogDebug("自动战斗技能失败提示 OCR 已有待处理任务，本次跳过。");
+            return;
+        }
+
         CapturedFrame frameReference;
         try
         {
@@ -436,6 +442,7 @@ public sealed partial class RuntimeTaskService
         }
         catch (ObjectDisposedException)
         {
+            _ = Interlocked.Exchange(ref _queuedAutoBattleSkillFailureTipRecognition, 0);
             return;
         }
 
@@ -444,8 +451,12 @@ public sealed partial class RuntimeTaskService
             {
                 using (frameReference)
                 {
+                    var hasExecutionLock = false;
                     try
                     {
+                        await _runtimeOcrExecutionLock.WaitAsync(cancellationToken);
+                        hasExecutionLock = true;
+
                         var tipText = await RecognizeRegionTextAsync(
                             state,
                             frameReference,
@@ -467,6 +478,15 @@ public sealed partial class RuntimeTaskService
                     catch (Exception ex)
                     {
                         _logger.LogDebug(ex, "自动战斗技能失败提示 OCR 失败");
+                    }
+                    finally
+                    {
+                        if (hasExecutionLock)
+                        {
+                            _runtimeOcrExecutionLock.Release();
+                        }
+
+                        _ = Interlocked.Exchange(ref _queuedAutoBattleSkillFailureTipRecognition, 0);
                     }
                 }
             });

@@ -33,6 +33,8 @@ flowchart TD
 
 自动战斗按键没有独立循环。它挂在实时截图循环中，由 `UpdateGameStateSnapshotAsync` 判断当前画面后顺手触发。OCR 类任务独立运行在 `RuntimeOcrLoopAsync` 中，按固定频率消费主截图循环发布的最新帧，避免 OCR 阻塞状态识别和按键发送。
 
+OCR 调度使用单个执行门：固定频率 OCR 如果发现上一次 OCR 仍在执行，会跳过本轮，不会排队；技能失败提示 OCR 允许最多一个等待或执行中的后台任务，避免 OCR 慢时堆积任务。
+
 ## 启动与配置流
 
 1. 实时页修改自动战斗开关、奇遇解除策略或释放配置时，`RealtimeViewModel` 调用 `IRuntimeTaskService.SetAutoBattleSettings` 保存设置。

@@ -61,12 +61,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
+    private readonly SemaphoreSlim _runtimeOcrExecutionLock = new(1, 1);
     private readonly object _latestRuntimeOcrFrameLock = new();
 
     private CancellationTokenSource? _captureCancellationTokenSource;
     private Task? _captureTask;
     private Task? _runtimeOcrTask;
     private CapturedFrame? _latestRuntimeOcrFrame;
+    private int _queuedAutoBattleSkillFailureTipRecognition;
     private bool _settingsLoaded;
     private bool _isBattleStateActive;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
@@ -422,7 +424,24 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                     using var frame = RentLatestRuntimeOcrFrame();
                     if (frame is not null && _isBattleStateActive)
                     {
-                        await UpdateRuntimeOcrSignalsAsync(state, frame, cancellationToken);
+                        if (!await _runtimeOcrExecutionLock.WaitAsync(0, cancellationToken))
+                        {
+                            LogDebugOncePerValue(
+                                CreateDebugLogKey("runtime-ocr-skip-busy"),
+                                "busy",
+                                "后台 OCR 本轮跳过：上一次 OCR 仍在执行。");
+                        }
+                        else
+                        {
+                            try
+                            {
+                                await UpdateRuntimeOcrSignalsAsync(state, frame, cancellationToken);
+                            }
+                            finally
+                            {
+                                _runtimeOcrExecutionLock.Release();
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException)

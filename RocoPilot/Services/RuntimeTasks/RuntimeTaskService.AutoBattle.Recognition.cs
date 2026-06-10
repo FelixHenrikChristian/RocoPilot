@@ -13,7 +13,7 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        return await MatchRuntimeTemplateAsync(
+        if (await MatchRuntimeTemplateAsync(
             state,
             frame,
             BattleChangeRegionIds,
@@ -21,6 +21,19 @@ public sealed partial class RuntimeTaskService
             BattleChangeMatchOptions,
             "状态识别",
             "切换精灵界面",
+            cancellationToken))
+        {
+            return true;
+        }
+
+        return await MatchRuntimeTemplateAsync(
+            state,
+            frame,
+            BattleSkillRegionIds,
+            BattleChangeTemplateName,
+            BattleChangeMatchOptions,
+            "状态识别",
+            "技能区域切换精灵界面",
             cancellationToken);
     }
 

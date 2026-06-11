@@ -3,10 +3,6 @@ name: Build and Release
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Release version. Leave empty to use RocoPilot.csproj."
-        required: false
-        type: string
       prerelease:
         description: "Mark the GitHub release as prerelease."
         required: false
@@ -18,6 +14,11 @@ on:
 
 permissions:
   contents: read
+
+env:
+  ROCO_R2_PUBLIC_URL: https://pub-749777b9646245b7bc1b15efee2b9b24.r2.dev
+  CLOUDFLARE_ACCOUNT_ID: 20049c2f69ed4c795000cb90655ca4d4
+  CLOUDFLARE_BUCKET_NAME: rocopilot-release
 
 jobs:
   build_release_assets:
@@ -37,7 +38,6 @@ jobs:
         id: version
         shell: pwsh
         env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
@@ -53,12 +53,6 @@ jobs:
             $version = $env:REF_NAME -replace "^v", ""
             if ($version -ne $projectVersion) {
               throw "Tag version '$version' does not match RocoPilot.csproj version '$projectVersion'."
-            }
-          }
-          elseif (-not [string]::IsNullOrWhiteSpace($env:INPUT_VERSION)) {
-            $version = $env:INPUT_VERSION.Trim()
-            if ($version -ne $projectVersion) {
-              throw "Input version '$version' does not match RocoPilot.csproj version '$projectVersion'."
             }
           }
           else {
@@ -202,34 +196,14 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile "update/kachina-builder.exe"
           Unblock-File -LiteralPath "update/kachina-builder.exe" -ErrorAction SilentlyContinue
 
-      - name: Configure Kachina Cloudflare source
+      - name: Configure Kachina R2 source
         shell: pwsh
-        env:
-          ROCO_R2_PUBLIC_URL: ${{ vars.ROCO_R2_PUBLIC_URL }}
-          ROCO_UPLOAD_TO_R2: ${{ vars.ROCO_UPLOAD_TO_R2 }}
         run: |
           $ErrorActionPreference = "Stop"
-          if (-not [string]::IsNullOrWhiteSpace($env:ROCO_R2_PUBLIC_URL)) {
-            $r2PublicUrl = ($env:ROCO_R2_PUBLIC_URL).TrimEnd("/")
-            $cloudflareUrl = "$r2PublicUrl/RocoPilot.Install.exe"
-            "ROCO_KACHINA_CLOUDFLARE_URL=$cloudflareUrl" >> $env:GITHUB_ENV
-            Write-Host "Kachina R2 source: $cloudflareUrl"
-
-            if ($env:ROCO_UPLOAD_TO_R2 -eq "true") {
-              $metadataUrl = "$r2PublicUrl/latest.json"
-              $appSettingsPath = "RocoPilot/appsettings.json"
-              $appSettings = Get-Content $appSettingsPath -Raw | ConvertFrom-Json
-              if ($null -eq $appSettings.UpdateSourceOptions) {
-                $appSettings | Add-Member -MemberType NoteProperty -Name "UpdateSourceOptions" -Value ([pscustomobject]@{})
-              }
-
-              $appSettings.UpdateSourceOptions.ReleaseMetadataUrl = $metadataUrl
-              $json = $appSettings | ConvertTo-Json -Depth 8
-              $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-              [System.IO.File]::WriteAllText((Resolve-Path $appSettingsPath), $json, $utf8NoBom)
-              Write-Host "Update metadata R2 source: $metadataUrl"
-            }
-          }
+          $r2PublicUrl = $env:ROCO_R2_PUBLIC_URL.TrimEnd("/")
+          $cloudflareUrl = "$r2PublicUrl/RocoPilot.Install.exe"
+          "ROCO_KACHINA_CLOUDFLARE_URL=$cloudflareUrl" >> $env:GITHUB_ENV
+          Write-Host "Kachina R2 source: $cloudflareUrl"
 
       - name: Build Kachina updater
         shell: pwsh
@@ -350,7 +324,6 @@ jobs:
     name: Upload release assets to Cloudflare R2
     needs: [build_release_assets, create_github_release]
     runs-on: ubuntu-latest
-    if: ${{ vars.ROCO_UPLOAD_TO_R2 == 'true' }}
 
     steps:
       - name: Download release assets
@@ -422,8 +395,8 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           aws s3 cp artifacts/RocoPilot.Install.exe \
-            s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/RocoPilot.Install.exe \
-            --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+            "s3://${CLOUDFLARE_BUCKET_NAME}/RocoPilot.Install.exe" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
       - name: Upload update metadata
         env:
@@ -432,10 +405,10 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           aws s3 cp artifacts/latest.json \
-            s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/latest.json \
+            "s3://${CLOUDFLARE_BUCKET_NAME}/latest.json" \
             --content-type "application/json; charset=utf-8" \
             --cache-control "no-cache" \
-            --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
       - name: Upload MicaSetup installer
         env:
@@ -450,5 +423,5 @@ jobs:
           fi
 
           aws s3 cp "$mica_installer" \
-            s3://${{ vars.CLOUDFLARE_BUCKET_NAME }}/RocoPilot-Setup.exe \
-            --endpoint-url https://${{ vars.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+            "s3://${CLOUDFLARE_BUCKET_NAME}/RocoPilot-Setup.exe" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"

@@ -1,0 +1,89 @@
+name: Sync Release Metadata to R2
+
+on:
+  release:
+    types: [edited]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: 20049c2f69ed4c795000cb90655ca4d4
+  CLOUDFLARE_BUCKET_NAME: rocopilot-release
+
+jobs:
+  sync_latest_json:
+    name: Sync latest.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve latest release metadata
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${GITHUB_REPOSITORY}/releases/latest" > latest-release.json
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open("latest-release.json", encoding="utf-8") as file:
+              latest_release = json.load(file)
+
+          latest_tag = latest_release["tag_name"]
+          should_sync = True
+
+          if os.environ["GITHUB_EVENT_NAME"] == "release":
+              with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as file:
+                  event = json.load(file)
+
+              edited_tag = event["release"]["tag_name"]
+              if edited_tag != latest_tag:
+                  should_sync = False
+                  print(f"Release {edited_tag} is not the latest release ({latest_tag}). Skipping R2 sync.")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"latest_tag={latest_tag}\n")
+              output.write(f"should_sync={str(should_sync).lower()}\n")
+
+          if not should_sync:
+              raise SystemExit(0)
+
+          name = latest_release.get("name") or f"RocoPilot {latest_tag.removeprefix('v')}"
+          metadata = {
+              "tag_name": latest_tag,
+              "name": name,
+              "body": latest_release.get("body") or "",
+              "published_at": latest_release.get("published_at") or "",
+              "html_url": latest_release.get("html_url") or "",
+          }
+
+          with open("latest.json", "w", encoding="utf-8") as file:
+              json.dump(metadata, file, ensure_ascii=False, indent=2)
+              file.write("\n")
+
+          print(f"Prepared R2 metadata for {latest_tag}.")
+          PY
+
+      - name: Install AWS CLI
+        if: steps.release.outputs.should_sync == 'true'
+        run: |
+          python3 -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Upload latest.json to R2
+        if: steps.release.outputs.should_sync == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp latest.json \
+            "s3://${CLOUDFLARE_BUCKET_NAME}/latest.json" \
+            --content-type "application/json; charset=utf-8" \
+            --cache-control "no-cache" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"

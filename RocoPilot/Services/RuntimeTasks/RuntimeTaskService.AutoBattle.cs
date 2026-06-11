@@ -433,7 +433,7 @@ public sealed partial class RuntimeTaskService
             if (MarkEncounterPlaceholderNameSeen(season.Id))
             {
                 _logger.LogInformation(
-                    "自动战斗：技能选择阶段识别到 {PlaceholderName}，等待名称恢复后再执行操作。",
+                    "自动战斗：技能选择阶段识别到 {PlaceholderName}，本回合按普通自动战斗流程执行。",
                     GetEncounterPlaceholderName(season));
             }
 
@@ -445,8 +445,8 @@ public sealed partial class RuntimeTaskService
                 GetEncounterPlaceholderName(season),
                 placeholderSimilarity,
                 season.PlaceholderMatchThreshold);
-            ResetAutoBattleSkillSelectionEnemyNameTask();
-            return false;
+            _hasAutoBattleSkillSelectionEnemyNameResult = true;
+            return true;
         }
 
         if (string.IsNullOrWhiteSpace(result.MatchedName))

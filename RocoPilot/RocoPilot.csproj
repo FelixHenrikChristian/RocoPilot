@@ -58,6 +58,20 @@
     <ProjectReference Include="..\RocoPilot.Core\RocoPilot.Core.csproj" />
   </ItemGroup>
 
+  <!-- WindowsAppSDK self-contained payload includes WinUI MUI files for every supported language. -->
+  <Target Name="ExcludeWinUIMuiFilesFromWindowsAppSDKPayload"
+          BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents"
+          DependsOnTargets="GetWindowsAppSDKNativePlatform">
+    <ItemGroup>
+      <MicrosoftWindowsAppSDKFilesExcluded Include="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\**\*.mui"
+                                           Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
+      <MicrosoftWindowsAppSDKFilesExcluded Remove="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\zh-CN\*.mui"
+                                           Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
+      <MicrosoftWindowsAppSDKFilesExcluded Remove="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\en-us\*.mui"
+                                           Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <Content Include="Configuration\RecognitionRegions\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

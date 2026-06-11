@@ -35,6 +35,7 @@ public sealed partial class RuntimeTaskService
     private readonly object _encounterRecordLock = new();
     private readonly object _pendingShinyRecordLock = new();
     private readonly object _encounterNameTransitionLock = new();
+    private readonly object _runtimeEncounterSignalLock = new();
     private volatile bool _encounterStatisticsEnabled = true;
     private bool _hasActiveEncounterRecord;
     private string? _lastRecordedEncounterSeasonId;
@@ -44,6 +45,13 @@ public sealed partial class RuntimeTaskService
     private string? _lastPendingShinySeasonId;
     private string? _lastPendingShinyName;
     private DateTimeOffset _lastPendingShinyAt;
+    private bool _hasPendingEncounterDetection;
+    private string? _pendingEncounterSeasonId;
+    private string? _pendingEncounterDetectionMode;
+    private double _pendingEncounterDetectionSimilarity;
+    private bool _hasPendingShinyDetection;
+    private string? _pendingShinyDetectionSeasonId;
+    private double _pendingShinyDetectionSimilarity;
     private bool _hasSeenEncounterPlaceholderName;
     private string? _encounterNameTransitionSeasonId;
 
@@ -97,6 +105,106 @@ public sealed partial class RuntimeTaskService
                 pendingCapture.Name,
                 pendingCapture.Season,
                 pendingCapture.DetectedAt);
+    }
+
+    private async Task UpdateRuntimeEncounterOcrSignalsAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        if (season is null)
+        {
+            return;
+        }
+
+        var shinyTipTask = TryUpdateRuntimeShinyTipSignalAsync(
+            state,
+            frame,
+            season,
+            cancellationToken);
+        var encounterTipTask = TryUpdateRuntimeEncounterTipSignalAsync(
+            state,
+            frame,
+            season,
+            cancellationToken);
+        await Task.WhenAll(shinyTipTask, encounterTipTask);
+    }
+
+    private async Task<bool> TryUpdateRuntimeEncounterTipSignalAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        EncounterSeasonDefinition season,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(season.TipText))
+        {
+            return false;
+        }
+
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipRegionIds,
+            cancellationToken,
+            "奇遇识别");
+
+        var isTipMatch = TextMatchingHelper.IsSimilar(
+            tipText,
+            season.TipText,
+            season.MatchThreshold,
+            out var similarity);
+        LogDebugOncePerValue(
+            CreateDebugLogKey("runtime-encounter-tip-filter", season.Id),
+            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
+            "奇遇识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            FormatLogText(tipText),
+            FormatLogText(season.TipText),
+            similarity,
+            season.MatchThreshold,
+            isTipMatch);
+
+        if (!isTipMatch)
+        {
+            return false;
+        }
+
+        RememberPendingEncounterDetection(season.Id, EncounterDetectionModes.TipText, similarity);
+        ApplyAutoBattleEncounterRelievedDetection("奇遇识别");
+        return true;
+    }
+
+    private async Task<bool> TryUpdateRuntimeShinyTipSignalAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        EncounterSeasonDefinition season,
+        CancellationToken cancellationToken)
+    {
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleTipHeterochromiaRegionIds,
+            cancellationToken,
+            "异色识别");
+
+        var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
+        LogDebugOncePerValue(
+            CreateDebugLogKey("runtime-shiny-tip-filter", season.Id),
+            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
+            "异色识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
+            FormatLogText(tipText),
+            HeterochromiaTipText,
+            similarity,
+            HeterochromiaTipMatchThreshold,
+            isTipMatch);
+        if (!isTipMatch)
+        {
+            return false;
+        }
+
+        RememberPendingShinyDetection(season.Id, similarity);
+        ApplyAutoBattleShinySuspension(tipText, "异色识别");
+        return true;
     }
 
     private async Task TryUpdateEncounterStatisticsAsync(
@@ -222,6 +330,11 @@ public sealed partial class RuntimeTaskService
         double detectionSimilarity,
         CancellationToken cancellationToken)
     {
+        if (!EncounterStatisticsEnabled)
+        {
+            return;
+        }
+
         enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
         if (string.IsNullOrWhiteSpace(enemyName))
         {
@@ -253,6 +366,34 @@ public sealed partial class RuntimeTaskService
             currentCount,
             detectionMode,
             detectionSimilarity);
+    }
+
+    private async Task RecordPendingShinyCaptureAsync(
+        EncounterSeasonDefinition season,
+        string enemyName,
+        CancellationToken cancellationToken)
+    {
+        if (!EncounterStatisticsEnabled)
+        {
+            return;
+        }
+
+        enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
+        if (string.IsNullOrWhiteSpace(enemyName))
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.Now;
+        if (!TryReservePendingShinyRecord(season.Id, enemyName, now))
+        {
+            return;
+        }
+
+        await _statisticsService.AddPendingShinyCaptureAsync(season, enemyName, now);
+        _logger.LogInformation(
+            "异色识别：{SpiritName} 已暂存，等待统计页面确认后计入异色并清空对应赛季奇遇计数。",
+            enemyName);
     }
 
     private async Task TryUpdatePendingShinyCaptureAsync(
@@ -396,6 +537,88 @@ public sealed partial class RuntimeTaskService
         }
     }
 
+    private void RememberPendingEncounterDetection(
+        string seasonId,
+        string detectionMode,
+        double similarity)
+    {
+        lock (_runtimeEncounterSignalLock)
+        {
+            _hasPendingEncounterDetection = true;
+            _pendingEncounterSeasonId = seasonId;
+            _pendingEncounterDetectionMode = detectionMode;
+            _pendingEncounterDetectionSimilarity = similarity;
+        }
+    }
+
+    private bool TryGetPendingEncounterDetection(
+        string seasonId,
+        out string detectionMode,
+        out double similarity)
+    {
+        lock (_runtimeEncounterSignalLock)
+        {
+            if (!_hasPendingEncounterDetection
+                || !string.Equals(_pendingEncounterSeasonId, seasonId, StringComparison.OrdinalIgnoreCase))
+            {
+                detectionMode = string.Empty;
+                similarity = 0;
+                return false;
+            }
+
+            detectionMode = _pendingEncounterDetectionMode ?? EncounterDetectionModes.TipText;
+            similarity = _pendingEncounterDetectionSimilarity;
+            return true;
+        }
+    }
+
+    private void ClearPendingEncounterDetection()
+    {
+        lock (_runtimeEncounterSignalLock)
+        {
+            _hasPendingEncounterDetection = false;
+            _pendingEncounterSeasonId = null;
+            _pendingEncounterDetectionMode = null;
+            _pendingEncounterDetectionSimilarity = 0;
+        }
+    }
+
+    private void RememberPendingShinyDetection(string seasonId, double similarity)
+    {
+        lock (_runtimeEncounterSignalLock)
+        {
+            _hasPendingShinyDetection = true;
+            _pendingShinyDetectionSeasonId = seasonId;
+            _pendingShinyDetectionSimilarity = similarity;
+        }
+    }
+
+    private bool TryGetPendingShinyDetection(string seasonId, out double similarity)
+    {
+        lock (_runtimeEncounterSignalLock)
+        {
+            if (!_hasPendingShinyDetection
+                || !string.Equals(_pendingShinyDetectionSeasonId, seasonId, StringComparison.OrdinalIgnoreCase))
+            {
+                similarity = 0;
+                return false;
+            }
+
+            similarity = _pendingShinyDetectionSimilarity;
+            return true;
+        }
+    }
+
+    private void ClearPendingShinyDetection()
+    {
+        lock (_runtimeEncounterSignalLock)
+        {
+            _hasPendingShinyDetection = false;
+            _pendingShinyDetectionSeasonId = null;
+            _pendingShinyDetectionSimilarity = 0;
+        }
+    }
+
     private void ResetEncounterRecordSuppression()
     {
         lock (_encounterRecordLock)
@@ -409,6 +632,8 @@ public sealed partial class RuntimeTaskService
         }
 
         ResetEncounterNameTransitionState();
+        ClearPendingEncounterDetection();
+        ClearPendingShinyDetection();
     }
 
     private int GetEncounterCount(string seasonId, string spiritName)

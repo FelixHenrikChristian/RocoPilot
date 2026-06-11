@@ -216,8 +216,7 @@ public sealed partial class RuntimeTaskService
     {
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
         var encounterRelievedAction = settings.EncounterRelievedAction;
-        if (!settings.IsEnabled
-            || _isAutoBattleSuspendedForShiny
+        if (_isAutoBattleSuspendedForShiny
             || !RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction))
         {
             return false;
@@ -239,11 +238,6 @@ public sealed partial class RuntimeTaskService
     private bool ApplyAutoBattleShinySuspension(string tipText, string source)
     {
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-        if (!settings.IsEnabled)
-        {
-            return false;
-        }
-
         if (_isAutoBattleSuspendedForShiny)
         {
             return true;

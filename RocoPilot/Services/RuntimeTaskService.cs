@@ -61,7 +61,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
-    private readonly SemaphoreSlim _runtimeOcrExecutionLock = new(1, 1);
     private readonly object _latestRuntimeOcrFrameLock = new();
 
     private CancellationTokenSource? _captureCancellationTokenSource;
@@ -366,10 +365,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
                 try
                 {
-                    if (frame is not null
-                        && (state.Options.InfoOverlayEnabled
-                            || EncounterStatisticsEnabled
-                            || _autoBattleSettings.IsEnabled))
+                    if (frame is not null)
                     {
                         PublishLatestRuntimeOcrFrame(frame);
 
@@ -413,36 +409,64 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
     private async Task RuntimeOcrLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
+        Task? activeScanTask = null;
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            using var timer = new PeriodicTimer(RuntimeOcrScanInterval);
+            while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                var scanStart = Stopwatch.GetTimestamp();
+                if (activeScanTask is not null)
+                {
+                    if (activeScanTask.IsCompleted)
+                    {
+                        try
+                        {
+                            await activeScanTask;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Runtime OCR scan failed.");
+                        }
 
+                        activeScanTask = null;
+                    }
+                    else
+                    {
+                        LogDebugOncePerValue(
+                            CreateDebugLogKey("runtime-ocr-skip-busy"),
+                            "busy",
+                            "后台 OCR 本轮跳过：上一次 OCR 仍在执行。");
+                        continue;
+                    }
+                }
+
+                if (!_isBattleStateActive)
+                {
+                    continue;
+                }
+
+                var frame = RentLatestRuntimeOcrFrame();
+                if (frame is null)
+                {
+                    continue;
+                }
+
+                activeScanTask = RunRuntimeOcrScanAsync(state, frame, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (activeScanTask is not null)
+            {
                 try
                 {
-                    using var frame = RentLatestRuntimeOcrFrame();
-                    if (frame is not null && _isBattleStateActive)
-                    {
-                        if (!await _runtimeOcrExecutionLock.WaitAsync(0, cancellationToken))
-                        {
-                            LogDebugOncePerValue(
-                                CreateDebugLogKey("runtime-ocr-skip-busy"),
-                                "busy",
-                                "后台 OCR 本轮跳过：上一次 OCR 仍在执行。");
-                        }
-                        else
-                        {
-                            try
-                            {
-                                await UpdateRuntimeOcrSignalsAsync(state, frame, cancellationToken);
-                            }
-                            finally
-                            {
-                                _runtimeOcrExecutionLock.Release();
-                            }
-                        }
-                    }
+                    await activeScanTask;
                 }
                 catch (OperationCanceledException)
                 {
@@ -451,15 +475,30 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 {
                     _logger.LogWarning(ex, "Runtime OCR scan failed.");
                 }
-
-                var elapsedMilliseconds = Stopwatch.GetElapsedTime(scanStart).TotalMilliseconds;
-                var delay = Math.Max(1, RuntimeOcrScanInterval.TotalMilliseconds - elapsedMilliseconds);
-                await DelayAsync((int)delay, cancellationToken);
             }
-        }
-        finally
-        {
+
             ClearLatestRuntimeOcrFrame();
+        }
+    }
+
+    private async Task RunRuntimeOcrScanAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        using (frame)
+        {
+            try
+            {
+                await UpdateRuntimeOcrSignalsAsync(state, frame, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Runtime OCR scan failed.");
+            }
         }
     }
 
@@ -468,24 +507,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        if (EncounterStatisticsEnabled)
-        {
-            await TryUpdateEncounterStatisticsAsync(state, frame, cancellationToken);
-            return;
-        }
-
-        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-        if (!settings.IsEnabled)
-        {
-            return;
-        }
-
-        var isAutoBattleSuspendedForShiny =
-            await TrySuspendAutoBattleForShinyAsync(state, frame, cancellationToken);
-        if (!isAutoBattleSuspendedForShiny)
-        {
-            await TryUpdateAutoBattleEncounterRelievedActionModeAsync(state, frame, cancellationToken);
-        }
+        await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, cancellationToken);
     }
 
     private void PublishLatestRuntimeOcrFrame(CapturedFrame frame)
@@ -599,9 +621,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 技能选择",
                 DateTimeOffset.Now));
-            if (!isAutoBattleSuspendedForShiny && !handledSkillFailure)
+            if (!handledSkillFailure)
             {
-                await HandleAutoBattleSkillSelectionAsync(state, cancellationToken);
+                await HandleAutoBattleSkillSelectionAsync(state, frame, cancellationToken);
             }
 
             return GameStateScanResult.Battle;

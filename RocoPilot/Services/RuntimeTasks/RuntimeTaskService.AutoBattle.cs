@@ -18,6 +18,7 @@ public sealed partial class RuntimeTaskService
 
     private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionEnemyNameOcrDelay = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan AutoBattleLegacyTipEncounterSkillSelectionExtraDelay = TimeSpan.FromMilliseconds(2500);
     private static readonly TimeSpan AutoBattleSkillReleaseFailureCheckDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
@@ -82,6 +83,7 @@ public sealed partial class RuntimeTaskService
     private int _autoBattleSkillSelectionEnemyNameTaskTurnNumber;
     private bool _hasAutoBattleSkillSelectionEnemyNameResult;
     private bool _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction;
+    private bool _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter;
     private bool _isAutoBattleEncounterRelieved;
     private DateTimeOffset _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
     private bool _isAutoBattleSuspendedForShiny;
@@ -430,6 +432,11 @@ public sealed partial class RuntimeTaskService
 
         if (IsEncounterPlaceholderName(result.RawText, season, out var placeholderSimilarity))
         {
+            if (_currentAutoBattleTurnNumber == 1)
+            {
+                _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = false;
+            }
+
             if (MarkEncounterPlaceholderNameSeen(season.Id))
             {
                 _logger.LogInformation(
@@ -459,6 +466,8 @@ public sealed partial class RuntimeTaskService
             ResetAutoBattleSkillSelectionEnemyNameTask();
             return false;
         }
+
+        UpdateAutoBattleLegacyTipEncounterSkillDelayState(season, result);
 
         await ApplyAutoBattleSkillSelectionEnemyNameResultAsync(
             season,
@@ -573,6 +582,21 @@ public sealed partial class RuntimeTaskService
             season.DetectionMode,
             1,
             cancellationToken);
+    }
+
+    private void UpdateAutoBattleLegacyTipEncounterSkillDelayState(
+        EncounterSeasonDefinition season,
+        AutoBattleSkillSelectionEnemyNameResult result)
+    {
+        if (_currentAutoBattleTurnNumber != 1
+            || _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter
+            || !UsesEnemyNameTransitionDetection(season)
+            || string.IsNullOrWhiteSpace(season.TipText))
+        {
+            return;
+        }
+
+        _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = true;
     }
 
     private void ResetAutoBattleSkillSelectionEnemyNameTask()
@@ -850,7 +874,10 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        if (now - _autoBattleSkillSelectionVisibleSince.Value < AutoBattleSkillSelectionActionDelay)
+        var actionDelay = _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter
+            ? AutoBattleSkillSelectionActionDelay + AutoBattleLegacyTipEncounterSkillSelectionExtraDelay
+            : AutoBattleSkillSelectionActionDelay;
+        if (now - _autoBattleSkillSelectionVisibleSince.Value < actionDelay)
         {
             return false;
         }
@@ -871,6 +898,7 @@ public sealed partial class RuntimeTaskService
         ResetAutoBattleEncounterRelievedActionState();
         ResetAutoBattleShinySuspendState();
         _wasAutoBattlePetSwitchingVisible = false;
+        _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = false;
     }
 
     private void ResetAutoBattleEncounterRelievedActionState()

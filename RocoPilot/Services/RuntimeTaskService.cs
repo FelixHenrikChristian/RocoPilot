@@ -729,6 +729,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             state.TargetWindow,
             state.RecognitionRegionConfig);
         var magicPointCount = 0;
+        var bestMatchScore = 0d;
         foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
         {
             var result = await _imageMatchingService.MatchAsync(
@@ -737,12 +738,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 MagicPointTemplateName,
                 matchOptions,
                 cancellationToken);
+            bestMatchScore = Math.Max(bestMatchScore, result.Score);
             if (result.IsMatch)
             {
                 magicPointCount++;
             }
         }
 
+        _recognitionOverlayService.ShowImageMatchResult(magicPointRegion.Id, bestMatchScore);
         LogDebugOncePerValue(
             CreateDebugLogKey("game-state-magic-point-active", magicPointRegion.Id),
             $"{magicPointCount}/{MagicPointSlotCount}",
@@ -801,6 +804,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             state.TargetWindow,
             state.RecognitionRegionConfig);
         var magicPointCount = 0;
+        var bestMatchScore = 0d;
         foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
         {
             var result = await _imageMatchingService.MatchAsync(
@@ -809,12 +813,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 MagicPointTemplateName,
                 matchOptions,
                 cancellationToken);
+            bestMatchScore = Math.Max(bestMatchScore, result.Score);
             if (result.IsMatch)
             {
                 magicPointCount++;
             }
         }
 
+        _recognitionOverlayService.ShowImageMatchResult(magicPointRegion.Id, bestMatchScore);
         LogDebugOncePerValue(
             CreateDebugLogKey("game-state-magic-point-world", magicPointRegion.Id),
             $"{magicPointCount}/{MagicPointSlotCount}",
@@ -886,6 +892,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             imageBytes,
             recognitionMethod.Method,
             cancellationToken);
+        _recognitionOverlayService.ShowOcrResult(region.Id, result.Text);
         LogDebugOncePerValue(
             CreateDebugLogKey("ocr-result", taskName, region.Id, recognitionMethod.Method),
             CreateTextDebugFingerprint(result.Text),
@@ -954,6 +961,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             templateName,
             matchOptions,
             cancellationToken);
+        _recognitionOverlayService.ShowImageMatchResult(region.Id, result.Score);
         LogDebugOncePerValue(
             CreateDebugLogKey("template-result", taskName, targetName, region.Id, templateName),
             CreateBooleanDebugFingerprint(result.IsMatch),

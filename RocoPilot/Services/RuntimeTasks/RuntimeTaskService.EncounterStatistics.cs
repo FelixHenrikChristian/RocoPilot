@@ -137,8 +137,7 @@ public sealed partial class RuntimeTaskService
         EncounterSeasonDefinition season,
         CancellationToken cancellationToken)
     {
-        if (UsesEnemyNameTransitionDetection(season)
-            || string.IsNullOrWhiteSpace(season.TipText))
+        if (string.IsNullOrWhiteSpace(season.TipText))
         {
             return false;
         }

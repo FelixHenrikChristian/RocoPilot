@@ -31,6 +31,26 @@ public sealed class RecognitionOverlayService : IRecognitionOverlayService
         RunOnDispatcher(() => ShowCore(state));
     }
 
+    public void ShowOcrResult(string regionId, string text)
+    {
+        if (string.IsNullOrWhiteSpace(regionId))
+        {
+            return;
+        }
+
+        RunOnDispatcher(() => _overlayWindow?.ShowOcrResult(regionId, text));
+    }
+
+    public void ShowImageMatchResult(string regionId, double score)
+    {
+        if (string.IsNullOrWhiteSpace(regionId))
+        {
+            return;
+        }
+
+        RunOnDispatcher(() => _overlayWindow?.ShowImageMatchResult(regionId, score));
+    }
+
     public void Hide()
     {
         RunOnDispatcher(HideCore);

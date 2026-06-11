@@ -9,6 +9,37 @@ namespace RocoPilot.Services;
 public sealed partial class RuntimeTaskService
 {
     private const int DeduplicatedDebugLogSummaryMinimumRepeatCount = 3;
+    private static readonly HashSet<string> SuppressedRecognitionDebugLogCategories = new(StringComparer.Ordinal)
+    {
+        "runtime-ocr-skip-busy",
+        "ocr-skip-outside-frame",
+        "ocr-skip-method-unavailable",
+        "ocr-result",
+        "template-skip-missing-template",
+        "template-skip-outside-frame",
+        "template-result",
+        "game-state-magic-point-active",
+        "game-state-magic-point-world",
+        "runtime-encounter-tip-filter",
+        "runtime-shiny-tip-filter",
+        "encounter-tip-filter",
+        "encounter-tip-enemy-filter",
+        "encounter-tip-missing-enemy",
+        "shiny-tip-filter",
+        "shiny-enemy-filter",
+        "shiny-missing-enemy",
+        "encounter-name-transition-placeholder",
+        "encounter-name-transition-spirit",
+        "encounter-duplicate-suppression",
+        "shiny-duplicate-suppression",
+        "auto-battle-encounter-relieved-transition-filter",
+        "auto-battle-encounter-relieved-tip-filter",
+        "auto-battle-shiny-filter",
+        "auto-battle-skill-selection-placeholder",
+        "auto-battle-skill-selection-enemy-missing",
+        "auto-battle-skill-selection-enemy",
+        "auto-battle-skill-selection-transition"
+    };
 
     private readonly object _deduplicatedDebugLogLock = new();
     private readonly Dictionary<string, DeduplicatedDebugLogState> _deduplicatedDebugLogs = [];
@@ -19,6 +50,11 @@ public sealed partial class RuntimeTaskService
         string message,
         params object?[] args)
     {
+        if (ShouldSuppressRecognitionDebugLog(key))
+        {
+            return;
+        }
+
         var normalizedFingerprint = string.IsNullOrWhiteSpace(fingerprint)
             ? "<empty>"
             : fingerprint;
@@ -77,6 +113,15 @@ public sealed partial class RuntimeTaskService
     private static string CreateDebugLogKey(string category, params object?[] parts)
     {
         return $"{category}:{string.Join("|", parts.Select(part => part?.ToString() ?? "<null>"))}";
+    }
+
+    private static bool ShouldSuppressRecognitionDebugLog(string key)
+    {
+        var separatorIndex = key.IndexOf(':', StringComparison.Ordinal);
+        var category = separatorIndex < 0
+            ? key
+            : key[..separatorIndex];
+        return SuppressedRecognitionDebugLogCategories.Contains(category);
     }
 
     private static string CreateTextDebugFingerprint(string? text)

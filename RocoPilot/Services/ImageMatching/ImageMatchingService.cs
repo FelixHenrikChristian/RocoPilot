@@ -26,12 +26,10 @@ public sealed class ImageMatchingService : IImageMatchingService
         ".tiff"
     ];
 
-    private readonly ILogger<ImageMatchingService> _logger;
     private readonly ConcurrentDictionary<TemplateCacheKey, Lazy<Task<ImageTemplate>>> _templateCache = new();
 
     public ImageMatchingService(ILogger<ImageMatchingService> logger)
     {
-        _logger = logger;
         TemplateDirectory = Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionAssets", "ImageMatching");
     }
 
@@ -162,15 +160,6 @@ public sealed class ImageMatchingService : IImageMatchingService
         bitmap.CopyToBuffer(pixels.AsBuffer());
 
         var template = ImageTemplate.Create(bitmap.PixelWidth, bitmap.PixelHeight, pixels, alphaThreshold);
-        _logger.LogDebug(
-            "Loaded image matching template {TemplatePath}: {Width}x{Height}, scale={ScaleX:F4}x{ScaleY:F4}, active pixels: {ActivePixelCount}",
-            templatePath,
-            template.Width,
-            template.Height,
-            scaleX,
-            scaleY,
-            template.ActivePixels.Count);
-
         return template;
     }
 

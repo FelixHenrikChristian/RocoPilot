@@ -560,6 +560,11 @@ public sealed partial class RuntimeTaskService
             FormatLogText(result.RawText),
             matchedName,
             hasSeenPlaceholderName);
+        if (!hasSeenPlaceholderName)
+        {
+            return;
+        }
+
         ApplyAutoBattleEncounterRelievedDetection("技能选择精灵名");
         await RecordEncounterAsync(
             season,

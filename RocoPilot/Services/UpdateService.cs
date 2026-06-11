@@ -174,6 +174,7 @@ public sealed class UpdateService : IUpdateService
         var metadataUrl = _sourceOptions.ReleaseMetadataUrl;
         if (string.IsNullOrWhiteSpace(metadataUrl))
         {
+            _logger.LogInformation("未配置备用更新元数据源，跳过备用源检查。");
             return null;
         }
 

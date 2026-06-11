@@ -49,9 +49,27 @@ Add a Cloudflare/R2 source when you have the final URL:
 
 You can also set `ROCO_KACHINA_CLOUDFLARE_URL` instead of passing the parameter.
 
-In GitHub Actions, set the repository variable `ROCO_R2_PUBLIC_URL` to the R2 public URL prefix. The workflow appends `/RocoPilot.Install.exe` and adds that as the R2 source automatically.
+GitHub Actions reads the release version from `RocoPilot/RocoPilot.csproj`. Manual release runs do not take a separate version input; tag-triggered release runs still verify that the `v*` tag matches the project version.
 
-When `ROCO_UPLOAD_TO_R2` is `true`, the workflow also uploads `/latest.json` to the same R2 public URL and injects that URL into `RocoPilot/appsettings.json` for release builds. The app still checks GitHub Releases first; it only reads this metadata file after the GitHub API request fails.
+The release workflow always uploads release assets to Cloudflare R2:
+
+- `RocoPilot.Install.exe`
+- `RocoPilot-Setup.exe`
+- `latest.json`
+
+The fixed R2 public URL is:
+
+```text
+https://pub-749777b9646245b7bc1b15efee2b9b24.r2.dev
+```
+
+The app still checks GitHub Releases first. If the GitHub API request fails, it reads update metadata from the fixed fallback URL in `RocoPilot/appsettings.json`:
+
+```text
+https://pub-749777b9646245b7bc1b15efee2b9b24.r2.dev/latest.json
+```
+
+If the R2 public domain, account, or bucket changes, update both `.github/workflows/release.yml` and `RocoPilot/appsettings.json`.
 
 `latest.json` uses the same fields consumed from the GitHub release API:
 

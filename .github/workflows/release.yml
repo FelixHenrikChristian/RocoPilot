@@ -258,10 +258,20 @@ jobs:
       contents: write
 
     steps:
+      - name: Check release publish token
+        shell: bash
+        env:
+          HAS_RELEASE_PUBLISH_TOKEN: ${{ secrets.RELEASE_PUBLISH_TOKEN != '' }}
+        run: |
+          if [ "${HAS_RELEASE_PUBLISH_TOKEN}" != "true" ]; then
+            echo "::warning title=RELEASE_PUBLISH_TOKEN is not configured::GitHub release will fall back to github.token, so release-edited workflows may still not trigger."
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_PUBLISH_TOKEN || github.token }}
 
       - name: Create release tag
         shell: bash
@@ -277,8 +287,8 @@ jobs:
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
           git tag -a "${RELEASE_TAG}" "${GITHUB_SHA}" -m "RocoPilot ${RELEASE_VERSION}"
           git push origin "${RELEASE_TAG}"
 
@@ -295,6 +305,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: RocoPilot ${{ needs.build_release_assets.outputs.version }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          token: ${{ secrets.RELEASE_PUBLISH_TOKEN || github.token }}
           body: |
             # RocoPilot ${{ needs.build_release_assets.outputs.version }}
 

@@ -11,6 +11,9 @@ internal sealed class LcxPokemonDto
 
     public string? Attributes { get; set; }
 
+    [JsonPropertyName("form_type")]
+    public string? FormType { get; set; }
+
     [JsonPropertyName("chain_group")]
     public string? ChainGroup { get; set; }
 

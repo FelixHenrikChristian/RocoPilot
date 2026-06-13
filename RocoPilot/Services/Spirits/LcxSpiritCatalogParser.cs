@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.RegularExpressions;
 
 using RocoPilot.Helpers;
@@ -10,6 +11,10 @@ internal static class LcxSpiritCatalogParser
     private static readonly Regex ShinySuffixRegex = new(
         "异色(?:S\\d+)?$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+    private static readonly Regex DetailAvatarRegex = new(
+        "<img\\b(?=[^>]*\\bid=\"pokemon-display-image\")[^>]*\\bsrc=\"(?<src>[^\"]+)\"",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     public static List<ScrapedSpiritState> BuildStates(
         IReadOnlyList<LcxPokemonDto> records,
@@ -86,6 +91,14 @@ internal static class LcxSpiritCatalogParser
         }
 
         return states;
+    }
+
+    public static string ParseDetailAvatarUrl(string markup, string baseUrl)
+    {
+        var match = DetailAvatarRegex.Match(markup);
+        return match.Success
+            ? new Uri(new Uri(baseUrl), WebUtility.HtmlDecode(match.Groups["src"].Value).Trim()).ToString()
+            : string.Empty;
     }
 
     private static IEnumerable<string> BuildAdditionalAliases(LcxPokemonDto record, SpiritCatalogItem item)
@@ -216,7 +229,7 @@ internal static class LcxSpiritCatalogParser
             var variantName = ExtractVariantName(formDisplayName, baseName);
             if (variantName.Length == 0)
             {
-                variantName = "异色";
+                variantName = formDisplayName.Length > 0 ? formDisplayName : "异色";
             }
 
             return new NameParts(baseName, FormatVariantDisplayName(baseName, variantName), variantName);
@@ -277,12 +290,15 @@ internal static class LcxSpiritCatalogParser
 
     private static bool IsLeaderForm(LcxPokemonDto record)
     {
-        return string.Equals(record.FormName?.Trim(), "首领形态", StringComparison.Ordinal);
+        return string.Equals(record.FormType?.Trim(), "boss", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(record.FormName?.Trim(), "首领形态", StringComparison.Ordinal);
     }
 
     private static bool IsShiny(LcxPokemonDto record)
     {
-        return string.Equals(record.FormName?.Trim(), "异色", StringComparison.Ordinal);
+        return string.Equals(record.FormType?.Trim(), "color", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(record.FormName?.Trim(), "异色", StringComparison.Ordinal)
+            || ShinySuffixRegex.IsMatch(TextMatchingHelper.NormalizeSpiritNameInput(record.FormName));
     }
 
     private static string BuildShinyKey(LcxPokemonDto record)
@@ -351,12 +367,37 @@ internal static class LcxSpiritCatalogParser
 
     private static string BuildImageUrl(LcxPokemonDto record, string displayName, string baseUrl)
     {
-        var imageName = record.IsForm && !string.IsNullOrWhiteSpace(record.FormImagePath)
-            ? record.FormImagePath.Trim()
-            : string.IsNullOrWhiteSpace(record.Name)
-                ? displayName
-                : record.Name.Trim();
+        var imageName = BuildImageName(record, displayName);
         return $"{baseUrl}imgs/{Uri.EscapeDataString(imageName)}.webp";
+    }
+
+    private static string BuildImageName(LcxPokemonDto record, string displayName)
+    {
+        var name = TextMatchingHelper.NormalizeSpiritNameInput(record.Name);
+        if (!record.IsForm)
+        {
+            return name.Length > 0 ? name : displayName;
+        }
+
+        var imageName = TextMatchingHelper.NormalizeSpiritNameInput(record.FormImagePath);
+        if (imageName.Length == 0)
+        {
+            imageName = TextMatchingHelper.NormalizeSpiritNameInput(record.FormDisplayName);
+        }
+
+        if (imageName.Length == 0)
+        {
+            return name.Length > 0 ? name : displayName;
+        }
+
+        if (!IsLeaderForm(record)
+            && name.Length > 0
+            && !imageName.StartsWith(name, StringComparison.Ordinal))
+        {
+            return $"{name}{imageName}";
+        }
+
+        return imageName;
     }
 
     private static IReadOnlyList<string> SplitAttributes(string? attributes)

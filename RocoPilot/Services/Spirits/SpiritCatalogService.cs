@@ -473,6 +473,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             await ThrottleAsync(cancellationToken);
         }
 
+        if (records.Count == 0)
+        {
+            throw new InvalidOperationException("离愁轩图鉴接口解析结果为空，已停止同步以避免覆盖现有图鉴数据。");
+        }
+
         var states = LcxSpiritCatalogParser.BuildStates(records, LcxBaseUrl);
         return BuildDocument(source, states);
     }
@@ -520,6 +525,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             progress?.Report(new SpiritCatalogSyncProgress(index + 1, document.Spirits.Count, "正在同步头像"));
             await DownloadAvatarAsync(
                 document.Spirits[index],
+                source,
                 avatarDirectory,
                 avatarPathPrefix,
                 cancellationToken);
@@ -766,6 +772,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     private async Task DownloadAvatarAsync(
         SpiritCatalogItem item,
+        SpiritCatalogSourceOption source,
         string avatarDirectory,
         string avatarPathPrefix,
         CancellationToken cancellationToken)
@@ -775,23 +782,88 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             return;
         }
 
-        var fileName = BuildAvatarFileName(item.Id, item.Name, item.AvatarUrl);
+        if (await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: false, cancellationToken))
+        {
+            return;
+        }
+
+        if (string.Equals(source.Id, LcxSourceId, StringComparison.OrdinalIgnoreCase))
+        {
+            var detailAvatarUrl = await TryResolveLcxDetailAvatarUrlAsync(item, source, cancellationToken);
+            if (!string.IsNullOrWhiteSpace(detailAvatarUrl)
+                && !string.Equals(detailAvatarUrl, item.AvatarUrl, StringComparison.OrdinalIgnoreCase))
+            {
+                item.AvatarUrl = detailAvatarUrl;
+                item.OriginalImageUrl = detailAvatarUrl;
+                if (await TryDownloadAvatarAsync(item, detailAvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: true, cancellationToken))
+                {
+                    return;
+                }
+
+                return;
+            }
+        }
+
+        await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: true, cancellationToken);
+    }
+
+    private async Task<bool> TryDownloadAvatarAsync(
+        SpiritCatalogItem item,
+        string avatarUrl,
+        string avatarDirectory,
+        string avatarPathPrefix,
+        bool logFailure,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(avatarUrl))
+        {
+            return false;
+        }
+
+        var fileName = BuildAvatarFileName(item.Id, item.Name, avatarUrl);
         var outputPath = Path.Combine(avatarDirectory, fileName);
         if (!File.Exists(outputPath))
         {
             try
             {
-                var bytes = await _httpClient.GetByteArrayAsync(item.AvatarUrl, cancellationToken);
+                var bytes = await _httpClient.GetByteArrayAsync(avatarUrl, cancellationToken);
                 await File.WriteAllBytesAsync(outputPath, bytes, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "同步精灵头像失败：{SpiritName} {AvatarUrl}", item.Name, item.AvatarUrl);
-                return;
+                if (logFailure)
+                {
+                    _logger.LogWarning(ex, "同步精灵头像失败：{SpiritName} {AvatarUrl}", item.Name, avatarUrl);
+                }
+
+                return false;
             }
         }
 
         item.AvatarPath = ToJsonPath(Path.Combine(avatarPathPrefix, fileName));
+        return true;
+    }
+
+    private async Task<string> TryResolveLcxDetailAvatarUrlAsync(
+        SpiritCatalogItem item,
+        SpiritCatalogSourceOption source,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(item.PageUrl))
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var markup = await GetStringAsync(item.PageUrl, source, "text/html, */*; q=0.01", cancellationToken);
+            return LcxSpiritCatalogParser.ParseDetailAvatarUrl(markup, LcxBaseUrl);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "读取离愁轩精灵详情头像失败：{SpiritName} {PageUrl}", item.Name, item.PageUrl);
+            return string.Empty;
+        }
     }
 
     private async Task NormalizeAvatarFilesAsync(

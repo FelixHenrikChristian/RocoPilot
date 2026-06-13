@@ -8,7 +8,7 @@ namespace RocoPilot.Services.Spirits;
 internal static class BiligameSpiritCatalogParser
 {
     private static readonly Regex DivSortRegex = new(
-        "<div class=\"divsort\"(?<attrs>[^>]*)>",
+        "<div\\s+class=\"(?=[^\"]*\\bdivsort\\b)(?=[^\"]*\\bdex-pet-card\\b)[^\"]*\"(?<attrs>[^>]*)>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex AttributeRegex = new(
@@ -20,15 +20,11 @@ internal static class BiligameSpiritCatalogParser
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly Regex NameRegex = new(
-        "block_2\"[^>]*>\\s*<a\\s+href=\"(?<href>[^\"]+)\"\\s+title=\"(?<title>[^\"]+)\"",
+        "dex-card-name[^>]*>\\s*<a\\s+href=\"(?<href>[^\"]+)\"\\s+title=\"(?<title>[^\"]+)\"",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
-    private static readonly Regex IconRegex = new(
-        "<img\\s+alt=\"(?<alt>[^\"]*)\"\\s+src=\"(?<src>[^\"]+)\"[^>]*class=\"rocom_prop_icon\"",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
-
-    private static readonly Regex FallbackImageRegex = new(
-        "<img\\s+alt=\"(?<alt>[^\"]*)\"\\s+src=\"(?<src>[^\"]+)\"",
+    private static readonly Regex AvatarImageRegex = new(
+        "<div\\s+class=\"[^\"]*\\bdex-pet-art\\b[^\"]*\"[^>]*>.*?<img\\s+alt=\"(?<alt>[^\"]*)\"\\s+src=\"(?<src>[^\"]+)\"",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
     public static List<ScrapedSpiritState> ParseListPage(string markup, string listUrl)
@@ -51,11 +47,7 @@ internal static class BiligameSpiritCatalogParser
                 continue;
             }
 
-            var imageMatch = IconRegex.Match(block);
-            if (!imageMatch.Success)
-            {
-                imageMatch = FallbackImageRegex.Match(block);
-            }
+            var imageMatch = AvatarImageRegex.Match(block);
 
             var avatarUrl = imageMatch.Success
                 ? new Uri(listUri, Decode(imageMatch.Groups["src"].Value).Trim()).ToString()
@@ -96,10 +88,13 @@ internal static class BiligameSpiritCatalogParser
         foreach (var rawLine in wikitext.Split('\n'))
         {
             var line = rawLine.TrimEnd('\r');
-            if (line.StartsWith('|') && line.Contains('=', StringComparison.Ordinal))
+            var fieldStartIndex = GetFieldStartIndex(line);
+            var separatorIndex = fieldStartIndex >= 0
+                ? line.IndexOf('=', fieldStartIndex)
+                : -1;
+            if (separatorIndex >= fieldStartIndex && fieldStartIndex >= 0)
             {
-                var separatorIndex = line.IndexOf('=');
-                currentKey = line[1..separatorIndex].Trim();
+                currentKey = line[fieldStartIndex..separatorIndex].Trim();
                 fields[currentKey] = line[(separatorIndex + 1)..].Trim();
                 continue;
             }
@@ -113,6 +108,25 @@ internal static class BiligameSpiritCatalogParser
         return fields;
     }
 
+    public static bool HasRequiredWikitextFields(IReadOnlyDictionary<string, string> fields)
+    {
+        return HasField(fields, "精灵名称")
+            && HasField(fields, "精灵初阶名称")
+            && HasField(fields, "精灵阶段");
+    }
+
+    public static bool IsStubWikitext(string wikitext)
+    {
+        return string.Equals(wikitext.Trim(), "{{精灵图鉴}}", StringComparison.Ordinal);
+    }
+
+    public static bool IsInvalidWikitextResponse(string wikitext)
+    {
+        return string.IsNullOrWhiteSpace(wikitext)
+            || wikitext.Contains("Frequency Capped", StringComparison.OrdinalIgnoreCase)
+            || wikitext.Contains("<html", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static void EnrichWithFields(
         ScrapedSpiritState state,
         IReadOnlyDictionary<string, string> fields)
@@ -120,12 +134,15 @@ internal static class BiligameSpiritCatalogParser
         var item = state.Item;
         item.WikiName = GetField(fields, "精灵名称", item.Name);
         item.BaseName = GetField(fields, "精灵初阶名称", item.Name);
-        item.Stage = GetField(fields, "精灵阶段", state.ListStage);
-        item.Form = GetField(fields, "精灵形态", state.ListForm);
+        item.Stage = SpiritCatalogParsingHelpers.NormalizeStage(GetField(fields, "精灵阶段", GetListStageFallback(state)));
+        item.Form = PreferListField(state.ListForm, fields, "精灵形态");
         item.RegionalForm = GetField(fields, "地区形态名称", string.Empty);
-        item.HasShiny = string.Equals(GetField(fields, "是否有异色", state.ListHasShiny), "是", StringComparison.Ordinal);
-        item.PrimaryAttribute = GetField(fields, "主属性", state.ListPrimaryAttribute);
-        item.SecondaryAttribute = GetField(fields, "2属性", state.ListSecondaryAttribute);
+        item.HasShiny = string.Equals(
+            PreferListField(state.ListHasShiny, fields, "是否有异色"),
+            "是",
+            StringComparison.Ordinal);
+        item.PrimaryAttribute = PreferListField(state.ListPrimaryAttribute, fields, "主属性");
+        item.SecondaryAttribute = PreferListField(state.ListSecondaryAttribute, fields, "2属性");
         item.UpdateVersion = GetField(fields, "更新版本", string.Empty);
         item.Aliases = SpiritCatalogParsingHelpers.BuildAliases(item);
         state.StageRank = SpiritCatalogParsingHelpers.StageRank(item.Stage);
@@ -166,6 +183,49 @@ internal static class BiligameSpiritCatalogParser
         return fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
             ? value.Trim()
             : fallback.Trim();
+    }
+
+    private static string PreferListField(
+        string listValue,
+        IReadOnlyDictionary<string, string> fields,
+        string key)
+    {
+        return !string.IsNullOrWhiteSpace(listValue)
+            ? listValue.Trim()
+            : GetField(fields, key, string.Empty);
+    }
+
+    private static string GetListStageFallback(ScrapedSpiritState state)
+    {
+        if (!string.IsNullOrWhiteSpace(state.ListStage))
+        {
+            return state.ListStage.Trim();
+        }
+
+        return state.ListForm.Contains("首领", StringComparison.Ordinal)
+            ? state.ListForm.Trim()
+            : string.Empty;
+    }
+
+    private static bool HasField(IReadOnlyDictionary<string, string> fields, string key)
+    {
+        return fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static int GetFieldStartIndex(string line)
+    {
+        if (line.StartsWith('|'))
+        {
+            return 1;
+        }
+
+        if (!line.StartsWith("{{", StringComparison.Ordinal))
+        {
+            return -1;
+        }
+
+        var templateFieldStart = line.IndexOf('|');
+        return templateFieldStart >= 0 ? templateFieldStart + 1 : -1;
     }
 
     private static string Decode(string value)

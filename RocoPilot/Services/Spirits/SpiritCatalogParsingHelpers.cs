@@ -39,37 +39,90 @@ internal static class SpiritCatalogParsingHelpers
 
     public static int StageRank(string stage)
     {
-        if (string.IsNullOrWhiteSpace(stage))
+        var normalizedStage = NormalizeStage(stage);
+        if (normalizedStage.Length == 0)
         {
             return 0;
         }
 
-        if (stage.Contains('Ⅴ') || stage.Contains("V", StringComparison.Ordinal))
+        if (normalizedStage.Contains('Ⅴ'))
         {
             return 5;
         }
 
-        if (stage.Contains('Ⅳ') || stage.Contains("IV", StringComparison.Ordinal))
+        if (normalizedStage.Contains('Ⅳ'))
         {
             return 4;
         }
 
-        if (stage.Contains('Ⅲ') || stage.Contains("III", StringComparison.Ordinal))
+        if (normalizedStage.Contains('Ⅲ'))
         {
             return 3;
         }
 
-        if (stage.Contains('Ⅱ') || stage.Contains("II", StringComparison.Ordinal))
+        if (normalizedStage.Contains('Ⅱ'))
         {
             return 2;
         }
 
-        if (stage.Contains('Ⅰ') || stage.Contains("I", StringComparison.Ordinal))
+        if (normalizedStage.Contains('Ⅰ'))
         {
             return 1;
         }
 
-        return stage.Contains("最终", StringComparison.Ordinal) ? 90 : 10;
+        return normalizedStage.Contains("最终", StringComparison.Ordinal)
+            || normalizedStage.Contains("首领", StringComparison.Ordinal)
+            ? 90
+            : 10;
+    }
+
+    public static string NormalizeStage(string stage)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+        {
+            return string.Empty;
+        }
+
+        var normalized = stage.Trim();
+        if (normalized.Contains("最终", StringComparison.Ordinal))
+        {
+            return "最终形态";
+        }
+
+        if (normalized.Contains("首领", StringComparison.Ordinal))
+        {
+            return "首领形态";
+        }
+
+        if (normalized.Contains('Ⅳ') || normalized.Contains("IV", StringComparison.Ordinal))
+        {
+            return "Ⅳ阶";
+        }
+
+        if (normalized.Contains('Ⅴ') || normalized.Contains("V", StringComparison.Ordinal))
+        {
+            return "Ⅴ阶";
+        }
+
+        if (normalized.Contains('Ⅲ') || normalized.Contains("III", StringComparison.Ordinal)
+            || normalized.Contains('三'))
+        {
+            return "Ⅲ阶";
+        }
+
+        if (normalized.Contains('Ⅱ') || normalized.Contains("II", StringComparison.Ordinal)
+            || normalized.Contains('二'))
+        {
+            return "Ⅱ阶";
+        }
+
+        if (normalized.Contains('Ⅰ') || normalized.Contains("I", StringComparison.Ordinal)
+            || normalized.Contains('一'))
+        {
+            return "Ⅰ阶";
+        }
+
+        return normalized;
     }
 
     public static int ParseCatalogId(string id)

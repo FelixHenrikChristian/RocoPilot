@@ -419,6 +419,10 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         progress?.Report(new SpiritCatalogSyncProgress(0, 0, $"正在读取{source.Name}列表"));
         var listMarkup = await GetStringAsync(source.ListUrl, source, "text/html", cancellationToken);
         var states = BiligameSpiritCatalogParser.ParseListPage(listMarkup, source.ListUrl);
+        if (states.Count == 0)
+        {
+            throw new InvalidOperationException("Biligame 图鉴列表解析结果为空，已停止同步以避免覆盖现有图鉴数据。");
+        }
 
         for (var index = 0; index < states.Count; index++)
         {
@@ -426,12 +430,19 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             var state = states[index];
             progress?.Report(new SpiritCatalogSyncProgress(index + 1, states.Count, "正在读取精灵详情"));
 
-            var fields = BiligameSpiritCatalogParser.ParseWikitextFields(
-                await GetStringAsync(
-                    BiligameSpiritCatalogParser.BuildRawPageUrl(state.Item.PageUrl),
-                    source,
-                    "text/plain",
-                    cancellationToken));
+            var wikitext = await GetStringAsync(
+                BiligameSpiritCatalogParser.BuildRawPageUrl(state.Item.PageUrl),
+                source,
+                "text/plain",
+                cancellationToken);
+            var fields = BiligameSpiritCatalogParser.ParseWikitextFields(wikitext);
+            if (BiligameSpiritCatalogParser.IsInvalidWikitextResponse(wikitext)
+                || (!BiligameSpiritCatalogParser.IsStubWikitext(wikitext)
+                    && !BiligameSpiritCatalogParser.HasRequiredWikitextFields(fields)))
+            {
+                throw new InvalidOperationException($"Biligame 精灵详情解析失败：{state.Item.Name}");
+            }
+
             BiligameSpiritCatalogParser.EnrichWithFields(state, fields);
             await ThrottleAsync(cancellationToken);
         }

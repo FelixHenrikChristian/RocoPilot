@@ -27,6 +27,10 @@ internal static class BiligameSpiritCatalogParser
         "<div\\s+class=\"[^\"]*\\bdex-pet-art\\b[^\"]*\"[^>]*>.*?<img\\s+alt=\"(?<alt>[^\"]*)\"\\s+src=\"(?<src>[^\"]+)\"",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
+    private static readonly Regex EvolutionNameRegex = new(
+        "sprite-evolve-btn\"[^>]*\\bdata-link=\"(?<name>[^\"]+)\"",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
+
     public static List<ScrapedSpiritState> ParseListPage(string markup, string listUrl)
     {
         var divs = DivSortRegex.Matches(markup).Cast<Match>().ToList();
@@ -148,6 +152,71 @@ internal static class BiligameSpiritCatalogParser
         state.StageRank = SpiritCatalogParsingHelpers.StageRank(item.Stage);
     }
 
+    public static IReadOnlyList<string> ParseEvolutionNames(string markup)
+    {
+        return EvolutionNameRegex.Matches(markup)
+            .Cast<Match>()
+            .Select(match => Decode(match.Groups["name"].Value).Trim())
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public static void ApplyEvolutionNames(
+        IReadOnlyList<ScrapedSpiritState> states,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> evolutionNamesByName)
+    {
+        foreach (var state in states)
+        {
+            var item = state.Item;
+            var wikiName = !string.IsNullOrWhiteSpace(item.WikiName) ? item.WikiName.Trim() : item.Name.Trim();
+            var itemName = item.Name.Trim();
+            if ((!evolutionNamesByName.TryGetValue(wikiName, out var evolutionNames)
+                    && !evolutionNamesByName.TryGetValue(itemName, out evolutionNames))
+                || evolutionNames.Count == 0)
+            {
+                continue;
+            }
+
+            var evolutionIndex = IndexOf(evolutionNames, wikiName);
+            if (evolutionIndex < 0)
+            {
+                evolutionIndex = IndexOf(evolutionNames, itemName);
+            }
+
+            if (evolutionIndex < 0)
+            {
+                evolutionIndex = InferEvolutionIndex(item.Stage, evolutionNames.Count);
+            }
+
+            if (evolutionIndex < 0)
+            {
+                continue;
+            }
+
+            item.BaseName = evolutionNames[0];
+            item.Stage = ToStageName(evolutionIndex, evolutionNames.Count);
+            item.Aliases = SpiritCatalogParsingHelpers.BuildAliases(item);
+            state.StageRank = SpiritCatalogParsingHelpers.StageRank(item.Stage);
+        }
+    }
+
+    private static int InferEvolutionIndex(string stage, int evolutionCount)
+    {
+        if (evolutionCount <= 0)
+        {
+            return -1;
+        }
+
+        var stageRank = SpiritCatalogParsingHelpers.StageRank(stage);
+        if (stageRank >= 90)
+        {
+            return evolutionCount - 1;
+        }
+
+        return stageRank >= 1 && stageRank <= evolutionCount ? stageRank - 1 : -1;
+    }
+
     private static Dictionary<string, string> ParseAttributes(string tag)
     {
         return AttributeRegex.Matches(tag)
@@ -210,6 +279,37 @@ internal static class BiligameSpiritCatalogParser
     private static bool HasField(IReadOnlyDictionary<string, string> fields, string key)
     {
         return fields.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static int IndexOf(IReadOnlyList<string> values, string value)
+    {
+        for (var index = 0; index < values.Count; index++)
+        {
+            if (string.Equals(values[index], value, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static string ToStageName(int zeroBasedIndex, int count)
+    {
+        if (zeroBasedIndex >= count - 1)
+        {
+            return "最终形态";
+        }
+
+        return zeroBasedIndex switch
+        {
+            <= 0 => "Ⅰ阶",
+            1 => "Ⅱ阶",
+            2 => "Ⅲ阶",
+            3 => "Ⅳ阶",
+            4 => "Ⅴ阶",
+            _ => $"{zeroBasedIndex + 1}阶"
+        };
     }
 
     private static int GetFieldStartIndex(string line)

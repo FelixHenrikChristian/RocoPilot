@@ -238,7 +238,7 @@ jobs:
           if ($null -eq $micaInstaller) {
             throw "MicaSetup installer was not created."
           }
-          Copy-Item $micaInstaller.FullName "artifacts/$($micaInstaller.Name)" -Force
+          Copy-Item $micaInstaller.FullName "artifacts/RocoPilot-Setup.exe" -Force
 
           Get-ChildItem "artifacts" -File | Format-Table Name, Length
 
@@ -324,7 +324,7 @@ jobs:
             <details>
             <summary>📦 安装包说明</summary>
 
-            - `RocoPilot-Setup-v*.exe`：完整安装程序，推荐首次安装或手动安装使用。
+            - `RocoPilot-Setup.exe`：完整安装程序，推荐首次安装或手动安装使用。
             - `RocoPilot.update.exe`：应用内更新器，用于自动下载并执行更新。
             - `RocoPilot.Install.exe`：应用内更新所需的安装包，由更新器使用。
 
@@ -379,7 +379,7 @@ jobs:
           <details>
           <summary>📦 安装包说明</summary>
 
-          - `RocoPilot-Setup-v*.exe`：完整安装程序，推荐首次安装或手动安装使用。
+          - `RocoPilot-Setup.exe`：完整安装程序，推荐首次安装或手动安装使用。
           - `RocoPilot.update.exe`：应用内更新器，用于自动下载并执行更新。
           - `RocoPilot.Install.exe`：应用内更新所需的安装包，由更新器使用。
 
@@ -427,8 +427,8 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
         run: |
-          mica_installer="$(find artifacts -maxdepth 1 -type f -name 'RocoPilot-Setup-v*.exe' | head -n 1)"
-          if [ -z "$mica_installer" ]; then
+          mica_installer="artifacts/RocoPilot-Setup.exe"
+          if [ ! -f "$mica_installer" ]; then
             echo "MicaSetup installer was not found."
             exit 1
           fi

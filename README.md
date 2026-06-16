@@ -57,7 +57,7 @@ RocoPilot 是一款 Windows 桌面辅助工具，面向游戏《洛克王国·�
 ### 下载安装
 
 1. 打开 [Releases](https://github.com/FelixHenrikChristian/RocoPilot/releases/latest) 页面。
-2. 下载 `RocoPilot-Setup-v*.exe`，参考提示进行安装。
+2. 下载 `RocoPilot-Setup.exe`，参考提示进行安装。
 3. 安装后启动 RocoPilot，并保持目标游戏窗口处于正常状态。
 
 ### 启动识别

@@ -285,6 +285,10 @@ FakesAssemblies/
 .ntvs_analysis.dat
 node_modules/
 
+# VitePress
+website/.vitepress/cache/
+website/.vitepress/dist/
+
 # Visual Studio 6 build log
 *.plg
 

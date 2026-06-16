@@ -1,0 +1,30 @@
+{
+  "name": "rocopilot",
+  "version": "1.0.0",
+  "description": "<div align=\"center\">\r   <img src=\"RocoPilot/Assets/RocoPilot.png\" width=\"112\" alt=\"RocoPilot\" />\r   <h1>🧭 RocoPilot</h1>\r   <p><strong>自动战斗 · 奇遇计数</strong></p>",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docs:dev": "vitepress dev website",
+    "docs:build": "vitepress build website",
+    "docs:preview": "vitepress preview website"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FelixHenrikChristian/RocoPilot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/FelixHenrikChristian/RocoPilot/issues"
+  },
+  "homepage": "https://github.com/FelixHenrikChristian/RocoPilot#readme",
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}

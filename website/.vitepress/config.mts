@@ -3,26 +3,30 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "RocoPilot",
-  description: "洛克王国世界辅助工具",
+  description: "洛克王国世界自动战斗与奇遇计数工具",
+  base: '/RocoPilot/',
+  lang: 'zh-CN',
+  head: [['link', { rel: 'icon', href: '/RocoPilot/logo.png' }]],
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
+    logo: '/logo.png',
     nav: [
-      { text: 'Home', link: '/' },
-      { text: 'Examples', link: '/markdown-examples' }
-    ],
-
-    sidebar: [
-      {
-        text: 'Examples',
-        items: [
-          { text: 'Markdown Examples', link: '/markdown-examples' },
-          { text: 'Runtime API Examples', link: '/api-examples' }
-        ]
-      }
+      { text: '首页', link: '/' },
+      { text: '文档', link: '/document/' },
+      { text: '下载', link: '/download/' }
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/vuejs/vitepress' }
-    ]
+      { icon: 'github', link: 'https://github.com/FelixHenrikChristian/RocoPilot' }
+    ],
+
+    footer: {
+      message: 'Released under the GPL-3.0 License.',
+      copyright: 'Copyright © 2026-present Felix Henrik Christian'
+    },
+
+    search: {
+      provider: 'local'
+    }
   }
 })

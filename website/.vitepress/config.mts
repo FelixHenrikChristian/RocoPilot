@@ -16,6 +16,21 @@ export default defineConfig({
       { text: '下载', link: '/download/' }
     ],
 
+    sidebar: {
+      '/document/': [
+        {
+          text: '文档',
+          items: [
+            { text: '介绍', link: '/document/' },
+            { text: '安装', link: '/document/install' },
+            { text: '使用', link: '/document/use' },
+            { text: '功能', link: '/document/features' },
+            { text: 'FAQ', link: '/document/faq' }
+          ]
+        }
+      ]
+    },
+
     socialLinks: [
       { icon: 'github', link: 'https://github.com/FelixHenrikChristian/RocoPilot' }
     ],

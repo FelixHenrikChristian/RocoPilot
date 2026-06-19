@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Spirits;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Spirits;
 
 using Windows.Graphics;
@@ -146,6 +147,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             _spiritCatalogService,
             SourceDisplayName,
             SourceUri);
+        WindowPlacementHelper.SetOwner(window, this);
+        WindowPlacementHelper.CenterOnParent(window, App.MainWindow);
         window.Activate();
     }
 
@@ -172,6 +175,8 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             _spiritCatalogService,
             SourceDisplayName,
             SourceUri);
+        WindowPlacementHelper.SetOwner(window, this);
+        WindowPlacementHelper.CenterOnParent(window, App.MainWindow);
         window.Activate();
     }
 

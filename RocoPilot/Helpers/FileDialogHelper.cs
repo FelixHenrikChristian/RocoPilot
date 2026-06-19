@@ -1,4 +1,7 @@
 using System.Runtime.InteropServices;
+
+using Microsoft.UI.Xaml;
+
 using WinRT.Interop;
 
 namespace RocoPilot.Helpers;
@@ -74,7 +77,8 @@ public static class FileDialogHelper
         string filter,
         string? initialDirectory = null,
         string? initialFileName = null,
-        string? defaultExtension = null)
+        string? defaultExtension = null,
+        Window? owner = null)
     {
         const int fileBufferCharCount = 32768;
 
@@ -109,7 +113,7 @@ public static class FileDialogHelper
             var openFileName = new OpenFileName
             {
                 lStructSize = Marshal.SizeOf<OpenFileName>(),
-                hwndOwner = WindowNative.GetWindowHandle(App.MainWindow),
+                hwndOwner = WindowNative.GetWindowHandle(owner ?? App.MainWindow),
                 lpstrFilter = filterBuffer,
                 nFilterIndex = 1,
                 lpstrFile = fileBuffer,

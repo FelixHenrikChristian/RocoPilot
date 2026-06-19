@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Input;
 using RocoPilot.ViewModels;
 using RocoPilot.Views.Windows;
@@ -53,6 +54,8 @@ public sealed partial class RealtimePage : Page
 
         _autoBattleConfigWindow = new AutoBattleConfigWindow(ViewModel);
         _autoBattleConfigWindow.Closed += (_, _) => _autoBattleConfigWindow = null;
+        WindowPlacementHelper.SetOwner(_autoBattleConfigWindow, App.MainWindow);
+        WindowPlacementHelper.CenterOnParent(_autoBattleConfigWindow, App.MainWindow);
         _autoBattleConfigWindow.Activate();
     }
 
@@ -66,6 +69,8 @@ public sealed partial class RealtimePage : Page
 
         _autoBattleOtherConfigWindow = new AutoBattleOtherConfigWindow(ViewModel);
         _autoBattleOtherConfigWindow.Closed += (_, _) => _autoBattleOtherConfigWindow = null;
+        WindowPlacementHelper.SetOwner(_autoBattleOtherConfigWindow, App.MainWindow);
+        WindowPlacementHelper.CenterOnParent(_autoBattleOtherConfigWindow, App.MainWindow);
         _autoBattleOtherConfigWindow.Activate();
     }
 
@@ -80,6 +85,8 @@ public sealed partial class RealtimePage : Page
 
         _spiritCatalogWindow = new SpiritCatalogWindow(ViewModel.SelectedSpiritCatalogSourceId);
         _spiritCatalogWindow.Closed += (_, _) => _spiritCatalogWindow = null;
+        WindowPlacementHelper.SetOwner(_spiritCatalogWindow, App.MainWindow);
+        WindowPlacementHelper.CenterOnParent(_spiritCatalogWindow, App.MainWindow);
         _spiritCatalogWindow.Activate();
     }
 

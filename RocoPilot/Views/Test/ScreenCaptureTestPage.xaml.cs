@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Views.Windows;
 
@@ -82,6 +83,8 @@ public sealed partial class ScreenCaptureTestPage : Page
         _previewWindow?.Close();
         _previewWindow = new CapturePreviewWindow(targetWindow, captureMethod);
         _previewWindow.Closed += (_, _) => _previewWindow = null;
+        WindowPlacementHelper.SetOwner(_previewWindow, App.MainWindow);
+        WindowPlacementHelper.CenterOnParent(_previewWindow, App.MainWindow);
         _previewWindow.Activate();
     }
 

@@ -12,6 +12,7 @@ using RocoPilot.Models.Recognition;
 
 using Windows.Foundation;
 using Windows.Graphics;
+using Windows.System;
 
 namespace RocoPilot.Views.Windows;
 
@@ -23,6 +24,13 @@ public sealed partial class RegionSelectionWindow : WindowEx
     private const int MinimumWindowHeight = 560;
     private const int DisplayHorizontalMargin = 120;
     private const int DisplayVerticalMargin = 100;
+    private const float MinimumZoomFactor = 0.25f;
+    private const float MaximumZoomFactor = 4f;
+    private const float ZoomStep = 0.25f;
+    private const double MinimumSelectionScreenSize = 4d;
+    private const double SelectionStrokeScreenThickness = 2d;
+    private const int OemPlusVirtualKey = 0xBB;
+    private const int OemMinusVirtualKey = 0xBD;
 
     private readonly CapturedFrame _frame;
     private readonly TaskCompletionSource<RecognitionRegion?> _selectionCompletion = new();
@@ -69,6 +77,7 @@ public sealed partial class RegionSelectionWindow : WindowEx
 
         SourceText.Text = sourceName;
         FrameSizeText.Text = $"{_frame.Width} x {_frame.Height}";
+        RegisterZoomKeyboardAccelerators();
 
         Closed += (_, _) => CompleteSelection(null);
     }
@@ -82,7 +91,9 @@ public sealed partial class RegionSelectionWindow : WindowEx
     private void ContentRoot_Loaded(object sender, RoutedEventArgs e)
     {
         PresentFrame();
+        UpdateImageHostSize();
         UpdateImageBounds();
+        UpdateZoomControls();
 
         if (_selectedRegion is not null)
         {
@@ -110,6 +121,31 @@ public sealed partial class RegionSelectionWindow : WindowEx
         _isDragging = false;
         UpdateImageBounds();
         ShowSelectedRegion();
+    }
+
+    private void ImageScrollViewer_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateImageHostSize();
+    }
+
+    private void ImageScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+    {
+        UpdateZoomControls();
+    }
+
+    private void ZoomOutButton_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeZoom(-ZoomStep);
+    }
+
+    private void ResetZoomButton_Click(object sender, RoutedEventArgs e)
+    {
+        ResetZoom();
+    }
+
+    private void ZoomInButton_Click(object sender, RoutedEventArgs e)
+    {
+        ChangeZoom(ZoomStep);
     }
 
     private void ImageHost_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -153,7 +189,8 @@ public sealed partial class RegionSelectionWindow : WindowEx
 
         var end = ClampToImage(e.GetCurrentPoint(ImageHost).Position);
         var selectedRect = GetRect(_selectionStart, end);
-        if (selectedRect.Width < 4 || selectedRect.Height < 4)
+        var minimumSelectionSize = MinimumSelectionScreenSize / ImageScrollViewer.ZoomFactor;
+        if (selectedRect.Width < minimumSelectionSize || selectedRect.Height < minimumSelectionSize)
         {
             StatusText.Text = "区域太小，请重新拖拽";
             HideSelection();
@@ -175,7 +212,7 @@ public sealed partial class RegionSelectionWindow : WindowEx
     {
         _isDragging = false;
         ClearSelection();
-        StatusText.Text = "在截图上拖拽一个矩形区域";
+        StatusText.Text = "在截图上拖拽一个矩形区域；Ctrl++ / Ctrl+- 缩放，Ctrl+0 复位";
     }
 
     private void CancelButton_Click(object sender, RoutedEventArgs e)
@@ -216,6 +253,90 @@ public sealed partial class RegionSelectionWindow : WindowEx
         var x = workArea.X + Math.Max(0, (workArea.Width - width) / 2);
         var y = workArea.Y + Math.Max(0, (workArea.Height - height) / 2);
         AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
+    }
+
+    private void UpdateImageHostSize()
+    {
+        var width = ImageScrollViewer.ActualWidth;
+        var height = ImageScrollViewer.ActualHeight;
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        ImageHost.Width = width;
+        ImageHost.Height = height;
+    }
+
+    private void ChangeZoom(float delta)
+    {
+        var currentZoom = ImageScrollViewer.ZoomFactor;
+        var targetZoom = Math.Clamp(
+            (float)Math.Round((currentZoom + delta) / ZoomStep) * ZoomStep,
+            MinimumZoomFactor,
+            MaximumZoomFactor);
+
+        if (Math.Abs(targetZoom - currentZoom) < 0.001f)
+        {
+            return;
+        }
+
+        _ = ImageScrollViewer.ChangeView(null, null, targetZoom, disableAnimation: false);
+    }
+
+    private void ResetZoom()
+    {
+        _ = ImageScrollViewer.ChangeView(0, 0, 1f, disableAnimation: false);
+    }
+
+    private void UpdateZoomControls()
+    {
+        var zoomFactor = ImageScrollViewer.ZoomFactor;
+        ZoomPercentText.Text = $"{Math.Round(zoomFactor * 100):0}%";
+        ZoomOutButton.IsEnabled = zoomFactor > MinimumZoomFactor + 0.001f;
+        ZoomInButton.IsEnabled = zoomFactor < MaximumZoomFactor - 0.001f;
+        SelectionRectangle.StrokeThickness = SelectionStrokeScreenThickness / zoomFactor;
+    }
+
+    private void RegisterZoomKeyboardAccelerators()
+    {
+        AddZoomKeyboardAccelerator(VirtualKey.Add, VirtualKeyModifiers.Control, () => ChangeZoom(ZoomStep));
+        AddZoomKeyboardAccelerator(
+            (VirtualKey)OemPlusVirtualKey,
+            VirtualKeyModifiers.Control,
+            () => ChangeZoom(ZoomStep));
+        AddZoomKeyboardAccelerator(
+            (VirtualKey)OemPlusVirtualKey,
+            VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift,
+            () => ChangeZoom(ZoomStep));
+        AddZoomKeyboardAccelerator(
+            VirtualKey.Subtract,
+            VirtualKeyModifiers.Control,
+            () => ChangeZoom(-ZoomStep));
+        AddZoomKeyboardAccelerator(
+            (VirtualKey)OemMinusVirtualKey,
+            VirtualKeyModifiers.Control,
+            () => ChangeZoom(-ZoomStep));
+        AddZoomKeyboardAccelerator(VirtualKey.Number0, VirtualKeyModifiers.Control, ResetZoom);
+        AddZoomKeyboardAccelerator(VirtualKey.NumberPad0, VirtualKeyModifiers.Control, ResetZoom);
+    }
+
+    private void AddZoomKeyboardAccelerator(
+        VirtualKey key,
+        VirtualKeyModifiers modifiers,
+        Action action)
+    {
+        var accelerator = new KeyboardAccelerator
+        {
+            Key = key,
+            Modifiers = modifiers
+        };
+        accelerator.Invoked += (_, args) =>
+        {
+            action();
+            args.Handled = true;
+        };
+        ContentRoot.KeyboardAccelerators.Add(accelerator);
     }
 
     private void UpdateImageBounds()

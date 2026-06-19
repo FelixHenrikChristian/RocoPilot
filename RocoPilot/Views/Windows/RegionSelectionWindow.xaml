@@ -56,18 +56,74 @@
                         TextTrimming="CharacterEllipsis" />
                 </StackPanel>
 
-                <Border
+                <StackPanel
                     Grid.Column="1"
-                    Padding="10,5"
                     VerticalAlignment="Center"
-                    Background="{ThemeResource ControlFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
-                    <TextBlock
-                        x:Name="FrameSizeText"
-                        Style="{StaticResource CaptionTextBlockStyle}" />
-                </Border>
+                    Orientation="Horizontal"
+                    Spacing="8">
+                    <Border
+                        Padding="10,5"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <TextBlock
+                            x:Name="FrameSizeText"
+                            Style="{StaticResource CaptionTextBlockStyle}" />
+                    </Border>
+
+                    <Border
+                        Padding="4"
+                        VerticalAlignment="Center"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel
+                            Orientation="Horizontal"
+                            Spacing="2">
+                            <Button
+                                x:Name="ZoomOutButton"
+                                Width="32"
+                                Height="30"
+                                MinWidth="0"
+                                Padding="0"
+                                Click="ZoomOutButton_Click"
+                                ToolTipService.ToolTip="缩小 (Ctrl+-)">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE71F;" />
+                            </Button>
+                            <Button
+                                x:Name="ResetZoomButton"
+                                Height="30"
+                                MinWidth="58"
+                                Padding="8,0"
+                                Click="ResetZoomButton_Click"
+                                ToolTipService.ToolTip="恢复适应窗口 (Ctrl+0)">
+                                <TextBlock
+                                    x:Name="ZoomPercentText"
+                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Text="100%" />
+                            </Button>
+                            <Button
+                                x:Name="ZoomInButton"
+                                Width="32"
+                                Height="30"
+                                MinWidth="0"
+                                Padding="0"
+                                Click="ZoomInButton_Click"
+                                ToolTipService.ToolTip="放大 (Ctrl++)">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE8A3;" />
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -77,28 +133,42 @@
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
             CornerRadius="8">
-            <Grid
-                x:Name="ImageHost"
-                Background="Black"
-                PointerCanceled="ImageHost_PointerCanceled"
-                PointerMoved="ImageHost_PointerMoved"
-                PointerPressed="ImageHost_PointerPressed"
-                PointerReleased="ImageHost_PointerReleased"
-                SizeChanged="ImageHost_SizeChanged">
-                <Image
-                    x:Name="PreviewImage"
-                    Stretch="Uniform" />
-                <Canvas
-                    x:Name="OverlayCanvas"
-                    IsHitTestVisible="False">
-                    <Rectangle
-                        x:Name="SelectionRectangle"
-                        Fill="#332FD7FF"
-                        Stroke="#FF2FD7FF"
-                        StrokeThickness="2"
-                        Visibility="Collapsed" />
-                </Canvas>
-            </Grid>
+            <ScrollViewer
+                x:Name="ImageScrollViewer"
+                HorizontalContentAlignment="Center"
+                HorizontalScrollBarVisibility="Auto"
+                HorizontalScrollMode="Auto"
+                MaxZoomFactor="4"
+                MinZoomFactor="0.25"
+                SizeChanged="ImageScrollViewer_SizeChanged"
+                VerticalContentAlignment="Center"
+                VerticalScrollBarVisibility="Auto"
+                VerticalScrollMode="Auto"
+                ViewChanged="ImageScrollViewer_ViewChanged"
+                ZoomMode="Enabled">
+                <Grid
+                    x:Name="ImageHost"
+                    Background="Black"
+                    PointerCanceled="ImageHost_PointerCanceled"
+                    PointerMoved="ImageHost_PointerMoved"
+                    PointerPressed="ImageHost_PointerPressed"
+                    PointerReleased="ImageHost_PointerReleased"
+                    SizeChanged="ImageHost_SizeChanged">
+                    <Image
+                        x:Name="PreviewImage"
+                        Stretch="Uniform" />
+                    <Canvas
+                        x:Name="OverlayCanvas"
+                        IsHitTestVisible="False">
+                        <Rectangle
+                            x:Name="SelectionRectangle"
+                            Fill="#332FD7FF"
+                            Stroke="#FF2FD7FF"
+                            StrokeThickness="2"
+                            Visibility="Collapsed" />
+                    </Canvas>
+                </Grid>
+            </ScrollViewer>
         </Border>
 
         <Border
@@ -117,7 +187,7 @@
                     Grid.Column="0"
                     VerticalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="在截图上拖拽一个矩形区域"
+                    Text="在截图上拖拽一个矩形区域；Ctrl++ / Ctrl+- 缩放，Ctrl+0 复位"
                     TextWrapping="WrapWholeWords" />
 
                 <Button

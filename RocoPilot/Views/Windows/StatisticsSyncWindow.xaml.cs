@@ -192,8 +192,9 @@ public sealed partial class StatisticsSyncWindow : WindowEx
 
         _tutorialWindow = new StatisticsSyncTutorialWindow();
         _tutorialWindow.Closed += TutorialWindow_Closed;
-        _tutorialWindow.Activate();
+        WindowPlacementHelper.SetOwner(_tutorialWindow, this);
         WindowPlacementHelper.CenterOnParent(_tutorialWindow, this);
+        _tutorialWindow.Activate();
     }
 
     private void TutorialWindow_Closed(object sender, WindowEventArgs args)

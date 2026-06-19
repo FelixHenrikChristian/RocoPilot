@@ -9,9 +9,12 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 
 using Windows.Graphics;
+using Windows.Graphics.Imaging;
+using Windows.Storage.Streams;
 
 namespace RocoPilot.Views.Windows;
 
@@ -46,7 +49,7 @@ public sealed partial class CapturePreviewWindow : WindowEx
         Title = $"捕获预览 - {_targetWindow.Title}";
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
-        HideNativeTitleBar();
+        AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
         AppWindow.Resize(new SizeInt32(920, 640));
 
         TargetText.Text = _targetWindow.DisplayName;
@@ -55,19 +58,6 @@ public sealed partial class CapturePreviewWindow : WindowEx
         FpsText.Text = "FPS: -";
 
         Closed += (_, _) => StopCapture();
-    }
-
-    private void HideNativeTitleBar()
-    {
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.SetBorderAndTitleBar(true, false);
-            return;
-        }
-
-        var overlappedPresenter = OverlappedPresenter.Create();
-        overlappedPresenter.SetBorderAndTitleBar(true, false);
-        AppWindow.SetPresenter(overlappedPresenter);
     }
 
     private void ContentRoot_Loaded(object sender, RoutedEventArgs e)
@@ -195,6 +185,7 @@ public sealed partial class CapturePreviewWindow : WindowEx
         }
 
         _previewBitmap.Invalidate();
+        SaveButton.IsEnabled = true;
         EmptyState.Visibility = Visibility.Collapsed;
         StatusText.Text = "捕获中";
         UpdateFps();
@@ -227,9 +218,87 @@ public sealed partial class CapturePreviewWindow : WindowEx
         StatusText.Text = _isPaused ? "已暂停" : "捕获中";
     }
 
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    private async void SaveCurrentFrameButton_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        var bitmap = _previewBitmap;
+        if (bitmap is null)
+        {
+            return;
+        }
+
+        var width = bitmap.PixelWidth;
+        var height = bitmap.PixelHeight;
+        var pixels = new byte[checked(width * height * 4)];
+        using (var stream = bitmap.PixelBuffer.AsStream())
+        {
+            stream.Seek(0, SeekOrigin.Begin);
+            stream.ReadExactly(pixels);
+        }
+
+        string? filePath;
+        try
+        {
+            filePath = FileDialogHelper.PickSaveFile(
+                "保存当前捕获帧",
+                "PNG 图片 (*.png)|*.png|所有文件 (*.*)|*.*",
+                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                $"RocoPilot_Capture_{DateTimeOffset.Now:yyyyMMdd_HHmmss_fff}.png",
+                ".png",
+                this);
+        }
+        catch
+        {
+            StatusText.Text = "打开保存窗口失败";
+            return;
+        }
+
+        if (filePath is null)
+        {
+            return;
+        }
+
+        SaveButton.IsEnabled = false;
+        try
+        {
+            await SavePngAsync(filePath, width, height, pixels);
+            StatusText.Text = "已保存";
+        }
+        catch
+        {
+            StatusText.Text = "保存失败";
+        }
+        finally
+        {
+            SaveButton.IsEnabled = true;
+        }
+    }
+
+    private static async Task SavePngAsync(string path, int width, int height, byte[] pixels)
+    {
+        using var stream = new InMemoryRandomAccessStream();
+        var encoder = await BitmapEncoder.CreateAsync(BitmapEncoder.PngEncoderId, stream);
+        encoder.SetPixelData(
+            BitmapPixelFormat.Bgra8,
+            BitmapAlphaMode.Ignore,
+            (uint)width,
+            (uint)height,
+            96,
+            96,
+            pixels);
+        await encoder.FlushAsync();
+
+        stream.Seek(0);
+        var encodedLength = checked((int)stream.Size);
+        using var reader = new DataReader(stream.GetInputStreamAt(0));
+        var loadedLength = await reader.LoadAsync((uint)encodedLength);
+        if (loadedLength != (uint)encodedLength)
+        {
+            throw new InvalidDataException("PNG 编码结果读取不完整");
+        }
+
+        var encodedBytes = new byte[encodedLength];
+        reader.ReadBytes(encodedBytes);
+        await File.WriteAllBytesAsync(path, encodedBytes);
     }
 
     private void StopCapture()

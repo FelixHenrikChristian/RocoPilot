@@ -58,6 +58,7 @@ public sealed partial class UpdateWindow : WindowEx
         _completion = new TaskCompletionSource<UpdateResult>(TaskCreationOptions.RunContinuationsAsynchronously);
         Closed += OnWindowClosed;
 
+        WindowPlacementHelper.SetOwner(this, App.MainWindow);
         WindowPlacementHelper.CenterOnParent(this, App.MainWindow);
         Activate();
         return _completion.Task;

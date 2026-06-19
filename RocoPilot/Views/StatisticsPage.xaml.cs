@@ -17,7 +17,7 @@ public sealed partial class StatisticsPage : Page
     private static readonly TimeSpan ScrollBarHideDelay = TimeSpan.FromMilliseconds(700);
 
     private readonly Dictionary<ScrollViewer, DispatcherTimer> _scrollBarHideTimers = [];
-    private ContentDialog? _activeShinyDetailDialog;
+    private StatisticsDetailWindow? _activeShinyDetailWindow;
     private StatisticDetailAction _requestedShinyDetailAction = StatisticDetailAction.None;
     private ShinyCaptureDetailItem? _requestedShinyDetailItem;
     private StatisticsSyncWindow? _statisticsSyncWindow;
@@ -308,18 +308,18 @@ public sealed partial class StatisticsPage : Page
         }
 
         var action = StatisticDetailAction.None;
-        ContentDialog? dialog = null;
+        StatisticsDetailWindow? detailWindow = null;
         var editButton = CreateDialogIconButton("\uE70F", "编辑", GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))));
         var deleteButton = CreateDialogIconButton("\uE74D", "删除", new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)));
         editButton.Click += (_, _) =>
         {
             action = StatisticDetailAction.Edit;
-            dialog?.Hide();
+            detailWindow?.Close();
         };
         deleteButton.Click += (_, _) =>
         {
             action = StatisticDetailAction.Delete;
-            dialog?.Hide();
+            detailWindow?.Close();
         };
 
         var headerCard = new Border
@@ -403,16 +403,8 @@ public sealed partial class StatisticsPage : Page
             }
         };
 
-        dialog = new ContentDialog
-        {
-            XamlRoot = xamlRoot,
-            Title = "奇遇详情",
-            Content = content,
-            CloseButtonText = "关闭",
-            DefaultButton = ContentDialogButton.Close
-        };
-
-        await dialog.ShowAsync();
+        detailWindow = new StatisticsDetailWindow("奇遇详情", content, App.MainWindow);
+        await detailWindow.ShowAsync();
 
         if (action == StatisticDetailAction.Edit)
         {
@@ -455,6 +447,12 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
+        if (_activeShinyDetailWindow is not null)
+        {
+            _activeShinyDetailWindow.Activate();
+            return;
+        }
+
         var flipView = new FlipView
         {
             Width = 470,
@@ -478,28 +476,21 @@ public sealed partial class StatisticsPage : Page
             args.Handled = true;
         };
 
-        var dialog = new ContentDialog
-        {
-            XamlRoot = xamlRoot,
-            Title = "异色详情",
-            Content = flipView,
-            CloseButtonText = "关闭",
-            DefaultButton = ContentDialogButton.Close
-        };
+        var detailWindow = new StatisticsDetailWindow("异色详情", flipView, App.MainWindow);
 
-        _activeShinyDetailDialog = dialog;
+        _activeShinyDetailWindow = detailWindow;
         _requestedShinyDetailAction = StatisticDetailAction.None;
         _requestedShinyDetailItem = null;
 
         try
         {
-            await dialog.ShowAsync();
+            await detailWindow.ShowAsync();
         }
         finally
         {
-            if (ReferenceEquals(_activeShinyDetailDialog, dialog))
+            if (ReferenceEquals(_activeShinyDetailWindow, detailWindow))
             {
-                _activeShinyDetailDialog = null;
+                _activeShinyDetailWindow = null;
             }
         }
 
@@ -541,7 +532,7 @@ public sealed partial class StatisticsPage : Page
 
         _requestedShinyDetailAction = action;
         _requestedShinyDetailItem = item;
-        _activeShinyDetailDialog?.Hide();
+        _activeShinyDetailWindow?.Close();
     }
 
     private async Task EditShinyCaptureAsync(ShinyCaptureDetailItem item)
@@ -893,6 +884,7 @@ public sealed partial class StatisticsPage : Page
 
         _statisticsSyncWindow = new StatisticsSyncWindow(ViewModel);
         _statisticsSyncWindow.Closed += (_, _) => _statisticsSyncWindow = null;
+        WindowPlacementHelper.SetOwner(_statisticsSyncWindow, App.MainWindow);
         WindowPlacementHelper.CenterOnParent(_statisticsSyncWindow, App.MainWindow);
         _statisticsSyncWindow.Activate();
     }

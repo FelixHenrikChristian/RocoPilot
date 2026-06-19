@@ -53,7 +53,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         Title = "自动战斗配置";
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
-        HideNativeTitleBar();
+        AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
         AppWindow.Resize(new SizeInt32(900, 620));
 
         ReleaseItems.CollectionChanged += ReleaseItems_CollectionChanged;
@@ -61,19 +61,6 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
 
         LoadSettings(_viewModel.AutoBattleSettings);
         UpdateEditorState();
-    }
-
-    private void HideNativeTitleBar()
-    {
-        if (AppWindow.Presenter is OverlappedPresenter presenter)
-        {
-            presenter.SetBorderAndTitleBar(true, false);
-            return;
-        }
-
-        var overlappedPresenter = OverlappedPresenter.Create();
-        overlappedPresenter.SetBorderAndTitleBar(true, false);
-        AppWindow.SetPresenter(overlappedPresenter);
     }
 
     private void LoadSettings(AutoBattleSettings settings)

@@ -142,15 +142,17 @@
                         </StackPanel>
                     </Button>
                     <Button
-                        Click="CloseButton_Click">
+                        x:Name="SaveButton"
+                        Click="SaveCurrentFrameButton_Click"
+                        IsEnabled="False">
                         <StackPanel
                             Orientation="Horizontal"
                             Spacing="6">
                             <FontIcon
                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                 FontSize="14"
-                                Glyph="&#xE8BB;" />
-                            <TextBlock Text="关闭" />
+                                Glyph="&#xE74E;" />
+                            <TextBlock Text="保存当前帧" />
                         </StackPanel>
                     </Button>
                 </StackPanel>

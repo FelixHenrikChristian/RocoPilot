@@ -743,8 +743,11 @@ public sealed partial class RegionEditorPage : Page
             return false;
         }
 
-        clientX = Math.Max(0, targetWindow.ClientOffsetX);
-        clientY = Math.Max(0, targetWindow.ClientOffsetY);
+        var (frameClientOffsetX, frameClientOffsetY) = targetWindow.GetClientOffsetForFrame(
+            frame.Width,
+            frame.Height);
+        clientX = Math.Max(0, frameClientOffsetX);
+        clientY = Math.Max(0, frameClientOffsetY);
 
         if (clientX >= frame.Width || clientY >= frame.Height)
         {

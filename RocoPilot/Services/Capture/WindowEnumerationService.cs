@@ -64,10 +64,14 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
             ProcessName = GetProcessName(processId),
             Width = rect.Width,
             Height = rect.Height,
+            ExtendedFrameWidth = clientInfo.ExtendedFrameWidth,
+            ExtendedFrameHeight = clientInfo.ExtendedFrameHeight,
             ClientWidth = clientInfo.Width,
             ClientHeight = clientInfo.Height,
             ClientOffsetX = clientInfo.OffsetX,
-            ClientOffsetY = clientInfo.OffsetY
+            ClientOffsetY = clientInfo.OffsetY,
+            WindowClientOffsetX = clientInfo.WindowOffsetX,
+            WindowClientOffsetY = clientInfo.WindowOffsetY
         };
 
         return true;
@@ -128,7 +132,15 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
         var clientTopLeft = new WindowPoint();
         if (!ClientToScreen(hwnd, ref clientTopLeft))
         {
-            return new ClientAreaInfo(clientRect.Width, clientRect.Height, 0, 0);
+            return new ClientAreaInfo(
+                clientRect.Width,
+                clientRect.Height,
+                windowRect.Width,
+                windowRect.Height,
+                0,
+                0,
+                0,
+                0);
         }
 
         var captureBounds = TryGetExtendedFrameBounds(hwnd, out var extendedFrameBounds)
@@ -138,8 +150,12 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
         return new ClientAreaInfo(
             clientRect.Width,
             clientRect.Height,
+            captureBounds.Width,
+            captureBounds.Height,
             clientTopLeft.X - captureBounds.Left,
-            clientTopLeft.Y - captureBounds.Top);
+            clientTopLeft.Y - captureBounds.Top,
+            clientTopLeft.X - windowRect.Left,
+            clientTopLeft.Y - windowRect.Top);
     }
 
     private static bool TryGetExtendedFrameBounds(IntPtr hwnd, out WindowRect bounds)
@@ -203,12 +219,24 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
 
     private readonly struct ClientAreaInfo
     {
-        public ClientAreaInfo(int width, int height, int offsetX, int offsetY)
+        public ClientAreaInfo(
+            int width,
+            int height,
+            int extendedFrameWidth,
+            int extendedFrameHeight,
+            int offsetX,
+            int offsetY,
+            int windowOffsetX,
+            int windowOffsetY)
         {
             Width = width;
             Height = height;
+            ExtendedFrameWidth = extendedFrameWidth;
+            ExtendedFrameHeight = extendedFrameHeight;
             OffsetX = offsetX;
             OffsetY = offsetY;
+            WindowOffsetX = windowOffsetX;
+            WindowOffsetY = windowOffsetY;
         }
 
         public int Width
@@ -221,12 +249,32 @@ public sealed class WindowEnumerationService : IWindowEnumerationService
             get;
         }
 
+        public int ExtendedFrameWidth
+        {
+            get;
+        }
+
+        public int ExtendedFrameHeight
+        {
+            get;
+        }
+
         public int OffsetX
         {
             get;
         }
 
         public int OffsetY
+        {
+            get;
+        }
+
+        public int WindowOffsetX
+        {
+            get;
+        }
+
+        public int WindowOffsetY
         {
             get;
         }

@@ -10,6 +10,13 @@ namespace RocoPilot.Services.Recognition;
 
 public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigService
 {
+    private const double AspectRatioTolerance = 0.01d;
+    private static readonly (int Width, int Height)[] SupportedConfigResolutions =
+    [
+        (2048, 1152),
+        (1920, 1440)
+    ];
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         Converters =
@@ -43,30 +50,76 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
 
     public RecognitionRegionConfig LoadForResolution(int width, int height)
     {
-        var path = GetConfigPath(width, height);
-        if (File.Exists(path))
+        if (!TryResolveConfigResolution(width, height, out var configWidth, out var configHeight))
         {
-            return LoadFromPath(path, width, height);
-        }
-
-        var fallbackPath = FindBestFallbackConfigPath(width, height);
-        if (string.IsNullOrWhiteSpace(fallbackPath))
-        {
+            var unsupportedPath = GetConfigPath(width, height);
             _logger.LogWarning(
-                "No recognition region config found for {Width}x{Height}: {ConfigPath}",
+                "不支持的游戏客户区分辨率：{Width}x{Height}，宽高比 {AspectRatio:F6}。当前仅支持 16:9 和 4:3。",
                 width,
                 height,
-                path);
-            return RecognitionRegionConfig.Empty(width, height, path);
+                GetAspectRatio(width, height));
+            return RecognitionRegionConfig.Empty(width, height, unsupportedPath);
         }
 
-        _logger.LogInformation(
-            "No exact recognition region config found for {Width}x{Height}. Using fallback config: {ConfigPath}",
+        var path = GetConfigPath(configWidth, configHeight);
+        if (!File.Exists(path))
+        {
+            _logger.LogWarning(
+                "未找到游戏分辨率配置：Detected={Width}x{Height}, Config={ConfigWidth}x{ConfigHeight}, Path={ConfigPath}",
+                width,
+                height,
+                configWidth,
+                configHeight,
+                path);
+            return RecognitionRegionConfig.Empty(configWidth, configHeight, path);
+        }
+
+        _logger.LogDebug(
+            "游戏分辨率配置匹配：Detected={Width}x{Height}, AspectRatio={AspectRatio:F6}, Config={ConfigWidth}x{ConfigHeight}, Path={ConfigPath}",
             width,
             height,
-            fallbackPath);
+            GetAspectRatio(width, height),
+            configWidth,
+            configHeight,
+            path);
 
-        return LoadFromPath(fallbackPath, width, height);
+        return LoadFromPath(path, configWidth, configHeight);
+    }
+
+    public bool TryResolveConfigResolution(
+        int width,
+        int height,
+        out int configWidth,
+        out int configHeight)
+    {
+        configWidth = 0;
+        configHeight = 0;
+
+        var aspectRatio = GetAspectRatio(width, height);
+        if (aspectRatio <= 0)
+        {
+            return false;
+        }
+
+        var match = SupportedConfigResolutions
+            .Select(resolution => new
+            {
+                resolution.Width,
+                resolution.Height,
+                Difference = Math.Abs(aspectRatio - GetAspectRatio(resolution.Width, resolution.Height))
+                    / GetAspectRatio(resolution.Width, resolution.Height)
+            })
+            .Where(candidate => candidate.Difference <= AspectRatioTolerance)
+            .OrderBy(candidate => candidate.Difference)
+            .FirstOrDefault();
+        if (match is null)
+        {
+            return false;
+        }
+
+        configWidth = match.Width;
+        configHeight = match.Height;
+        return true;
     }
 
     public RecognitionRegionConfig LoadFromPath(string path)
@@ -173,45 +226,9 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         }
     }
 
-    private string? FindBestFallbackConfigPath(int width, int height)
+    private static double GetAspectRatio(int width, int height)
     {
-        if (width <= 0 || height <= 0)
-        {
-            return ListConfigPaths().FirstOrDefault();
-        }
-
-        return ListConfigPaths()
-            .Select(path => new
-            {
-                Path = path,
-                Resolution = GetResolutionFromPath(path)
-            })
-            .Where(candidate => candidate.Resolution.Width > 0 && candidate.Resolution.Height > 0)
-            .OrderBy(candidate => GetResolutionMatchScore(
-                width,
-                height,
-                candidate.Resolution.Width,
-                candidate.Resolution.Height))
-            .ThenBy(candidate => candidate.Path, StringComparer.OrdinalIgnoreCase)
-            .Select(candidate => candidate.Path)
-            .FirstOrDefault();
-    }
-
-    private static double GetResolutionMatchScore(
-        int targetWidth,
-        int targetHeight,
-        int configWidth,
-        int configHeight)
-    {
-        var targetAspect = targetWidth / (double)targetHeight;
-        var configAspect = configWidth / (double)configHeight;
-        var aspectDifference = Math.Abs(targetAspect - configAspect) / targetAspect;
-
-        var targetArea = targetWidth * (double)targetHeight;
-        var configArea = configWidth * (double)configHeight;
-        var areaDifference = Math.Abs(Math.Log(configArea / targetArea));
-
-        return (aspectDifference * 1000d) + areaDifference;
+        return width > 0 && height > 0 ? width / (double)height : 0d;
     }
 
     private static (int Width, int Height) GetResolutionFromPath(string path)

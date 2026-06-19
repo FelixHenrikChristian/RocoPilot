@@ -1,0 +1,62 @@
+{
+  "resolutionWidth": 1920,
+  "resolutionHeight": 1440,
+  "regions": [
+    {
+      "id": "magic-point",
+      "x": 176,
+      "y": 67,
+      "width": 171,
+      "height": 28,
+      "enabled": true
+    },
+    {
+      "id": "battle-enemy-name",
+      "x": 1679,
+      "y": 66,
+      "width": 144,
+      "height": 25,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-chat",
+      "x": 1800,
+      "y": 1045,
+      "width": 94,
+      "height": 67,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-skill",
+      "x": 1785,
+      "y": 1303,
+      "width": 90,
+      "height": 90,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-heterochromia",
+      "x": 1485,
+      "y": 149,
+      "width": 435,
+      "height": 52,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip",
+      "x": 592,
+      "y": 142,
+      "width": 737,
+      "height": 46,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-change",
+      "x": 1692,
+      "y": 1304,
+      "width": 88,
+      "height": 90,
+      "enabled": true
+    }
+  ]
+}

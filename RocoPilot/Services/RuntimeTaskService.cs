@@ -207,9 +207,53 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var configResolutionHeight = targetWindow.HasClientArea
                 ? targetWindow.ClientHeight
                 : firstFrame.Height;
+            var detectedAspectRatio = configResolutionHeight > 0
+                ? configResolutionWidth / (double)configResolutionHeight
+                : 0d;
+            var (detectedClientOffsetX, detectedClientOffsetY) = targetWindow.GetClientOffsetForFrame(
+                firstFrame.Width,
+                firstFrame.Height);
+            _logger.LogDebug(
+                "检测到游戏分辨率：Client={ClientWidth}x{ClientHeight}, AspectRatio={AspectRatio:F6}, Window={WindowWidth}x{WindowHeight}, DwmFrame={DwmWidth}x{DwmHeight}, FirstFrame={FrameWidth}x{FrameHeight}, ClientOffset={ClientOffsetX},{ClientOffsetY}, CaptureMethod={CaptureMethod}",
+                configResolutionWidth,
+                configResolutionHeight,
+                detectedAspectRatio,
+                targetWindow.Width,
+                targetWindow.Height,
+                targetWindow.ExtendedFrameWidth,
+                targetWindow.ExtendedFrameHeight,
+                firstFrame.Width,
+                firstFrame.Height,
+                detectedClientOffsetX,
+                detectedClientOffsetY,
+                options.CaptureMethod);
+
+            if (!_recognitionRegionConfigService.TryResolveConfigResolution(
+                configResolutionWidth,
+                configResolutionHeight,
+                out var matchedConfigWidth,
+                out var matchedConfigHeight))
+            {
+                _screenCaptureService.Release(targetWindow, options.CaptureMethod);
+                var unsupportedResolutionMessage =
+                    $"不支持的游戏分辨率：{configResolutionWidth}x{configResolutionHeight}（宽高比 {detectedAspectRatio:F4}）。当前仅支持 16:9 和 4:3。";
+                _logger.LogWarning("{Message}", unsupportedResolutionMessage);
+                return RuntimeTaskStartResult.Failed(unsupportedResolutionMessage);
+            }
+
             var recognitionRegionConfig = _recognitionRegionConfigService.LoadForResolution(
                 configResolutionWidth,
                 configResolutionHeight);
+            if (!recognitionRegionConfig.LoadedFromFile
+                || !recognitionRegionConfig.Regions.Any(region => region.Enabled))
+            {
+                _screenCaptureService.Release(targetWindow, options.CaptureMethod);
+                var missingConfigMessage =
+                    $"未能加载 {matchedConfigWidth}x{matchedConfigHeight} 识别配置：{recognitionRegionConfig.SourcePath}";
+                _logger.LogWarning("{Message}", missingConfigMessage);
+                return RuntimeTaskStartResult.Failed(missingConfigMessage);
+            }
+
             var state = new RuntimeTaskState(
                 targetWindow,
                 recognitionRegionConfig,
@@ -708,7 +752,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CancellationToken cancellationToken)
     {
         var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
-        if (!TemplateExists(MagicPointTemplateName))
+        var magicPointTemplatePath = GetResolutionTemplatePath(
+            state.RecognitionRegionConfig,
+            MagicPointTemplateName);
+        if (!TemplateExists(magicPointTemplatePath))
         {
             return false;
         }
@@ -735,7 +782,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var result = await _imageMatchingService.MatchAsync(
                 frame,
                 slotRegion,
-                MagicPointTemplateName,
+                magicPointTemplatePath,
                 matchOptions,
                 cancellationToken);
             bestMatchScore = Math.Max(bestMatchScore, result.Score);
@@ -777,10 +824,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CancellationToken cancellationToken)
     {
         var magicPointRegion = FindRegion(state.RecognitionRegionConfig, MagicPointRegionIds);
-        if (!TemplateExists(MagicPointTemplateName))
+        var magicPointTemplatePath = GetResolutionTemplatePath(
+            state.RecognitionRegionConfig,
+            MagicPointTemplateName);
+        if (!TemplateExists(magicPointTemplatePath))
         {
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                "未找到 magic-point.png",
+                $"未找到 {magicPointTemplatePath}",
                 DateTimeOffset.Now));
             return GameStateScanResult.NonBattle;
         }
@@ -810,7 +860,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var result = await _imageMatchingService.MatchAsync(
                 frame,
                 slotRegion,
-                MagicPointTemplateName,
+                magicPointTemplatePath,
                 matchOptions,
                 cancellationToken);
             bestMatchScore = Math.Max(bestMatchScore, result.Score);
@@ -919,16 +969,17 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CancellationToken cancellationToken)
     {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
-        if (!TemplateExists(templateName))
+        var templatePath = GetResolutionTemplatePath(state.RecognitionRegionConfig, templateName);
+        if (!TemplateExists(templatePath))
         {
             LogDebugOncePerValue(
-                CreateDebugLogKey("template-skip-missing-template", taskName, targetName, region.Id, templateName),
+                CreateDebugLogKey("template-skip-missing-template", taskName, targetName, region.Id, templatePath),
                 "missing-template",
                 "{TaskName} 目标识别跳过：未找到模板。Target={Target}, Region={RegionId}, Template={Template}",
                 taskName,
                 targetName,
                 region.Id,
-                templateName);
+                templatePath);
             return false;
         }
 
@@ -940,13 +991,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
             LogDebugOncePerValue(
-                CreateDebugLogKey("template-skip-outside-frame", taskName, targetName, region.Id, templateName),
+                CreateDebugLogKey("template-skip-outside-frame", taskName, targetName, region.Id, templatePath),
                 $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
                 "{TaskName} 目标识别跳过：识别区域不在截图内。Target={Target}, Region={RegionId}, Template={Template}",
                 taskName,
                 targetName,
                 region.Id,
-                templateName);
+                templatePath);
             return false;
         }
 
@@ -958,18 +1009,18 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var result = await _imageMatchingService.MatchAsync(
             frame,
             frameRegion,
-            templateName,
+            templatePath,
             matchOptions,
             cancellationToken);
         _recognitionOverlayService.ShowImageMatchResult(region.Id, result.Score);
         LogDebugOncePerValue(
-            CreateDebugLogKey("template-result", taskName, targetName, region.Id, templateName),
+            CreateDebugLogKey("template-result", taskName, targetName, region.Id, templatePath),
             CreateBooleanDebugFingerprint(result.IsMatch),
             "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}",
             taskName,
             targetName,
             region.Id,
-            templateName,
+            templatePath,
             result.Score,
             matchOptions.MinimumScore,
             result.IsMatch,
@@ -1054,6 +1105,20 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private bool TemplateExists(string templateName)
     {
         return File.Exists(Path.Combine(_imageMatchingService.TemplateDirectory, templateName));
+    }
+
+    private static string GetResolutionTemplatePath(
+        RecognitionRegionConfig config,
+        string templateName)
+    {
+        if (config.ResolutionWidth <= 0 || config.ResolutionHeight <= 0)
+        {
+            return templateName;
+        }
+
+        return Path.Combine(
+            $"{config.ResolutionWidth}x{config.ResolutionHeight}",
+            templateName);
     }
 
     private static RecognitionRegion FindRegion(
@@ -1216,8 +1281,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return false;
         }
 
-        clientX = Math.Max(0, targetWindow.ClientOffsetX);
-        clientY = Math.Max(0, targetWindow.ClientOffsetY);
+        var (frameClientOffsetX, frameClientOffsetY) = targetWindow.GetClientOffsetForFrame(
+            frame.Width,
+            frame.Height);
+        clientX = Math.Max(0, frameClientOffsetX);
+        clientY = Math.Max(0, frameClientOffsetY);
 
         if (clientX >= frame.Width || clientY >= frame.Height)
         {

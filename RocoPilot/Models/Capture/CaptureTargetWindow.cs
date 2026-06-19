@@ -38,6 +38,18 @@ public sealed class CaptureTargetWindow
         set;
     }
 
+    public int ExtendedFrameWidth
+    {
+        get;
+        set;
+    }
+
+    public int ExtendedFrameHeight
+    {
+        get;
+        set;
+    }
+
     public int ClientWidth
     {
         get;
@@ -62,6 +74,18 @@ public sealed class CaptureTargetWindow
         set;
     }
 
+    public int WindowClientOffsetX
+    {
+        get;
+        set;
+    }
+
+    public int WindowClientOffsetY
+    {
+        get;
+        set;
+    }
+
     public bool HasClientArea => ClientWidth > 0 && ClientHeight > 0;
 
     public string DisplayName => string.IsNullOrWhiteSpace(ProcessName)
@@ -69,6 +93,13 @@ public sealed class CaptureTargetWindow
         : $"{Title} - {ProcessName} ({Width} x {Height})";
 
     public string HandleText => $"0x{Hwnd.ToInt64():X}";
+
+    public (int X, int Y) GetClientOffsetForFrame(int frameWidth, int frameHeight)
+    {
+        return frameWidth == Width && frameHeight == Height
+            ? (WindowClientOffsetX, WindowClientOffsetY)
+            : (ClientOffsetX, ClientOffsetY);
+    }
 
     public override string ToString() => DisplayName;
 }

@@ -6,6 +6,12 @@ public interface IRecognitionRegionConfigService
 {
     IReadOnlyList<string> ListConfigPaths();
 
+    bool TryResolveConfigResolution(
+        int width,
+        int height,
+        out int configWidth,
+        out int configHeight);
+
     RecognitionRegionConfig LoadForResolution(int width, int height);
 
     RecognitionRegionConfig LoadFromPath(string path);

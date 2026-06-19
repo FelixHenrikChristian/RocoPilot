@@ -36,6 +36,12 @@ public partial class RealtimeViewModel : ObservableRecipient
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
     private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
     private AutoBattleKeyboardInputMethodOption? _selectedAutoBattleKeyboardInputMethodOption;
+    private int _autoBattleSkillSelectionActionDelayMs = AutoBattleSettings.DefaultSkillSelectionActionDelayMs;
+    private int _autoBattleLegacyTipEncounterExtraDelayMs = AutoBattleSettings.DefaultLegacyTipEncounterExtraDelayMs;
+    private int _autoBattleSkillSelectionRetryDelayMs = AutoBattleSettings.DefaultSkillSelectionRetryDelayMs;
+    private int _autoBattleKeyboardHoldDurationMs = AutoBattleSettings.DefaultKeyboardHoldDurationMs;
+    private int _autoBattleKeyboardIntervalMs = AutoBattleSettings.DefaultKeyboardIntervalMs;
+    private int _autoBattleCaptureKeyboardIntervalMs = AutoBattleSettings.DefaultCaptureKeyboardIntervalMs;
 
     public IReadOnlyList<AutoBattleEncounterRelievedActionOption> AutoBattleEncounterRelievedActionOptions
     {
@@ -173,6 +179,9 @@ public partial class RealtimeViewModel : ObservableRecipient
         _autoBattleReleaseSequence,
         SelectedAutoBattleEncounterRelievedAction,
         SelectedAutoBattleKeyboardInputMethod);
+
+    public string AutoBattleOtherConfigurationSummary =>
+        "包含高级时序选项；如无明确需求，建议保持默认设置。";
 
     public AutoBattleEncounterRelievedActionOption? SelectedAutoBattleEncounterRelievedActionOption
     {
@@ -418,6 +427,12 @@ public partial class RealtimeViewModel : ObservableRecipient
             FindAutoBattleEncounterRelievedActionOption(settings.EncounterRelievedAction);
         _selectedAutoBattleKeyboardInputMethodOption =
             FindAutoBattleKeyboardInputMethodOption(settings.KeyboardInputMethod);
+        _autoBattleSkillSelectionActionDelayMs = settings.SkillSelectionActionDelayMs;
+        _autoBattleLegacyTipEncounterExtraDelayMs = settings.LegacyTipEncounterExtraDelayMs;
+        _autoBattleSkillSelectionRetryDelayMs = settings.SkillSelectionRetryDelayMs;
+        _autoBattleKeyboardHoldDurationMs = settings.KeyboardHoldDurationMs;
+        _autoBattleKeyboardIntervalMs = settings.KeyboardIntervalMs;
+        _autoBattleCaptureKeyboardIntervalMs = settings.CaptureKeyboardIntervalMs;
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(AutoBattleRoundOrder));
@@ -427,6 +442,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SelectedAutoBattleKeyboardInputMethodOption));
         OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+        OnPropertyChanged(nameof(AutoBattleOtherConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }
 
@@ -444,6 +460,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
 
         OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
+        OnPropertyChanged(nameof(AutoBattleOtherConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }
 
@@ -457,7 +474,13 @@ public partial class RealtimeViewModel : ObservableRecipient
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
             TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,
-            KeyboardInputMethod = SelectedAutoBattleKeyboardInputMethod
+            KeyboardInputMethod = SelectedAutoBattleKeyboardInputMethod,
+            SkillSelectionActionDelayMs = _autoBattleSkillSelectionActionDelayMs,
+            LegacyTipEncounterExtraDelayMs = _autoBattleLegacyTipEncounterExtraDelayMs,
+            SkillSelectionRetryDelayMs = _autoBattleSkillSelectionRetryDelayMs,
+            KeyboardHoldDurationMs = _autoBattleKeyboardHoldDurationMs,
+            KeyboardIntervalMs = _autoBattleKeyboardIntervalMs,
+            CaptureKeyboardIntervalMs = _autoBattleCaptureKeyboardIntervalMs
         };
     }
 

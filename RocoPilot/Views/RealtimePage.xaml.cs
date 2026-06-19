@@ -15,6 +15,7 @@ public sealed partial class RealtimePage : Page
     private readonly IInterceptionDriverService _interceptionDriverService;
 
     private AutoBattleConfigWindow? _autoBattleConfigWindow;
+    private AutoBattleOtherConfigWindow? _autoBattleOtherConfigWindow;
     private SpiritCatalogWindow? _spiritCatalogWindow;
     private AutoBattleKeyboardInputMethodOption? _confirmedKeyboardInputMethodOption;
     private bool _isKeyboardInputMethodSelectionReady;
@@ -53,6 +54,19 @@ public sealed partial class RealtimePage : Page
         _autoBattleConfigWindow = new AutoBattleConfigWindow(ViewModel);
         _autoBattleConfigWindow.Closed += (_, _) => _autoBattleConfigWindow = null;
         _autoBattleConfigWindow.Activate();
+    }
+
+    private void ConfigureAutoBattleOtherButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_autoBattleOtherConfigWindow is not null)
+        {
+            _autoBattleOtherConfigWindow.Activate();
+            return;
+        }
+
+        _autoBattleOtherConfigWindow = new AutoBattleOtherConfigWindow(ViewModel);
+        _autoBattleOtherConfigWindow.Closed += (_, _) => _autoBattleOtherConfigWindow = null;
+        _autoBattleOtherConfigWindow.Activate();
     }
 
     private async void ViewSpiritCatalogButton_Click(object sender, RoutedEventArgs e)

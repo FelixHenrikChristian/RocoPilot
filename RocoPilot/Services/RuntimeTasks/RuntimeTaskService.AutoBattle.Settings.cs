@@ -152,6 +152,31 @@ public sealed partial class RuntimeTaskService
             normalized.KeyboardInputMethod = KeyboardInputMethod.PostMessage;
         }
 
+        normalized.SkillSelectionActionDelayMs = Math.Clamp(
+            normalized.SkillSelectionActionDelayMs,
+            AutoBattleSettings.MinimumDelayMs,
+            AutoBattleSettings.MaximumDelayMs);
+        normalized.LegacyTipEncounterExtraDelayMs = Math.Clamp(
+            normalized.LegacyTipEncounterExtraDelayMs,
+            AutoBattleSettings.MinimumDelayMs,
+            AutoBattleSettings.MaximumDelayMs);
+        normalized.SkillSelectionRetryDelayMs = Math.Clamp(
+            normalized.SkillSelectionRetryDelayMs,
+            AutoBattleSettings.MinimumRetryDelayMs,
+            AutoBattleSettings.MaximumDelayMs);
+        normalized.KeyboardHoldDurationMs = Math.Clamp(
+            normalized.KeyboardHoldDurationMs,
+            AutoBattleSettings.MinimumKeyboardHoldDurationMs,
+            AutoBattleSettings.MaximumKeyboardHoldDurationMs);
+        normalized.KeyboardIntervalMs = Math.Clamp(
+            normalized.KeyboardIntervalMs,
+            AutoBattleSettings.MinimumDelayMs,
+            AutoBattleSettings.MaximumDelayMs);
+        normalized.CaptureKeyboardIntervalMs = Math.Clamp(
+            normalized.CaptureKeyboardIntervalMs,
+            AutoBattleSettings.MinimumDelayMs,
+            AutoBattleSettings.MaximumDelayMs);
+
         return normalized;
     }
 
@@ -160,8 +185,8 @@ public sealed partial class RuntimeTaskService
         return new KeyboardInputOptions
         {
             Method = settings.KeyboardInputMethod,
-            HoldDurationMs = AutoBattleKeyboardHoldDurationMs,
-            IntervalMs = AutoBattleKeyboardIntervalMs
+            HoldDurationMs = settings.KeyboardHoldDurationMs,
+            IntervalMs = settings.KeyboardIntervalMs
         };
     }
 
@@ -170,8 +195,8 @@ public sealed partial class RuntimeTaskService
         return new KeyboardInputOptions
         {
             Method = settings.KeyboardInputMethod,
-            HoldDurationMs = AutoBattleKeyboardHoldDurationMs,
-            IntervalMs = AutoBattleCaptureKeyboardIntervalMs
+            HoldDurationMs = settings.KeyboardHoldDurationMs,
+            IntervalMs = settings.CaptureKeyboardIntervalMs
         };
     }
 

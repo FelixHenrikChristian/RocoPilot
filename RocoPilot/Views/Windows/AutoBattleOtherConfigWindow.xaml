@@ -1,0 +1,374 @@
+<windowex:WindowEx
+    x:Class="RocoPilot.Views.Windows.AutoBattleOtherConfigWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:RocoPilot.Helpers"
+    xmlns:windowex="using:WinUIEx"
+    Width="720"
+    Height="680"
+    MinWidth="620"
+    MinHeight="560">
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid
+        x:Name="ContentRoot"
+        Padding="12"
+        RowSpacing="10">
+        <Grid.Resources>
+            <Style x:Key="AdvancedSettingRowStyle" TargetType="Grid">
+                <Setter Property="MinHeight" Value="82" />
+                <Setter Property="Padding" Value="14,10,16,12" />
+            </Style>
+            <Style x:Key="AdvancedSettingTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+            <Style x:Key="AdvancedSettingDescriptionStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="TextWrapping" Value="Wrap" />
+            </Style>
+        </Grid.Resources>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0">
+            <StackPanel Spacing="10">
+                <Border
+                    Padding="18,16"
+                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <Grid ColumnSpacing="14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border
+                            Width="40"
+                            Height="40"
+                            Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                            CornerRadius="8">
+                            <FontIcon
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                Glyph="&#xE7BA;" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock
+                                FontSize="18"
+                                FontWeight="SemiBold"
+                                Text="自动战斗高级选项" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="这些设置会直接改变识别等待和按键节奏，普通用户建议保留默认值。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <Border Padding="0" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <Grid
+                            Padding="16,13"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE823;" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock FontWeight="SemiBold" Text="战斗时序" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="控制识别开始、执行动作和失败重试的等待时间。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid ColumnSpacing="12" Style="{StaticResource AdvancedSettingRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="180" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Border
+                                        Width="1"
+                                        HorizontalAlignment="Center"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="技能选择基础等待" />
+                                    <TextBlock Style="{StaticResource AdvancedSettingDescriptionStyle}" Text="进入技能选择界面后，开始识别并发送本回合按键前的等待。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox
+                                        x:Name="SkillSelectionActionDelayNumberBox"
+                                        Width="140"
+                                        Maximum="30000"
+                                        Minimum="0"
+                                        SmallChange="100"
+                                        SpinButtonPlacementMode="Compact" />
+                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid ColumnSpacing="12" Style="{StaticResource AdvancedSettingRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="180" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Border
+                                        Width="1"
+                                        HorizontalAlignment="Center"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="污染奇遇额外等待" />
+                                    <TextBlock Style="{StaticResource AdvancedSettingDescriptionStyle}" Text="第一回合为图鉴精灵名而非幸运惊喜盒时，在基础等待上追加，留出时间识别污染解除提示。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox
+                                        x:Name="LegacyTipEncounterExtraDelayNumberBox"
+                                        Width="140"
+                                        Maximum="30000"
+                                        Minimum="0"
+                                        SmallChange="100"
+                                        SpinButtonPlacementMode="Compact" />
+                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid ColumnSpacing="12" Style="{StaticResource AdvancedSettingRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="180" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Border
+                                        Width="1"
+                                        HorizontalAlignment="Center"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="技能操作重试间隔" />
+                                    <TextBlock Style="{StaticResource AdvancedSettingDescriptionStyle}" Text="技能选择界面持续未消失时，再次执行同一动作前的等待。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox
+                                        x:Name="SkillSelectionRetryDelayNumberBox"
+                                        Width="140"
+                                        Maximum="30000"
+                                        Minimum="500"
+                                        SmallChange="500"
+                                        SpinButtonPlacementMode="Compact" />
+                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <Border Padding="0" Style="{StaticResource CardStyle}">
+                    <StackPanel>
+                        <Grid
+                            Padding="16,13"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE765;" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock FontWeight="SemiBold" Text="按键时序" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="控制单个按键及连续按键之间的节奏。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid ColumnSpacing="12" Style="{StaticResource AdvancedSettingRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="180" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Border
+                                        Width="1"
+                                        HorizontalAlignment="Center"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="按键按下时长" />
+                                    <TextBlock Style="{StaticResource AdvancedSettingDescriptionStyle}" Text="每个按键从按下到松开的持续时间。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox
+                                        x:Name="KeyboardHoldDurationNumberBox"
+                                        Width="140"
+                                        Maximum="2000"
+                                        Minimum="10"
+                                        SmallChange="10"
+                                        SpinButtonPlacementMode="Compact" />
+                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid ColumnSpacing="12" Style="{StaticResource AdvancedSettingRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="180" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Border
+                                        Width="1"
+                                        HorizontalAlignment="Center"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="普通按键间隔" />
+                                    <TextBlock Style="{StaticResource AdvancedSettingDescriptionStyle}" Text="战技、自定义序列等相邻按键之间的等待。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox
+                                        x:Name="KeyboardIntervalNumberBox"
+                                        Width="140"
+                                        Maximum="30000"
+                                        Minimum="0"
+                                        SmallChange="100"
+                                        SpinButtonPlacementMode="Compact" />
+                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
+                            <Grid ColumnSpacing="12" Style="{StaticResource AdvancedSettingRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="180" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Border
+                                        Width="1"
+                                        HorizontalAlignment="Center"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                    <Ellipse
+                                        Width="8"
+                                        Height="8"
+                                        Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                                </Grid>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="捕捉序列按键间隔" />
+                                    <TextBlock Style="{StaticResource AdvancedSettingDescriptionStyle}" Text="奇遇解除后执行 W、1、Space 捕捉序列时的相邻按键等待。" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <NumberBox
+                                        x:Name="CaptureKeyboardIntervalNumberBox"
+                                        Width="140"
+                                        Maximum="30000"
+                                        Minimum="0"
+                                        SmallChange="100"
+                                        SpinButtonPlacementMode="Compact" />
+                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid Grid.Row="1" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Button
+                Grid.Column="0"
+                Click="RestoreDefaultsButton_Click"
+                Content="恢复默认值" />
+
+            <InfoBar
+                x:Name="MessageBar"
+                Grid.Column="1"
+                helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+                IsClosable="False"
+                IsOpen="False" />
+
+            <Button
+                Grid.Column="2"
+                MinWidth="92"
+                Click="CancelButton_Click"
+                Content="取消" />
+            <Button
+                Grid.Column="3"
+                MinWidth="92"
+                Click="SaveButton_Click"
+                Content="保存"
+                Style="{ThemeResource AccentButtonStyle}" />
+        </Grid>
+    </Grid>
+</windowex:WindowEx>

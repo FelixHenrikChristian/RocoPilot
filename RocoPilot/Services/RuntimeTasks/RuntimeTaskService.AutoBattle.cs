@@ -16,11 +16,7 @@ public sealed partial class RuntimeTaskService
     private const string AutoBattleCaptureSequence = "W, 1, Space";
     private const string AutoBattleSkillPlaceholder = "{skill}";
 
-    private static readonly TimeSpan AutoBattleSkillSelectionActionDelay = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan AutoBattleSkillSelectionEnemyNameOcrDelay = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan AutoBattleLegacyTipEncounterSkillSelectionExtraDelay = TimeSpan.FromMilliseconds(2500);
     private static readonly TimeSpan AutoBattleSkillReleaseFailureCheckDelay = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan AutoBattleSkillSelectionRetryDelay = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattleShinySuspendScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattlePetSwitchConfirmDelay = TimeSpan.FromMilliseconds(1500);
@@ -63,9 +59,6 @@ public sealed partial class RuntimeTaskService
         AlphaThreshold = 16,
         SearchStep = 1
     };
-    private const int AutoBattleKeyboardHoldDurationMs = 100;
-    private const int AutoBattleKeyboardIntervalMs = 120;
-    private const int AutoBattleCaptureKeyboardIntervalMs = 500;
 
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
@@ -137,6 +130,7 @@ public sealed partial class RuntimeTaskService
         if (!await EnsureAutoBattleSkillSelectionEnemyNameResultAsync(
             state,
             frame,
+            settings,
             now,
             cancellationToken))
         {
@@ -148,7 +142,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        if (!ShouldRunAutoBattleSkillSelectionAction(now))
+        if (!ShouldRunAutoBattleSkillSelectionAction(settings, now))
         {
             return;
         }
@@ -364,7 +358,7 @@ public sealed partial class RuntimeTaskService
         _logger.LogDebug(
             "自动战斗：进入第 {TurnNumber} 回合技能选择，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
             _currentAutoBattleTurnNumber,
-            AutoBattleSkillSelectionActionDelay.TotalMilliseconds,
+            settings.SkillSelectionActionDelayMs,
             GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep),
             _autoBattleRoundIndex);
     }
@@ -372,6 +366,7 @@ public sealed partial class RuntimeTaskService
     private async Task<bool> EnsureAutoBattleSkillSelectionEnemyNameResultAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
+        AutoBattleSettings settings,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -386,7 +381,8 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        if (now - _autoBattleSkillSelectionVisibleSince.Value < AutoBattleSkillSelectionEnemyNameOcrDelay)
+        if (now - _autoBattleSkillSelectionVisibleSince.Value
+            < TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs))
         {
             return false;
         }
@@ -866,7 +862,9 @@ public sealed partial class RuntimeTaskService
         return action == AutoBattleSkillSelectionAction.Skill;
     }
 
-    private bool ShouldRunAutoBattleSkillSelectionAction(DateTimeOffset now)
+    private bool ShouldRunAutoBattleSkillSelectionAction(
+        AutoBattleSettings settings,
+        DateTimeOffset now)
     {
         if (!_autoBattleSkillSelectionVisibleSince.HasValue)
         {
@@ -874,9 +872,13 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        var actionDelay = _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter
-            ? AutoBattleSkillSelectionActionDelay + AutoBattleLegacyTipEncounterSkillSelectionExtraDelay
-            : AutoBattleSkillSelectionActionDelay;
+        var actionDelayMs = settings.SkillSelectionActionDelayMs;
+        if (_shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter)
+        {
+            actionDelayMs += settings.LegacyTipEncounterExtraDelayMs;
+        }
+
+        var actionDelay = TimeSpan.FromMilliseconds(actionDelayMs);
         if (now - _autoBattleSkillSelectionVisibleSince.Value < actionDelay)
         {
             return false;
@@ -887,7 +889,8 @@ public sealed partial class RuntimeTaskService
             return true;
         }
 
-        return now - _lastAutoBattleSkillSelectionActionAt.Value >= AutoBattleSkillSelectionRetryDelay;
+        return now - _lastAutoBattleSkillSelectionActionAt.Value
+            >= TimeSpan.FromMilliseconds(settings.SkillSelectionRetryDelayMs);
     }
 
     private void ResetAutoBattleBattleState()

@@ -8,6 +8,18 @@ public sealed class AutoBattleSettings
 {
     public const string DefaultRoundOrder = "1, 2, 3, 4, X";
     public const string DefaultTurnSequence = "{skill}";
+    public const int DefaultSkillSelectionActionDelayMs = 500;
+    public const int DefaultLegacyTipEncounterExtraDelayMs = 2500;
+    public const int DefaultSkillSelectionRetryDelayMs = 4000;
+    public const int DefaultKeyboardHoldDurationMs = 100;
+    public const int DefaultKeyboardIntervalMs = 500;
+    public const int DefaultCaptureKeyboardIntervalMs = 500;
+
+    public const int MinimumDelayMs = 0;
+    public const int MaximumDelayMs = 30000;
+    public const int MinimumRetryDelayMs = 500;
+    public const int MinimumKeyboardHoldDurationMs = 10;
+    public const int MaximumKeyboardHoldDurationMs = 2000;
 
     public bool IsEnabled
     {
@@ -53,6 +65,42 @@ public sealed class AutoBattleSettings
         set;
     } = KeyboardInputMethod.PostMessage;
 
+    public int SkillSelectionActionDelayMs
+    {
+        get;
+        set;
+    } = DefaultSkillSelectionActionDelayMs;
+
+    public int LegacyTipEncounterExtraDelayMs
+    {
+        get;
+        set;
+    } = DefaultLegacyTipEncounterExtraDelayMs;
+
+    public int SkillSelectionRetryDelayMs
+    {
+        get;
+        set;
+    } = DefaultSkillSelectionRetryDelayMs;
+
+    public int KeyboardHoldDurationMs
+    {
+        get;
+        set;
+    } = DefaultKeyboardHoldDurationMs;
+
+    public int KeyboardIntervalMs
+    {
+        get;
+        set;
+    } = DefaultKeyboardIntervalMs;
+
+    public int CaptureKeyboardIntervalMs
+    {
+        get;
+        set;
+    } = DefaultCaptureKeyboardIntervalMs;
+
     public static AutoBattleSettings CreateDefault()
     {
         return new AutoBattleSettings
@@ -63,7 +111,13 @@ public sealed class AutoBattleSettings
             ReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
-            KeyboardInputMethod = KeyboardInputMethod.PostMessage
+            KeyboardInputMethod = KeyboardInputMethod.PostMessage,
+            SkillSelectionActionDelayMs = DefaultSkillSelectionActionDelayMs,
+            LegacyTipEncounterExtraDelayMs = DefaultLegacyTipEncounterExtraDelayMs,
+            SkillSelectionRetryDelayMs = DefaultSkillSelectionRetryDelayMs,
+            KeyboardHoldDurationMs = DefaultKeyboardHoldDurationMs,
+            KeyboardIntervalMs = DefaultKeyboardIntervalMs,
+            CaptureKeyboardIntervalMs = DefaultCaptureKeyboardIntervalMs
         };
     }
 
@@ -89,7 +143,13 @@ public sealed class AutoBattleSettings
             ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = EncounterRelievedAction,
-            KeyboardInputMethod = KeyboardInputMethod
+            KeyboardInputMethod = KeyboardInputMethod,
+            SkillSelectionActionDelayMs = SkillSelectionActionDelayMs,
+            LegacyTipEncounterExtraDelayMs = LegacyTipEncounterExtraDelayMs,
+            SkillSelectionRetryDelayMs = SkillSelectionRetryDelayMs,
+            KeyboardHoldDurationMs = KeyboardHoldDurationMs,
+            KeyboardIntervalMs = KeyboardIntervalMs,
+            CaptureKeyboardIntervalMs = CaptureKeyboardIntervalMs
         };
     }
 }

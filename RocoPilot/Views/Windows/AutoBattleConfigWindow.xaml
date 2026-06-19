@@ -214,7 +214,7 @@
                         <TextBlock
                             FontSize="12"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="保存常用按键组合后，可插入上方释放顺序。写法：用逗号、空格或换行分隔，如 1, Space；组合键用 +，如 Ctrl+1。每步按键保持 45ms，步间间隔 120ms。支持 A-Z、0-9、F1-F24、方向键、Space、Enter、Esc、Tab 等。"
+                            Text="保存常用按键组合后，可插入上方释放顺序。写法：用逗号、空格或换行分隔，如 1, Space；组合键用 +，如 Ctrl+1。默认每步按键保持 100ms，步间间隔 500ms。支持 A-Z、0-9、F1-F24、方向键、Space、Enter、Esc、Tab 等。"
                             TextWrapping="Wrap" />
                     </StackPanel>
 

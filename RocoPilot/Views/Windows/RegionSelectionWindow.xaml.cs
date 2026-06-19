@@ -35,16 +35,33 @@ public sealed partial class RegionSelectionWindow : WindowEx
     private bool _hasImageBounds;
     private bool _hasCompleted;
 
-    public RegionSelectionWindow(CapturedFrame frame, string sourceName)
+    public RegionSelectionWindow(
+        CapturedFrame frame,
+        string sourceName,
+        RecognitionRegion? initialRegion = null)
     {
         _frame = frame;
         _themeSelectorService = App.GetService<IThemeSelectorService>();
+
+        if (initialRegion is not null)
+        {
+            _selectedRegion = new RecognitionRegion
+            {
+                Id = initialRegion.Id,
+                X = initialRegion.X,
+                Y = initialRegion.Y,
+                Width = initialRegion.Width,
+                Height = initialRegion.Height,
+                Enabled = initialRegion.Enabled
+            };
+        }
 
         InitializeComponent();
 
         ContentRoot.RequestedTheme = _themeSelectorService.Theme;
 
-        Title = "框选检测区域";
+        Title = initialRegion is null ? "框选检测区域" : "修改检测区域";
+        SelectionTitleText.Text = Title;
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
@@ -66,6 +83,13 @@ public sealed partial class RegionSelectionWindow : WindowEx
     {
         PresentFrame();
         UpdateImageBounds();
+
+        if (_selectedRegion is not null)
+        {
+            ShowSelectedRegion();
+            ConfirmButton.IsEnabled = true;
+            StatusText.Text = $"当前区域：{FormatRegion(_selectedRegion)}，拖拽可重新框选";
+        }
     }
 
     private void PresentFrame()
@@ -138,7 +162,7 @@ public sealed partial class RegionSelectionWindow : WindowEx
 
         _selectedRegion = CreateRegionFromDisplayRect(selectedRect);
         ConfirmButton.IsEnabled = true;
-        StatusText.Text = FormatSelectionStatus(_selectedRegion);
+        StatusText.Text = $"已选择区域：{FormatRegion(_selectedRegion)}，点击确认应用";
     }
 
     private void ImageHost_PointerCanceled(object sender, PointerRoutedEventArgs e)
@@ -282,9 +306,9 @@ public sealed partial class RegionSelectionWindow : WindowEx
         };
     }
 
-    private static string FormatSelectionStatus(RecognitionRegion region)
+    private static string FormatRegion(RecognitionRegion region)
     {
-        return $"已选择区域：X={region.X}, Y={region.Y}, 宽={region.Width}, 高={region.Height}，点击确认添加";
+        return $"X={region.X}, Y={region.Y}, 宽={region.Width}, 高={region.Height}";
     }
 
     private Point ClampToImage(Point point)

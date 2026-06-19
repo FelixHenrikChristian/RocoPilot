@@ -311,6 +311,100 @@ public sealed partial class RegionEditorPage : Page
         }
     }
 
+    private async void EditRegionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button editButton
+            || editButton.DataContext is not EditableRecognitionRegion editableRegion)
+        {
+            return;
+        }
+
+        if (_currentConfig is null)
+        {
+            ShowMessage("请先选择一个配置文件", InfoBarSeverity.Warning);
+            return;
+        }
+
+        if (!editableRegion.TryToModel(out var region, out var error))
+        {
+            ShowMessage($"区域无效：{error}", InfoBarSeverity.Warning);
+            return;
+        }
+
+        if (!TryGetCaptureRequest(out var targetWindow, out var selectedMethod))
+        {
+            return;
+        }
+
+        editButton.IsEnabled = false;
+
+        CapturedFrame? frame = null;
+        try
+        {
+            frame = await CaptureFrameAsync(targetWindow, selectedMethod.Method);
+            if (frame is null)
+            {
+                ShowMessage("未获取到游戏画面", InfoBarSeverity.Warning);
+                return;
+            }
+
+            if (!TryReadResolution(out var configWidth, out var configHeight))
+            {
+                return;
+            }
+
+            if (!TryCreateFrameRegion(
+                region,
+                frame,
+                targetWindow,
+                configWidth,
+                configHeight,
+                out var frameRegion,
+                out var regionError))
+            {
+                ShowMessage(regionError, InfoBarSeverity.Warning);
+                return;
+            }
+
+            var selectionWindow = new RegionSelectionWindow(
+                frame,
+                targetWindow.DisplayName,
+                frameRegion);
+            var selectedRegion = await selectionWindow.SelectAsync();
+            if (selectedRegion is null)
+            {
+                return;
+            }
+
+            selectedRegion = NormalizeRegionToClientArea(
+                selectedRegion,
+                frame,
+                targetWindow,
+                out var sourceWidth,
+                out var sourceHeight);
+            selectedRegion = ScaleRegion(
+                selectedRegion,
+                sourceWidth,
+                sourceHeight,
+                configWidth,
+                configHeight);
+
+            selectedRegion.Id = region.Id;
+            selectedRegion.Enabled = region.Enabled;
+            editableRegion.UpdateCoordinates(selectedRegion);
+            HideMessage();
+        }
+        catch (Exception ex)
+        {
+            ShowMessage($"修改区域失败：{ex.Message}", InfoBarSeverity.Error);
+        }
+        finally
+        {
+            frame?.Dispose();
+            editButton.IsEnabled = true;
+        }
+    }
+
     private void DeleteRegionButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: EditableRecognitionRegion region })
@@ -736,6 +830,14 @@ public sealed partial class RegionEditorPage : Page
                 Height = region.Height.ToString(),
                 Enabled = region.Enabled
             };
+        }
+
+        public void UpdateCoordinates(RecognitionRegion region)
+        {
+            X = region.X.ToString();
+            Y = region.Y.ToString();
+            Width = region.Width.ToString();
+            Height = region.Height.ToString();
         }
 
         public bool TryToModel(out RecognitionRegion region, out string error)

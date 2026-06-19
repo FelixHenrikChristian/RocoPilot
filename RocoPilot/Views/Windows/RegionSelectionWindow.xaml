@@ -46,6 +46,7 @@
                             Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                             Glyph="&#xE722;" />
                         <TextBlock
+                            x:Name="SelectionTitleText"
                             Style="{StaticResource BodyStrongTextBlockStyle}"
                             Text="框选检测区域" />
                     </StackPanel>

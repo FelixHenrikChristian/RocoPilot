@@ -28,11 +28,8 @@ namespace RocoPilot.Services;
 
 public sealed partial class RuntimeTaskService : IRuntimeTaskService
 {
-    private const int TargetFrameIntervalMs = 33;
     private const int MagicPointSlotCount = 6;
     private const string MagicPointTemplateName = "magic-point.png";
-    private static readonly TimeSpan GameStateScanInterval = TimeSpan.FromMilliseconds(250);
-    private static readonly TimeSpan RuntimeOcrScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan UnrecognizedStateConfirmDelay = TimeSpan.FromSeconds(2);
     private static readonly string[] MagicPointRegionIds =
     [
@@ -67,6 +64,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private Task? _captureTask;
     private Task? _runtimeOcrTask;
     private CapturedFrame? _latestRuntimeOcrFrame;
+    private RuntimeRecognitionSettings _runtimeRecognitionSettings = RuntimeRecognitionSettings.CreateDefault();
     private int _queuedAutoBattleSkillFailureTipRecognition;
     private bool _settingsLoaded;
     private bool _isBattleStateActive;
@@ -81,6 +79,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     }
 
     public bool IsRunning => CurrentState is not null;
+
+    public RuntimeRecognitionSettings RuntimeRecognitionSettings =>
+        Volatile.Read(ref _runtimeRecognitionSettings).Clone();
 
     public RuntimeTaskService(
         IGameWindowService gameWindowService,
@@ -132,6 +133,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var savedAutoBattleSettings =
                 await _localSettingsService.ReadSettingAsync<AutoBattleSettings>(SettingsKeys.AutoBattleSettings);
             _autoBattleSettings = NormalizeAutoBattleSettings(savedAutoBattleSettings);
+
+            var savedRuntimeRecognitionSettings =
+                await _localSettingsService.ReadSettingAsync<RuntimeRecognitionSettings>(SettingsKeys.RuntimeRecognitionSettings);
+            _runtimeRecognitionSettings = NormalizeRuntimeRecognitionSettings(savedRuntimeRecognitionSettings);
             await _hotkeyService.LoadSettingsAsync(cancellationToken);
             _settingsLoaded = true;
         }
@@ -416,7 +421,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                         var now = DateTimeOffset.Now;
                         if (now >= nextGameStateScanAt)
                         {
-                            nextGameStateScanAt = now + GameStateScanInterval;
+                            var scanSettings = Volatile.Read(ref _runtimeRecognitionSettings);
+                            nextGameStateScanAt = now + TimeSpan.FromMilliseconds(scanSettings.GameStateScanIntervalMs);
 
                             var gameStateScanResult = GameStateScanResult.UnrecognizedPending;
                             try
@@ -441,7 +447,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 }
 
                 var elapsedMilliseconds = Stopwatch.GetElapsedTime(frameStart).TotalMilliseconds;
-                var delay = Math.Max(1, TargetFrameIntervalMs - (int)elapsedMilliseconds);
+                var captureSettings = Volatile.Read(ref _runtimeRecognitionSettings);
+                var delay = Math.Max(1, captureSettings.FrameCaptureIntervalMs - (int)elapsedMilliseconds);
                 await DelayAsync(delay, cancellationToken);
             }
         }
@@ -456,9 +463,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         Task? activeScanTask = null;
         try
         {
-            using var timer = new PeriodicTimer(RuntimeOcrScanInterval);
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (!cancellationToken.IsCancellationRequested)
             {
+                var settings = Volatile.Read(ref _runtimeRecognitionSettings);
+                await Task.Delay(settings.OcrScanIntervalMs, cancellationToken);
+
                 if (activeScanTask is not null)
                 {
                     if (activeScanTask.IsCompleted)
@@ -1289,6 +1298,48 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
 
         return value > max ? max : value;
+    }
+
+    public void SetRuntimeRecognitionSettings(RuntimeRecognitionSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var normalized = NormalizeRuntimeRecognitionSettings(settings);
+        Volatile.Write(ref _runtimeRecognitionSettings, normalized);
+        _ = SaveRuntimeRecognitionSettingsAsync(normalized);
+        NotifySettingsChanged();
+    }
+
+    private async Task SaveRuntimeRecognitionSettingsAsync(RuntimeRecognitionSettings settings)
+    {
+        try
+        {
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.RuntimeRecognitionSettings, settings);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "保存运行频率设置失败。");
+        }
+    }
+
+    private static RuntimeRecognitionSettings NormalizeRuntimeRecognitionSettings(RuntimeRecognitionSettings? settings)
+    {
+        var source = settings ?? RuntimeRecognitionSettings.CreateDefault();
+        return new RuntimeRecognitionSettings
+        {
+            FrameCaptureIntervalMs = Math.Clamp(
+                source.FrameCaptureIntervalMs,
+                RuntimeRecognitionSettings.MinimumFrameCaptureIntervalMs,
+                RuntimeRecognitionSettings.MaximumIntervalMs),
+            GameStateScanIntervalMs = Math.Clamp(
+                source.GameStateScanIntervalMs,
+                RuntimeRecognitionSettings.MinimumGameStateScanIntervalMs,
+                RuntimeRecognitionSettings.MaximumIntervalMs),
+            OcrScanIntervalMs = Math.Clamp(
+                source.OcrScanIntervalMs,
+                RuntimeRecognitionSettings.MinimumOcrScanIntervalMs,
+                RuntimeRecognitionSettings.MaximumIntervalMs)
+        };
     }
 
     private Task<CapturedFrame?> CaptureFrameAsync(

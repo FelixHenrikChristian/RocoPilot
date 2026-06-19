@@ -76,6 +76,9 @@ public partial class MainViewModel : ObservableRecipient
 
     public string StartStopButtonGlyph => IsRealtimeCaptureRunning ? "\uF2D9" : "\uE768";
 
+    public RuntimeRecognitionSettings RuntimeRecognitionSettings =>
+        _runtimeTaskService.RuntimeRecognitionSettings;
+
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,
         IInfoOverlayService infoOverlayService,
@@ -191,6 +194,16 @@ public partial class MainViewModel : ObservableRecipient
             InfoBarSeverity.Success,
             "启动成功",
             result.Message);
+    }
+
+    public async Task LoadRuntimeRecognitionSettingsAsync()
+    {
+        await _runtimeTaskService.LoadSettingsAsync();
+    }
+
+    public void UpdateRuntimeRecognitionSettings(RuntimeRecognitionSettings settings)
+    {
+        _runtimeTaskService.SetRuntimeRecognitionSettings(settings);
     }
 
     [RelayCommand]

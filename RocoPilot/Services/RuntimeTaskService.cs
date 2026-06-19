@@ -775,22 +775,15 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             frame,
             state.TargetWindow,
             state.RecognitionRegionConfig);
-        var magicPointCount = 0;
-        var bestMatchScore = 0d;
-        foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
-        {
-            var result = await _imageMatchingService.MatchAsync(
-                frame,
-                slotRegion,
-                magicPointTemplatePath,
-                matchOptions,
-                cancellationToken);
-            bestMatchScore = Math.Max(bestMatchScore, result.Score);
-            if (result.IsMatch)
-            {
-                magicPointCount++;
-            }
-        }
+        var matchResult = await _imageMatchingService.FindMatchesAsync(
+            frame,
+            frameRegion,
+            magicPointTemplatePath,
+            MagicPointSlotCount,
+            matchOptions,
+            cancellationToken: cancellationToken);
+        var magicPointCount = matchResult.Matches.Count;
+        var bestMatchScore = matchResult.BestScore;
 
         _recognitionOverlayService.ShowImageMatchResult(magicPointRegion.Id, bestMatchScore);
         LogDebugOncePerValue(
@@ -853,22 +846,15 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             frame,
             state.TargetWindow,
             state.RecognitionRegionConfig);
-        var magicPointCount = 0;
-        var bestMatchScore = 0d;
-        foreach (var slotRegion in SplitMagicPointSlots(frameRegion))
-        {
-            var result = await _imageMatchingService.MatchAsync(
-                frame,
-                slotRegion,
-                magicPointTemplatePath,
-                matchOptions,
-                cancellationToken);
-            bestMatchScore = Math.Max(bestMatchScore, result.Score);
-            if (result.IsMatch)
-            {
-                magicPointCount++;
-            }
-        }
+        var matchResult = await _imageMatchingService.FindMatchesAsync(
+            frame,
+            frameRegion,
+            magicPointTemplatePath,
+            MagicPointSlotCount,
+            matchOptions,
+            cancellationToken: cancellationToken);
+        var magicPointCount = matchResult.Matches.Count;
+        var bestMatchScore = matchResult.BestScore;
 
         _recognitionOverlayService.ShowImageMatchResult(magicPointRegion.Id, bestMatchScore);
         LogDebugOncePerValue(
@@ -1139,24 +1125,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
         var id = region.Id.Trim();
         return aliases.Any(alias => string.Equals(id, alias, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static IEnumerable<RecognitionRegion> SplitMagicPointSlots(RecognitionRegion region)
-    {
-        for (var index = 0; index < MagicPointSlotCount; index++)
-        {
-            var left = (int)Math.Round(region.Width * (double)index / MagicPointSlotCount);
-            var right = (int)Math.Round(region.Width * (double)(index + 1) / MagicPointSlotCount);
-            yield return new RecognitionRegion
-            {
-                Id = $"{region.Id}-{index + 1}",
-                X = region.X + left,
-                Y = region.Y,
-                Width = Math.Max(1, right - left),
-                Height = region.Height,
-                Enabled = region.Enabled
-            };
-        }
     }
 
     private static ImageMatchOptions CreateScaledImageMatchOptions(

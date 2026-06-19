@@ -79,6 +79,55 @@ public sealed class ImageMatchingService : IImageMatchingService
         return MatchTemplate(frame, region, template, resolvedTemplatePath, normalizedOptions, cancellationToken);
     }
 
+    public async Task<ImageMatchCollectionResult> FindMatchesAsync(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        string templatePath,
+        int maximumMatches,
+        ImageMatchOptions? options = null,
+        double maximumOverlapRatio = 0.5,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(region);
+
+        if (string.IsNullOrWhiteSpace(templatePath))
+        {
+            throw new ArgumentException("Template path is required.", nameof(templatePath));
+        }
+
+        if (maximumMatches <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumMatches), "Maximum matches must be greater than 0.");
+        }
+
+        if (double.IsNaN(maximumOverlapRatio) || maximumOverlapRatio < 0 || maximumOverlapRatio > 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumOverlapRatio),
+                "Maximum overlap ratio must be between 0 and 1.");
+        }
+
+        var resolvedTemplatePath = ResolveTemplatePath(templatePath);
+        var normalizedOptions = NormalizeOptions(options);
+        var template = await GetTemplateAsync(
+            resolvedTemplatePath,
+            normalizedOptions.AlphaThreshold,
+            normalizedOptions.TemplateScaleX,
+            normalizedOptions.TemplateScaleY,
+            cancellationToken);
+
+        return FindTemplateMatches(
+            frame,
+            region,
+            template,
+            resolvedTemplatePath,
+            maximumMatches,
+            maximumOverlapRatio,
+            normalizedOptions,
+            cancellationToken);
+    }
+
     private string ResolveTemplatePath(string templatePath)
     {
         if (Path.IsPathRooted(templatePath))
@@ -298,6 +347,107 @@ public sealed class ImageMatchingService : IImageMatchingService
             template.Width,
             template.Height,
             templatePath);
+    }
+
+    private static ImageMatchCollectionResult FindTemplateMatches(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        ImageTemplate template,
+        string templatePath,
+        int maximumMatches,
+        double maximumOverlapRatio,
+        ImageMatchOptions options,
+        CancellationToken cancellationToken)
+    {
+        ValidateFrame(frame);
+
+        if (!region.Enabled)
+        {
+            return ImageMatchCollectionResult.NoMatch(0, templatePath);
+        }
+
+        var searchArea = ClipRegion(region, frame);
+        if (searchArea.Width < template.Width || searchArea.Height < template.Height)
+        {
+            return ImageMatchCollectionResult.NoMatch(0, templatePath);
+        }
+
+        var candidates = new List<ImageMatchResult>();
+        var bestScore = double.NegativeInfinity;
+        var maxX = searchArea.Right - template.Width;
+        var maxY = searchArea.Bottom - template.Height;
+
+        for (var y = searchArea.Y; y <= maxY; y += options.SearchStep)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            for (var x = searchArea.X; x <= maxX; x += options.SearchStep)
+            {
+                double? competitiveScore = candidates.Count > 0
+                    ? options.MinimumScore
+                    : null;
+                var score = ScoreAt(frame, template, x, y, competitiveScore);
+                bestScore = Math.Max(bestScore, score);
+                if (score < options.MinimumScore)
+                {
+                    continue;
+                }
+
+                candidates.Add(new ImageMatchResult(
+                    true,
+                    score,
+                    x,
+                    y,
+                    template.Width,
+                    template.Height,
+                    templatePath));
+            }
+        }
+
+        if (double.IsNegativeInfinity(bestScore))
+        {
+            bestScore = 0;
+        }
+
+        var matches = new List<ImageMatchResult>(Math.Min(maximumMatches, candidates.Count));
+        foreach (var candidate in candidates
+                     .OrderByDescending(candidate => candidate.Score)
+                     .ThenBy(candidate => candidate.Y)
+                     .ThenBy(candidate => candidate.X))
+        {
+            if (matches.Any(match => CalculateOverlapRatio(candidate, match) > maximumOverlapRatio))
+            {
+                continue;
+            }
+
+            matches.Add(candidate);
+            if (matches.Count >= maximumMatches)
+            {
+                break;
+            }
+        }
+
+        return new ImageMatchCollectionResult(matches, bestScore, templatePath);
+    }
+
+    private static double CalculateOverlapRatio(ImageMatchResult first, ImageMatchResult second)
+    {
+        var intersectionLeft = Math.Max(first.X, second.X);
+        var intersectionTop = Math.Max(first.Y, second.Y);
+        var intersectionRight = Math.Min(first.X + first.Width, second.X + second.Width);
+        var intersectionBottom = Math.Min(first.Y + first.Height, second.Y + second.Height);
+        var intersectionWidth = Math.Max(0, intersectionRight - intersectionLeft);
+        var intersectionHeight = Math.Max(0, intersectionBottom - intersectionTop);
+        var intersectionArea = intersectionWidth * intersectionHeight;
+        if (intersectionArea <= 0)
+        {
+            return 0;
+        }
+
+        var firstArea = first.Width * first.Height;
+        var secondArea = second.Width * second.Height;
+        var unionArea = firstArea + secondArea - intersectionArea;
+        return unionArea <= 0 ? 0 : intersectionArea / (double)unionArea;
     }
 
     private static void ValidateFrame(CapturedFrame frame)

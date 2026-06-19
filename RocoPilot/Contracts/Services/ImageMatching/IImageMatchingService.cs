@@ -19,4 +19,13 @@ public interface IImageMatchingService
         string templatePath,
         ImageMatchOptions? options = null,
         CancellationToken cancellationToken = default);
+
+    Task<ImageMatchCollectionResult> FindMatchesAsync(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        string templatePath,
+        int maximumMatches,
+        ImageMatchOptions? options = null,
+        double maximumOverlapRatio = 0.5,
+        CancellationToken cancellationToken = default);
 }

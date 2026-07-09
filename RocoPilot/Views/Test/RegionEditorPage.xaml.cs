@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -21,6 +22,8 @@ namespace RocoPilot.Views.Test;
 
 public sealed partial class RegionEditorPage : Page
 {
+    private const int AutoSaveDelayMilliseconds = 600;
+
     private static readonly string RegionScreenshotDirectory = Path.Combine(
         AppContext.BaseDirectory,
         "Screenshots",
@@ -29,7 +32,9 @@ public sealed partial class RegionEditorPage : Page
     private readonly IRecognitionRegionConfigService _configService;
     private readonly IGameWindowService _gameWindowService;
     private readonly IScreenCaptureService _captureService;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _autoSaveTimer;
     private RecognitionRegionConfig? _currentConfig;
+    private bool _isLoadingConfig;
 
     public ObservableCollection<EditableRecognitionRegion> Regions
     {
@@ -54,11 +59,19 @@ public sealed partial class RegionEditorPage : Page
 
         InitializeComponent();
 
+        _autoSaveTimer = DispatcherQueue.CreateTimer();
+        _autoSaveTimer.Interval = TimeSpan.FromMilliseconds(AutoSaveDelayMilliseconds);
+        _autoSaveTimer.Tick += AutoSaveTimer_Tick;
+
         CaptureMethodComboBox.ItemsSource = CaptureMethods;
         CaptureMethodComboBox.SelectedIndex = 0;
         RegionsListView.ItemsSource = Regions;
+        Regions.CollectionChanged += Regions_CollectionChanged;
+        ResolutionWidthTextBox.TextChanged += CoordinateInput_TextChanged;
+        ResolutionHeightTextBox.TextChanged += CoordinateInput_TextChanged;
 
         Loaded += RegionEditorPage_Loaded;
+        Unloaded += RegionEditorPage_Unloaded;
     }
 
     private void RegionEditorPage_Loaded(object sender, RoutedEventArgs e)
@@ -128,35 +141,64 @@ public sealed partial class RegionEditorPage : Page
 
     private void SaveConfigButton_Click(object sender, RoutedEventArgs e)
     {
+        _autoSaveTimer.Stop();
+        _ = SaveConfig(isAutoSave: false);
+    }
+
+    private void AutoSaveTimer_Tick(
+        Microsoft.UI.Dispatching.DispatcherQueueTimer sender,
+        object args)
+    {
+        sender.Stop();
+        _ = SaveConfig(isAutoSave: true);
+    }
+
+    private void Regions_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        UnsubscribeRegions(e.OldItems);
+        SubscribeRegions(e.NewItems);
+        ScheduleAutoSave();
+    }
+
+    private void CoordinateInput_TextChanged(object sender, TextChangedEventArgs e) =>
+        ScheduleAutoSave();
+
+    private void EditableRegion_PropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+        ScheduleAutoSave();
+
+    private void ScheduleAutoSave()
+    {
+        if (_isLoadingConfig)
+        {
+            return;
+        }
+
+        _autoSaveTimer.Stop();
+        _autoSaveTimer.Start();
+    }
+
+    private bool SaveConfig(bool isAutoSave)
+    {
         if (_currentConfig is null)
         {
-            ShowMessage("请先选择一个配置文件", InfoBarSeverity.Warning);
-            return;
-        }
-
-        if (!TryReadResolution(out var resolutionWidth, out var resolutionHeight))
-        {
-            return;
-        }
-
-        var regions = new List<RecognitionRegion>();
-        var regionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < Regions.Count; index++)
-        {
-            var editableRegion = Regions[index];
-            if (!editableRegion.TryToModel(out var region, out var error))
+            if (!isAutoSave)
             {
-                ShowMessage($"第 {index + 1} 个区域无效：{error}", InfoBarSeverity.Warning);
-                return;
+                ShowMessage("请先选择一个配置文件", InfoBarSeverity.Warning);
             }
 
-            if (!regionIds.Add(region.Id))
-            {
-                ShowMessage($"区域 ID 重复：{region.Id}", InfoBarSeverity.Warning);
-                return;
-            }
+            return false;
+        }
 
-            regions.Add(region);
+        if (!TryBuildConfig(
+                out var resolutionWidth,
+                out var resolutionHeight,
+                out var regions,
+                out var error))
+        {
+            ShowMessage(
+                isAutoSave ? $"自动保存暂停：{error}" : error,
+                InfoBarSeverity.Warning);
+            return false;
         }
 
         try
@@ -165,12 +207,62 @@ public sealed partial class RegionEditorPage : Page
             _currentConfig.ResolutionHeight = resolutionHeight;
             _currentConfig.Regions = regions;
             _configService.Save(_currentConfig);
-            HideMessage();
+            if (!isAutoSave ||
+                (EditorInfoBar.IsOpen && EditorInfoBar.Severity == InfoBarSeverity.Warning))
+            {
+                HideMessage();
+            }
+
+            return true;
         }
         catch (Exception ex)
         {
-            ShowMessage($"保存失败：{ex.Message}", InfoBarSeverity.Error);
+            ShowMessage($"{(isAutoSave ? "自动保存" : "保存")}失败：{ex.Message}", InfoBarSeverity.Error);
+            return false;
         }
+    }
+
+    private void RegionEditorPage_Unloaded(object sender, RoutedEventArgs e)
+    {
+        _autoSaveTimer.Stop();
+    }
+
+    private bool TryBuildConfig(
+        out int resolutionWidth,
+        out int resolutionHeight,
+        out List<RecognitionRegion> regions,
+        out string error)
+    {
+        resolutionWidth = 0;
+        resolutionHeight = 0;
+        regions = [];
+        error = string.Empty;
+
+        if (!TryReadResolution(out resolutionWidth, out resolutionHeight, out error))
+        {
+            return false;
+        }
+
+        var regionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < Regions.Count; index++)
+        {
+            var editableRegion = Regions[index];
+            if (!editableRegion.TryToModel(out var region, out var itemError))
+            {
+                error = $"第 {index + 1} 个区域无效：{itemError}";
+                return false;
+            }
+
+            if (!regionIds.Add(region.Id))
+            {
+                error = $"区域 ID 重复：{region.Id}";
+                return false;
+            }
+
+            regions.Add(region);
+        }
+
+        return true;
     }
 
     private async void CaptureAddRegionButton_Click(object sender, RoutedEventArgs e)
@@ -456,22 +548,35 @@ public sealed partial class RegionEditorPage : Page
 
     private void LoadConfig(string path)
     {
-        _currentConfig = _configService.LoadFromPath(path);
-        SelectedConfigFileText.Text = Path.GetFileName(path);
-        ResolutionWidthTextBox.Text = _currentConfig.ResolutionWidth > 0
-            ? _currentConfig.ResolutionWidth.ToString()
-            : string.Empty;
-        ResolutionHeightTextBox.Text = _currentConfig.ResolutionHeight > 0
-            ? _currentConfig.ResolutionHeight.ToString()
-            : string.Empty;
-
-        Regions.Clear();
-        foreach (var region in _currentConfig.Regions)
+        _isLoadingConfig = true;
+        try
         {
-            Regions.Add(EditableRecognitionRegion.FromModel(region));
-        }
+            foreach (var region in Regions)
+            {
+                region.PropertyChanged -= EditableRegion_PropertyChanged;
+            }
 
-        HideMessage();
+            _currentConfig = _configService.LoadFromPath(path);
+            SelectedConfigFileText.Text = Path.GetFileName(path);
+            ResolutionWidthTextBox.Text = _currentConfig.ResolutionWidth > 0
+                ? _currentConfig.ResolutionWidth.ToString()
+                : string.Empty;
+            ResolutionHeightTextBox.Text = _currentConfig.ResolutionHeight > 0
+                ? _currentConfig.ResolutionHeight.ToString()
+                : string.Empty;
+
+            Regions.Clear();
+            foreach (var region in _currentConfig.Regions)
+            {
+                Regions.Add(EditableRecognitionRegion.FromModel(region));
+            }
+
+            HideMessage();
+        }
+        finally
+        {
+            _isLoadingConfig = false;
+        }
     }
 
     private void EnsureResolutionFromSource(int width, int height)
@@ -489,22 +594,60 @@ public sealed partial class RegionEditorPage : Page
 
     private bool TryReadResolution(out int width, out int height)
     {
+        if (TryReadResolution(out width, out height, out var error))
+        {
+            return true;
+        }
+
+        ShowMessage(error, InfoBarSeverity.Warning);
+        return false;
+    }
+
+    private bool TryReadResolution(out int width, out int height, out string error)
+    {
         width = 0;
         height = 0;
+        error = string.Empty;
 
         if (!int.TryParse(ResolutionWidthTextBox.Text, out width) || width <= 0)
         {
-            ShowMessage("配置宽度必须是大于 0 的整数", InfoBarSeverity.Warning);
+            error = "配置宽度必须是大于 0 的整数";
             return false;
         }
 
         if (!int.TryParse(ResolutionHeightTextBox.Text, out height) || height <= 0)
         {
-            ShowMessage("配置高度必须是大于 0 的整数", InfoBarSeverity.Warning);
+            error = "配置高度必须是大于 0 的整数";
             return false;
         }
 
         return true;
+    }
+
+    private void SubscribeRegions(System.Collections.IList? regions)
+    {
+        if (regions is null)
+        {
+            return;
+        }
+
+        foreach (EditableRecognitionRegion region in regions)
+        {
+            region.PropertyChanged += EditableRegion_PropertyChanged;
+        }
+    }
+
+    private void UnsubscribeRegions(System.Collections.IList? regions)
+    {
+        if (regions is null)
+        {
+            return;
+        }
+
+        foreach (EditableRecognitionRegion region in regions)
+        {
+            region.PropertyChanged -= EditableRegion_PropertyChanged;
+        }
     }
 
     private string GenerateUniqueId(string prefix)

@@ -305,6 +305,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: RocoPilot ${{ needs.build_release_assets.outputs.version }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          draft: true
           token: ${{ secrets.RELEASE_PUBLISH_TOKEN || github.token }}
           body: |
             # RocoPilot ${{ needs.build_release_assets.outputs.version }}

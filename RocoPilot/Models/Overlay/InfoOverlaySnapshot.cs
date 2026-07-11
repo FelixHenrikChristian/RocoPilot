@@ -23,3 +23,7 @@ public sealed record InfoOverlayPendingShinyCapture(
     string CreatureName,
     string Season,
     DateTimeOffset DetectedAt);
+
+public sealed record InfoOverlayNotice(
+    string Title,
+    string Message);

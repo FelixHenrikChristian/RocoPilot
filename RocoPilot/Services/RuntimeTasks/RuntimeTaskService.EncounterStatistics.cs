@@ -85,7 +85,7 @@ public sealed partial class RuntimeTaskService
             return [];
         }
 
-        return _statisticsService.GetSelectedAccountSeasonEncounters(season.Id)
+        return _statisticsService.GetActiveAccountSeasonEncounters(season.Id)
             .Select(record => new InfoOverlayCounter(
                 record.Name,
                 record.Count,
@@ -639,7 +639,7 @@ public sealed partial class RuntimeTaskService
     private int GetEncounterCount(string seasonId, string spiritName)
     {
         var record = _statisticsService
-            .GetSelectedAccountSeasonEncounters(seasonId)
+            .GetActiveAccountSeasonEncounters(seasonId)
             .FirstOrDefault(record => TextMatchingHelper.AreSameSpiritName(record.Name, spiritName));
         return record?.Count ?? 0;
     }

@@ -27,12 +27,21 @@ public sealed class StatisticsService : IStatisticsService
     private StatisticsDocument _document = StatisticsDocumentNormalizer.CreateDefault();
     private bool _isLoaded;
     private string? _selectedAccountUid;
+    private string? _activeAccountUid;
+    private bool _isActiveAccountSelectionRequired;
+    private int _activeAccountWarningLogged;
 
     public event EventHandler<StatisticsDocumentChangedEventArgs>? DocumentChanged;
 
     public event EventHandler? SelectedAccountChanged;
 
     public StatisticsDocument CurrentDocument => CloneDocument(_document);
+
+    public string? SelectedAccountUid => Volatile.Read(ref _selectedAccountUid);
+
+    public string? ActiveAccountUid => Volatile.Read(ref _activeAccountUid);
+
+    public bool IsActiveAccountSelectionRequired => Volatile.Read(ref _isActiveAccountSelectionRequired);
 
     public StatisticsService(
         ILocalSettingsService localSettingsService,
@@ -64,6 +73,7 @@ public sealed class StatisticsService : IStatisticsService
     public async Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document)
     {
         var changedDocument = await UpdateAsync(() => StatisticsDocumentNormalizer.Normalize(document));
+        EnsureActiveAccountExists(changedDocument);
         RaiseDocumentChanged(changedDocument);
         return changedDocument;
     }
@@ -101,6 +111,11 @@ public sealed class StatisticsService : IStatisticsService
                 _selectedAccountUid = _document.Accounts.FirstOrDefault()?.Uid;
             }
 
+            if (string.Equals(ActiveAccountUid, uid, StringComparison.OrdinalIgnoreCase))
+            {
+                RequireActiveAccountSelection();
+            }
+
             return StatisticsDocumentNormalizer.Normalize(_document);
         });
         RaiseDocumentChanged(changedDocument);
@@ -113,6 +128,7 @@ public sealed class StatisticsService : IStatisticsService
         {
             _document.Accounts.Clear();
             _selectedAccountUid = null;
+            RequireActiveAccountSelection();
             return StatisticsDocumentNormalizer.Normalize(_document);
         });
         RaiseDocumentChanged(changedDocument);
@@ -132,7 +148,7 @@ public sealed class StatisticsService : IStatisticsService
 
         var changedDocument = await UpdateAsync(() =>
         {
-            var account = ResolveTargetAccount(_document);
+            var account = ResolveActiveAccount(_document);
             if (account is null)
             {
                 return _document;
@@ -384,7 +400,7 @@ public sealed class StatisticsService : IStatisticsService
 
         var changedDocument = await UpdateAsync(() =>
         {
-            var account = ResolveTargetAccount(_document);
+            var account = ResolveActiveAccount(_document);
             if (account is null)
             {
                 return _document;
@@ -464,6 +480,11 @@ public sealed class StatisticsService : IStatisticsService
     public void SetSelectedAccountUid(string? uid)
     {
         var nextUid = string.IsNullOrWhiteSpace(uid) ? null : uid.Trim();
+        if (nextUid is not null && IsActiveAccountSelectionRequired)
+        {
+            SetActiveAccountUid(nextUid);
+        }
+
         if (string.Equals(_selectedAccountUid, nextUid, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -473,14 +494,35 @@ public sealed class StatisticsService : IStatisticsService
         SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public IReadOnlyList<EncounterSpiritRecord> GetSelectedAccountSeasonEncounters(string seasonId)
+    public void SetActiveAccountUid(string uid)
+    {
+        uid = uid.Trim();
+        if (string.IsNullOrWhiteSpace(uid))
+        {
+            throw new ArgumentException("UID 不能为空。", nameof(uid));
+        }
+
+        Volatile.Write(ref _activeAccountUid, uid);
+        Volatile.Write(ref _isActiveAccountSelectionRequired, false);
+        Interlocked.Exchange(ref _activeAccountWarningLogged, 0);
+        _logger.LogInformation("本次启动的统计记录账号已设为 {Uid}。", uid);
+    }
+
+    public void RequireActiveAccountSelection()
+    {
+        Volatile.Write(ref _activeAccountUid, null);
+        Volatile.Write(ref _isActiveAccountSelectionRequired, true);
+        Interlocked.Exchange(ref _activeAccountWarningLogged, 0);
+    }
+
+    public IReadOnlyList<EncounterSpiritRecord> GetActiveAccountSeasonEncounters(string seasonId)
     {
         if (string.IsNullOrWhiteSpace(seasonId))
         {
             return [];
         }
 
-        var account = ResolveSelectedAccountForRead(_document);
+        var account = ResolveActiveAccountForRead(_document);
         var season = account?.Seasons.FirstOrDefault(item =>
             string.Equals(item.Id, seasonId.Trim(), StringComparison.OrdinalIgnoreCase));
         if (season is null)
@@ -603,6 +645,65 @@ public sealed class StatisticsService : IStatisticsService
 
         _logger.LogWarning("没有可写入的统计账号，本次奇遇记录已跳过。");
         return null;
+    }
+
+    private AccountStatisticsData? ResolveActiveAccount(StatisticsDocument document)
+    {
+        if (IsActiveAccountSelectionRequired)
+        {
+            LogMissingActiveAccountOnce("尚未确认本次启动使用的统计账号，本次自动统计已跳过。");
+            return null;
+        }
+
+        var activeAccountUid = ActiveAccountUid;
+        if (!string.IsNullOrWhiteSpace(activeAccountUid))
+        {
+            var activeAccount = document.Accounts.FirstOrDefault(account =>
+                string.Equals(account.Uid, activeAccountUid, StringComparison.OrdinalIgnoreCase));
+            if (activeAccount is not null)
+            {
+                return activeAccount;
+            }
+
+            RequireActiveAccountSelection();
+            LogMissingActiveAccountOnce($"本次启动的统计账号 {activeAccountUid} 已不存在，本次自动统计已跳过。");
+            return null;
+        }
+
+        return ResolveTargetAccount(document);
+    }
+
+    private AccountStatisticsData? ResolveActiveAccountForRead(StatisticsDocument document)
+    {
+        if (IsActiveAccountSelectionRequired)
+        {
+            return null;
+        }
+
+        var activeAccountUid = ActiveAccountUid;
+        return !string.IsNullOrWhiteSpace(activeAccountUid)
+            ? document.Accounts.FirstOrDefault(account =>
+                string.Equals(account.Uid, activeAccountUid, StringComparison.OrdinalIgnoreCase))
+            : ResolveSelectedAccountForRead(document);
+    }
+
+    private void EnsureActiveAccountExists(StatisticsDocument document)
+    {
+        var activeAccountUid = ActiveAccountUid;
+        if (!string.IsNullOrWhiteSpace(activeAccountUid)
+            && !document.Accounts.Any(account =>
+                string.Equals(account.Uid, activeAccountUid, StringComparison.OrdinalIgnoreCase)))
+        {
+            RequireActiveAccountSelection();
+        }
+    }
+
+    private void LogMissingActiveAccountOnce(string message)
+    {
+        if (Interlocked.Exchange(ref _activeAccountWarningLogged, 1) == 0)
+        {
+            _logger.LogWarning("{Message}", message);
+        }
     }
 
     private AccountStatisticsData? ResolveSelectedAccountForRead(StatisticsDocument document)

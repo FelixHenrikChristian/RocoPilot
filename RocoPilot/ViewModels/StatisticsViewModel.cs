@@ -61,6 +61,11 @@ public partial class StatisticsViewModel : ObservableRecipient
         get => _selectedAccount;
         set
         {
+            if (value is not null && _statisticsService.IsActiveAccountSelectionRequired)
+            {
+                _statisticsService.SetSelectedAccountUid(value.Uid);
+            }
+
             if (SetProperty(ref _selectedAccount, value))
             {
                 _statisticsService.SetSelectedAccountUid(value?.Uid);
@@ -266,6 +271,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _document = _statisticsService.CurrentDocument;
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
+        _statisticsService.SelectedAccountChanged += StatisticsService_SelectedAccountChanged;
         _statisticsSyncService.StatusChanged += StatisticsSyncService_StatusChanged;
         ApplyDocument(_document);
         ApplySyncStatus(_statisticsSyncService.CurrentStatus);
@@ -344,7 +350,9 @@ public partial class StatisticsViewModel : ObservableRecipient
             return false;
         }
 
-        ApplyDocument(await _statisticsService.AddAccountAsync(uid), uid);
+        var document = await _statisticsService.AddAccountAsync(uid);
+        _statisticsService.SetSelectedAccountUid(uid);
+        ApplyDocument(document, uid);
         ShowNotification(InfoBarSeverity.Success, "已添加账号", $"已添加账号 {uid}。");
         return true;
     }
@@ -589,18 +597,49 @@ public partial class StatisticsViewModel : ObservableRecipient
         _dispatcherQueue.TryEnqueue(() => ApplyDocument(e.Document));
     }
 
+    private void StatisticsService_SelectedAccountChanged(object? sender, EventArgs e)
+    {
+        var selectedUid = _statisticsService.SelectedAccountUid;
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            ApplySelectedAccountUid(selectedUid);
+            return;
+        }
+
+        _dispatcherQueue.TryEnqueue(() => ApplySelectedAccountUid(selectedUid));
+    }
+
+    private void ApplySelectedAccountUid(string? uid)
+    {
+        var account = Accounts.FirstOrDefault(item =>
+            string.Equals(item.Uid, uid, StringComparison.OrdinalIgnoreCase));
+        if (account is null
+            || string.Equals(_selectedAccount?.Uid, account.Uid, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _selectedAccount = account;
+        OnPropertyChanged(nameof(SelectedAccount));
+        OnPropertyChanged(nameof(SelectedAccountDisplayName));
+        RefreshSelectedAccount();
+    }
+
     private void ApplyDocument(StatisticsDocument document, string? preferredUid = null)
     {
         _document = CloneDocument(document);
 
-        var previousUid = preferredUid ?? SelectedAccount?.Uid;
+        var previousUid = preferredUid ?? SelectedAccount?.Uid ?? _statisticsService.ActiveAccountUid;
         Accounts = StatisticsProjection.BuildAccounts(_document);
 
         var nextSelectedAccount = Accounts.FirstOrDefault(account => string.Equals(account.Uid, previousUid, StringComparison.OrdinalIgnoreCase))
             ?? Accounts.FirstOrDefault();
 
         _selectedAccount = nextSelectedAccount;
-        _statisticsService.SetSelectedAccountUid(nextSelectedAccount?.Uid);
+        if (!_statisticsService.IsActiveAccountSelectionRequired)
+        {
+            _statisticsService.SetSelectedAccountUid(nextSelectedAccount?.Uid);
+        }
         OnPropertyChanged(nameof(SelectedAccount));
         OnPropertyChanged(nameof(SelectedAccountDisplayName));
         RefreshSelectedAccount();

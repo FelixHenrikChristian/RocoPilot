@@ -58,6 +58,10 @@
     <ProjectReference Include="..\RocoPilot.Core\RocoPilot.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="RocoPilot.Tests" />
+  </ItemGroup>
+
   <!-- WindowsAppSDK self-contained payload includes WinUI MUI files for every supported language. -->
   <Target Name="ExcludeWinUIMuiFilesFromWindowsAppSDKPayload"
           BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents"

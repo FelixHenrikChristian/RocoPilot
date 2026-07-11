@@ -4,17 +4,19 @@ using Microsoft.UI.Xaml;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 
+using Serilog;
+
 using Windows.UI.ViewManagement;
 
 namespace RocoPilot;
 
 public sealed partial class MainWindow : WindowEx
 {
+    private readonly WindowShutdownCoordinator _shutdownCoordinator;
+
     private Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue;
 
     private UISettings? settings;
-    private bool _isShutdownStarted;
-    private bool _isShutdownComplete;
 
     public MainWindow()
     {
@@ -23,6 +25,11 @@ public sealed partial class MainWindow : WindowEx
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         Content = null;
         Title = "AppDisplayName".GetLocalized();
+        _shutdownCoordinator = new WindowShutdownCoordinator(
+            ShutdownAsync,
+            callback => DispatcherQueue.TryEnqueue(() => callback()),
+            Close,
+            exception => Log.Error(exception, "关闭主窗口时发生异常"));
 
         // Theme change code picked from https://github.com/microsoft/WinUI-Gallery/pull/1239
         dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -32,23 +39,9 @@ public sealed partial class MainWindow : WindowEx
         Closed += MainWindow_Closed;
     }
 
-    private async void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
-        if (_isShutdownComplete)
-        {
-            return;
-        }
-
-        args.Cancel = true;
-        if (_isShutdownStarted)
-        {
-            return;
-        }
-
-        _isShutdownStarted = true;
-        await ShutdownAsync();
-        _isShutdownComplete = true;
-        Close();
+        args.Cancel = _shutdownCoordinator.HandleCloseRequest();
     }
 
     private async Task ShutdownAsync()
@@ -89,7 +82,7 @@ public sealed partial class MainWindow : WindowEx
     private void Settings_ColorValuesChanged(UISettings sender, object args)
     {
         var queue = dispatcherQueue;
-        if (_isShutdownStarted || queue is null)
+        if (_shutdownCoordinator.IsShutdownStarted || queue is null)
         {
             return;
         }
@@ -97,7 +90,7 @@ public sealed partial class MainWindow : WindowEx
         // This calls comes off-thread, hence we will need to dispatch it to current app's thread
         _ = queue.TryEnqueue(() =>
         {
-            if (!_isShutdownStarted)
+            if (!_shutdownCoordinator.IsShutdownStarted)
             {
                 TitleBarHelper.ApplySystemThemeToCaptionButtons();
             }

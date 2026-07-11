@@ -47,6 +47,8 @@ public sealed class StatisticsSyncSettings
     public DateTimeOffset? LastSyncedRemoteModifiedAt { get; set; }
 
     public string? LastSyncedRemoteEntityTag { get; set; }
+
+    public Dictionary<string, string>? LastSyncedAccountFingerprints { get; set; }
 }
 
 public sealed class StatisticsSyncStatus

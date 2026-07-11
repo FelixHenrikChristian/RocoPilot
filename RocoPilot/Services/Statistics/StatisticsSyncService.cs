@@ -24,6 +24,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
     private const string S3Region = "auto";
     private const string S3Service = "s3";
     private const string S3Algorithm = "AWS4-HMAC-SHA256";
+    private const int MaxConditionalUploadAttempts = 3;
     private static readonly TimeSpan AutoUploadDelay = TimeSpan.FromSeconds(8);
 
     private static readonly IReadOnlyList<StatisticsSyncProviderOption> ProviderOptions =
@@ -97,17 +98,34 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         string? password,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        var normalizedSettings = NormalizeSettings(settings);
-        ValidateSettingsForSave(normalizedSettings, password);
-        if (!string.IsNullOrEmpty(password))
+        await _operationGate.WaitAsync(cancellationToken);
+        try
         {
-            SavePassword(normalizedSettings.UserName, password);
-        }
+            var currentSettings = await LoadSettingsCoreAsync();
+            var normalizedSettings = NormalizeSettings(settings);
+            if (AreSameRemoteTarget(currentSettings, normalizedSettings))
+            {
+                CopySyncMetadata(currentSettings, normalizedSettings);
+            }
+            else
+            {
+                ClearSyncMetadata(normalizedSettings);
+            }
 
-        await SaveSettingsCoreAsync(normalizedSettings, cancellationToken);
-        ApplyStatusFromSettings(normalizedSettings, normalizedSettings.IsEnabled ? "云同步设置已保存" : "云同步未启用");
-        return CloneStatus(_status);
+            ValidateSettingsForSave(normalizedSettings, password);
+            if (!string.IsNullOrEmpty(password))
+            {
+                SavePassword(normalizedSettings.UserName, password);
+            }
+
+            await SaveSettingsCoreAsync(normalizedSettings, cancellationToken);
+            ApplyStatusFromSettings(normalizedSettings, normalizedSettings.IsEnabled ? "云同步设置已保存" : "云同步未启用");
+            return CloneStatus(_status);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     private static void ValidateSettingsForSave(StatisticsSyncSettings settings, string? password)
@@ -184,6 +202,58 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         }
     }
 
+    public async Task<bool> DownloadRemoteChangesIfNeededAsync(CancellationToken cancellationToken = default)
+    {
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var settings = await LoadSettingsCoreAsync();
+            if (!settings.IsEnabled || !HasRequiredSettings(settings))
+            {
+                ApplyStatusFromSettings(settings, BuildIdleMessage(settings));
+                return false;
+            }
+
+            var (_, password) = await LoadConfiguredSettingsAsync(cancellationToken);
+            SetBusy(true, "正在检查云端统计更新");
+            var remoteInfo = await ReadRemoteInfoCoreAsync(settings, password, cancellationToken);
+            await SaveRemoteInfoAsync(settings, remoteInfo, cancellationToken);
+            if (!remoteInfo.Exists)
+            {
+                ApplyStatusFromSettings(settings, "云端暂无统计数据");
+                return false;
+            }
+
+            if (!HasRemoteChangedSinceLastSync(settings, remoteInfo))
+            {
+                ApplyStatusFromSettings(settings, "云端统计数据已是最新");
+                return false;
+            }
+
+            SetBusy(true, "检测到云端更新，正在先同步到本地");
+            await DownloadAndMergeCoreAsync(
+                settings,
+                password,
+                "启动时已同步云端统计更新",
+                cancellationToken);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            SetFailureStatus("检查云端统计更新失败", ex);
+            throw;
+        }
+        finally
+        {
+            SetBusy(false);
+            _operationGate.Release();
+        }
+    }
+
     public async Task<StatisticsSyncResult> UploadAsync(CancellationToken cancellationToken = default)
     {
         return await UploadAsync(automatic: false, cancellationToken);
@@ -196,40 +266,15 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         {
             var (settings, password) = await LoadConfiguredSettingsAsync(cancellationToken);
             SetBusy(true, "正在合并云端统计数据");
-            using var response = await SendDownloadRequestAsync(settings, password, cancellationToken);
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var remoteDocument = DeserializeDocument(json);
-            var localDocument = await _statisticsService.LoadAsync();
-            var mergedDocument = StatisticsDocumentMerger.Merge(localDocument, remoteDocument);
-
-            _suspendAutoUpload = true;
-            try
-            {
-                await _statisticsService.ReplaceAsync(mergedDocument);
-            }
-            finally
-            {
-                _suspendAutoUpload = false;
-            }
-
-            var completedAt = DateTimeOffset.Now;
-            var result = new StatisticsSyncResult
-            {
-                CompletedAt = completedAt,
-                RemoteLastModifiedAt = ReadLastModified(response),
-                ContentLength = response.Content.Headers.ContentLength,
-                EntityTag = ReadEntityTag(response)
-            };
-
-            settings.LastDownloadedAt = completedAt;
-            settings.LastRemoteCheckedAt = completedAt;
-            settings.LastRemoteModifiedAt = result.RemoteLastModifiedAt;
-            settings.LastRemoteEntityTag = result.EntityTag;
-            settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
-            settings.LastSyncedRemoteEntityTag = result.EntityTag;
-            await SaveSettingsCoreAsync(settings, cancellationToken);
-            ApplyStatusFromSettings(settings, "已合并云端统计数据");
-            return result;
+            return await DownloadAndMergeCoreAsync(
+                settings,
+                password,
+                "已合并云端统计数据",
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -243,43 +288,156 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         }
     }
 
+    private async Task<StatisticsSyncResult> DownloadAndMergeCoreAsync(
+        StatisticsSyncSettings settings,
+        string password,
+        string successMessage,
+        CancellationToken cancellationToken)
+    {
+        using var response = await SendDownloadRequestAsync(settings, password, cancellationToken);
+        var json = await response.Content.ReadAsStringAsync(cancellationToken);
+        var remoteDocument = DeserializeDocument(json);
+        var downloadedRemoteInfo = new StatisticsSyncRemoteInfo
+        {
+            Exists = true,
+            LastModifiedAt = ReadLastModified(response),
+            ContentLength = response.Content.Headers.ContentLength,
+            EntityTag = ReadEntityTag(response),
+            CheckedAt = DateTimeOffset.Now
+        };
+        var localDocument = await _statisticsService.LoadAsync();
+        var mergeResult = StatisticsDocumentMerger.Merge(
+            localDocument,
+            remoteDocument,
+            settings.LastSyncedAccountFingerprints,
+            preferRemoteAccountsWithoutBaseline:
+                settings.LastSyncedAccountFingerprints is null
+                && HasRecordedSyncVersion(settings)
+                && HasRemoteChangedSinceLastSync(settings, downloadedRemoteInfo));
+        if (mergeResult.ConflictingAccountUids.Count > 0)
+        {
+            _logger.LogWarning(
+                "云同步检测到同一账号在本地和云端都发生变化，已采用云端版本：{AccountUids}",
+                string.Join(", ", mergeResult.ConflictingAccountUids));
+        }
+
+        _suspendAutoUpload = true;
+        try
+        {
+            await _statisticsService.ReplaceAsync(mergeResult.Document);
+        }
+        finally
+        {
+            _suspendAutoUpload = false;
+        }
+
+        var completedAt = DateTimeOffset.Now;
+        var result = new StatisticsSyncResult
+        {
+            CompletedAt = completedAt,
+            RemoteLastModifiedAt = downloadedRemoteInfo.LastModifiedAt,
+            ContentLength = downloadedRemoteInfo.ContentLength,
+            EntityTag = downloadedRemoteInfo.EntityTag
+        };
+
+        settings.LastDownloadedAt = completedAt;
+        settings.LastRemoteCheckedAt = completedAt;
+        settings.LastRemoteModifiedAt = result.RemoteLastModifiedAt;
+        settings.LastRemoteEntityTag = result.EntityTag;
+        settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
+        settings.LastSyncedRemoteEntityTag = result.EntityTag;
+        settings.LastSyncedAccountFingerprints = StatisticsDocumentMerger.ComputeAccountFingerprints(remoteDocument);
+        await SaveSettingsCoreAsync(settings, cancellationToken);
+        ApplyStatusFromSettings(settings, successMessage);
+        return result;
+    }
+
     private async Task<StatisticsSyncResult> UploadAsync(bool automatic, CancellationToken cancellationToken)
     {
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
             var (settings, password) = await LoadConfiguredSettingsAsync(cancellationToken);
-            SetBusy(true, automatic ? "正在自动上传统计数据" : "正在上传统计数据");
-            var currentRemoteInfo = await ReadRemoteInfoCoreAsync(settings, password, cancellationToken);
-            if (HasRemoteChangedSinceLastSync(settings, currentRemoteInfo))
+            var mergedRemoteChanges = false;
+            for (var attempt = 1; attempt <= MaxConditionalUploadAttempts; attempt++)
             {
-                throw new InvalidOperationException("云端统计数据已在其他设备更新，请先下载合并后再上传。");
+                SetBusy(true, automatic ? "正在自动上传统计数据" : "正在上传统计数据");
+                var currentRemoteInfo = await ReadRemoteInfoCoreAsync(settings, password, cancellationToken);
+                if (HasRemoteChangedSinceLastSync(settings, currentRemoteInfo))
+                {
+                    SetBusy(true, "检测到云端更新，正在先同步到本地");
+                    var downloadResult = await DownloadAndMergeCoreAsync(
+                        settings,
+                        password,
+                        "已先同步云端统计更新",
+                        cancellationToken);
+                    mergedRemoteChanges = true;
+                    currentRemoteInfo = new StatisticsSyncRemoteInfo
+                    {
+                        Exists = true,
+                        LastModifiedAt = downloadResult.RemoteLastModifiedAt,
+                        ContentLength = downloadResult.ContentLength,
+                        EntityTag = downloadResult.EntityTag,
+                        CheckedAt = downloadResult.CompletedAt
+                    };
+                }
+
+                var document = await _statisticsService.LoadAsync();
+                var payload = Encoding.UTF8.GetBytes(SerializeDocument(document));
+                using var response = await SendUploadRequestAsync(
+                    settings,
+                    password,
+                    payload,
+                    currentRemoteInfo,
+                    cancellationToken);
+                if (response.StatusCode == HttpStatusCode.PreconditionFailed)
+                {
+                    if (attempt < MaxConditionalUploadAttempts)
+                    {
+                        SetBusy(true, "上传期间云端再次更新，正在重新同步");
+                        continue;
+                    }
+
+                    throw new InvalidOperationException("上传期间云端数据连续发生变化，已停止上传以避免覆盖，请稍后重试。");
+                }
+
+                await EnsureSuccessAsync(response, cancellationToken);
+                var completedAt = DateTimeOffset.Now;
+                var result = new StatisticsSyncResult
+                {
+                    CompletedAt = completedAt,
+                    RemoteLastModifiedAt = ReadLastModified(response) ?? completedAt,
+                    ContentLength = payload.LongLength,
+                    EntityTag = ReadEntityTag(response)
+                };
+                if (string.IsNullOrWhiteSpace(result.EntityTag))
+                {
+                    throw new InvalidOperationException(
+                        "云端已接收上传，但没有返回用于并发校验的 ETag；本地未记录本次同步基线，下次将重新检查云端。");
+                }
+
+                settings.LastUploadedAt = completedAt;
+                settings.LastRemoteCheckedAt = completedAt;
+                settings.LastRemoteModifiedAt = result.RemoteLastModifiedAt;
+                settings.LastRemoteEntityTag = result.EntityTag;
+                settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
+                settings.LastSyncedRemoteEntityTag = result.EntityTag;
+                settings.LastSyncedAccountFingerprints = StatisticsDocumentMerger.ComputeAccountFingerprints(document);
+                await SaveSettingsCoreAsync(settings, cancellationToken);
+                var successMessage = mergedRemoteChanges
+                    ? "已先同步云端更新并上传统计数据"
+                    : automatic
+                        ? "已自动上传统计数据"
+                        : "已上传统计数据";
+                ApplyStatusFromSettings(settings, successMessage);
+                return result;
             }
 
-            var document = await _statisticsService.LoadAsync();
-            var json = SerializeDocument(document);
-            using var response = await SendUploadRequestAsync(settings, password, json, cancellationToken);
-            await EnsureSuccessAsync(response, cancellationToken);
-
-            var completedAt = DateTimeOffset.Now;
-            var info = await ReadRemoteInfoCoreAsync(settings, password, cancellationToken);
-            var result = new StatisticsSyncResult
-            {
-                CompletedAt = completedAt,
-                RemoteLastModifiedAt = info.LastModifiedAt ?? ReadLastModified(response) ?? completedAt,
-                ContentLength = info.ContentLength,
-                EntityTag = info.EntityTag ?? ReadEntityTag(response)
-            };
-
-            settings.LastUploadedAt = completedAt;
-            settings.LastRemoteCheckedAt = completedAt;
-            settings.LastRemoteModifiedAt = result.RemoteLastModifiedAt;
-            settings.LastRemoteEntityTag = result.EntityTag;
-            settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
-            settings.LastSyncedRemoteEntityTag = result.EntityTag;
-            await SaveSettingsCoreAsync(settings, cancellationToken);
-            ApplyStatusFromSettings(settings, automatic ? "已自动上传统计数据" : "已上传统计数据");
-            return result;
+            throw new InvalidOperationException("云端统计数据持续变化，已停止上传以避免覆盖。");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -462,10 +620,16 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
     private async Task<HttpResponseMessage> SendUploadRequestAsync(
         StatisticsSyncSettings settings,
         string password,
-        string json,
+        byte[] payload,
+        StatisticsSyncRemoteInfo expectedRemoteInfo,
         CancellationToken cancellationToken)
     {
-        using var request = CreateS3Request(settings, HttpMethod.Put, password, Encoding.UTF8.GetBytes(json));
+        using var request = CreateS3Request(
+            settings,
+            HttpMethod.Put,
+            password,
+            payload,
+            expectedRemoteInfo);
         return await _httpClient.SendAsync(request, cancellationToken);
     }
 
@@ -473,7 +637,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         StatisticsSyncSettings settings,
         HttpMethod method,
         string secretAccessKey,
-        byte[] payload)
+        byte[] payload,
+        StatisticsSyncRemoteInfo? expectedRemoteInfo = null)
     {
         var uri = BuildS3ObjectUri(settings);
         var request = new HttpRequestMessage(method, uri);
@@ -487,8 +652,39 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         }
 
         request.Headers.UserAgent.ParseAdd("RocoPilot");
+        if (method == HttpMethod.Put && expectedRemoteInfo is not null)
+        {
+            ApplyUploadCondition(request, expectedRemoteInfo);
+        }
+
         SignS3Request(request, settings.UserName, secretAccessKey, payload);
         return request;
+    }
+
+    private static void ApplyUploadCondition(
+        HttpRequestMessage request,
+        StatisticsSyncRemoteInfo expectedRemoteInfo)
+    {
+        if (!expectedRemoteInfo.Exists)
+        {
+            request.Headers.IfNoneMatch.Add(EntityTagHeaderValue.Any);
+            return;
+        }
+
+        var entityTag = NormalizeEntityTag(expectedRemoteInfo.EntityTag);
+        if (!string.IsNullOrWhiteSpace(entityTag))
+        {
+            request.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{entityTag}\""));
+            return;
+        }
+
+        if (expectedRemoteInfo.LastModifiedAt is not null)
+        {
+            request.Headers.IfUnmodifiedSince = expectedRemoteInfo.LastModifiedAt.Value.ToUniversalTime();
+            return;
+        }
+
+        throw new InvalidOperationException("云端没有返回 ETag 或更新时间，无法安全地执行覆盖上传。");
     }
 
     private static void SignS3Request(
@@ -771,6 +967,67 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             && !string.IsNullOrWhiteSpace(settings.UserName);
     }
 
+    private static bool AreSameRemoteTarget(
+        StatisticsSyncSettings left,
+        StatisticsSyncSettings right)
+    {
+        return string.Equals(left.ProviderId, right.ProviderId, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.ProviderKind, right.ProviderKind, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.Endpoint.Trim(), right.Endpoint.Trim(), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(left.BucketName.Trim(), right.BucketName.Trim(), StringComparison.Ordinal)
+            && string.Equals(
+                NormalizeRemotePath(left.RemotePath),
+                NormalizeRemotePath(right.RemotePath),
+                StringComparison.Ordinal)
+            && string.Equals(left.UserName.Trim(), right.UserName.Trim(), StringComparison.Ordinal);
+    }
+
+    private static void CopySyncMetadata(
+        StatisticsSyncSettings source,
+        StatisticsSyncSettings target)
+    {
+        target.LastUploadedAt = source.LastUploadedAt;
+        target.LastDownloadedAt = source.LastDownloadedAt;
+        target.LastRemoteCheckedAt = source.LastRemoteCheckedAt;
+        target.LastRemoteModifiedAt = source.LastRemoteModifiedAt;
+        target.LastRemoteEntityTag = source.LastRemoteEntityTag;
+        target.LastSyncedRemoteModifiedAt = source.LastSyncedRemoteModifiedAt;
+        target.LastSyncedRemoteEntityTag = source.LastSyncedRemoteEntityTag;
+        target.LastSyncedAccountFingerprints = NormalizeAccountFingerprints(source.LastSyncedAccountFingerprints);
+    }
+
+    private static void ClearSyncMetadata(StatisticsSyncSettings settings)
+    {
+        settings.LastUploadedAt = null;
+        settings.LastDownloadedAt = null;
+        settings.LastRemoteCheckedAt = null;
+        settings.LastRemoteModifiedAt = null;
+        settings.LastRemoteEntityTag = null;
+        settings.LastSyncedRemoteModifiedAt = null;
+        settings.LastSyncedRemoteEntityTag = null;
+        settings.LastSyncedAccountFingerprints = null;
+    }
+
+    private static Dictionary<string, string>? NormalizeAccountFingerprints(
+        IReadOnlyDictionary<string, string>? fingerprints)
+    {
+        if (fingerprints is null)
+        {
+            return null;
+        }
+
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (uid, fingerprint) in fingerprints)
+        {
+            if (!string.IsNullOrWhiteSpace(uid) && !string.IsNullOrWhiteSpace(fingerprint))
+            {
+                normalized[uid.Trim()] = fingerprint.Trim().ToLowerInvariant();
+            }
+        }
+
+        return normalized;
+    }
+
     private static StatisticsSyncSettings NormalizeSettings(StatisticsSyncSettings settings)
     {
         var provider = ResolveProvider(settings.ProviderId);
@@ -794,6 +1051,9 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         var lastRemoteEntityTag = isSameProvider ? NormalizeEntityTag(settings.LastRemoteEntityTag) : null;
         var lastSyncedRemoteModifiedAt = isSameProvider ? settings.LastSyncedRemoteModifiedAt : null;
         var lastSyncedRemoteEntityTag = isSameProvider ? NormalizeEntityTag(settings.LastSyncedRemoteEntityTag) : null;
+        var lastSyncedAccountFingerprints = isSameProvider
+            ? NormalizeAccountFingerprints(settings.LastSyncedAccountFingerprints)
+            : null;
         var isEnabled = isSameProvider && settings.IsEnabled;
 
         remotePath = string.IsNullOrWhiteSpace(remotePath)
@@ -815,7 +1075,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             LastRemoteModifiedAt = lastRemoteModifiedAt,
             LastRemoteEntityTag = lastRemoteEntityTag,
             LastSyncedRemoteModifiedAt = lastSyncedRemoteModifiedAt,
-            LastSyncedRemoteEntityTag = lastSyncedRemoteEntityTag
+            LastSyncedRemoteEntityTag = lastSyncedRemoteEntityTag,
+            LastSyncedAccountFingerprints = lastSyncedAccountFingerprints
         };
     }
 
@@ -902,6 +1163,14 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         return !AreSameRemoteTimestamp(syncedModifiedAt.Value, remoteInfo.LastModifiedAt.Value);
     }
 
+    private static bool HasRecordedSyncVersion(StatisticsSyncSettings settings)
+    {
+        return !string.IsNullOrWhiteSpace(settings.LastSyncedRemoteEntityTag)
+            || settings.LastSyncedRemoteModifiedAt is not null
+            || settings.LastUploadedAt is not null
+            || settings.LastDownloadedAt is not null;
+    }
+
     private static DateTimeOffset? ResolveLegacySyncedRemoteModifiedAt(StatisticsSyncSettings settings)
     {
         var lastSyncAt = Max(settings.LastUploadedAt, settings.LastDownloadedAt);
@@ -944,7 +1213,16 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             return null;
         }
 
-        return entityTag.Trim('"');
+        if (entityTag.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
+        {
+            entityTag = entityTag[2..].Trim();
+        }
+
+        return entityTag.Length >= 2
+            && entityTag.StartsWith('"')
+            && entityTag.EndsWith('"')
+                ? entityTag[1..^1]
+                : entityTag;
     }
 
     private static StatisticsSyncProviderOption CloneProvider(StatisticsSyncProviderOption provider)
@@ -976,7 +1254,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             LastRemoteModifiedAt = settings.LastRemoteModifiedAt,
             LastRemoteEntityTag = settings.LastRemoteEntityTag,
             LastSyncedRemoteModifiedAt = settings.LastSyncedRemoteModifiedAt,
-            LastSyncedRemoteEntityTag = settings.LastSyncedRemoteEntityTag
+            LastSyncedRemoteEntityTag = settings.LastSyncedRemoteEntityTag,
+            LastSyncedAccountFingerprints = NormalizeAccountFingerprints(settings.LastSyncedAccountFingerprints)
         };
     }
 

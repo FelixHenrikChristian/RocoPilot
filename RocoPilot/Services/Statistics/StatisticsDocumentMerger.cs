@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -5,6 +7,10 @@ using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Services.Statistics;
+
+internal sealed record StatisticsDocumentMergeResult(
+    StatisticsDocument Document,
+    IReadOnlyList<string> ConflictingAccountUids);
 
 internal static class StatisticsDocumentMerger
 {
@@ -15,25 +21,140 @@ internal static class StatisticsDocumentMerger
         WriteIndented = true
     };
 
-    public static StatisticsDocument Merge(StatisticsDocument localDocument, StatisticsDocument remoteDocument)
+    public static StatisticsDocumentMergeResult Merge(
+        StatisticsDocument localDocument,
+        StatisticsDocument remoteDocument,
+        IReadOnlyDictionary<string, string>? lastSyncedAccountFingerprints,
+        bool preferRemoteAccountsWithoutBaseline)
     {
-        var merged = CloneAndNormalize(localDocument);
+        var local = CloneAndNormalize(localDocument);
         var remote = CloneAndNormalize(remoteDocument);
 
+        if (lastSyncedAccountFingerprints is null)
+        {
+            var mergedWithoutBaseline = preferRemoteAccountsWithoutBaseline
+                ? MergeWithRemoteAccountPriority(local, remote)
+                : MergeLegacy(local, remote);
+            return new StatisticsDocumentMergeResult(mergedWithoutBaseline, []);
+        }
+
+        return MergeWithBaseline(local, remote, lastSyncedAccountFingerprints);
+    }
+
+    public static Dictionary<string, string> ComputeAccountFingerprints(StatisticsDocument document)
+    {
+        var normalized = CloneAndNormalize(document);
+        return normalized.Accounts.ToDictionary(
+            account => account.Uid,
+            ComputeAccountFingerprint,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static StatisticsDocumentMergeResult MergeWithBaseline(
+        StatisticsDocument local,
+        StatisticsDocument remote,
+        IReadOnlyDictionary<string, string> lastSyncedAccountFingerprints)
+    {
+        var baseline = NormalizeFingerprints(lastSyncedAccountFingerprints);
+        var localAccounts = local.Accounts.ToDictionary(account => account.Uid, StringComparer.OrdinalIgnoreCase);
+        var remoteAccounts = remote.Accounts.ToDictionary(account => account.Uid, StringComparer.OrdinalIgnoreCase);
+        var localFingerprints = localAccounts.ToDictionary(
+            pair => pair.Key,
+            pair => ComputeAccountFingerprint(pair.Value),
+            StringComparer.OrdinalIgnoreCase);
+        var remoteFingerprints = remoteAccounts.ToDictionary(
+            pair => pair.Key,
+            pair => ComputeAccountFingerprint(pair.Value),
+            StringComparer.OrdinalIgnoreCase);
+        var accountUids = new HashSet<string>(baseline.Keys, StringComparer.OrdinalIgnoreCase);
+        accountUids.UnionWith(localAccounts.Keys);
+        accountUids.UnionWith(remoteAccounts.Keys);
+
+        var mergedAccounts = new List<AccountStatisticsData>();
+        var conflictingAccountUids = new List<string>();
+        foreach (var uid in accountUids.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+        {
+            localAccounts.TryGetValue(uid, out var localAccount);
+            remoteAccounts.TryGetValue(uid, out var remoteAccount);
+            baseline.TryGetValue(uid, out var baselineFingerprint);
+            localFingerprints.TryGetValue(uid, out var localFingerprint);
+            remoteFingerprints.TryGetValue(uid, out var remoteFingerprint);
+
+            AccountStatisticsData? selectedAccount;
+            if (AreSameFingerprint(localFingerprint, remoteFingerprint))
+            {
+                selectedAccount = localAccount ?? remoteAccount;
+            }
+            else
+            {
+                var localChanged = !AreSameFingerprint(localFingerprint, baselineFingerprint);
+                var remoteChanged = !AreSameFingerprint(remoteFingerprint, baselineFingerprint);
+                if (localChanged && remoteChanged)
+                {
+                    // The user workflow guarantees that one account is not played on two devices at once.
+                    // If that guarantee is broken, prefer the version just read from the cloud and surface a warning.
+                    selectedAccount = remoteAccount;
+                    conflictingAccountUids.Add(uid);
+                }
+                else
+                {
+                    selectedAccount = remoteChanged ? remoteAccount : localAccount;
+                }
+            }
+
+            if (selectedAccount is not null)
+            {
+                mergedAccounts.Add(selectedAccount);
+            }
+        }
+
+        var merged = new StatisticsDocument
+        {
+            Info = remote.Info,
+            Accounts = mergedAccounts
+        };
+        return new StatisticsDocumentMergeResult(
+            StatisticsDocumentNormalizer.Normalize(merged),
+            conflictingAccountUids);
+    }
+
+    private static StatisticsDocument MergeWithRemoteAccountPriority(
+        StatisticsDocument local,
+        StatisticsDocument remote)
+    {
         foreach (var remoteAccount in remote.Accounts)
         {
-            var localAccount = merged.Accounts.FirstOrDefault(account =>
+            var localAccountIndex = local.Accounts.FindIndex(account =>
+                string.Equals(account.Uid, remoteAccount.Uid, StringComparison.OrdinalIgnoreCase));
+            if (localAccountIndex < 0)
+            {
+                local.Accounts.Add(remoteAccount);
+            }
+            else
+            {
+                local.Accounts[localAccountIndex] = remoteAccount;
+            }
+        }
+
+        return StatisticsDocumentNormalizer.Normalize(local);
+    }
+
+    private static StatisticsDocument MergeLegacy(StatisticsDocument local, StatisticsDocument remote)
+    {
+        foreach (var remoteAccount in remote.Accounts)
+        {
+            var localAccount = local.Accounts.FirstOrDefault(account =>
                 string.Equals(account.Uid, remoteAccount.Uid, StringComparison.OrdinalIgnoreCase));
             if (localAccount is null)
             {
-                merged.Accounts.Add(remoteAccount);
+                local.Accounts.Add(remoteAccount);
                 continue;
             }
 
             MergeAccount(localAccount, remoteAccount);
         }
 
-        return StatisticsDocumentNormalizer.Normalize(merged);
+        return StatisticsDocumentNormalizer.Normalize(local);
     }
 
     private static void MergeAccount(AccountStatisticsData localAccount, AccountStatisticsData remoteAccount)
@@ -131,6 +252,32 @@ internal static class StatisticsDocumentMerger
                 localCapture.DetectedAt = remoteCapture.DetectedAt;
             }
         }
+    }
+
+    private static Dictionary<string, string> NormalizeFingerprints(
+        IReadOnlyDictionary<string, string> fingerprints)
+    {
+        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (uid, fingerprint) in fingerprints)
+        {
+            if (!string.IsNullOrWhiteSpace(uid) && !string.IsNullOrWhiteSpace(fingerprint))
+            {
+                normalized[uid.Trim()] = fingerprint.Trim();
+            }
+        }
+
+        return normalized;
+    }
+
+    private static string ComputeAccountFingerprint(AccountStatisticsData account)
+    {
+        var json = JsonSerializer.Serialize(account, JsonOptions);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+    }
+
+    private static bool AreSameFingerprint(string? left, string? right)
+    {
+        return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string PreferNonEmpty(string localValue, string remoteValue)

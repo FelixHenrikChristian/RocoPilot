@@ -23,6 +23,8 @@ public interface IStatisticsSyncService
 
     Task<StatisticsSyncResult> TestConnectionAsync(CancellationToken cancellationToken = default);
 
+    Task<bool> DownloadRemoteChangesIfNeededAsync(CancellationToken cancellationToken = default);
+
     Task<StatisticsSyncResult> UploadAsync(CancellationToken cancellationToken = default);
 
     Task<StatisticsSyncResult> DownloadAsync(CancellationToken cancellationToken = default);

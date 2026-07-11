@@ -159,7 +159,7 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         {
             XamlRoot = ContentRoot.XamlRoot,
             Title = "合并云端数据",
-            Content = "将把云端统计数据合并到本地记录，不会直接覆盖本地。若两台设备同时修改了同一精灵的聚合计数，将保留较大的计数。",
+            Content = "将根据上次同步状态合并云端数据：仅本机变化的账号保留本机版本，仅云端变化的账号采用云端版本。若同一账号在两台设备同时修改，将采用云端版本。",
             PrimaryButtonText = "合并",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close

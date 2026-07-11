@@ -1,8 +1,10 @@
-﻿using Microsoft.UI.Xaml;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Activation;
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Views;
 
 namespace RocoPilot.Services;
@@ -12,16 +14,22 @@ public class ActivationService : IActivationService
     private readonly ActivationHandler<LaunchActivatedEventArgs> _defaultHandler;
     private readonly IEnumerable<IActivationHandler> _activationHandlers;
     private readonly IThemeSelectorService _themeSelectorService;
+    private readonly IStatisticsSyncService _statisticsSyncService;
+    private readonly ILogger<ActivationService> _logger;
     private UIElement? _shell = null;
 
     public ActivationService(
         ActivationHandler<LaunchActivatedEventArgs> defaultHandler,
         IEnumerable<IActivationHandler> activationHandlers,
-        IThemeSelectorService themeSelectorService)
+        IThemeSelectorService themeSelectorService,
+        IStatisticsSyncService statisticsSyncService,
+        ILogger<ActivationService> logger)
     {
         _defaultHandler = defaultHandler;
         _activationHandlers = activationHandlers;
         _themeSelectorService = themeSelectorService;
+        _statisticsSyncService = statisticsSyncService;
+        _logger = logger;
     }
 
     public async Task ActivateAsync(object activationArgs)
@@ -71,6 +79,13 @@ public class ActivationService : IActivationService
     {
         await _themeSelectorService.SetRequestedThemeAsync();
 
-        await Task.CompletedTask;
+        try
+        {
+            await _statisticsSyncService.DownloadRemoteChangesIfNeededAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "启动时同步云端统计数据失败，应用将继续使用本地数据。");
+        }
     }
 }

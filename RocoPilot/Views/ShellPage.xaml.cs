@@ -142,14 +142,14 @@ public sealed partial class ShellPage : Page
             switch (result.Status)
             {
                 case UpdateCheckStatus.UpToDate:
-                    ShowStartupUpdateInfoBar(
+                    ShowStartupInfoBar(
                         InfoBarSeverity.Success,
                         "已是最新版本",
                         string.IsNullOrWhiteSpace(result.Message) ? "当前已是最新版本。" : result.Message);
                     break;
 
                 case UpdateCheckStatus.Failed:
-                    ShowStartupUpdateInfoBar(
+                    ShowStartupInfoBar(
                         InfoBarSeverity.Warning,
                         "检查更新失败",
                         string.IsNullOrWhiteSpace(result.Message) ? "请检查网络连接后重试。" : result.Message);
@@ -159,11 +159,11 @@ public sealed partial class ShellPage : Page
         catch (Exception ex)
         {
             _logger.LogError(ex, "启动时自动检查更新失败");
-            ShowStartupUpdateInfoBar(InfoBarSeverity.Warning, "检查更新失败", "请检查网络连接后重试。");
+            ShowStartupInfoBar(InfoBarSeverity.Warning, "检查更新失败", "请检查网络连接后重试。");
         }
     }
 
-    private void ShowStartupUpdateInfoBar(InfoBarSeverity severity, string title, string message)
+    public void ShowStartupInfoBar(InfoBarSeverity severity, string title, string message)
     {
         StartupUpdateInfoBar.Severity = severity;
         StartupUpdateInfoBar.Title = title;

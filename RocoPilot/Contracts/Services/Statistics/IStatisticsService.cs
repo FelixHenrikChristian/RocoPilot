@@ -11,6 +11,12 @@ public interface IStatisticsService
 
     StatisticsDocument CurrentDocument { get; }
 
+    string? SelectedAccountUid { get; }
+
+    string? ActiveAccountUid { get; }
+
+    bool IsActiveAccountSelectionRequired { get; }
+
     Task<StatisticsDocument> LoadAsync();
 
     Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document);
@@ -78,11 +84,15 @@ public interface IStatisticsService
     Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(
         string pendingCaptureId);
 
-    IReadOnlyList<EncounterSpiritRecord> GetSelectedAccountSeasonEncounters(string seasonId);
+    IReadOnlyList<EncounterSpiritRecord> GetActiveAccountSeasonEncounters(string seasonId);
 
     IReadOnlyList<PendingShinyCaptureRecord> GetSelectedAccountPendingShinyCaptures();
 
     void SetSelectedAccountUid(string? uid);
+
+    void SetActiveAccountUid(string uid);
+
+    void RequireActiveAccountSelection();
 }
 
 public sealed class StatisticsDocumentChangedEventArgs : EventArgs

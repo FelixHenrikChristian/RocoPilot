@@ -2,21 +2,27 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Views.Windows;
 
 namespace RocoPilot.Services;
 
-public sealed class InfoOverlayService : IInfoOverlayService
+public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotificationService
 {
     private readonly ILogger<InfoOverlayService> _logger;
     private readonly DispatcherQueue _dispatcherQueue;
+    private readonly IStatisticsService _statisticsService;
 
     private InfoOverlayWindow? _overlayWindow;
+    private InfoOverlayNotice? _uidNotice;
 
-    public InfoOverlayService(ILogger<InfoOverlayService> logger)
+    public InfoOverlayService(
+        IStatisticsService statisticsService,
+        ILogger<InfoOverlayService> logger)
     {
+        _statisticsService = statisticsService;
         _logger = logger;
         _dispatcherQueue = App.MainWindow.DispatcherQueue;
     }
@@ -39,12 +45,20 @@ public sealed class InfoOverlayService : IInfoOverlayService
 
     public void ResetPosition()
     {
-        RunOnDispatcher(() => _overlayWindow?.ResetPosition());
+        RunOnDispatcher(() =>
+        {
+            _overlayWindow?.ResetPosition();
+            _overlayWindow?.RefreshTopNoticeLayout();
+        });
     }
 
     public void SetLocked(bool isLocked)
     {
-        RunOnDispatcher(() => _overlayWindow?.SetLocked(isLocked));
+        RunOnDispatcher(() =>
+        {
+            _overlayWindow?.SetLocked(isLocked);
+            _overlayWindow?.RefreshTopNoticeLayout();
+        });
     }
 
     public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
@@ -54,7 +68,25 @@ public sealed class InfoOverlayService : IInfoOverlayService
 
     public void UpdateSnapshot(InfoOverlaySnapshot snapshot)
     {
-        RunOnDispatcher(() => _overlayWindow?.UpdateSnapshot(snapshot));
+        RunOnDispatcher(() =>
+        {
+            if (!_statisticsService.IsActiveAccountSelectionRequired && _uidNotice is not null)
+            {
+                _uidNotice = null;
+                _overlayWindow?.UpdateUidNotice(null);
+            }
+
+            _overlayWindow?.UpdateSnapshotWithTopNotices(snapshot);
+        });
+    }
+
+    public void UpdateUidNotice(InfoOverlayNotice? notice)
+    {
+        RunOnDispatcher(() =>
+        {
+            _uidNotice = notice;
+            _overlayWindow?.UpdateUidNotice(notice);
+        });
     }
 
     private void ShowCore(RuntimeTaskState state)
@@ -69,8 +101,11 @@ public sealed class InfoOverlayService : IInfoOverlayService
                 state.Options.EncounterStatisticsEnabled,
                 state.Options.AutoBattleSettings.IsEnabled);
             _overlayWindow.Closed += (_, _) => _overlayWindow = null;
-            _overlayWindow.UpdateSnapshot(InfoOverlaySnapshot.CreateInitial(state.StartedAt));
+            _overlayWindow.InitializeTopNoticeLayout();
+            _overlayWindow.UpdateUidNotice(_uidNotice);
+            _overlayWindow.UpdateSnapshotWithTopNotices(InfoOverlaySnapshot.CreateInitial(state.StartedAt));
             _overlayWindow.ShowOverlay();
+            _overlayWindow.RefreshTopNoticeLayout();
 
             _logger.LogDebug("信息遮罩窗口已显示。Locked={Locked}", state.Options.InfoOverlayLocked);
         }

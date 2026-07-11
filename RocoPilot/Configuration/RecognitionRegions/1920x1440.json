@@ -57,6 +57,14 @@
       "width": 88,
       "height": 90,
       "enabled": true
+    },
+    {
+      "id": "uid",
+      "x": 1705,
+      "y": 1411,
+      "width": 118,
+      "height": 24,
+      "enabled": true
     }
   ]
 }

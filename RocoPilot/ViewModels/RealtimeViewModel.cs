@@ -32,6 +32,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private bool _isAutoBattleEnabled;
     private string _autoBattleRoundOrder = AutoBattleSettings.DefaultRoundOrder;
     private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
+    private string _autoBattleBossComboSequence = AutoBattleSettings.DefaultBossComboSequence;
     private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
     private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
@@ -177,6 +178,7 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(
         _autoBattleReleaseSequence,
+        _autoBattleBossComboSequence,
         SelectedAutoBattleEncounterRelievedAction,
         SelectedAutoBattleKeyboardInputMethod);
 
@@ -421,6 +423,8 @@ public partial class RealtimeViewModel : ObservableRecipient
         _isAutoBattleEnabled = settings.IsEnabled;
         _autoBattleRoundOrder = settings.RoundOrder;
         _autoBattleTurnSequence = settings.TurnSequence;
+        _autoBattleBossComboSequence = BossBattleComboSequence.NormalizeOrDefault(
+            settings.BossComboSequence);
         _autoBattleReleaseSequence = (settings.ReleaseSequence ?? []).Select(step => step.Clone()).ToList();
         _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
         _selectedAutoBattleEncounterRelievedActionOption =
@@ -471,6 +475,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             IsEnabled = IsAutoBattleEnabled,
             RoundOrder = AutoBattleRoundOrder,
             TurnSequence = AutoBattleTurnSequence,
+            BossComboSequence = _autoBattleBossComboSequence,
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
             TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,
@@ -486,14 +491,16 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     private static string BuildAutoBattleConfigurationSummary(
         IReadOnlyList<AutoBattleReleaseStep> releaseSequence,
+        string bossComboSequence,
         AutoBattleEncounterRelievedAction encounterRelievedAction,
         KeyboardInputMethod inputMethod)
     {
         var encounterRelievedActionText = GetAutoBattleEncounterRelievedActionSummary(encounterRelievedAction);
         var inputMethodText = GetAutoBattleKeyboardInputMethodSummary(inputMethod);
+        var bossComboText = string.Join(" → ", BossBattleComboSequence.ParseOrDefault(bossComboSequence));
         if (releaseSequence.Count == 0)
         {
-            return $"未配置释放顺序 · {encounterRelievedActionText} · {inputMethodText}";
+            return $"未配置释放顺序 · 首领连招 {bossComboText} → Space · {encounterRelievedActionText} · {inputMethodText}";
         }
 
         var previewItems = releaseSequence
@@ -505,7 +512,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         var suffix = releaseSequence.Count > 6
             ? $"等 {releaseSequence.Count} 步"
             : $"{releaseSequence.Count} 步";
-        return $"{preview} · {suffix} · {encounterRelievedActionText} · {inputMethodText}";
+        return $"{preview} · {suffix} · 首领连招 {bossComboText} → Space · {encounterRelievedActionText} · {inputMethodText}";
     }
 
     private AutoBattleEncounterRelievedActionOption FindAutoBattleEncounterRelievedActionOption(

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Recognition;
@@ -15,7 +16,11 @@ namespace RocoPilot.Services.Statistics;
 
 public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionService
 {
-    private const string UidRegionId = "uid";
+    private static readonly string[] UidRegionIds =
+    [
+        RecognitionRegionIds.StatisticsUid,
+        "uid"
+    ];
     private const int DetectionAttemptCount = 3;
     private const int RequiredMatchingResults = 2;
     private static readonly TimeSpan DetectionAttemptDelay = TimeSpan.FromMilliseconds(120);
@@ -99,7 +104,7 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
                     if (uidRegion is null)
                     {
                         return StatisticsUidDetectionResult.Failed(
-                            $"识别配置中缺少启用的 {UidRegionId} 区域：{config.SourcePath}");
+                            $"识别配置中缺少启用的 {RecognitionRegionIds.StatisticsUid} 区域：{config.SourcePath}");
                     }
 
                     var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
@@ -181,7 +186,10 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
     {
         return config.Regions.FirstOrDefault(region =>
             region.Enabled
-            && string.Equals(region.Id?.Trim(), UidRegionId, StringComparison.OrdinalIgnoreCase));
+            && UidRegionIds.Any(regionId => string.Equals(
+                region.Id?.Trim(),
+                regionId,
+                StringComparison.OrdinalIgnoreCase)));
     }
 
     private static IReadOnlyList<CaptureMethod> BuildCaptureMethods(CaptureMethod preferredCaptureMethod)

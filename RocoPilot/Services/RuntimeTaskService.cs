@@ -30,7 +30,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private static readonly TimeSpan UnrecognizedStateConfirmDelay = TimeSpan.FromSeconds(2);
     private static readonly string[] MagicPointRegionIds =
     [
-        "magic-point"
+        RecognitionRegionIds.MagicPoint
     ];
     private static readonly ImageMatchOptions MagicPointMatchOptions = new()
     {
@@ -557,6 +557,12 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
+        if (IsAutoBattleBossBattle)
+        {
+            await UpdateAutoBattleBossOcrSignalAsync(state, frame, cancellationToken);
+            return;
+        }
+
         await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, cancellationToken);
     }
 
@@ -654,6 +660,15 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         bool? isBattleChatVisible,
         CancellationToken cancellationToken)
     {
+        var bossComboStatusText = AutoBattleBossComboStatusText;
+        if (bossComboStatusText is not null)
+        {
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+                bossComboStatusText,
+                DateTimeOffset.Now));
+            return GameStateScanResult.Battle;
+        }
+
         var isSkillSelectionVisible = await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken);
         if (isSkillSelectionVisible)
         {
@@ -669,7 +684,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             }
 
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 技能选择",
+                isAutoBattleSuspendedForShiny
+                    ? "战斗中 - 异色保护"
+                    : IsAutoBattleBossBattle
+                        ? _isAutoBattleBossComboPromptMatchedForCurrentTurn
+                            ? "首领战斗 - 连招配置"
+                            : "首领战斗 - 技能选择"
+                        : "战斗中 - 技能选择",
                 DateTimeOffset.Now));
             if (!handledSkillFailure)
             {
@@ -684,7 +705,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         {
             var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中 - 切换精灵",
+                isAutoBattleSuspendedForShiny
+                    ? "战斗中 - 异色保护"
+                    : IsAutoBattleBossBattle ? "首领战斗 - 切换精灵" : "战斗中 - 切换精灵",
                 DateTimeOffset.Now));
             CompleteAutoBattleSkillSelectionState();
             if (!isAutoBattleSuspendedForShiny)
@@ -707,14 +730,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             }
 
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny ? "战斗中 - 异色保护" : "战斗中",
+                isAutoBattleSuspendedForShiny
+                    ? "战斗中 - 异色保护"
+                    : IsAutoBattleBossBattle ? "首领战斗" : "战斗中",
                 DateTimeOffset.Now));
             return GameStateScanResult.Battle;
         }
 
         CompleteAutoBattleSkillSelectionState();
         UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-            "战斗中",
+            IsAutoBattleBossBattle ? "首领战斗" : "战斗中",
             DateTimeOffset.Now));
         return GameStateScanResult.Battle;
     }

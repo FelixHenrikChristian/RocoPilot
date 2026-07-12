@@ -21,15 +21,17 @@ public sealed partial class RuntimeTaskService
 
     private static readonly string[] BattleTipRegionIds =
     [
+        RecognitionRegionIds.BattleEncounterTip,
         "battle-tip"
     ];
     private static readonly string[] BattleTipHeterochromiaRegionIds =
     [
+        RecognitionRegionIds.BattleShinyTip,
         "battle-tip-heterochromia"
     ];
     private static readonly string[] BattleEnemyNameRegionIds =
     [
-        "battle-enemy-name"
+        RecognitionRegionIds.BattleEnemyName
     ];
 
     private readonly object _encounterRecordLock = new();

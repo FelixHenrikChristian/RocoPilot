@@ -54,7 +54,7 @@ public sealed partial class RuntimeTaskService
         return BuildAutoBattleTurnSequence(settings, releaseStep.SkillKey);
     }
 
-    private AutoBattleSkillSelectionPlan BuildAutoBattleSkillSelectionPlan(
+    private AutoBattleSkillSelectionPlan BuildNormalAutoBattleSkillSelectionPlan(
         AutoBattleSettings settings,
         AutoBattleReleaseStep releaseStep)
     {
@@ -137,6 +137,9 @@ public sealed partial class RuntimeTaskService
         {
             normalized.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         }
+
+        normalized.BossComboSequence = BossBattleComboSequence.NormalizeOrDefault(
+            normalized.BossComboSequence);
 
         normalized.ReleaseSequence = NormalizeAutoBattleReleaseSequence(normalized)
             .Select(step => step.Clone())

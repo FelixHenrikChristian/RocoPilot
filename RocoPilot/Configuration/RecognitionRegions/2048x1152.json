@@ -35,7 +35,7 @@
       "enabled": true
     },
     {
-      "id": "battle-tip-heterochromia",
+      "id": "battle-tip-shiny",
       "x": 1582,
       "y": 158,
       "width": 466,
@@ -43,7 +43,7 @@
       "enabled": true
     },
     {
-      "id": "battle-tip",
+      "id": "battle-tip-encounter",
       "x": 627,
       "y": 152,
       "width": 795,
@@ -59,11 +59,27 @@
       "enabled": true
     },
     {
-      "id": "uid",
+      "id": "statistics-uid",
       "x": 1819,
       "y": 1123,
       "width": 127,
       "height": 24,
+      "enabled": true
+    },
+    {
+      "id": "battle-boss-name",
+      "x": 1503,
+      "y": 48,
+      "width": 115,
+      "height": 27,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-boss-combo",
+      "x": 1670,
+      "y": 153,
+      "width": 321,
+      "height": 36,
       "enabled": true
     }
   ]

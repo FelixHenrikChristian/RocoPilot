@@ -31,15 +31,15 @@ public sealed partial class RuntimeTaskService
     ];
     private static readonly string[] BattleChatRegionIds =
     [
-        "battle-button-chat"
+        RecognitionRegionIds.BattleChatButton
     ];
     private static readonly string[] BattleSkillRegionIds =
     [
-        "battle-button-skill"
+        RecognitionRegionIds.BattleSkillButton
     ];
     private static readonly string[] BattleChangeRegionIds =
     [
-        "battle-button-change"
+        RecognitionRegionIds.BattleChangeButton
     ];
     private static readonly ImageMatchOptions BattleChatMatchOptions = new()
     {
@@ -142,6 +142,15 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        if (!await EnsureBossBattleSkillSelectionCanContinueAsync(
+            state,
+            frame,
+            settings,
+            cancellationToken))
+        {
+            return;
+        }
+
         if (!ShouldRunAutoBattleSkillSelectionAction(settings, now))
         {
             return;
@@ -159,6 +168,11 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            if (IsAutoBattleBossBattle && HasAutoBattleBossComboStarted)
+            {
+                return;
+            }
+
             if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
             {
                 _logger.LogWarning("自动战斗未执行：目标游戏窗口句柄已失效。");
@@ -166,7 +180,9 @@ public sealed partial class RuntimeTaskService
             }
 
             var releaseStep = _currentAutoBattleReleaseStep ?? GetCurrentAutoBattleReleaseStep(settings);
-            var plan = BuildAutoBattleSkillSelectionPlan(settings, releaseStep);
+            var plan = IsAutoBattleBossBattle
+                ? BuildBossAutoBattleSkillSelectionPlan(settings, releaseStep)
+                : BuildNormalAutoBattleSkillSelectionPlan(settings, releaseStep);
             if (!plan.ShouldSendKeys)
             {
                 if (_autoBattleSkillSelectionAction != plan.Action)
@@ -212,6 +228,10 @@ public sealed partial class RuntimeTaskService
 
             _autoBattleSkillSelectionAction = plan.Action;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+            if (IsAutoBattleBossBattle)
+            {
+                ResetAutoBattleBossSkillSelectionState();
+            }
 
             LogAutoBattleTurnAction(plan.Description, plan.Sequence);
             _logger.LogDebug(
@@ -370,6 +390,11 @@ public sealed partial class RuntimeTaskService
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (IsAutoBattleBossBattle)
+        {
+            return true;
+        }
+
         if (_hasAutoBattleSkillSelectionEnemyNameResult)
         {
             return true;
@@ -422,12 +447,20 @@ public sealed partial class RuntimeTaskService
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
+            if (TryActivateAutoBattleBossBattle(result.BossNameRawText))
+            {
+                _hasAutoBattleSkillSelectionEnemyNameResult = true;
+                return true;
+            }
+
+            ActivateNormalAutoBattleIfUnknown();
             _hasAutoBattleSkillSelectionEnemyNameResult = true;
             return true;
         }
 
         if (IsEncounterPlaceholderName(result.RawText, season, out var placeholderSimilarity))
         {
+            ActivateNormalAutoBattleIfUnknown();
             if (_currentAutoBattleTurnNumber == 1)
             {
                 _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = false;
@@ -454,6 +487,12 @@ public sealed partial class RuntimeTaskService
 
         if (string.IsNullOrWhiteSpace(result.MatchedName))
         {
+            if (TryActivateAutoBattleBossBattle(result.BossNameRawText))
+            {
+                _hasAutoBattleSkillSelectionEnemyNameResult = true;
+                return true;
+            }
+
             LogDebugOncePerValue(
                 CreateDebugLogKey("auto-battle-skill-selection-enemy-missing", season.Id),
                 CreateTextDebugFingerprint(result.RawText),
@@ -462,6 +501,8 @@ public sealed partial class RuntimeTaskService
             ResetAutoBattleSkillSelectionEnemyNameTask();
             return false;
         }
+
+        ActivateNormalAutoBattleIfUnknown();
 
         UpdateAutoBattleLegacyTipEncounterSkillDelayState(season, result);
 
@@ -485,7 +526,10 @@ public sealed partial class RuntimeTaskService
         }
         catch (ObjectDisposedException)
         {
-            return Task.FromResult(new AutoBattleSkillSelectionEnemyNameResult(string.Empty, string.Empty));
+            return Task.FromResult(new AutoBattleSkillSelectionEnemyNameResult(
+                string.Empty,
+                string.Empty,
+                string.Empty));
         }
 
         return Task.Run(
@@ -503,7 +547,20 @@ public sealed partial class RuntimeTaskService
                     var matchedName = season is null
                         ? string.Empty
                         : await MatchRecognizedSpiritNameAsync(rawText, season, cancellationToken);
-                    return new AutoBattleSkillSelectionEnemyNameResult(rawText, matchedName);
+                    var isPlaceholderName = season is not null
+                        && IsEncounterPlaceholderName(rawText, season, out _);
+                    var bossNameRawText = _autoBattleType == AutoBattleType.Unknown
+                        && string.IsNullOrWhiteSpace(matchedName)
+                        && !isPlaceholderName
+                        ? await RecognizeAutoBattleBossNameAsync(
+                            state,
+                            frameReference,
+                            cancellationToken)
+                        : string.Empty;
+                    return new AutoBattleSkillSelectionEnemyNameResult(
+                        rawText,
+                        matchedName,
+                        bossNameRawText);
                 }
             },
             cancellationToken);
@@ -626,6 +683,9 @@ public sealed partial class RuntimeTaskService
         var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
         if (!settings.IsEnabled
             || _isAutoBattleSuspendedForShiny
+            || (IsAutoBattleBossBattle
+                && (!_hasAutoBattleBossComboPromptResultForCurrentTurn
+                    || _isAutoBattleBossComboPromptMatchedForCurrentTurn))
             || _autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.Skill)
         {
             return false;
@@ -902,6 +962,7 @@ public sealed partial class RuntimeTaskService
         ResetAutoBattleShinySuspendState();
         _wasAutoBattlePetSwitchingVisible = false;
         _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = false;
+        ResetAutoBattleBossBattleState();
     }
 
     private void ResetAutoBattleEncounterRelievedActionState()
@@ -928,9 +989,11 @@ public sealed partial class RuntimeTaskService
         ResetAutoBattleSkillSelectionEnemyNameTask();
         _hasAutoBattleSkillSelectionEnemyNameResult = false;
         _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
+        ResetAutoBattleBossSkillSelectionState();
     }
 
     private sealed record AutoBattleSkillSelectionEnemyNameResult(
         string RawText,
-        string MatchedName);
+        string MatchedName,
+        string BossNameRawText);
 }

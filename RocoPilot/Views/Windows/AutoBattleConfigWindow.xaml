@@ -7,9 +7,9 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
     Width="900"
-    Height="620"
+    Height="740"
     MinWidth="680"
-    MinHeight="500"
+    MinHeight="620"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -20,12 +20,25 @@
         Padding="12"
         RowSpacing="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="220" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource CardStyle}">
+        <ScrollViewer
+            Grid.Row="0"
+            HorizontalContentAlignment="Stretch"
+            HorizontalScrollBarVisibility="Disabled"
+            HorizontalScrollMode="Disabled"
+            VerticalScrollBarVisibility="Auto"
+            VerticalScrollMode="Auto">
+            <Grid RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="220" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="280" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource CardStyle}">
             <Grid RowSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -192,9 +205,89 @@
                     </StackPanel>
                 </Grid>
             </Grid>
-        </Border>
+                </Border>
 
-        <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+                <Border Grid.Row="1" Style="{StaticResource CardStyle}">
+            <Grid RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock
+                            FontWeight="SemiBold"
+                            Text="首领连招" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="识别到“连续释放技能攻击首领”后，依次发送 6 个配置按键（技能 1-4 或 X 回能），最后自动按 Space 确认；能量不足时会临时插入 X，等待 5 分钟仍未结束则尝试自动解卡。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Button
+                        Grid.Column="1"
+                        Click="ResetBossComboButton_Click"
+                        ToolTipService.ToolTip="恢复默认首领连招">
+                        <FontIcon
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="14"
+                            Glyph="&#xE777;" />
+                    </Button>
+                </Grid>
+
+                <StackPanel
+                    Grid.Row="1"
+                    HorizontalAlignment="Left"
+                    Orientation="Horizontal"
+                    Spacing="7">
+                    <ComboBox
+                        x:Name="BossComboSkill1ComboBox"
+                        Width="58"
+                        Header="#1"
+                        ItemsSource="{x:Bind BossComboSkillOptions, Mode=OneTime}" />
+                    <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,9" Text="→" />
+                    <ComboBox
+                        x:Name="BossComboSkill2ComboBox"
+                        Width="58"
+                        Header="#2"
+                        ItemsSource="{x:Bind BossComboSkillOptions, Mode=OneTime}" />
+                    <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,9" Text="→" />
+                    <ComboBox
+                        x:Name="BossComboSkill3ComboBox"
+                        Width="58"
+                        Header="#3"
+                        ItemsSource="{x:Bind BossComboSkillOptions, Mode=OneTime}" />
+                    <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,9" Text="→" />
+                    <ComboBox
+                        x:Name="BossComboSkill4ComboBox"
+                        Width="58"
+                        Header="#4"
+                        ItemsSource="{x:Bind BossComboSkillOptions, Mode=OneTime}" />
+                    <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,9" Text="→" />
+                    <ComboBox
+                        x:Name="BossComboSkill5ComboBox"
+                        Width="58"
+                        Header="#5"
+                        ItemsSource="{x:Bind BossComboSkillOptions, Mode=OneTime}" />
+                    <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,9" Text="→" />
+                    <ComboBox
+                        x:Name="BossComboSkill6ComboBox"
+                        Width="58"
+                        Header="#6"
+                        ItemsSource="{x:Bind BossComboSkillOptions, Mode=OneTime}" />
+                    <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,9" Text="→ Space" />
+                </StackPanel>
+            </Grid>
+                </Border>
+
+                <Border Grid.Row="2" Style="{StaticResource CardStyle}">
             <Grid RowSpacing="8">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -311,9 +404,11 @@
                     </StackPanel>
                 </Grid>
             </Grid>
-        </Border>
+                </Border>
+            </Grid>
+        </ScrollViewer>
 
-        <Grid Grid.Row="2" ColumnSpacing="10">
+        <Grid Grid.Row="1" ColumnSpacing="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

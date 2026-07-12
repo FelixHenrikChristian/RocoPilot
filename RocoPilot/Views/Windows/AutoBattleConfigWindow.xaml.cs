@@ -34,6 +34,11 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         get;
     } = [];
 
+    public IReadOnlyList<string> BossComboSkillOptions
+    {
+        get;
+    } = ["1", "2", "3", "4", "X"];
+
     public string HeaderSummary
     {
         get;
@@ -54,7 +59,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(900, 620));
+        AppWindow.Resize(new SizeInt32(900, 740));
 
         ReleaseItems.CollectionChanged += ReleaseItems_CollectionChanged;
         PresetItems.CollectionChanged += PresetItems_CollectionChanged;
@@ -82,6 +87,18 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
                 Name = preset.Name,
                 Sequence = preset.Sequence
             });
+        }
+
+        ApplyBossComboSequence(settings.BossComboSequence);
+    }
+
+    private void ApplyBossComboSequence(string? sequence)
+    {
+        var skillKeys = BossBattleComboSequence.ParseOrDefault(sequence);
+        var comboBoxes = GetBossComboSkillComboBoxes();
+        for (var index = 0; index < comboBoxes.Count; index++)
+        {
+            comboBoxes[index].SelectedItem = skillKeys[index];
         }
     }
 
@@ -125,6 +142,11 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
     private void ClearReleaseSequenceButton_Click(object sender, RoutedEventArgs e)
     {
         ReleaseItems.Clear();
+    }
+
+    private void ResetBossComboButton_Click(object sender, RoutedEventArgs e)
+    {
+        ApplyBossComboSequence(AutoBattleSettings.DefaultBossComboSequence);
     }
 
     private void ReleaseSequenceGrid_DragItemsCompleted(ListViewBase sender, DragItemsCompletedEventArgs args)
@@ -237,11 +259,24 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
             });
         }
 
+        var bossComboSkillKeys = GetBossComboSkillComboBoxes()
+            .Select(comboBox => comboBox.SelectedItem as string)
+            .ToArray();
+        if (bossComboSkillKeys.Any(string.IsNullOrWhiteSpace)
+            || !BossBattleComboSequence.TryNormalize(
+                string.Join(", ", bossComboSkillKeys),
+                out var bossComboSequence))
+        {
+            ShowMessage("首领连招无效", "请为首领连招的 6 个位置分别选择技能 1-4 或 X 回能。", InfoBarSeverity.Warning);
+            return;
+        }
+
         var settings = _viewModel.AutoBattleSettings.Clone();
         settings.RoundOrder = BuildRoundOrder(releaseSequence);
         settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         settings.ReleaseSequence = releaseSequence;
         settings.TurnSequencePresets = presets;
+        settings.BossComboSequence = bossComboSequence;
 
         _viewModel.UpdateAutoBattleSettings(settings);
         Close();
@@ -355,6 +390,19 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         return normalized is "1" or "2" or "3" or "4" or "X"
             ? normalized
             : null;
+    }
+
+    private IReadOnlyList<ComboBox> GetBossComboSkillComboBoxes()
+    {
+        return
+        [
+            BossComboSkill1ComboBox,
+            BossComboSkill2ComboBox,
+            BossComboSkill3ComboBox,
+            BossComboSkill4ComboBox,
+            BossComboSkill5ComboBox,
+            BossComboSkill6ComboBox
+        ];
     }
 
     private void ShowMessage(string title, string message, InfoBarSeverity severity)

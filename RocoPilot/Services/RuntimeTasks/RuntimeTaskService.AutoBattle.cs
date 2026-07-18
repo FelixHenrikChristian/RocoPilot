@@ -17,7 +17,6 @@ public sealed partial class RuntimeTaskService
     private const string AutoBattleSkillPlaceholder = "{skill}";
 
     private static readonly TimeSpan AutoBattleSkillReleaseFailureCheckDelay = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan AutoBattleEncounterRelieveScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattleShinySuspendScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattlePetSwitchConfirmDelay = TimeSpan.FromMilliseconds(1500);
     private static readonly TimeSpan AutoBattlePetSwitchStateCheckDelay = TimeSpan.FromMilliseconds(1500);
@@ -76,9 +75,7 @@ public sealed partial class RuntimeTaskService
     private int _autoBattleSkillSelectionEnemyNameTaskTurnNumber;
     private bool _hasAutoBattleSkillSelectionEnemyNameResult;
     private bool _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction;
-    private bool _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter;
     private bool _isAutoBattleEncounterRelieved;
-    private DateTimeOffset _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
     private bool _isAutoBattleSuspendedForShiny;
     private DateTimeOffset _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
 
@@ -183,6 +180,12 @@ public sealed partial class RuntimeTaskService
             var plan = IsAutoBattleBossBattle
                 ? BuildBossAutoBattleSkillSelectionPlan(settings, releaseStep)
                 : BuildNormalAutoBattleSkillSelectionPlan(settings, releaseStep);
+            if (plan.Action == AutoBattleSkillSelectionAction.Skill
+                && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
+            {
+                return;
+            }
+
             if (!plan.ShouldSendKeys)
             {
                 if (_autoBattleSkillSelectionAction != plan.Action)
@@ -253,6 +256,22 @@ public sealed partial class RuntimeTaskService
         {
             _autoBattleActionLock.Release();
         }
+    }
+
+    private bool ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief()
+    {
+        if (IsAutoBattleBossBattle
+            || !_encounterCaptureButtonStateTracker.ShouldHoldAttackForUnconfirmedRelief)
+        {
+            return false;
+        }
+
+        LogDebugOncePerValue(
+            CreateDebugLogKey("auto-battle-encounter-relief-unconfirmed-hold"),
+            _currentAutoBattleTurnNumber.ToString(),
+            "自动战斗：本场已识别到禁用捕捉按钮，但奇遇解除状态尚未确认；第 {TurnNumber} 回合暂停攻击并等待下一次快速扫描。",
+            _currentAutoBattleTurnNumber > 0 ? _currentAutoBattleTurnNumber : 1);
+        return true;
     }
 
     private async Task HandleAutoBattlePetSwitchingAsync(
@@ -458,38 +477,21 @@ public sealed partial class RuntimeTaskService
             return true;
         }
 
-        if (IsEncounterPlaceholderName(result.RawText, season, out var placeholderSimilarity))
-        {
-            ActivateNormalAutoBattleIfUnknown();
-            if (_currentAutoBattleTurnNumber == 1)
-            {
-                _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = false;
-            }
-
-            if (MarkEncounterPlaceholderNameSeen(season.Id))
-            {
-                _logger.LogInformation(
-                    "自动战斗：技能选择阶段识别到 {PlaceholderName}，本回合按普通自动战斗流程执行。",
-                    GetEncounterPlaceholderName(season));
-            }
-
-            LogDebugOncePerValue(
-                CreateDebugLogKey("auto-battle-skill-selection-placeholder", season.Id),
-                CreateSimilarityDebugFingerprint(placeholderSimilarity),
-                "自动战斗技能选择精灵名筛选：EnemyNameRaw={EnemyNameRaw}, Placeholder={PlaceholderName}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsPlaceholder=True",
-                FormatLogText(result.RawText),
-                GetEncounterPlaceholderName(season),
-                placeholderSimilarity,
-                season.PlaceholderMatchThreshold);
-            _hasAutoBattleSkillSelectionEnemyNameResult = true;
-            return true;
-        }
-
         if (string.IsNullOrWhiteSpace(result.MatchedName))
         {
             if (TryActivateAutoBattleBossBattle(result.BossNameRawText))
             {
                 _hasAutoBattleSkillSelectionEnemyNameResult = true;
+                return true;
+            }
+
+            if (_encounterCaptureButtonStateTracker.HasSeenDisabled)
+            {
+                ActivateNormalAutoBattleIfUnknown();
+                _hasAutoBattleSkillSelectionEnemyNameResult = true;
+                _logger.LogDebug(
+                    "自动战斗：捕捉按钮处于禁用阶段，按奇遇第一形态继续普通战斗。EnemyNameRaw={EnemyNameRaw}",
+                    FormatLogText(result.RawText));
                 return true;
             }
 
@@ -503,8 +505,6 @@ public sealed partial class RuntimeTaskService
         }
 
         ActivateNormalAutoBattleIfUnknown();
-
-        UpdateAutoBattleLegacyTipEncounterSkillDelayState(season, result);
 
         await ApplyAutoBattleSkillSelectionEnemyNameResultAsync(
             season,
@@ -546,12 +546,9 @@ public sealed partial class RuntimeTaskService
                     var season = _encounterSeasonConfigService.GetCurrentSeason();
                     var matchedName = season is null
                         ? string.Empty
-                        : await MatchRecognizedSpiritNameAsync(rawText, season, cancellationToken);
-                    var isPlaceholderName = season is not null
-                        && IsEncounterPlaceholderName(rawText, season, out _);
+                        : await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
                     var bossNameRawText = _autoBattleType == AutoBattleType.Unknown
                         && string.IsNullOrWhiteSpace(matchedName)
-                        && !isPlaceholderName
                         ? await RecognizeAutoBattleBossNameAsync(
                             state,
                             frameReference,
@@ -572,6 +569,7 @@ public sealed partial class RuntimeTaskService
         CancellationToken cancellationToken)
     {
         var matchedName = result.MatchedName;
+        var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
         LogDebugOncePerValue(
             CreateDebugLogKey("auto-battle-skill-selection-enemy", season.Id),
             string.Join(
@@ -581,75 +579,13 @@ public sealed partial class RuntimeTaskService
             "自动战斗技能选择精灵名筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, MatchThreshold={MatchThreshold:P1}",
             FormatLogText(result.RawText),
             matchedName,
-            season.SpiritNameMatchThreshold);
+            spiritNameMatchThreshold);
 
         if (TryGetPendingShinyDetection(season.Id, out _))
         {
             await RecordPendingShinyCaptureAsync(season, matchedName, cancellationToken);
             ClearPendingShinyDetection();
-            return;
         }
-
-        if (TryGetPendingEncounterDetection(
-            season.Id,
-            out var pendingDetectionMode,
-            out var pendingDetectionSimilarity))
-        {
-            await RecordEncounterAsync(
-                season,
-                matchedName,
-                DateTimeOffset.Now,
-                pendingDetectionMode,
-                pendingDetectionSimilarity,
-                cancellationToken);
-            ClearPendingEncounterDetection();
-        }
-
-        if (!UsesEnemyNameTransitionDetection(season))
-        {
-            return;
-        }
-
-        var hasSeenPlaceholderName = HasSeenEncounterPlaceholderName(season.Id);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("auto-battle-skill-selection-transition", season.Id),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(result.RawText),
-                CreateTextDebugFingerprint(matchedName),
-                CreateBooleanDebugFingerprint(hasSeenPlaceholderName)),
-            "自动战斗技能选择名称变化筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, HasSeenPlaceholder={HasSeenPlaceholder}",
-            FormatLogText(result.RawText),
-            matchedName,
-            hasSeenPlaceholderName);
-        if (!hasSeenPlaceholderName)
-        {
-            return;
-        }
-
-        ApplyAutoBattleEncounterRelievedDetection("技能选择精灵名");
-        await RecordEncounterAsync(
-            season,
-            matchedName,
-            DateTimeOffset.Now,
-            season.DetectionMode,
-            1,
-            cancellationToken);
-    }
-
-    private void UpdateAutoBattleLegacyTipEncounterSkillDelayState(
-        EncounterSeasonDefinition season,
-        AutoBattleSkillSelectionEnemyNameResult result)
-    {
-        if (_currentAutoBattleTurnNumber != 1
-            || _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter
-            || !UsesEnemyNameTransitionDetection(season)
-            || string.IsNullOrWhiteSpace(season.TipText))
-        {
-            return;
-        }
-
-        _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = true;
     }
 
     private void ResetAutoBattleSkillSelectionEnemyNameTask()
@@ -932,13 +868,7 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        var actionDelayMs = settings.SkillSelectionActionDelayMs;
-        if (_shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter)
-        {
-            actionDelayMs += settings.LegacyTipEncounterExtraDelayMs;
-        }
-
-        var actionDelay = TimeSpan.FromMilliseconds(actionDelayMs);
+        var actionDelay = TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs);
         if (now - _autoBattleSkillSelectionVisibleSince.Value < actionDelay)
         {
             return false;
@@ -961,14 +891,12 @@ public sealed partial class RuntimeTaskService
         ResetAutoBattleEncounterRelievedActionState();
         ResetAutoBattleShinySuspendState();
         _wasAutoBattlePetSwitchingVisible = false;
-        _shouldDelayAutoBattleSkillSelectionForLegacyTipEncounter = false;
         ResetAutoBattleBossBattleState();
     }
 
     private void ResetAutoBattleEncounterRelievedActionState()
     {
         _isAutoBattleEncounterRelieved = false;
-        _nextAutoBattleEncounterRelieveScanAt = DateTimeOffset.MinValue;
     }
 
     private void ResetAutoBattleShinySuspendState()

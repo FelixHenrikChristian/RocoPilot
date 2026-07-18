@@ -64,7 +64,6 @@ public sealed partial class RuntimeTaskService
             _autoBattleType = AutoBattleType.Boss;
             ResetAutoBattleEncounterRelievedActionState();
             ResetAutoBattleShinySuspendState();
-            ClearPendingEncounterDetection();
             ClearPendingShinyDetection();
             _logger.LogInformation(
                 "自动战斗：普通精灵名未匹配，首领名称区域识别到文字，已进入首领战斗。BossName={BossName}",

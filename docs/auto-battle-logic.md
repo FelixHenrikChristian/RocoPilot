@@ -153,7 +153,7 @@ OCR 调度使用单个执行门：固定频率 OCR 如果发现上一次 OCR 仍
 
 ## 异色保护处理
 
-后台 OCR 会在战斗态中识别 `battle-tip-heterochromia` 区域：
+后台 OCR 会在战斗态中识别 `battle-tip-shiny` 区域：
 
 1. 匹配 `发现异色精灵` 或包含 `异色`、`精灵` 的提示。
 2. 设置 `_isAutoBattleSuspendedForShiny = true`。

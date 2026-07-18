@@ -11,7 +11,6 @@ public sealed class AutoBattleSettings
     public const string DefaultBossComboSequence = "1, X, 2, X, 3, X";
     public const int BossComboSkillCount = 6;
     public const int DefaultSkillSelectionActionDelayMs = 500;
-    public const int DefaultLegacyTipEncounterExtraDelayMs = 2500;
     public const int DefaultSkillSelectionRetryDelayMs = 4000;
     public const int DefaultKeyboardHoldDurationMs = 100;
     public const int DefaultKeyboardIntervalMs = 500;
@@ -79,12 +78,6 @@ public sealed class AutoBattleSettings
         set;
     } = DefaultSkillSelectionActionDelayMs;
 
-    public int LegacyTipEncounterExtraDelayMs
-    {
-        get;
-        set;
-    } = DefaultLegacyTipEncounterExtraDelayMs;
-
     public int SkillSelectionRetryDelayMs
     {
         get;
@@ -122,7 +115,6 @@ public sealed class AutoBattleSettings
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
             KeyboardInputMethod = KeyboardInputMethod.PostMessage,
             SkillSelectionActionDelayMs = DefaultSkillSelectionActionDelayMs,
-            LegacyTipEncounterExtraDelayMs = DefaultLegacyTipEncounterExtraDelayMs,
             SkillSelectionRetryDelayMs = DefaultSkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = DefaultKeyboardHoldDurationMs,
             KeyboardIntervalMs = DefaultKeyboardIntervalMs,
@@ -155,7 +147,6 @@ public sealed class AutoBattleSettings
             EncounterRelievedAction = EncounterRelievedAction,
             KeyboardInputMethod = KeyboardInputMethod,
             SkillSelectionActionDelayMs = SkillSelectionActionDelayMs,
-            LegacyTipEncounterExtraDelayMs = LegacyTipEncounterExtraDelayMs,
             SkillSelectionRetryDelayMs = SkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = KeyboardHoldDurationMs,
             KeyboardIntervalMs = KeyboardIntervalMs,

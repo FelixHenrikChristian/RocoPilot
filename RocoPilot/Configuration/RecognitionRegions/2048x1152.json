@@ -43,7 +43,7 @@
       "enabled": true
     },
     {
-      "id": "battle-tip-encounter",
+      "id": "battle-tip-message",
       "x": 627,
       "y": 152,
       "width": 795,
@@ -80,6 +80,62 @@
       "y": 153,
       "width": 321,
       "height": 36,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-name",
+      "x": 819,
+      "y": 48,
+      "width": 115,
+      "height": 24,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-capture-title",
+      "x": 928,
+      "y": 404,
+      "width": 179,
+      "height": 54,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-capture-button-confirm",
+      "x": 1145,
+      "y": 930,
+      "width": 81,
+      "height": 35,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-capture-button-exit",
+      "x": 823,
+      "y": 929,
+      "width": 77,
+      "height": 39,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-capture-mark-contract",
+      "x": 872,
+      "y": 525,
+      "width": 147,
+      "height": 143,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-capture-mark-legend",
+      "x": 1032,
+      "y": 527,
+      "width": 147,
+      "height": 140,
+      "enabled": true
+    },
+    {
+      "id": "battle-legendary-partner-marker",
+      "x": 1617,
+      "y": 1025,
+      "width": 47,
+      "height": 47,
       "enabled": true
     }
   ]

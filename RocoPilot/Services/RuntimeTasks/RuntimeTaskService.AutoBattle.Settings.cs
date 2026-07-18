@@ -159,10 +159,6 @@ public sealed partial class RuntimeTaskService
             normalized.SkillSelectionActionDelayMs,
             AutoBattleSettings.MinimumDelayMs,
             AutoBattleSettings.MaximumDelayMs);
-        normalized.LegacyTipEncounterExtraDelayMs = Math.Clamp(
-            normalized.LegacyTipEncounterExtraDelayMs,
-            AutoBattleSettings.MinimumDelayMs,
-            AutoBattleSettings.MaximumDelayMs);
         normalized.SkillSelectionRetryDelayMs = Math.Clamp(
             normalized.SkillSelectionRetryDelayMs,
             AutoBattleSettings.MinimumRetryDelayMs,

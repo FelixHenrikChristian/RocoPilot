@@ -29,9 +29,9 @@
     {
       "id": "battle-button-skill",
       "x": 1903,
-      "y": 1004,
+      "y": 998,
       "width": 99,
-      "height": 121,
+      "height": 128,
       "enabled": true
     },
     {
@@ -54,7 +54,7 @@
       "id": "battle-button-change",
       "x": 1796,
       "y": 998,
-      "width": 106,
+      "width": 107,
       "height": 128,
       "enabled": true
     },
@@ -136,6 +136,22 @@
       "y": 1025,
       "width": 47,
       "height": 47,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-capture",
+      "x": 1703,
+      "y": 998,
+      "width": 93,
+      "height": 128,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-encounter-s3",
+      "x": 1343,
+      "y": 159,
+      "width": 701,
+      "height": 56,
       "enabled": true
     }
   ]

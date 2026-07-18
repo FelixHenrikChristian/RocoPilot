@@ -27,7 +27,7 @@ public sealed partial class AutoBattleOtherConfigWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(720, 680));
+        AppWindow.Resize(new SizeInt32(720, 600));
 
         LoadSettings(_viewModel.AutoBattleSettings);
     }
@@ -35,7 +35,6 @@ public sealed partial class AutoBattleOtherConfigWindow : WindowEx
     private void LoadSettings(AutoBattleSettings settings)
     {
         SkillSelectionActionDelayNumberBox.Value = settings.SkillSelectionActionDelayMs;
-        LegacyTipEncounterExtraDelayNumberBox.Value = settings.LegacyTipEncounterExtraDelayMs;
         SkillSelectionRetryDelayNumberBox.Value = settings.SkillSelectionRetryDelayMs;
         KeyboardHoldDurationNumberBox.Value = settings.KeyboardHoldDurationMs;
         KeyboardIntervalNumberBox.Value = settings.KeyboardIntervalMs;
@@ -55,7 +54,6 @@ public sealed partial class AutoBattleOtherConfigWindow : WindowEx
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetMilliseconds(SkillSelectionActionDelayNumberBox, "技能选择基础等待", out var actionDelayMs)
-            || !TryGetMilliseconds(LegacyTipEncounterExtraDelayNumberBox, "污染奇遇额外等待", out var encounterExtraDelayMs)
             || !TryGetMilliseconds(SkillSelectionRetryDelayNumberBox, "技能操作重试间隔", out var retryDelayMs)
             || !TryGetMilliseconds(KeyboardHoldDurationNumberBox, "按键按下时长", out var holdDurationMs)
             || !TryGetMilliseconds(KeyboardIntervalNumberBox, "普通按键间隔", out var keyboardIntervalMs)
@@ -66,7 +64,6 @@ public sealed partial class AutoBattleOtherConfigWindow : WindowEx
 
         var settings = _viewModel.AutoBattleSettings.Clone();
         settings.SkillSelectionActionDelayMs = actionDelayMs;
-        settings.LegacyTipEncounterExtraDelayMs = encounterExtraDelayMs;
         settings.SkillSelectionRetryDelayMs = retryDelayMs;
         settings.KeyboardHoldDurationMs = holdDurationMs;
         settings.KeyboardIntervalMs = keyboardIntervalMs;

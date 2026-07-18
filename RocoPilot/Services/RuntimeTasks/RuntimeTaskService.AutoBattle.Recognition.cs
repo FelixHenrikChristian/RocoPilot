@@ -69,100 +69,6 @@ public sealed partial class RuntimeTaskService
             cancellationToken);
     }
 
-    private async Task<bool> TryUpdateAutoBattleEncounterRelievedActionModeAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
-    {
-        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-        var encounterRelievedAction = settings.EncounterRelievedAction;
-        if (!settings.IsEnabled || !RequiresAutoBattleEncounterRelieveDetection(encounterRelievedAction))
-        {
-            return false;
-        }
-
-        if (_isAutoBattleSuspendedForShiny)
-        {
-            return false;
-        }
-
-        if (_isAutoBattleEncounterRelieved)
-        {
-            return true;
-        }
-
-        var now = DateTimeOffset.Now;
-        if (now < _nextAutoBattleEncounterRelieveScanAt)
-        {
-            return false;
-        }
-
-        _nextAutoBattleEncounterRelieveScanAt = now + AutoBattleEncounterRelieveScanInterval;
-
-        var season = _encounterSeasonConfigService.GetCurrentSeason();
-        if (season is null)
-        {
-            return false;
-        }
-
-        if (UsesEnemyNameTransitionDetection(season))
-        {
-            var enemyName = await TryDetectEncounterNameTransitionAsync(
-                state,
-                frame,
-                season,
-                cancellationToken,
-                "自动战斗");
-            if (!string.IsNullOrWhiteSpace(enemyName))
-            {
-                LogDebugOncePerValue(
-                    CreateDebugLogKey("auto-battle-encounter-relieved-transition-filter", season.Id),
-                    string.Join(
-                        "|",
-                        season.DetectionMode,
-                        CreateTextDebugFingerprint(enemyName),
-                        "true"),
-                    "自动战斗奇遇解除操作筛选：DetectionMode={DetectionMode}, Spirit={SpiritName}, IsMatch=True",
-                    season.DetectionMode,
-                    enemyName);
-                return ApplyAutoBattleEncounterRelievedDetection("自动战斗");
-            }
-        }
-
-        if (string.IsNullOrWhiteSpace(season.TipText))
-        {
-            return false;
-        }
-
-        var tipText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleTipRegionIds,
-            cancellationToken,
-            "自动战斗");
-        var isTipMatch = TextMatchingHelper.IsSimilar(
-            tipText,
-            season.TipText,
-            season.MatchThreshold,
-            out var similarity);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("auto-battle-encounter-relieved-tip-filter", season.Id),
-            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
-            "自动战斗奇遇解除操作筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
-            FormatLogText(tipText),
-            FormatLogText(season.TipText),
-            similarity,
-            season.MatchThreshold,
-            isTipMatch);
-
-        if (!isTipMatch)
-        {
-            return false;
-        }
-
-        return ApplyAutoBattleEncounterRelievedDetection("自动战斗");
-    }
-
     private async Task<bool> TrySuspendAutoBattleForShinyAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
@@ -190,18 +96,18 @@ public sealed partial class RuntimeTaskService
         var tipText = await RecognizeRegionTextAsync(
             state,
             frame,
-            BattleTipHeterochromiaRegionIds,
+            BattleShinyTipRegionIds,
             cancellationToken,
             "自动战斗异色保护");
-        var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
+        var isTipMatch = IsShinyTip(tipText, out var similarity);
         LogDebugOncePerValue(
             CreateDebugLogKey("auto-battle-shiny-filter"),
             CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
             "自动战斗异色保护筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
             FormatLogText(tipText),
-            HeterochromiaTipText,
+            ShinyTipText,
             similarity,
-            HeterochromiaTipMatchThreshold,
+            ShinyTipMatchThreshold,
             isTipMatch);
 
         if (!isTipMatch)

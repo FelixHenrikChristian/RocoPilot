@@ -31,7 +31,7 @@
       "x": 1785,
       "y": 1303,
       "width": 90,
-      "height": 90,
+      "height": 91,
       "enabled": true
     },
     {
@@ -53,9 +53,9 @@
     {
       "id": "battle-button-change",
       "x": 1692,
-      "y": 1304,
-      "width": 88,
-      "height": 90,
+      "y": 1303,
+      "width": 93,
+      "height": 91,
       "enabled": true
     },
     {
@@ -136,6 +136,22 @@
       "y": 1321,
       "width": 43,
       "height": 43,
+      "enabled": true
+    },
+    {
+      "id": "battle-button-capture",
+      "x": 1596,
+      "y": 1303,
+      "width": 96,
+      "height": 91,
+      "enabled": true
+    },
+    {
+      "id": "battle-tip-encounter-s3",
+      "x": 1270,
+      "y": 151,
+      "width": 650,
+      "height": 52,
       "enabled": true
     }
   ]

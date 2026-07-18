@@ -1,0 +1,97 @@
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+using RocoPilot.Services;
+
+namespace RocoPilot.Tests;
+
+[TestClass]
+public sealed class EncounterCaptureButtonStateTrackerTests
+{
+    [TestMethod]
+    public void ClassifiesVisibleButtonByDisabledMarker()
+    {
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Enabled,
+            EncounterCaptureButtonRecognition.Classify(0.96, 0.89, 0.74));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Disabled,
+            EncounterCaptureButtonRecognition.Classify(0.90, 0.97, 0.96));
+    }
+
+    [TestMethod]
+    public void ClassifiesRealEnabledButtonWhenDisabledOutlineScoresHigher()
+    {
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Enabled,
+            EncounterCaptureButtonRecognition.Classify(0.898, 0.916, 0.737));
+    }
+
+    [TestMethod]
+    public void RejectsInvisibleButtonOrAmbiguousDisabledMarker()
+    {
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonRecognition.Classify(0.87, 0.86, 0.97));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonRecognition.Classify(0.94, 0.93, 0.85));
+    }
+
+    [TestMethod]
+    public void RequiresDisabledToEnabledTransition()
+    {
+        var tracker = new EncounterCaptureButtonStateTracker();
+
+        Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Enabled));
+        Assert.AreEqual(EncounterCaptureButtonState.Enabled, tracker.CurrentState);
+        Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Unknown));
+        Assert.AreEqual(EncounterCaptureButtonState.Unknown, tracker.CurrentState);
+        Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Disabled));
+        Assert.IsTrue(tracker.HasSeenDisabled);
+        Assert.AreEqual(EncounterCaptureButtonState.Disabled, tracker.CurrentState);
+        Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Enabled));
+        Assert.IsTrue(tracker.ShouldHoldAttackForUnconfirmedRelief);
+        Assert.IsTrue(tracker.Observe(EncounterCaptureButtonState.Enabled));
+        Assert.IsTrue(tracker.IsRelieved);
+        Assert.AreEqual(EncounterCaptureButtonState.Enabled, tracker.CurrentState);
+        Assert.IsFalse(tracker.ShouldHoldAttackForUnconfirmedRelief);
+        Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Enabled));
+    }
+
+    [TestMethod]
+    public void ResetStartsANewBattleTransition()
+    {
+        var tracker = new EncounterCaptureButtonStateTracker();
+        tracker.Observe(EncounterCaptureButtonState.Disabled);
+        tracker.Observe(EncounterCaptureButtonState.Enabled);
+        tracker.Observe(EncounterCaptureButtonState.Enabled);
+
+        tracker.Reset();
+
+        Assert.IsFalse(tracker.HasSeenDisabled);
+        Assert.IsFalse(tracker.IsRelieved);
+        Assert.AreEqual(EncounterCaptureButtonState.Unknown, tracker.CurrentState);
+        Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Enabled));
+    }
+
+    [TestMethod]
+    public void UnknownAfterDisabledPreservesEncounterButMarksCurrentFrameAsUncertain()
+    {
+        var tracker = new EncounterCaptureButtonStateTracker();
+
+        tracker.Observe(EncounterCaptureButtonState.Disabled);
+        Assert.IsFalse(tracker.ShouldHoldAttackForUnconfirmedRelief);
+        tracker.Observe(EncounterCaptureButtonState.Unknown);
+
+        Assert.IsTrue(tracker.HasSeenDisabled);
+        Assert.IsFalse(tracker.IsRelieved);
+        Assert.AreEqual(EncounterCaptureButtonState.Unknown, tracker.CurrentState);
+        Assert.IsTrue(tracker.ShouldHoldAttackForUnconfirmedRelief);
+
+        tracker.Observe(EncounterCaptureButtonState.Enabled);
+
+        Assert.IsTrue(tracker.ShouldHoldAttackForUnconfirmedRelief);
+        tracker.Observe(EncounterCaptureButtonState.Enabled);
+        Assert.IsFalse(tracker.ShouldHoldAttackForUnconfirmedRelief);
+    }
+}

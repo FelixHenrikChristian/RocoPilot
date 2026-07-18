@@ -660,6 +660,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         bool? isBattleChatVisible,
         CancellationToken cancellationToken)
     {
+        await UpdateEncounterCaptureButtonStateAsync(state, frame, cancellationToken);
+
         var bossComboStatusText = AutoBattleBossComboStatusText;
         if (bossComboStatusText is not null)
         {
@@ -988,6 +990,28 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         string targetName,
         CancellationToken cancellationToken)
     {
+        var result = await MatchRuntimeTemplateResultAsync(
+            state,
+            frame,
+            regionAliases,
+            templateName,
+            options,
+            taskName,
+            targetName,
+            cancellationToken);
+        return result.IsMatch;
+    }
+
+    private async Task<ImageMatchResult> MatchRuntimeTemplateResultAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        IReadOnlyList<string> regionAliases,
+        string templateName,
+        ImageMatchOptions options,
+        string taskName,
+        string targetName,
+        CancellationToken cancellationToken)
+    {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         var templatePath = GetResolutionTemplatePath(state.RecognitionRegionConfig, templateName);
         if (!TemplateExists(templatePath))
@@ -1000,7 +1024,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 targetName,
                 region.Id,
                 templatePath);
-            return false;
+            return ImageMatchResult.NoMatch(0, templatePath);
         }
 
         var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
@@ -1018,7 +1042,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 targetName,
                 region.Id,
                 templatePath);
-            return false;
+            return ImageMatchResult.NoMatch(0, templatePath);
         }
 
         var matchOptions = CreateScaledImageMatchOptions(
@@ -1048,7 +1072,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             frameRegion.Y,
             frameRegion.Width,
             frameRegion.Height);
-        return result.IsMatch;
+        return result;
     }
 
     private static string FormatLogText(string? text, int maximumLength = 120)

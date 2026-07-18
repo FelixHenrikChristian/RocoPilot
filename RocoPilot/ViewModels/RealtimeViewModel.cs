@@ -38,7 +38,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
     private AutoBattleKeyboardInputMethodOption? _selectedAutoBattleKeyboardInputMethodOption;
     private int _autoBattleSkillSelectionActionDelayMs = AutoBattleSettings.DefaultSkillSelectionActionDelayMs;
-    private int _autoBattleLegacyTipEncounterExtraDelayMs = AutoBattleSettings.DefaultLegacyTipEncounterExtraDelayMs;
     private int _autoBattleSkillSelectionRetryDelayMs = AutoBattleSettings.DefaultSkillSelectionRetryDelayMs;
     private int _autoBattleKeyboardHoldDurationMs = AutoBattleSettings.DefaultKeyboardHoldDurationMs;
     private int _autoBattleKeyboardIntervalMs = AutoBattleSettings.DefaultKeyboardIntervalMs;
@@ -432,7 +431,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         _selectedAutoBattleKeyboardInputMethodOption =
             FindAutoBattleKeyboardInputMethodOption(settings.KeyboardInputMethod);
         _autoBattleSkillSelectionActionDelayMs = settings.SkillSelectionActionDelayMs;
-        _autoBattleLegacyTipEncounterExtraDelayMs = settings.LegacyTipEncounterExtraDelayMs;
         _autoBattleSkillSelectionRetryDelayMs = settings.SkillSelectionRetryDelayMs;
         _autoBattleKeyboardHoldDurationMs = settings.KeyboardHoldDurationMs;
         _autoBattleKeyboardIntervalMs = settings.KeyboardIntervalMs;
@@ -481,7 +479,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,
             KeyboardInputMethod = SelectedAutoBattleKeyboardInputMethod,
             SkillSelectionActionDelayMs = _autoBattleSkillSelectionActionDelayMs,
-            LegacyTipEncounterExtraDelayMs = _autoBattleLegacyTipEncounterExtraDelayMs,
             SkillSelectionRetryDelayMs = _autoBattleSkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = _autoBattleKeyboardHoldDurationMs,
             KeyboardIntervalMs = _autoBattleKeyboardIntervalMs,

@@ -4,6 +4,7 @@ using RocoPilot.Configuration;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Encounters;
+using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
 
@@ -14,30 +15,54 @@ public sealed partial class RuntimeTaskService
     private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(6);
     private static readonly TimeSpan PendingShinyDuplicateSuppressWindow = TimeSpan.FromSeconds(12);
 
-    private const string DefaultEncounterPlaceholderName = "幸运惊喜盒";
-    private const string HeterochromiaTipText = "发现异色精灵";
-    private const double HeterochromiaTipMatchThreshold = 0.78;
-    private const int HeterochromiaTipMinimumTextLength = 4;
+    private const string CaptureButtonEnabledTemplateName = "battle-button-capture.png";
+    private const string CaptureButtonDisabledTemplateName = "battle-button-capture-disabled.png";
+    private const string CaptureButtonDisabledMarkerTemplateName = "battle-button-capture-disabled-marker.png";
+    private const string S3SeasonId = "S3";
+    private const string ShinyTipText = "发现异色精灵";
+    private const double ShinyTipMatchThreshold = 0.78;
+    private const int ShinyTipMinimumTextLength = 4;
 
     private static readonly string[] BattleTipRegionIds =
     [
-        RecognitionRegionIds.BattleEncounterTip,
+        RecognitionRegionIds.BattleMessageTip,
         "battle-tip"
     ];
-    private static readonly string[] BattleTipHeterochromiaRegionIds =
+    private static readonly string[] BattleS3EncounterTipRegionIds =
     [
-        RecognitionRegionIds.BattleShinyTip,
-        "battle-tip-heterochromia"
+        RecognitionRegionIds.BattleS3EncounterTip
+    ];
+    private static readonly string[] BattleShinyTipRegionIds =
+    [
+        RecognitionRegionIds.BattleShinyTip
     ];
     private static readonly string[] BattleEnemyNameRegionIds =
     [
         RecognitionRegionIds.BattleEnemyName
     ];
+    private static readonly string[] BattleCaptureButtonRegionIds =
+    [
+        RecognitionRegionIds.BattleCaptureButton
+    ];
+    private static readonly ImageMatchOptions CaptureButtonMatchOptions = new()
+    {
+        MinimumScore = EncounterCaptureButtonRecognition.MinimumVisibilityScore,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions CaptureButtonDisabledMarkerMatchOptions = new()
+    {
+        MinimumScore = EncounterCaptureButtonRecognition.DisabledMarkerPresentScore,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
 
     private readonly object _encounterRecordLock = new();
     private readonly object _pendingShinyRecordLock = new();
-    private readonly object _encounterNameTransitionLock = new();
     private readonly object _runtimeEncounterSignalLock = new();
+    private readonly EncounterCaptureButtonStateTracker _encounterCaptureButtonStateTracker = new();
+    private readonly Dictionary<string, string> _lastAuxiliaryTipTexts =
+        new(StringComparer.OrdinalIgnoreCase);
     private volatile bool _encounterStatisticsEnabled = true;
     private bool _hasActiveEncounterRecord;
     private string? _lastRecordedEncounterSeasonId;
@@ -47,15 +72,9 @@ public sealed partial class RuntimeTaskService
     private string? _lastPendingShinySeasonId;
     private string? _lastPendingShinyName;
     private DateTimeOffset _lastPendingShinyAt;
-    private bool _hasPendingEncounterDetection;
-    private string? _pendingEncounterSeasonId;
-    private string? _pendingEncounterDetectionMode;
-    private double _pendingEncounterDetectionSimilarity;
     private bool _hasPendingShinyDetection;
     private string? _pendingShinyDetectionSeasonId;
     private double _pendingShinyDetectionSimilarity;
-    private bool _hasSeenEncounterPlaceholderName;
-    private string? _encounterNameTransitionSeasonId;
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
 
@@ -125,55 +144,260 @@ public sealed partial class RuntimeTaskService
             frame,
             season,
             cancellationToken);
-        var encounterTipTask = TryUpdateRuntimeEncounterTipSignalAsync(
+        var battleTipTask = TryLogBattleTipAsync(
             state,
             frame,
             season,
             cancellationToken);
-        await Task.WhenAll(shinyTipTask, encounterTipTask);
+        var s3EncounterTipTask = TryLogS3EncounterTipAsync(
+            state,
+            frame,
+            season,
+            cancellationToken);
+
+        await Task.WhenAll(
+            shinyTipTask,
+            battleTipTask,
+            s3EncounterTipTask);
+        await TryRecordEncounterAfterRelievedAsync(
+            state,
+            frame,
+            season,
+            cancellationToken);
     }
 
-    private async Task<bool> TryUpdateRuntimeEncounterTipSignalAsync(
+    private async Task TryLogBattleTipAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         EncounterSeasonDefinition season,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(season.TipText))
-        {
-            return false;
-        }
-
         var tipText = await RecognizeRegionTextAsync(
             state,
             frame,
             BattleTipRegionIds,
             cancellationToken,
-            "奇遇识别");
-
-        var isTipMatch = TextMatchingHelper.IsSimilar(
-            tipText,
-            season.TipText,
-            season.MatchThreshold,
-            out var similarity);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("runtime-encounter-tip-filter", season.Id),
-            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
-            "奇遇识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
-            FormatLogText(tipText),
-            FormatLogText(season.TipText),
-            similarity,
-            season.MatchThreshold,
-            isTipMatch);
-
-        if (!isTipMatch)
+            "战斗提示");
+        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleMessageTip, tipText))
         {
-            return false;
+            return;
         }
 
-        RememberPendingEncounterDetection(season.Id, EncounterDetectionModes.TipText, similarity);
-        ApplyAutoBattleEncounterRelievedDetection("奇遇识别");
-        return true;
+        _logger.LogInformation(
+            "战斗提示：{TipText}。Season={SeasonId}",
+            FormatLogText(tipText),
+            season.Id);
+    }
+
+    private async Task TryLogS3EncounterTipAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        EncounterSeasonDefinition season,
+        CancellationToken cancellationToken)
+    {
+        if (!string.Equals(season.Id, S3SeasonId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var tipText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleS3EncounterTipRegionIds,
+            cancellationToken,
+            "S3 奇遇提示");
+        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
+        {
+            return;
+        }
+
+        _logger.LogInformation(
+            "S3 奇遇血脉提示：{TipText}",
+            FormatLogText(tipText));
+    }
+
+    private bool TryRememberAuxiliaryTip(string regionId, string tipText)
+    {
+        var normalizedTipText = TextMatchingHelper.CleanRecognizedText(tipText);
+        lock (_runtimeEncounterSignalLock)
+        {
+            if (normalizedTipText.Length == 0)
+            {
+                return false;
+            }
+
+            if (_lastAuxiliaryTipTexts.TryGetValue(regionId, out var previousTipText)
+                && string.Equals(
+                    previousTipText,
+                    normalizedTipText,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            _lastAuxiliaryTipTexts[regionId] = normalizedTipText;
+            return true;
+        }
+    }
+
+    private async Task UpdateEncounterCaptureButtonStateAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        if (IsAutoBattleBossBattle)
+        {
+            return;
+        }
+
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        if (season is null)
+        {
+            return;
+        }
+
+        var buttonState = await RecognizeEncounterCaptureButtonStateAsync(
+            state,
+            frame,
+            cancellationToken);
+        ApplyEncounterCaptureButtonState(season, buttonState);
+    }
+
+    private async Task<EncounterCaptureButtonState> RecognizeEncounterCaptureButtonStateAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        CancellationToken cancellationToken)
+    {
+        var disabledMarkerTemplatePath = GetResolutionTemplatePath(
+            state.RecognitionRegionConfig,
+            CaptureButtonDisabledMarkerTemplateName);
+        if (!TemplateExists(disabledMarkerTemplatePath))
+        {
+            LogDebugOncePerValue(
+                CreateDebugLogKey(
+                    "encounter-capture-button-disabled-marker-missing",
+                    disabledMarkerTemplatePath),
+                "missing",
+                "奇遇捕捉按钮筛选跳过：未找到捕捉按钮禁用标志模板。Template={Template}",
+                disabledMarkerTemplatePath);
+            return EncounterCaptureButtonState.Unknown;
+        }
+
+        var enabledMatchTask = MatchRuntimeTemplateResultAsync(
+            state,
+            frame,
+            BattleCaptureButtonRegionIds,
+            CaptureButtonEnabledTemplateName,
+            CaptureButtonMatchOptions,
+            "奇遇识别",
+            "可捕捉按钮",
+            cancellationToken);
+        var disabledMatchTask = MatchRuntimeTemplateResultAsync(
+            state,
+            frame,
+            BattleCaptureButtonRegionIds,
+            CaptureButtonDisabledTemplateName,
+            CaptureButtonMatchOptions,
+            "奇遇识别",
+            "禁用捕捉按钮",
+            cancellationToken);
+        var disabledMarkerMatchTask = MatchRuntimeTemplateResultAsync(
+            state,
+            frame,
+            BattleCaptureButtonRegionIds,
+            CaptureButtonDisabledMarkerTemplateName,
+            CaptureButtonDisabledMarkerMatchOptions,
+            "奇遇识别",
+            "捕捉按钮禁用标志",
+            cancellationToken);
+
+        await Task.WhenAll(
+            enabledMatchTask,
+            disabledMatchTask,
+            disabledMarkerMatchTask);
+        var enabledMatch = await enabledMatchTask;
+        var disabledMatch = await disabledMatchTask;
+        var disabledMarkerMatch = await disabledMarkerMatchTask;
+        var buttonState = EncounterCaptureButtonRecognition.Classify(
+            enabledMatch.Score,
+            disabledMatch.Score,
+            disabledMarkerMatch.Score);
+
+        LogDebugOncePerValue(
+            CreateDebugLogKey("encounter-capture-button-state"),
+            string.Join(
+                "|",
+                buttonState,
+                CreateSimilarityDebugFingerprint(enabledMatch.Score),
+                CreateSimilarityDebugFingerprint(disabledMatch.Score),
+                CreateSimilarityDebugFingerprint(disabledMarkerMatch.Score)),
+            "奇遇捕捉按钮筛选：State={State}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, VisibilityThreshold={VisibilityThreshold:F3}, MarkerPresent={MarkerPresent:F3}, MarkerAbsent={MarkerAbsent:F3}",
+            buttonState,
+            enabledMatch.Score,
+            disabledMatch.Score,
+            disabledMarkerMatch.Score,
+            EncounterCaptureButtonRecognition.MinimumVisibilityScore,
+            EncounterCaptureButtonRecognition.DisabledMarkerPresentScore,
+            EncounterCaptureButtonRecognition.DisabledMarkerAbsentScore);
+        return buttonState;
+    }
+
+    private void ApplyEncounterCaptureButtonState(
+        EncounterSeasonDefinition season,
+        EncounterCaptureButtonState buttonState)
+    {
+        if (_encounterCaptureButtonStateTracker.Observe(buttonState))
+        {
+            _logger.LogInformation(
+                "奇遇识别：捕捉按钮已由禁用变为可用，判定本场奇遇效果解除。Season={SeasonId}",
+                season.Id);
+            ApplyAutoBattleEncounterRelievedDetection("捕捉按钮状态");
+        }
+    }
+
+    private async Task TryRecordEncounterAfterRelievedAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        EncounterSeasonDefinition season,
+        CancellationToken cancellationToken)
+    {
+        if (!EncounterStatisticsEnabled
+            || !_encounterCaptureButtonStateTracker.IsRelieved
+            || HasActiveEncounterRecord())
+        {
+            return;
+        }
+
+        var enemyNameText = await RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleEnemyNameRegionIds,
+            cancellationToken,
+            "奇遇解除精灵名");
+        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
+        var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
+        LogDebugOncePerValue(
+            CreateDebugLogKey("encounter-relieved-enemy-filter", season.Id),
+            string.Join(
+                "|",
+                CreateTextDebugFingerprint(enemyNameText),
+                CreateTextDebugFingerprint(enemyName),
+                CreateBooleanDebugFingerprint(!string.IsNullOrWhiteSpace(enemyName))),
+            "奇遇解除精灵名筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, IsValid={IsValid}, MatchThreshold={MatchThreshold:P1}",
+            FormatLogText(enemyNameText),
+            enemyName,
+            !string.IsNullOrWhiteSpace(enemyName),
+            spiritNameMatchThreshold);
+        if (string.IsNullOrWhiteSpace(enemyName))
+        {
+            return;
+        }
+
+        await RecordEncounterAsync(
+            season,
+            enemyName,
+            DateTimeOffset.Now,
+            cancellationToken);
     }
 
     private async Task<bool> TryUpdateRuntimeShinyTipSignalAsync(
@@ -185,19 +409,19 @@ public sealed partial class RuntimeTaskService
         var tipText = await RecognizeRegionTextAsync(
             state,
             frame,
-            BattleTipHeterochromiaRegionIds,
+            BattleShinyTipRegionIds,
             cancellationToken,
             "异色识别");
 
-        var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
+        var isTipMatch = IsShinyTip(tipText, out var similarity);
         LogDebugOncePerValue(
             CreateDebugLogKey("runtime-shiny-tip-filter", season.Id),
             CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
             "异色识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
             FormatLogText(tipText),
-            HeterochromiaTipText,
+            ShinyTipText,
             similarity,
-            HeterochromiaTipMatchThreshold,
+            ShinyTipMatchThreshold,
             isTipMatch);
         if (!isTipMatch)
         {
@@ -209,127 +433,10 @@ public sealed partial class RuntimeTaskService
         return true;
     }
 
-    private async Task TryUpdateEncounterStatisticsAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
-    {
-        var season = _encounterSeasonConfigService.GetCurrentSeason();
-        if (season is null)
-        {
-            return;
-        }
-
-        await TryUpdatePendingShinyCaptureAsync(state, frame, season, cancellationToken);
-
-        if (UsesEnemyNameTransitionDetection(season)
-            && await TryUpdateEncounterStatisticsByEnemyNameTransitionAsync(state, frame, season, cancellationToken))
-        {
-            return;
-        }
-
-        await TryUpdateEncounterStatisticsByTipTextAsync(state, frame, season, cancellationToken);
-    }
-
-    private async Task TryUpdateEncounterStatisticsByTipTextAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        EncounterSeasonDefinition season,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(season.TipText))
-        {
-            return;
-        }
-
-        var tipText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleTipRegionIds,
-            cancellationToken,
-            "奇遇统计");
-
-        var isTipMatch = TextMatchingHelper.IsSimilar(
-                tipText,
-                season.TipText,
-                season.MatchThreshold,
-                out var similarity);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("encounter-tip-filter", season.Id),
-            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
-            "奇遇统计筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
-            FormatLogText(tipText),
-            FormatLogText(season.TipText),
-            similarity,
-            season.MatchThreshold,
-            isTipMatch);
-        if (!isTipMatch)
-        {
-            return;
-        }
-
-        ApplyAutoBattleEncounterRelievedDetection("奇遇统计");
-
-        var enemyNameText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleEnemyNameRegionIds,
-            cancellationToken,
-            "奇遇统计");
-        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, season, cancellationToken);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("encounter-tip-enemy-filter", season.Id),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(enemyNameText),
-                CreateTextDebugFingerprint(enemyName),
-                CreateBooleanDebugFingerprint(!string.IsNullOrWhiteSpace(enemyName))),
-            "奇遇统计筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, IsValid={IsValid}, MatchThreshold={MatchThreshold:P1}",
-            FormatLogText(enemyNameText),
-            enemyName,
-            !string.IsNullOrWhiteSpace(enemyName),
-            season.SpiritNameMatchThreshold);
-        if (string.IsNullOrWhiteSpace(enemyName))
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("encounter-tip-missing-enemy", season.Id),
-                CreateSimilarityDebugFingerprint(similarity),
-                "已匹配奇遇提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}",
-                similarity);
-            return;
-        }
-
-        await RecordEncounterAsync(season, enemyName, DateTimeOffset.Now, "TipText", similarity, cancellationToken);
-    }
-
-    private async Task<bool> TryUpdateEncounterStatisticsByEnemyNameTransitionAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        EncounterSeasonDefinition season,
-        CancellationToken cancellationToken)
-    {
-        var enemyName = await TryDetectEncounterNameTransitionAsync(
-            state,
-            frame,
-            season,
-            cancellationToken,
-            "奇遇统计");
-        if (string.IsNullOrWhiteSpace(enemyName))
-        {
-            return false;
-        }
-
-        ApplyAutoBattleEncounterRelievedDetection("奇遇统计");
-        await RecordEncounterAsync(season, enemyName, DateTimeOffset.Now, season.DetectionMode, 1, cancellationToken);
-        return true;
-    }
-
     private async Task RecordEncounterAsync(
         EncounterSeasonDefinition season,
         string enemyName,
         DateTimeOffset now,
-        string detectionMode,
-        double detectionSimilarity,
         CancellationToken cancellationToken)
     {
         if (!EncounterStatisticsEnabled)
@@ -360,14 +467,12 @@ public sealed partial class RuntimeTaskService
         }
 
         _logger.LogDebug(
-            "奇遇统计已记录：Season={SeasonId}, Type={EncounterType}, Spirit={SpiritName}, PreviousCount={PreviousCount}, CurrentCount={CurrentCount}, DetectionMode={DetectionMode}, DetectionSimilarity={Similarity:P1}",
+            "奇遇统计已记录：Season={SeasonId}, Type={EncounterType}, Spirit={SpiritName}, PreviousCount={PreviousCount}, CurrentCount={CurrentCount}, Detection=CaptureButtonTransition",
             season.Id,
             season.EncounterTypeName,
             enemyName,
             previousCount,
-            currentCount,
-            detectionMode,
-            detectionSimilarity);
+            currentCount);
     }
 
     private async Task RecordPendingShinyCaptureAsync(
@@ -407,19 +512,19 @@ public sealed partial class RuntimeTaskService
         var tipText = await RecognizeRegionTextAsync(
             state,
             frame,
-            BattleTipHeterochromiaRegionIds,
+            BattleShinyTipRegionIds,
             cancellationToken,
             "异色识别");
 
-        var isTipMatch = IsHeterochromiaTip(tipText, out var similarity);
+        var isTipMatch = IsShinyTip(tipText, out var similarity);
         LogDebugOncePerValue(
             CreateDebugLogKey("shiny-tip-filter", season.Id),
             CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
             "异色识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
             FormatLogText(tipText),
-            HeterochromiaTipText,
+            ShinyTipText,
             similarity,
-            HeterochromiaTipMatchThreshold,
+            ShinyTipMatchThreshold,
             isTipMatch);
         if (!isTipMatch)
         {
@@ -434,7 +539,8 @@ public sealed partial class RuntimeTaskService
             BattleEnemyNameRegionIds,
             cancellationToken,
             "异色识别");
-        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, season, cancellationToken);
+        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
+        var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
         LogDebugOncePerValue(
             CreateDebugLogKey("shiny-enemy-filter", season.Id),
             string.Join(
@@ -446,7 +552,7 @@ public sealed partial class RuntimeTaskService
             FormatLogText(enemyNameText),
             enemyName,
             !string.IsNullOrWhiteSpace(enemyName),
-            season.SpiritNameMatchThreshold);
+            spiritNameMatchThreshold);
         if (string.IsNullOrWhiteSpace(enemyName))
         {
             LogDebugOncePerValue(
@@ -507,6 +613,14 @@ public sealed partial class RuntimeTaskService
         }
     }
 
+    private bool HasActiveEncounterRecord()
+    {
+        lock (_encounterRecordLock)
+        {
+            return _hasActiveEncounterRecord;
+        }
+    }
+
     private bool TryReservePendingShinyRecord(string seasonId, string spiritName, DateTimeOffset now)
     {
         lock (_pendingShinyRecordLock)
@@ -536,52 +650,6 @@ public sealed partial class RuntimeTaskService
             _lastPendingShinyAt = now;
             _hasActivePendingShinyRecord = true;
             return true;
-        }
-    }
-
-    private void RememberPendingEncounterDetection(
-        string seasonId,
-        string detectionMode,
-        double similarity)
-    {
-        lock (_runtimeEncounterSignalLock)
-        {
-            _hasPendingEncounterDetection = true;
-            _pendingEncounterSeasonId = seasonId;
-            _pendingEncounterDetectionMode = detectionMode;
-            _pendingEncounterDetectionSimilarity = similarity;
-        }
-    }
-
-    private bool TryGetPendingEncounterDetection(
-        string seasonId,
-        out string detectionMode,
-        out double similarity)
-    {
-        lock (_runtimeEncounterSignalLock)
-        {
-            if (!_hasPendingEncounterDetection
-                || !string.Equals(_pendingEncounterSeasonId, seasonId, StringComparison.OrdinalIgnoreCase))
-            {
-                detectionMode = string.Empty;
-                similarity = 0;
-                return false;
-            }
-
-            detectionMode = _pendingEncounterDetectionMode ?? EncounterDetectionModes.TipText;
-            similarity = _pendingEncounterDetectionSimilarity;
-            return true;
-        }
-    }
-
-    private void ClearPendingEncounterDetection()
-    {
-        lock (_runtimeEncounterSignalLock)
-        {
-            _hasPendingEncounterDetection = false;
-            _pendingEncounterSeasonId = null;
-            _pendingEncounterDetectionMode = null;
-            _pendingEncounterDetectionSimilarity = 0;
         }
     }
 
@@ -633,8 +701,12 @@ public sealed partial class RuntimeTaskService
             _hasActivePendingShinyRecord = false;
         }
 
-        ResetEncounterNameTransitionState();
-        ClearPendingEncounterDetection();
+        _encounterCaptureButtonStateTracker.Reset();
+        lock (_runtimeEncounterSignalLock)
+        {
+            _lastAuxiliaryTipTexts.Clear();
+        }
+
         ClearPendingShinyDetection();
     }
 
@@ -646,125 +718,15 @@ public sealed partial class RuntimeTaskService
         return record?.Count ?? 0;
     }
 
-    private async Task<string> TryDetectEncounterNameTransitionAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        EncounterSeasonDefinition season,
-        CancellationToken cancellationToken,
-        string taskName)
-    {
-        var enemyNameText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleEnemyNameRegionIds,
-            cancellationToken,
-            taskName);
-
-        var isPlaceholderName = IsEncounterPlaceholderName(enemyNameText, season, out var placeholderSimilarity);
-        var hasSeenPlaceholderName = HasSeenEncounterPlaceholderName(season.Id);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("encounter-name-transition-placeholder", taskName, season.Id),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(enemyNameText),
-                CreateSimilarityDebugFingerprint(placeholderSimilarity),
-                CreateBooleanDebugFingerprint(hasSeenPlaceholderName),
-                CreateBooleanDebugFingerprint(isPlaceholderName)),
-            "{TaskName}名称变化筛选：EnemyNameRaw={EnemyNameRaw}, Placeholder={PlaceholderName}, PlaceholderSimilarity={Similarity:P1}, Threshold={Threshold:P1}, HasSeenPlaceholder={HasSeenPlaceholder}, IsPlaceholder={IsPlaceholder}",
-            taskName,
-            FormatLogText(enemyNameText),
-            GetEncounterPlaceholderName(season),
-            placeholderSimilarity,
-            season.PlaceholderMatchThreshold,
-            hasSeenPlaceholderName,
-            isPlaceholderName);
-
-        if (isPlaceholderName)
-        {
-            if (MarkEncounterPlaceholderNameSeen(season.Id))
-            {
-                _logger.LogInformation(
-                    "{TaskName}：已识别到 {PlaceholderName}，等待名称恢复后记录奇遇。",
-                    taskName,
-                    GetEncounterPlaceholderName(season));
-            }
-
-            return string.Empty;
-        }
-
-        if (!hasSeenPlaceholderName)
-        {
-            return string.Empty;
-        }
-
-        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, season, cancellationToken);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("encounter-name-transition-spirit", taskName, season.Id),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(enemyNameText),
-                CreateTextDebugFingerprint(enemyName),
-                CreateBooleanDebugFingerprint(!string.IsNullOrWhiteSpace(enemyName))),
-            "{TaskName}名称变化筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, IsValid={IsValid}, MatchThreshold={MatchThreshold:P1}",
-            taskName,
-            FormatLogText(enemyNameText),
-            enemyName,
-            !string.IsNullOrWhiteSpace(enemyName),
-            season.SpiritNameMatchThreshold);
-        if (string.IsNullOrWhiteSpace(enemyName))
-        {
-            return string.Empty;
-        }
-
-        return IsEncounterPlaceholderName(enemyName, season, out _)
-            ? string.Empty
-            : enemyName;
-    }
-
-    private bool HasSeenEncounterPlaceholderName(string seasonId)
-    {
-        lock (_encounterNameTransitionLock)
-        {
-            return _hasSeenEncounterPlaceholderName
-                && string.Equals(_encounterNameTransitionSeasonId, seasonId, StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    private bool MarkEncounterPlaceholderNameSeen(string seasonId)
-    {
-        lock (_encounterNameTransitionLock)
-        {
-            if (_hasSeenEncounterPlaceholderName
-                && string.Equals(_encounterNameTransitionSeasonId, seasonId, StringComparison.OrdinalIgnoreCase))
-            {
-                return false;
-            }
-
-            _hasSeenEncounterPlaceholderName = true;
-            _encounterNameTransitionSeasonId = seasonId;
-            return true;
-        }
-    }
-
-    private void ResetEncounterNameTransitionState()
-    {
-        lock (_encounterNameTransitionLock)
-        {
-            _hasSeenEncounterPlaceholderName = false;
-            _encounterNameTransitionSeasonId = null;
-        }
-    }
-
     private async Task<string> MatchRecognizedSpiritNameAsync(
         string recognizedText,
-        EncounterSeasonDefinition season,
         CancellationToken cancellationToken)
     {
         try
         {
             return await _spiritCatalogService.MatchSpiritNameAsync(
                 recognizedText,
-                season.SpiritNameMatchThreshold,
+                GetSpiritNameMatchThreshold(),
                 cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -772,6 +734,11 @@ public sealed partial class RuntimeTaskService
             _logger.LogWarning(ex, "精灵名图鉴匹配失败，本次 OCR 精灵名已跳过。");
             return string.Empty;
         }
+    }
+
+    private double GetSpiritNameMatchThreshold()
+    {
+        return _encounterSeasonConfigService.Load().SpiritNameMatchThreshold;
     }
 
     private async Task<string> ResolveEncounterStatisticsRecordNameAsync(
@@ -803,44 +770,10 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private static bool UsesEnemyNameTransitionDetection(EncounterSeasonDefinition season)
-    {
-        return string.Equals(
-            season.DetectionMode,
-            EncounterDetectionModes.EnemyNameTransition,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool IsEncounterPlaceholderName(
-        string text,
-        EncounterSeasonDefinition season,
-        out double similarity)
-    {
-        var placeholderName = GetEncounterPlaceholderName(season);
-        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(placeholderName))
-        {
-            similarity = 0;
-            return false;
-        }
-
-        return TextMatchingHelper.IsSimilar(
-            text,
-            placeholderName,
-            season.PlaceholderMatchThreshold,
-            out similarity);
-    }
-
-    private static string GetEncounterPlaceholderName(EncounterSeasonDefinition season)
-    {
-        return string.IsNullOrWhiteSpace(season.PlaceholderName)
-            ? DefaultEncounterPlaceholderName
-            : season.PlaceholderName.Trim();
-    }
-
-    private static bool IsHeterochromiaTip(string tipText, out double similarity)
+    private static bool IsShinyTip(string tipText, out double similarity)
     {
         var normalized = TextMatchingHelper.CleanRecognizedText(tipText);
-        if (normalized.Length < HeterochromiaTipMinimumTextLength)
+        if (normalized.Length < ShinyTipMinimumTextLength)
         {
             similarity = 0;
             return false;
@@ -854,8 +787,8 @@ public sealed partial class RuntimeTaskService
         }
 
         similarity = Math.Max(
-            TextMatchingHelper.CalculateSimilarity(normalized, HeterochromiaTipText),
+            TextMatchingHelper.CalculateSimilarity(normalized, ShinyTipText),
             TextMatchingHelper.CalculateSimilarity(normalized, "异色精灵"));
-        return similarity >= HeterochromiaTipMatchThreshold;
+        return similarity >= ShinyTipMatchThreshold;
     }
 }

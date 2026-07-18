@@ -1,27 +1,18 @@
 {
   "currentSeasonId": "S2",
+  "spiritNameMatchThreshold": 0.55,
   "seasons": [
     {
       "id": "S1",
       "name": "S1赛季",
       "dateRange": "2025/3/26-2025/5/21",
-      "encounterTypeName": "污染",
-      "detectionMode": "TipText",
-      "tipText": "噩梦力量的保护解除，捕捉功能已恢复",
-      "matchThreshold": 0.78,
-      "spiritNameMatchThreshold": 0.55
+      "encounterTypeName": "污染"
     },
     {
       "id": "S2",
       "name": "S2赛季",
       "dateRange": "2025/5/22-2025/7/15",
-      "encounterTypeName": "狂欢",
-      "detectionMode": "EnemyNameTransition",
-      "tipText": "噩梦力量的保护解除，捕捉功能已恢复",
-      "matchThreshold": 0.78,
-      "placeholderName": "幸运惊喜盒",
-      "placeholderMatchThreshold": 0.78,
-      "spiritNameMatchThreshold": 0.55
+      "encounterTypeName": "狂欢"
     }
   ]
 }

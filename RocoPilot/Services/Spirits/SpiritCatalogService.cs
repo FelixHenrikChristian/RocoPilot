@@ -424,67 +424,15 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             throw new InvalidOperationException("Biligame 图鉴列表解析结果为空，已停止同步以避免覆盖现有图鉴数据。");
         }
 
-        var evolutionNamesByName = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
-        for (var index = 0; index < states.Count; index++)
+        var reportedCount = BiligameSpiritCatalogParser.ParseReportedCount(listMarkup);
+        if (reportedCount > 0 && states.Count != reportedCount)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var state = states[index];
-            progress?.Report(new SpiritCatalogSyncProgress(index + 1, states.Count, "正在读取精灵详情"));
-
-            var wikitext = await GetStringAsync(
-                BiligameSpiritCatalogParser.BuildRawPageUrl(state.Item.PageUrl),
-                source,
-                "text/plain",
-                cancellationToken);
-            var fields = BiligameSpiritCatalogParser.ParseWikitextFields(wikitext);
-            if (BiligameSpiritCatalogParser.IsInvalidWikitextResponse(wikitext)
-                || (!BiligameSpiritCatalogParser.IsStubWikitext(wikitext)
-                    && !BiligameSpiritCatalogParser.HasRequiredWikitextFields(fields)))
-            {
-                throw new InvalidOperationException($"Biligame 精灵详情解析失败：{state.Item.Name}");
-            }
-
-            BiligameSpiritCatalogParser.EnrichWithFields(state, fields);
-            if (BiligameSpiritCatalogParser.IsStubWikitext(wikitext))
-            {
-                var detailMarkup = await GetStringAsync(state.Item.PageUrl, source, "text/html, */*; q=0.01", cancellationToken);
-                var evolutionNames = BiligameSpiritCatalogParser.ParseEvolutionNames(detailMarkup);
-                if (evolutionNames.Count > 1)
-                {
-                    RegisterEvolutionNames(evolutionNamesByName, evolutionNames, state.Item);
-                }
-            }
-
-            await ThrottleAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Biligame 图鉴列表声明 {reportedCount} 张卡片，实际解析 {states.Count} 张，已停止同步以避免覆盖现有图鉴数据。");
         }
 
-        BiligameSpiritCatalogParser.ApplyEvolutionNames(states, evolutionNamesByName);
+        progress?.Report(new SpiritCatalogSyncProgress(states.Count, states.Count, "图鉴列表解析完成"));
         return BuildDocument(source, states);
-    }
-
-    private static void RegisterEvolutionNames(
-        Dictionary<string, IReadOnlyList<string>> evolutionNamesByName,
-        IReadOnlyList<string> evolutionNames,
-        SpiritCatalogItem sourceItem)
-    {
-        foreach (var evolutionName in evolutionNames)
-        {
-            AddEvolutionNameMapping(evolutionNamesByName, evolutionName, evolutionNames);
-        }
-
-        AddEvolutionNameMapping(evolutionNamesByName, sourceItem.Name, evolutionNames);
-        AddEvolutionNameMapping(evolutionNamesByName, sourceItem.WikiName, evolutionNames);
-    }
-
-    private static void AddEvolutionNameMapping(
-        Dictionary<string, IReadOnlyList<string>> evolutionNamesByName,
-        string name,
-        IReadOnlyList<string> evolutionNames)
-    {
-        if (!string.IsNullOrWhiteSpace(name))
-        {
-            evolutionNamesByName[name.Trim()] = evolutionNames;
-        }
     }
 
     private async Task<SpiritCatalogDocument> ScrapeLcxAsync(
@@ -519,7 +467,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return BuildDocument(source, states);
     }
 
-    private static SpiritCatalogDocument BuildDocument(
+    internal static SpiritCatalogDocument BuildDocument(
         SpiritCatalogSourceOption source,
         List<ScrapedSpiritState> states)
     {
@@ -769,6 +717,8 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                 .Where(state => state.StageRank == highestRank)
                 .ToList();
             var highest = highestCandidates.FirstOrDefault(state =>
+                    state.IsPrimaryForm)
+                ?? highestCandidates.FirstOrDefault(state =>
                     string.Equals(state.Item.Form, "原始形态", StringComparison.Ordinal))
                 ?? highestCandidates.Last();
 

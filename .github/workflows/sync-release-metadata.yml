@@ -2,7 +2,7 @@ name: Sync Release Metadata to R2
 
 on:
   release:
-    types: [edited]
+    types: [published, edited]
   workflow_dispatch:
 
 permissions:
@@ -41,10 +41,10 @@ jobs:
               with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as file:
                   event = json.load(file)
 
-              edited_tag = event["release"]["tag_name"]
-              if edited_tag != latest_tag:
-                  should_sync = False
-                  print(f"Release {edited_tag} is not the latest release ({latest_tag}). Skipping R2 sync.")
+              event_tag = event["release"]["tag_name"]
+              if event_tag != latest_tag:
+                should_sync = False
+                print(f"Release {event_tag} is not the latest release ({latest_tag}). Skipping R2 sync.")
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"latest_tag={latest_tag}\n")

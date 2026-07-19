@@ -83,10 +83,13 @@ public sealed partial class SpiritCatalogWindow : WindowEx
                 Items.Add(CreateDisplayItem(
                     representative,
                     variants,
+                    GetShinyVariants(representative),
                     BuildEvolutionChainRepresentatives(representative),
                     showVariantButton: true,
+                    showShinyButton: true,
                     showChainButton: true,
-                    showFullName: false));
+                    showFullName: false,
+                    useShinyAvatar: false));
             }
 
             Summary = BuildSummary(document);
@@ -135,14 +138,53 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             .Select(variant => CreateDisplayItem(
                 variant,
                 [],
+                CanShowShiny(variant) ? [variant] : [],
                 [],
                 showVariantButton: false,
+                showShinyButton: true,
                 showChainButton: false,
-                showFullName: true))
+                showFullName: true,
+                useShinyAvatar: false))
             .ToList();
         var window = new SpiritCatalogDetailWindow(
             $"NO.{item.Id} 变种",
             $"{item.Name} · {items.Count} 个变种",
+            items,
+            _spiritCatalogService,
+            SourceDisplayName,
+            SourceUri);
+        WindowPlacementHelper.SetOwner(window, this);
+        WindowPlacementHelper.CenterOnParent(window, App.MainWindow);
+        window.Activate();
+    }
+
+    private void ShinyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SpiritCatalogDisplayItem item })
+        {
+            return;
+        }
+
+        var items = item.ShinyItems
+            .Select(shiny => CreateDisplayItem(
+                shiny,
+                [],
+                [],
+                [],
+                showVariantButton: false,
+                showShinyButton: false,
+                showChainButton: false,
+                showFullName: true,
+                useShinyAvatar: true))
+            .ToList();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var window = new SpiritCatalogDetailWindow(
+            $"NO.{item.Id} 异色",
+            $"{item.Name} · {items.Count} 个异色形态",
             items,
             _spiritCatalogService,
             SourceDisplayName,
@@ -163,10 +205,13 @@ public sealed partial class SpiritCatalogWindow : WindowEx
             .Select(chainItem => CreateDisplayItem(
                 chainItem,
                 GetVariants(chainItem.Id),
+                GetShinyVariants(chainItem),
                 [],
                 showVariantButton: true,
+                showShinyButton: true,
                 showChainButton: false,
-                showFullName: false))
+                showFullName: false,
+                useShinyAvatar: false))
             .ToList();
         var window = new SpiritCatalogDetailWindow(
             $"进化链 - {item.Name}",
@@ -183,19 +228,25 @@ public sealed partial class SpiritCatalogWindow : WindowEx
     private SpiritCatalogDisplayItem CreateDisplayItem(
         SpiritCatalogItem item,
         IReadOnlyList<SpiritCatalogItem> variants,
+        IReadOnlyList<SpiritCatalogItem> shinyItems,
         IReadOnlyList<SpiritCatalogItem> chainItems,
         bool showVariantButton,
+        bool showShinyButton,
         bool showChainButton,
-        bool showFullName)
+        bool showFullName,
+        bool useShinyAvatar)
     {
         return SpiritCatalogDisplayItem.FromCatalogItem(
             item,
             _spiritCatalogService,
             variants,
+            shinyItems,
             chainItems,
             showVariantButton,
+            showShinyButton,
             showChainButton,
-            showFullName);
+            showFullName,
+            useShinyAvatar);
     }
 
     private List<SpiritCatalogItem> BuildEvolutionChainRepresentatives(SpiritCatalogItem item)
@@ -218,6 +269,31 @@ public sealed partial class SpiritCatalogWindow : WindowEx
     private IReadOnlyList<SpiritCatalogItem> GetVariants(string id)
     {
         return _variantsById.TryGetValue(id, out var variants) ? variants : [];
+    }
+
+    private IReadOnlyList<SpiritCatalogItem> GetShinyVariants(SpiritCatalogItem item)
+    {
+        return FilterShinyVariants(item, GetVariants(item.Id));
+    }
+
+    internal static IReadOnlyList<SpiritCatalogItem> FilterShinyVariants(
+        SpiritCatalogItem item,
+        IEnumerable<SpiritCatalogItem> variants)
+    {
+        return variants
+            .Where(variant =>
+                string.Equals(variant.Id, item.Id, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(variant.Stage, item.Stage, StringComparison.Ordinal)
+                && CanShowShiny(variant))
+            .ToList();
+    }
+
+    internal static bool CanShowShiny(SpiritCatalogItem item)
+    {
+        return item.HasShiny
+            && !string.IsNullOrWhiteSpace(item.ShinyAvatarPath)
+            && !string.Equals(item.Stage, "首领形态", StringComparison.Ordinal)
+            && !string.Equals(item.Form, "首领形态", StringComparison.Ordinal);
     }
 
     internal static SpiritCatalogItem? ChooseRepresentative(IReadOnlyList<SpiritCatalogItem> variants)
@@ -275,9 +351,13 @@ public sealed class SpiritCatalogDisplayItem
 
     public IReadOnlyList<SpiritCatalogItem> Variants { get; private init; } = [];
 
+    public IReadOnlyList<SpiritCatalogItem> ShinyItems { get; private init; } = [];
+
     public IReadOnlyList<SpiritCatalogItem> ChainItems { get; private init; } = [];
 
     public Visibility VariantButtonVisibility { get; private init; }
+
+    public Visibility ShinyButtonVisibility { get; private init; }
 
     public Visibility ChainButtonVisibility { get; private init; }
 
@@ -285,10 +365,13 @@ public sealed class SpiritCatalogDisplayItem
         SpiritCatalogItem item,
         ISpiritCatalogService spiritCatalogService,
         IReadOnlyList<SpiritCatalogItem> variants,
+        IReadOnlyList<SpiritCatalogItem> shinyItems,
         IReadOnlyList<SpiritCatalogItem> chainItems,
         bool showVariantButton,
+        bool showShinyButton,
         bool showChainButton,
-        bool showFullName)
+        bool showFullName,
+        bool useShinyAvatar)
     {
         return new SpiritCatalogDisplayItem
         {
@@ -296,10 +379,15 @@ public sealed class SpiritCatalogDisplayItem
             Name = showFullName
                 ? item.Name
                 : RocoPilot.Helpers.TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name),
-            Avatar = CreateAvatar(spiritCatalogService.ResolveAvatarPath(item.AvatarPath)),
+            Avatar = CreateAvatar(spiritCatalogService.ResolveAvatarPath(
+                useShinyAvatar ? item.ShinyAvatarPath : item.AvatarPath)),
             Variants = variants,
+            ShinyItems = shinyItems,
             ChainItems = chainItems,
             VariantButtonVisibility = showVariantButton && variants.Count > 1
+                ? Visibility.Visible
+                : Visibility.Collapsed,
+            ShinyButtonVisibility = showShinyButton && shinyItems.Count > 0
                 ? Visibility.Visible
                 : Visibility.Collapsed,
             ChainButtonVisibility = showChainButton

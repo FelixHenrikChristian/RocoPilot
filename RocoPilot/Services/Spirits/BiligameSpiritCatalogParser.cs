@@ -28,7 +28,15 @@ internal static class BiligameSpiritCatalogParser
         "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-card-subtitle\\b[^\"]*\")[^>]*>(?<text>.*?)</div>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-    private static readonly Regex AvatarImageRegex = new(
+    private static readonly Regex NormalAvatarImageRegex = new(
+        "<span\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-pet-art-normal\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex ShinyAvatarImageRegex = new(
+        "<span\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-pet-art-shiny\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex FallbackAvatarImageRegex = new(
         "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-pet-art\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
@@ -85,7 +93,13 @@ internal static class BiligameSpiritCatalogParser
         var cardAttributes = ParseAttributes(cardStart.Groups["attrs"].Value);
         var kickerMatch = KickerRegex.Match(block);
         var nameMatch = NameRegex.Match(block);
-        var imageMatch = AvatarImageRegex.Match(block);
+        var imageMatch = NormalAvatarImageRegex.Match(block);
+        if (!imageMatch.Success)
+        {
+            imageMatch = FallbackAvatarImageRegex.Match(block);
+        }
+
+        var shinyImageMatch = ShinyAvatarImageRegex.Match(block);
         if (!kickerMatch.Success || !nameMatch.Success || !imageMatch.Success)
         {
             throw new InvalidOperationException(
@@ -94,11 +108,15 @@ internal static class BiligameSpiritCatalogParser
 
         var nameAttributes = ParseAttributes(nameMatch.Groups["attrs"].Value);
         var imageAttributes = ParseAttributes(imageMatch.Groups["attrs"].Value);
+        var shinyImageAttributes = shinyImageMatch.Success
+            ? ParseAttributes(shinyImageMatch.Groups["attrs"].Value)
+            : [];
         var id = NormalizeCatalogId(kickerMatch.Groups["id"].Value);
         var wikiName = NormalizeText(nameMatch.Groups["text"].Value);
         var fullName = NormalizeText(nameAttributes.GetValueOrDefault("title", wikiName));
         var href = Decode(nameAttributes.GetValueOrDefault("href", string.Empty)).Trim();
         var avatarSource = Decode(imageAttributes.GetValueOrDefault("src", string.Empty)).Trim();
+        var shinyAvatarSource = Decode(shinyImageAttributes.GetValueOrDefault("src", string.Empty)).Trim();
         if (id.Length == 0 || wikiName.Length == 0 || href.Length == 0 || avatarSource.Length == 0)
         {
             throw new InvalidOperationException(
@@ -111,12 +129,22 @@ internal static class BiligameSpiritCatalogParser
         var variant = IsGenericSubtitle(subtitle, form) ? string.Empty : subtitle;
         var primaryAttribute = NormalizeText(cardAttributes.GetValueOrDefault("data-param2", string.Empty));
         var secondaryAttribute = NormalizeText(cardAttributes.GetValueOrDefault("data-param3", string.Empty));
-        var hasShiny = string.Equals(
+        var declaresShiny = string.Equals(
             NormalizeText(cardAttributes.GetValueOrDefault("data-param6", string.Empty)),
             "是",
             StringComparison.Ordinal);
+        var hasShiny = shinyAvatarSource.Length > 0;
+        if (declaresShiny != hasShiny)
+        {
+            throw new InvalidOperationException(
+                $"Biligame 图鉴列表第 {sourceIndex + 1} 张卡片的异色标记与异色头像不一致。");
+        }
+
         var pageUrl = new Uri(listUri, href).ToString();
         var avatarUrl = new Uri(listUri, avatarSource).ToString();
+        var shinyAvatarUrl = hasShiny
+            ? new Uri(listUri, shinyAvatarSource).ToString()
+            : string.Empty;
 
         var item = new SpiritCatalogItem
         {
@@ -126,6 +154,8 @@ internal static class BiligameSpiritCatalogParser
             PageUrl = pageUrl,
             AvatarUrl = avatarUrl,
             OriginalImageUrl = ToOriginalImageUrl(avatarUrl),
+            ShinyAvatarUrl = shinyAvatarUrl,
+            ShinyOriginalImageUrl = ToOriginalImageUrl(shinyAvatarUrl),
             Stage = stage,
             Form = form,
             RegionalForm = variant,

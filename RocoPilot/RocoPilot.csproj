@@ -38,6 +38,7 @@
     <PackageReference Include="InputInterceptor" Version="2.2.1" />
     <PackageReference Include="Markdig" Version="1.2.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.21.0" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.1.3" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="3.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
@@ -76,6 +77,17 @@
     </ItemGroup>
   </Target>
 
+  <Target Name="ExcludeWindowsAiMachineLearningOnnxRuntimeFromMsix"
+          BeforeTargets="_ComputeAppxPackagePayload">
+    <PropertyGroup>
+      <WindowsAiMachineLearningOnnxRuntimePath>$(NuGetPackageRoot)microsoft.windows.ai.machinelearning\2.1.1\runtimes\win-$([System.String]::Copy('$(Platform)').ToLowerInvariant())\native\onnxruntime.dll</WindowsAiMachineLearningOnnxRuntimePath>
+    </PropertyGroup>
+    <ItemGroup>
+      <PackagingOutputs Remove="@(PackagingOutputs)"
+                        Condition="$([System.String]::Copy('%(PackagingOutputs.FullPath)').ToLowerInvariant()) == $([System.String]::Copy('$(WindowsAiMachineLearningOnnxRuntimePath)').ToLowerInvariant())" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <Content Include="Configuration\RecognitionRegions\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -90,6 +102,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Assets\Models\OCR\TesseractOCR\*.traineddata">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\Models\OCR\Onnx\PaddleOcrV5\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Update="Assets\LaunchPageCover.png">

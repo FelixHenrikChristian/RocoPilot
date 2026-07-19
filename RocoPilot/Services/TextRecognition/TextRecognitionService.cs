@@ -17,10 +17,14 @@ public sealed class TextRecognitionService : ITextRecognitionService
     };
 
     private readonly IReadOnlyDictionary<TextRecognitionMethod, ITextRecognitionBackend> _backends;
+    private readonly IReadOnlyList<ISingleLineTextRecognitionBackend> _singleLineBackends;
 
-    public TextRecognitionService(IEnumerable<ITextRecognitionBackend> backends)
+    public TextRecognitionService(
+        IEnumerable<ITextRecognitionBackend> backends,
+        IEnumerable<ISingleLineTextRecognitionBackend>? singleLineBackends = null)
     {
         _backends = backends.ToDictionary(backend => backend.Method);
+        _singleLineBackends = singleLineBackends?.ToList() ?? [];
     }
 
     public IReadOnlyList<TextRecognitionMethodOption> GetMethods()
@@ -70,6 +74,14 @@ public sealed class TextRecognitionService : ITextRecognitionService
         if (!_backends.TryGetValue(method, out var backend))
         {
             throw new NotSupportedException($"Unsupported text recognition method: {method}");
+        }
+
+        var singleLineBackend = layout == TextRecognitionLayout.SingleLine
+            ? _singleLineBackends.FirstOrDefault(candidate => candidate.Method == method && candidate.IsAvailable)
+            : null;
+        if (singleLineBackend is not null)
+        {
+            return await singleLineBackend.RecognizeAsync(frame, region, cancellationToken);
         }
 
         if (backend is IFrameTextRecognitionBackend frameBackend)

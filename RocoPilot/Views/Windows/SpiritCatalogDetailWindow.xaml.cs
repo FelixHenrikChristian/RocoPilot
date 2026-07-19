@@ -70,14 +70,54 @@ public sealed partial class SpiritCatalogDetailWindow : WindowEx
                 variant,
                 _spiritCatalogService,
                 [],
+                SpiritCatalogWindow.CanShowShiny(variant) ? [variant] : [],
                 [],
                 showVariantButton: false,
+                showShinyButton: true,
                 showChainButton: false,
-                showFullName: true))
+                showFullName: true,
+                useShinyAvatar: false))
             .ToList();
         var window = new SpiritCatalogDetailWindow(
             $"NO.{item.Id} 变种",
             $"{item.Name} · {items.Count} 个变种",
+            items,
+            _spiritCatalogService,
+            SourceDisplayName,
+            SourceUri);
+        WindowPlacementHelper.SetOwner(window, this);
+        WindowPlacementHelper.CenterOnParent(window, App.MainWindow);
+        window.Activate();
+    }
+
+    private void ShinyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SpiritCatalogDisplayItem item })
+        {
+            return;
+        }
+
+        var items = item.ShinyItems
+            .Select(shiny => SpiritCatalogDisplayItem.FromCatalogItem(
+                shiny,
+                _spiritCatalogService,
+                [],
+                [],
+                [],
+                showVariantButton: false,
+                showShinyButton: false,
+                showChainButton: false,
+                showFullName: true,
+                useShinyAvatar: true))
+            .ToList();
+        if (items.Count == 0)
+        {
+            return;
+        }
+
+        var window = new SpiritCatalogDetailWindow(
+            $"NO.{item.Id} 异色",
+            $"{item.Name} · {items.Count} 个异色形态",
             items,
             _spiritCatalogService,
             SourceDisplayName,

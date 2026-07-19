@@ -472,6 +472,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                 avatarDirectory,
                 avatarPathPrefix,
                 cancellationToken);
+            await DownloadShinyAvatarAsync(
+                document.Spirits[index],
+                avatarDirectory,
+                avatarPathPrefix,
+                cancellationToken);
             await ThrottleAsync(cancellationToken);
         }
 
@@ -722,15 +727,59 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             return;
         }
 
-        if (await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: false, cancellationToken))
+        var avatarPath = await TryDownloadAvatarAsync(
+            item,
+            item.AvatarUrl,
+            avatarDirectory,
+            avatarPathPrefix,
+            logFailure: false,
+            cancellationToken);
+        if (avatarPath.Length > 0)
         {
+            item.AvatarPath = avatarPath;
             return;
         }
 
-        await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: true, cancellationToken);
+        item.AvatarPath = await TryDownloadAvatarAsync(
+            item,
+            item.AvatarUrl,
+            avatarDirectory,
+            avatarPathPrefix,
+            logFailure: true,
+            cancellationToken);
     }
 
-    private async Task<bool> TryDownloadAvatarAsync(
+    private async Task DownloadShinyAvatarAsync(
+        SpiritCatalogItem item,
+        string avatarDirectory,
+        string avatarPathPrefix,
+        CancellationToken cancellationToken)
+    {
+        if (!item.HasShiny || string.IsNullOrWhiteSpace(item.ShinyAvatarUrl))
+        {
+            item.ShinyAvatarPath = string.Empty;
+            return;
+        }
+
+        var avatarPath = await TryDownloadAvatarAsync(
+            item,
+            item.ShinyAvatarUrl,
+            avatarDirectory,
+            avatarPathPrefix,
+            logFailure: false,
+            cancellationToken);
+        item.ShinyAvatarPath = avatarPath.Length > 0
+            ? avatarPath
+            : await TryDownloadAvatarAsync(
+                item,
+                item.ShinyAvatarUrl,
+                avatarDirectory,
+                avatarPathPrefix,
+                logFailure: true,
+                cancellationToken);
+    }
+
+    private async Task<string> TryDownloadAvatarAsync(
         SpiritCatalogItem item,
         string avatarUrl,
         string avatarDirectory,
@@ -740,7 +789,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     {
         if (string.IsNullOrWhiteSpace(avatarUrl))
         {
-            return false;
+            return string.Empty;
         }
 
         var fileName = BuildAvatarFileName(item.Id, item.Name, avatarUrl);
@@ -759,12 +808,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                     _logger.LogWarning(ex, "同步精灵头像失败：{SpiritName} {AvatarUrl}", item.Name, avatarUrl);
                 }
 
-                return false;
+                return string.Empty;
             }
         }
 
-        item.AvatarPath = ToJsonPath(Path.Combine(avatarPathPrefix, fileName));
-        return true;
+        return ToJsonPath(Path.Combine(avatarPathPrefix, fileName));
     }
 
     private async Task NormalizeAvatarFilesAsync(
@@ -778,37 +826,62 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         foreach (var item in document.Spirits)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var fileName = GetAvatarFileName(item.AvatarPath);
-            if (fileName.Length == 0)
-            {
-                continue;
-            }
-
-            var filePath = Path.Combine(avatarDirectory, fileName);
-            if (!File.Exists(filePath))
-            {
-                continue;
-            }
-
-            await using var stream = File.OpenRead(filePath);
-            var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken);
-            var hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
-            if (canonicalFileNamesByHash.TryGetValue(hash, out var canonicalFileName))
-            {
-                item.AvatarPath = ToJsonPath(Path.Combine(avatarPathPrefix, canonicalFileName));
-                continue;
-            }
-
-            canonicalFileNamesByHash[hash] = fileName;
+            item.AvatarPath = await NormalizeAvatarFileAsync(
+                item.AvatarPath,
+                avatarDirectory,
+                avatarPathPrefix,
+                canonicalFileNamesByHash,
+                cancellationToken);
+            item.ShinyAvatarPath = await NormalizeAvatarFileAsync(
+                item.ShinyAvatarPath,
+                avatarDirectory,
+                avatarPathPrefix,
+                canonicalFileNamesByHash,
+                cancellationToken);
         }
 
         PruneUnreferencedAvatarFiles(document, avatarDirectory);
     }
 
+    private static async Task<string> NormalizeAvatarFileAsync(
+        string avatarPath,
+        string avatarDirectory,
+        string avatarPathPrefix,
+        Dictionary<string, string> canonicalFileNamesByHash,
+        CancellationToken cancellationToken)
+    {
+        var fileName = GetAvatarFileName(avatarPath);
+        if (fileName.Length == 0)
+        {
+            return avatarPath;
+        }
+
+        var filePath = Path.Combine(avatarDirectory, fileName);
+        if (!File.Exists(filePath))
+        {
+            return avatarPath;
+        }
+
+        await using var stream = File.OpenRead(filePath);
+        var hashBytes = await SHA256.HashDataAsync(stream, cancellationToken);
+        var hash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        if (canonicalFileNamesByHash.TryGetValue(hash, out var canonicalFileName))
+        {
+            return ToJsonPath(Path.Combine(avatarPathPrefix, canonicalFileName));
+        }
+
+        canonicalFileNamesByHash[hash] = fileName;
+        return avatarPath;
+    }
+
     private void PruneUnreferencedAvatarFiles(SpiritCatalogDocument document, string avatarDirectory)
     {
         var referencedFileNames = document.Spirits
-            .Select(item => GetAvatarFileName(item.AvatarPath))
+            .SelectMany(item => new[]
+            {
+                GetAvatarFileName(item.AvatarPath),
+                GetAvatarFileName(item.ShinyAvatarPath)
+            })
             .Where(fileName => fileName.Length > 0)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 

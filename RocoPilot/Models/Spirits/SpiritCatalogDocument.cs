@@ -42,6 +42,12 @@ public sealed class SpiritCatalogItem
 
     public string AvatarPath { get; set; } = string.Empty;
 
+    public string ShinyAvatarUrl { get; set; } = string.Empty;
+
+    public string ShinyOriginalImageUrl { get; set; } = string.Empty;
+
+    public string ShinyAvatarPath { get; set; } = string.Empty;
+
     public string Stage { get; set; } = string.Empty;
 
     public string Form { get; set; } = string.Empty;

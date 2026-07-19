@@ -125,6 +125,27 @@
                                             Height="28"
                                             Margin="4"
                                             HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="14"
+                                            Padding="0"
+                                            Click="ShinyButton_Click"
+                                            ToolTipService.ToolTip="查看异色"
+                                            Visibility="{Binding ShinyButtonVisibility}">
+                                            <FontIcon
+                                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                                FontSize="13"
+                                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                                Glyph="&#xE790;" />
+                                        </Button>
+
+                                        <Button
+                                            Width="28"
+                                            Height="28"
+                                            Margin="4"
+                                            HorizontalAlignment="Left"
                                             VerticalAlignment="Bottom"
                                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -137,7 +158,7 @@
                                             <FontIcon
                                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                 FontSize="13"
-                                                Glyph="&#xE790;" />
+                                                Glyph="&#xE8AB;" />
                                         </Button>
 
                                         <Button

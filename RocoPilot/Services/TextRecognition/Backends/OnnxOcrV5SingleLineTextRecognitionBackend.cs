@@ -27,6 +27,31 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextR
 
     public bool IsAvailable => !_isDisposed && _recognizer.Value is not null;
 
+    public Task PrewarmAsync(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+
+        return Task.Run(
+            async () =>
+            {
+                try
+                {
+                    using var frame = new CapturedFrame(1, 1, new byte[4]);
+                    var region = new RecognitionRegion { Id = "onnx-ocr-prewarm", Width = 1, Height = 1 };
+                    _ = await RecognizeAsync(frame, region, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    // Keep PaddleOCR available if the optional ONNX warmup cannot complete.
+                }
+            },
+            cancellationToken);
+    }
+
     public async Task<TextRecognitionResult> RecognizeAsync(
         CapturedFrame frame,
         RecognitionRegion region,

@@ -120,7 +120,9 @@ public partial class App : Application
             services.AddSingleton<ITextRecognitionBackend, PaddleOcrV5TextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, WindowsOcrTextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, TesseractTextRecognitionBackend>();
-            services.AddSingleton<ISingleLineTextRecognitionBackend, OnnxOcrV5SingleLineTextRecognitionBackend>();
+            services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionBackend>();
+            services.AddSingleton<ISingleLineTextRecognitionBackend>(provider =>
+                provider.GetRequiredService<OnnxOcrV5SingleLineTextRecognitionBackend>());
             services.AddSingleton<ITextRecognitionService, TextRecognitionService>();
 
             // Core Services
@@ -153,6 +155,7 @@ public partial class App : Application
         Build();
 
         App.GetService<IAppNotificationService>().Initialize();
+        _ = App.GetService<OnnxOcrV5SingleLineTextRecognitionBackend>().PrewarmAsync();
 
         UnhandledException += App_UnhandledException;
     }

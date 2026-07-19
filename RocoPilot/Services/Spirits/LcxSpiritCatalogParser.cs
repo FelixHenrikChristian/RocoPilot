@@ -79,12 +79,7 @@ internal static class LcxSpiritCatalogParser
 
             states.Add(new ScrapedSpiritState(
                 item,
-                index,
-                stage,
-                primaryAttribute,
-                secondaryAttribute,
-                form,
-                hasShiny ? "是" : string.Empty)
+                index)
             {
                 StageRank = SpiritCatalogParsingHelpers.StageRank(stage)
             });

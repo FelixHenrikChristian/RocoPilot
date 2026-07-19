@@ -1,0 +1,5 @@
+PP-OCRv5 mobile recognition ONNX model
+
+Source: https://huggingface.co/itextresearch/itext-PP-OCRv5_mobile_rec_infer
+Upstream PaddleOCR model: PP-OCRv5_mobile_rec_infer
+License: Apache License 2.0

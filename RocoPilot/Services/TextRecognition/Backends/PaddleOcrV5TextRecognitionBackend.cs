@@ -2,6 +2,8 @@
 
 using OpenCvSharp;
 
+using RocoPilot.Models.Capture;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.TextRecognition;
 
 using Sdcb.PaddleInference;
@@ -10,7 +12,7 @@ using Sdcb.PaddleOCR.Models.Local;
 
 namespace RocoPilot.Services.TextRecognition.Backends;
 
-public sealed class PaddleOcrV5TextRecognitionBackend : ITextRecognitionBackend, IDisposable
+public sealed class PaddleOcrV5TextRecognitionBackend : ITextRecognitionBackend, IFrameTextRecognitionBackend, IDisposable
 {
     private const string MethodName = "PaddleOCR PP-OCRv5";
     private const string LanguageName = "中文/英文";
@@ -68,6 +70,54 @@ public sealed class PaddleOcrV5TextRecognitionBackend : ITextRecognitionBackend,
         }
     }
 
+    public async Task<TextRecognitionResult> RecognizeAsync(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        TextRecognitionLayout layout,
+        CancellationToken cancellationToken)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (RuntimeInformation.ProcessArchitecture != Architecture.X64)
+        {
+            throw new PlatformNotSupportedException("PaddleOCR local execution is only configured for x64.");
+        }
+
+        ValidateFrameRegion(frame, region);
+
+        await _recognitionLock.WaitAsync(cancellationToken);
+        GCHandle pixelHandle = default;
+        try
+        {
+            pixelHandle = GCHandle.Alloc(frame.Pixels, GCHandleType.Pinned);
+            using var source = Mat.FromPixelData(
+                frame.Height,
+                frame.Width,
+                MatType.CV_8UC4,
+                pixelHandle.AddrOfPinnedObject());
+            using var sourceRegion = new Mat(source, new Rect(region.X, region.Y, region.Width, region.Height));
+            using var image = new Mat();
+            Cv2.CvtColor(sourceRegion, image, ColorConversionCodes.BGRA2BGR);
+
+            var text = await Task.Run(
+                () => layout == TextRecognitionLayout.SingleLine
+                    ? _engine.Value.Recognizer.Run(image).Text
+                    : _engine.Value.Run(image).Text,
+                cancellationToken);
+            return TextRecognitionResultFactory.Create(Method, MethodName, LanguageName, text);
+        }
+        finally
+        {
+            if (pixelHandle.IsAllocated)
+            {
+                pixelHandle.Free();
+            }
+
+            _recognitionLock.Release();
+        }
+    }
+
     private static PaddleOcrAll CreateEngine()
     {
         return new PaddleOcrAll(LocalFullModels.ChineseV5, PaddleDevice.Blas())
@@ -75,6 +125,28 @@ public sealed class PaddleOcrV5TextRecognitionBackend : ITextRecognitionBackend,
             AllowRotateDetection = false,
             Enable180Classification = false
         };
+    }
+
+    private static void ValidateFrameRegion(CapturedFrame frame, RecognitionRegion region)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(region);
+
+        var expectedPixelByteLength = checked(frame.Width * frame.Height * 4);
+        if (frame.PixelByteLength < expectedPixelByteLength)
+        {
+            throw new InvalidDataException("Captured frame pixel data is incomplete.");
+        }
+
+        if (region.X < 0
+            || region.Y < 0
+            || region.Width <= 0
+            || region.Height <= 0
+            || region.X > frame.Width - region.Width
+            || region.Y > frame.Height - region.Height)
+        {
+            throw new ArgumentOutOfRangeException(nameof(region), "Recognition region must be inside the captured frame.");
+        }
     }
 
     public void Dispose()

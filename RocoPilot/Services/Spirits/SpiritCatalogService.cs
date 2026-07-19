@@ -23,10 +23,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     private const string BiligameSourceId = "biligame";
     private const string BiligameListUrl = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
     private const string BiligameSourceName = "Biligame 洛克王国:手游 Wiki 精灵图鉴";
-    private const string LcxSourceId = "lcx";
-    private const string LcxListUrl = "https://wiki.lcx.cab/lk/tujian.php";
-    private const string LcxSourceName = "离愁轩 洛克王国:手游 精灵图鉴";
-    private const string LcxBaseUrl = "https://wiki.lcx.cab/lk/";
     private const string DataFileName = "spirits.json";
     private const string SourcesDirectoryName = "Sources";
     private const string BundledCatalogMarkerFileName = "bundled-spirits.marker";
@@ -35,8 +31,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     private static readonly IReadOnlyList<SpiritCatalogSourceOption> SourceOptions =
     [
-        new(BiligameSourceId, BiligameSourceName, BiligameListUrl),
-        new(LcxSourceId, LcxSourceName, LcxListUrl)
+        new(BiligameSourceId, BiligameSourceName, BiligameListUrl)
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -151,11 +146,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         try
         {
             var source = ResolveSource(sourceId);
-            var document = source.Id switch
-            {
-                LcxSourceId => await ScrapeLcxAsync(source, progress, cancellationToken),
-                _ => await ScrapeBiligameAsync(source, progress, cancellationToken)
-            };
+            var document = await ScrapeBiligameAsync(source, progress, cancellationToken);
 
             await PersistCatalogAsync(source, document, progress, cancellationToken);
 
@@ -435,38 +426,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return BuildDocument(source, states);
     }
 
-    private async Task<SpiritCatalogDocument> ScrapeLcxAsync(
-        SpiritCatalogSourceOption source,
-        IProgress<SpiritCatalogSyncProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        var records = new List<LcxPokemonDto>();
-        for (var page = 1; ; page++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            progress?.Report(new SpiritCatalogSyncProgress(page, 0, $"正在读取{source.Name}第 {page} 页"));
-
-            var url = $"{LcxBaseUrl}get_pokemon_data.php?page={page}&exclude_details=1&hide_not_released=0&sort=t_id&direction=asc";
-            var json = await GetStringAsync(url, source, "application/json, text/javascript, */*; q=0.01", cancellationToken);
-            var pageRecords = JsonSerializer.Deserialize<List<LcxPokemonDto>>(json, JsonOptions) ?? [];
-            if (pageRecords.Count == 0)
-            {
-                break;
-            }
-
-            records.AddRange(pageRecords);
-            await ThrottleAsync(cancellationToken);
-        }
-
-        if (records.Count == 0)
-        {
-            throw new InvalidOperationException("离愁轩图鉴接口解析结果为空，已停止同步以避免覆盖现有图鉴数据。");
-        }
-
-        var states = LcxSpiritCatalogParser.BuildStates(records, LcxBaseUrl);
-        return BuildDocument(source, states);
-    }
-
     internal static SpiritCatalogDocument BuildDocument(
         SpiritCatalogSourceOption source,
         List<ScrapedSpiritState> states)
@@ -510,7 +469,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             progress?.Report(new SpiritCatalogSyncProgress(index + 1, document.Spirits.Count, "正在同步头像"));
             await DownloadAvatarAsync(
                 document.Spirits[index],
-                source,
                 avatarDirectory,
                 avatarPathPrefix,
                 cancellationToken);
@@ -570,10 +528,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Referrer = new Uri(source.ListUrl);
         request.Headers.Accept.ParseAdd(accept);
-        if (string.Equals(source.Id, LcxSourceId, StringComparison.OrdinalIgnoreCase))
-        {
-            request.Headers.Add("X-Requested-With", "XMLHttpRequest");
-        }
 
         using var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -759,7 +713,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
     private async Task DownloadAvatarAsync(
         SpiritCatalogItem item,
-        SpiritCatalogSourceOption source,
         string avatarDirectory,
         string avatarPathPrefix,
         CancellationToken cancellationToken)
@@ -772,23 +725,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         if (await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: false, cancellationToken))
         {
             return;
-        }
-
-        if (string.Equals(source.Id, LcxSourceId, StringComparison.OrdinalIgnoreCase))
-        {
-            var detailAvatarUrl = await TryResolveLcxDetailAvatarUrlAsync(item, source, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(detailAvatarUrl)
-                && !string.Equals(detailAvatarUrl, item.AvatarUrl, StringComparison.OrdinalIgnoreCase))
-            {
-                item.AvatarUrl = detailAvatarUrl;
-                item.OriginalImageUrl = detailAvatarUrl;
-                if (await TryDownloadAvatarAsync(item, detailAvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: true, cancellationToken))
-                {
-                    return;
-                }
-
-                return;
-            }
         }
 
         await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, logFailure: true, cancellationToken);
@@ -829,28 +765,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
         item.AvatarPath = ToJsonPath(Path.Combine(avatarPathPrefix, fileName));
         return true;
-    }
-
-    private async Task<string> TryResolveLcxDetailAvatarUrlAsync(
-        SpiritCatalogItem item,
-        SpiritCatalogSourceOption source,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(item.PageUrl))
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            var markup = await GetStringAsync(item.PageUrl, source, "text/html, */*; q=0.01", cancellationToken);
-            return LcxSpiritCatalogParser.ParseDetailAvatarUrl(markup, LcxBaseUrl);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogWarning(ex, "读取离愁轩精灵详情头像失败：{SpiritName} {PageUrl}", item.Name, item.PageUrl);
-            return string.Empty;
-        }
     }
 
     private async Task NormalizeAvatarFilesAsync(

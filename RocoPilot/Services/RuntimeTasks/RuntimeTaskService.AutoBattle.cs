@@ -67,6 +67,7 @@ public sealed partial class RuntimeTaskService
     private bool _wasAutoBattleSkillSelectionVisible;
     private bool _wasAutoBattlePetSwitchingVisible;
     private bool _hasLoggedCurrentAutoBattleTurnAction;
+    private bool _hasLoggedCurrentAutoBattleCaptureButtonObservation;
     private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
     private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
     private AutoBattleReleaseStep? _currentAutoBattleReleaseStep;
@@ -195,6 +196,7 @@ public sealed partial class RuntimeTaskService
 
                 _autoBattleSkillSelectionAction = plan.Action;
                 _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+                LogAdoptedEncounterCaptureButtonObservationForCurrentTurn();
                 return;
             }
 
@@ -231,6 +233,7 @@ public sealed partial class RuntimeTaskService
 
             _autoBattleSkillSelectionAction = plan.Action;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
+            LogAdoptedEncounterCaptureButtonObservationForCurrentTurn();
             if (IsAutoBattleBossBattle)
             {
                 ResetAutoBattleBossSkillSelectionState();
@@ -389,6 +392,7 @@ public sealed partial class RuntimeTaskService
         _autoBattleTurnNumber++;
         _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
         _hasLoggedCurrentAutoBattleTurnAction = false;
+        _hasLoggedCurrentAutoBattleCaptureButtonObservation = false;
         _wasAutoBattleSkillSelectionVisible = true;
         _autoBattleSkillSelectionVisibleSince = now;
         _lastAutoBattleSkillSelectionActionAt = null;
@@ -913,6 +917,7 @@ public sealed partial class RuntimeTaskService
         _currentAutoBattleReleaseStep = null;
         _currentAutoBattleTurnNumber = 0;
         _hasLoggedCurrentAutoBattleTurnAction = false;
+        _hasLoggedCurrentAutoBattleCaptureButtonObservation = false;
         _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
         ResetAutoBattleSkillSelectionEnemyNameTask();
         _hasAutoBattleSkillSelectionEnemyNameResult = false;

@@ -60,6 +60,7 @@ public sealed partial class RuntimeTaskService
     private readonly object _encounterRecordLock = new();
     private readonly object _pendingShinyRecordLock = new();
     private readonly object _runtimeEncounterSignalLock = new();
+    private readonly object _encounterCaptureButtonObservationLock = new();
     private readonly EncounterCaptureButtonStateTracker _encounterCaptureButtonStateTracker = new();
     private readonly Dictionary<string, string> _lastAuxiliaryTipTexts =
         new(StringComparer.OrdinalIgnoreCase);
@@ -75,6 +76,7 @@ public sealed partial class RuntimeTaskService
     private bool _hasPendingShinyDetection;
     private string? _pendingShinyDetectionSeasonId;
     private double _pendingShinyDetectionSimilarity;
+    private EncounterCaptureButtonObservation? _latestEncounterCaptureButtonObservation;
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
 
@@ -256,14 +258,15 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var buttonState = await RecognizeEncounterCaptureButtonStateAsync(
+        var observation = await RecognizeEncounterCaptureButtonStateAsync(
             state,
             frame,
             cancellationToken);
-        ApplyEncounterCaptureButtonState(season, buttonState);
+        RememberEncounterCaptureButtonObservation(observation);
+        ApplyEncounterCaptureButtonState(season, observation.State);
     }
 
-    private async Task<EncounterCaptureButtonState> RecognizeEncounterCaptureButtonStateAsync(
+    private async Task<EncounterCaptureButtonObservation> RecognizeEncounterCaptureButtonStateAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
@@ -280,7 +283,11 @@ public sealed partial class RuntimeTaskService
                 "missing",
                 "奇遇捕捉按钮筛选跳过：未找到捕捉按钮禁用标志模板。Template={Template}",
                 disabledMarkerTemplatePath);
-            return EncounterCaptureButtonState.Unknown;
+            return new EncounterCaptureButtonObservation(
+                EncounterCaptureButtonState.Unknown,
+                0,
+                0,
+                0);
         }
 
         var enabledMatchTask = MatchRuntimeTemplateResultAsync(
@@ -322,24 +329,52 @@ public sealed partial class RuntimeTaskService
             enabledMatch.Score,
             disabledMatch.Score,
             disabledMarkerMatch.Score);
-
-        LogDebugOncePerValue(
-            CreateDebugLogKey("encounter-capture-button-state"),
-            string.Join(
-                "|",
-                buttonState,
-                CreateSimilarityDebugFingerprint(enabledMatch.Score),
-                CreateSimilarityDebugFingerprint(disabledMatch.Score),
-                CreateSimilarityDebugFingerprint(disabledMarkerMatch.Score)),
-            "奇遇捕捉按钮筛选：State={State}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, VisibilityThreshold={VisibilityThreshold:F3}, MarkerPresent={MarkerPresent:F3}, MarkerAbsent={MarkerAbsent:F3}",
+        return new EncounterCaptureButtonObservation(
             buttonState,
             enabledMatch.Score,
             disabledMatch.Score,
-            disabledMarkerMatch.Score,
-            EncounterCaptureButtonRecognition.MinimumVisibilityScore,
-            EncounterCaptureButtonRecognition.DisabledMarkerPresentScore,
-            EncounterCaptureButtonRecognition.DisabledMarkerAbsentScore);
-        return buttonState;
+            disabledMarkerMatch.Score);
+    }
+
+    private void RememberEncounterCaptureButtonObservation(
+        EncounterCaptureButtonObservation observation)
+    {
+        lock (_encounterCaptureButtonObservationLock)
+        {
+            _latestEncounterCaptureButtonObservation = observation;
+        }
+    }
+
+    private void LogAdoptedEncounterCaptureButtonObservationForCurrentTurn()
+    {
+        if (IsAutoBattleBossBattle
+            || _hasLoggedCurrentAutoBattleCaptureButtonObservation)
+        {
+            return;
+        }
+
+        EncounterCaptureButtonObservation? observation;
+        lock (_encounterCaptureButtonObservationLock)
+        {
+            observation = _latestEncounterCaptureButtonObservation;
+        }
+
+        if (observation is null)
+        {
+            return;
+        }
+
+        var turnNumber = _currentAutoBattleTurnNumber > 0
+            ? _currentAutoBattleTurnNumber
+            : 1;
+        _logger.LogDebug(
+            "自动战斗：第 {TurnNumber} 回合采用捕捉按钮识别结果：State={State}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}",
+            turnNumber,
+            observation.State,
+            observation.EnabledScore,
+            observation.DisabledScore,
+            observation.DisabledMarkerScore);
+        _hasLoggedCurrentAutoBattleCaptureButtonObservation = true;
     }
 
     private void ApplyEncounterCaptureButtonState(
@@ -702,6 +737,11 @@ public sealed partial class RuntimeTaskService
         }
 
         _encounterCaptureButtonStateTracker.Reset();
+        lock (_encounterCaptureButtonObservationLock)
+        {
+            _latestEncounterCaptureButtonObservation = null;
+        }
+
         lock (_runtimeEncounterSignalLock)
         {
             _lastAuxiliaryTipTexts.Clear();
@@ -791,4 +831,10 @@ public sealed partial class RuntimeTaskService
             TextMatchingHelper.CalculateSimilarity(normalized, "异色精灵"));
         return similarity >= ShinyTipMatchThreshold;
     }
+
+    private sealed record EncounterCaptureButtonObservation(
+        EncounterCaptureButtonState State,
+        double EnabledScore,
+        double DisabledScore,
+        double DisabledMarkerScore);
 }

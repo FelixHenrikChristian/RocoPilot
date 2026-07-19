@@ -1,5 +1,8 @@
 using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Models.Capture;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.TextRecognition;
+using RocoPilot.Services.Recognition;
 using RocoPilot.Services.TextRecognition.Backends;
 
 namespace RocoPilot.Services.TextRecognition;
@@ -52,6 +55,33 @@ public sealed class TextRecognitionService : ITextRecognitionService
         }
 
         return backend.RecognizeAsync(imageBytes, cancellationToken);
+    }
+
+    public async Task<TextRecognitionResult> RecognizeAsync(
+        CapturedFrame frame,
+        RecognitionRegion region,
+        TextRecognitionLayout layout,
+        TextRecognitionMethod method,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(frame);
+        ArgumentNullException.ThrowIfNull(region);
+
+        if (!_backends.TryGetValue(method, out var backend))
+        {
+            throw new NotSupportedException($"Unsupported text recognition method: {method}");
+        }
+
+        if (backend is IFrameTextRecognitionBackend frameBackend)
+        {
+            return await frameBackend.RecognizeAsync(frame, region, layout, cancellationToken);
+        }
+
+        var imageBytes = await RecognitionRegionImageHelper.EncodePngAsync(
+            frame,
+            region,
+            cancellationToken);
+        return await backend.RecognizeAsync(imageBytes, cancellationToken);
     }
 
     private static int GetMethodPriority(TextRecognitionMethod method)

@@ -20,6 +20,7 @@ using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Services.Recognition;
+using RocoPilot.Services.TextRecognition;
 
 namespace RocoPilot.Services;
 
@@ -956,12 +957,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return string.Empty;
         }
 
-        var imageBytes = await RecognitionRegionImageHelper.EncodePngAsync(
+        var result = await _textRecognitionService.RecognizeAsync(
             frame,
             frameRegion,
-            cancellationToken);
-        var result = await _textRecognitionService.RecognizeAsync(
-            imageBytes,
+            RuntimeOcrRecognitionMode.ResolveLayout(region.Id),
             recognitionMethod.Method,
             cancellationToken);
         _recognitionOverlayService.ShowOcrResult(region.Id, result.Text);

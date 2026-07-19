@@ -1,18 +1,24 @@
 {
-  "currentSeasonId": "S2",
+  "currentSeasonId": "S3",
   "spiritNameMatchThreshold": 0.55,
   "seasons": [
     {
       "id": "S1",
       "name": "S1赛季",
-      "dateRange": "2025/3/26-2025/5/21",
+      "dateRange": "2026/3/26-2026/5/21",
       "encounterTypeName": "污染"
     },
     {
       "id": "S2",
       "name": "S2赛季",
-      "dateRange": "2025/5/22-2025/7/15",
+      "dateRange": "2026/5/22-2026/7/15",
       "encounterTypeName": "狂欢"
+    },
+    {
+      "id": "S3",
+      "name": "S3赛季",
+      "dateRange": "2026/7/16-2026/9/9",
+      "encounterTypeName": "铅绘"
     }
   ]
 }

@@ -123,6 +123,7 @@ public partial class App : Application
             services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionBackend>();
             services.AddSingleton<ISingleLineTextRecognitionBackend>(provider =>
                 provider.GetRequiredService<OnnxOcrV5SingleLineTextRecognitionBackend>());
+            services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionTestBackend>();
             services.AddSingleton<ITextRecognitionService, TextRecognitionService>();
 
             // Core Services

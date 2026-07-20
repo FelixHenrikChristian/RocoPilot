@@ -12,42 +12,43 @@ namespace RocoPilot.Tests;
 public sealed class TextRecognitionServiceFrameTests
 {
     [TestMethod]
-    public async Task SendsFrameDirectlyToFrameCapableBackend()
+    public async Task SendsFrameDirectlyToBackendSelectedByMethod()
     {
-        var backend = new FrameCapableBackend();
-        var service = new TextRecognitionService([backend]);
+        var paddleBackend = new FrameCapableBackend(TextRecognitionMethod.PaddleOcrV5, "paddle-frame");
+        var onnxBackend = new FrameCapableBackend(TextRecognitionMethod.OnnxOcrV5, "onnx-frame");
+        var service = new TextRecognitionService([paddleBackend, onnxBackend]);
         using var frame = new CapturedFrame(2, 2, new byte[16]);
         var region = new RecognitionRegion { Id = "single-line", Width = 2, Height = 2 };
+        var recognizeMethod = service.GetType().GetMethod(
+            "RecognizeAsync",
+            [
+                typeof(CapturedFrame),
+                typeof(RecognitionRegion),
+                typeof(TextRecognitionMethod),
+                typeof(CancellationToken)
+            ]);
 
-        var result = await service.RecognizeAsync(
-            frame,
-            region,
-            TextRecognitionLayout.SingleLine,
-            TextRecognitionMethod.PaddleOcrV5);
+        Assert.IsNotNull(recognizeMethod, "帧识别不应再依赖单行或多行布局。");
+        var recognitionTask = (Task<TextRecognitionResult>)recognizeMethod.Invoke(
+            service,
+            [frame, region, TextRecognitionMethod.OnnxOcrV5, CancellationToken.None])!;
+        var result = await recognitionTask;
 
-        Assert.AreEqual("direct-frame", result.Text);
-        Assert.IsTrue(backend.ReceivedFrame);
-        Assert.IsFalse(backend.ReceivedImageBytes);
+        Assert.AreEqual("onnx-frame", result.Text);
+        Assert.IsTrue(onnxBackend.ReceivedFrame);
+        Assert.IsFalse(paddleBackend.ReceivedFrame);
     }
 
     [TestMethod]
-    public async Task PrefersAvailableSingleLineBackend()
+    public void PrefersOnnxAsDefaultMethod()
     {
-        var frameBackend = new FrameCapableBackend();
-        var singleLineBackend = new SingleLineBackend();
-        var service = new TextRecognitionService([frameBackend], [singleLineBackend]);
-        using var frame = new CapturedFrame(2, 2, new byte[16]);
-        var region = new RecognitionRegion { Id = "single-line", Width = 2, Height = 2 };
+        var service = new TextRecognitionService(
+        [
+            new FrameCapableBackend(TextRecognitionMethod.PaddleOcrV5, "paddle-frame"),
+            new FrameCapableBackend(TextRecognitionMethod.OnnxOcrV5, "onnx-frame")
+        ]);
 
-        var result = await service.RecognizeAsync(
-            frame,
-            region,
-            TextRecognitionLayout.SingleLine,
-            TextRecognitionMethod.PaddleOcrV5);
-
-        Assert.AreEqual("onnx-single-line", result.Text);
-        Assert.IsTrue(singleLineBackend.ReceivedFrame);
-        Assert.IsFalse(frameBackend.ReceivedFrame);
+        Assert.AreEqual(TextRecognitionMethod.OnnxOcrV5, service.GetDefaultMethod()?.Method);
     }
 
     private sealed class FrameCapableBackend : ITextRecognitionBackend, IFrameTextRecognitionBackend
@@ -56,7 +57,15 @@ public sealed class TextRecognitionServiceFrameTests
 
         public bool ReceivedImageBytes { get; private set; }
 
-        public TextRecognitionMethod Method => TextRecognitionMethod.PaddleOcrV5;
+        private readonly string _text;
+
+        public FrameCapableBackend(TextRecognitionMethod method, string text)
+        {
+            Method = method;
+            _text = text;
+        }
+
+        public TextRecognitionMethod Method { get; }
 
         public TextRecognitionMethodOption GetOption()
         {
@@ -72,13 +81,11 @@ public sealed class TextRecognitionServiceFrameTests
         public Task<TextRecognitionResult> RecognizeAsync(
             CapturedFrame frame,
             RecognitionRegion region,
-            TextRecognitionLayout layout,
             CancellationToken cancellationToken)
         {
             ReceivedFrame = true;
-            Assert.AreEqual(TextRecognitionLayout.SingleLine, layout);
             Assert.AreEqual("single-line", region.Id);
-            return Task.FromResult(CreateResult("direct-frame"));
+            return Task.FromResult(CreateResult(_text));
         }
 
         private TextRecognitionResult CreateResult(string text)
@@ -87,21 +94,4 @@ public sealed class TextRecognitionServiceFrameTests
         }
     }
 
-    private sealed class SingleLineBackend : ISingleLineTextRecognitionBackend
-    {
-        public bool ReceivedFrame { get; private set; }
-
-        public TextRecognitionMethod Method => TextRecognitionMethod.PaddleOcrV5;
-
-        public bool IsAvailable => true;
-
-        public Task<TextRecognitionResult> RecognizeAsync(
-            CapturedFrame frame,
-            RecognitionRegion region,
-            CancellationToken cancellationToken)
-        {
-            ReceivedFrame = true;
-            return Task.FromResult(new TextRecognitionResult(Method, "onnx", null, ["onnx-single-line"], 1));
-        }
-    }
 }

@@ -12,18 +12,17 @@ using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.Services.TextRecognition.Backends;
 
-public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextRecognitionBackend, IDisposable
+public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
 {
     private const string MethodName = "ONNX Runtime PP-OCRv5";
     private const string LanguageName = "Chinese/English";
+    private const TextRecognitionMethod ResultMethod = TextRecognitionMethod.OnnxOcrV5;
     private const int ModelHeight = 48;
     private const int MaximumWidth = 320;
 
     private readonly Lazy<OnnxOcrV5Recognizer?> _recognizer = new(CreateRecognizer);
     private readonly SemaphoreSlim _recognitionLock = new(1, 1);
     private bool _isDisposed;
-
-    public TextRecognitionMethod Method => TextRecognitionMethod.PaddleOcrV5;
 
     public bool IsAvailable => !_isDisposed && _recognizer.Value is not null;
 
@@ -177,7 +176,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextR
         try
         {
             var text = await Task.Run(() => recognizer.Recognize(image), cancellationToken);
-            return TextRecognitionResultFactory.Create(Method, MethodName, LanguageName, text);
+            return TextRecognitionResultFactory.Create(ResultMethod, MethodName, LanguageName, text);
         }
         finally
         {

@@ -15,7 +15,7 @@ public sealed class RuntimeTaskStartOptions
     {
         get;
         init;
-    } = TextRecognitionMethod.PaddleOcrV5;
+    } = TextRecognitionMethod.OnnxOcrV5;
 
     public bool RecognitionOverlayEnabled
     {

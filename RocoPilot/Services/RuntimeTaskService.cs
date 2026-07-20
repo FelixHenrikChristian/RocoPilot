@@ -960,7 +960,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var result = await _textRecognitionService.RecognizeAsync(
             frame,
             frameRegion,
-            RuntimeOcrRecognitionMode.ResolveLayout(region.Id),
             recognitionMethod.Method,
             cancellationToken);
         _recognitionOverlayService.ShowOcrResult(region.Id, result.Text);

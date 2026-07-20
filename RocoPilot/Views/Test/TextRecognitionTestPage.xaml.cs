@@ -8,7 +8,6 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using RocoPilot.Helpers;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.TextRecognition;
-using RocoPilot.Services.TextRecognition.Backends;
 
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Streams;
@@ -20,7 +19,6 @@ public sealed partial class TextRecognitionTestPage : Page
     private const int ScreenClipClipboardTimeoutSeconds = 30;
 
     private readonly ITextRecognitionService _textRecognitionService;
-    private readonly OnnxOcrV5SingleLineTextRecognitionTestBackend _onnxOcrV5SingleLineTestBackend;
     private IReadOnlyList<TextRecognitionMethodOption> _recognitionMethods = Array.Empty<TextRecognitionMethodOption>();
     private byte[]? _loadedImageBytes;
     private string? _loadedSourceName;
@@ -31,7 +29,6 @@ public sealed partial class TextRecognitionTestPage : Page
     public TextRecognitionTestPage()
     {
         _textRecognitionService = App.GetService<ITextRecognitionService>();
-        _onnxOcrV5SingleLineTestBackend = App.GetService<OnnxOcrV5SingleLineTextRecognitionTestBackend>();
 
         InitializeComponent();
 
@@ -43,8 +40,7 @@ public sealed partial class TextRecognitionTestPage : Page
     private void LoadRecognitionMethods()
     {
         _recognitionMethods = BuildRecognitionMethods(
-            _textRecognitionService.GetMethods(),
-            _onnxOcrV5SingleLineTestBackend.GetOption());
+            _textRecognitionService.GetMethods());
         RecognitionMethodComboBox.ItemsSource = _recognitionMethods;
         RecognitionMethodComboBox.SelectedItem = _recognitionMethods.FirstOrDefault(method => method.IsAvailable)
             ?? _recognitionMethods.FirstOrDefault();
@@ -53,14 +49,11 @@ public sealed partial class TextRecognitionTestPage : Page
     }
 
     private static IReadOnlyList<TextRecognitionMethodOption> BuildRecognitionMethods(
-        IReadOnlyList<TextRecognitionMethodOption> methods,
-        TextRecognitionMethodOption onnxSingleLineOption)
+        IReadOnlyList<TextRecognitionMethodOption> methods)
     {
-        return
-        [
-            onnxSingleLineOption,
-            .. methods.Where(method => method.Method != TextRecognitionMethod.OnnxOcrV5)
-        ];
+        return methods
+            .OrderBy(method => method.Method == TextRecognitionMethod.OnnxOcrV5 ? 0 : 1)
+            .ToList();
     }
 
     private async void ImportImageButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -159,9 +152,7 @@ public sealed partial class TextRecognitionTestPage : Page
         try
         {
             var recognitionStartedAt = Stopwatch.GetTimestamp();
-            var result = selectedMethod.Method == TextRecognitionMethod.OnnxOcrV5
-                ? await _onnxOcrV5SingleLineTestBackend.RecognizeAsync(_loadedImageBytes)
-                : await _textRecognitionService.RecognizeAsync(_loadedImageBytes, selectedMethod.Method);
+            var result = await _textRecognitionService.RecognizeAsync(_loadedImageBytes, selectedMethod.Method);
             var recognitionElapsed = Stopwatch.GetElapsedTime(recognitionStartedAt);
             ResultTextBox.Text = result.Text;
 

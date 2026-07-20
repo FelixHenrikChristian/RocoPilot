@@ -18,7 +18,6 @@ public interface ITextRecognitionService
     Task<TextRecognitionResult> RecognizeAsync(
         CapturedFrame frame,
         RecognitionRegion region,
-        TextRecognitionLayout layout,
         TextRecognitionMethod method,
         CancellationToken cancellationToken = default);
 }

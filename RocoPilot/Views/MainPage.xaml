@@ -174,7 +174,7 @@
                             DisplayMemberPath="Name"
                             ItemsSource="{x:Bind ViewModel.TextRecognitionMethods}"
                             SelectedItem="{x:Bind ViewModel.SelectedTextRecognitionMethod, Mode=TwoWay}"
-                            ToolTipService.ToolTip="PaddleOCR 效果最好，推荐使用。" />
+                            ToolTipService.ToolTip="ONNX OCR 速度优先；PaddleOCR 适合需要完整文字检测的场景。" />
                     </Grid>
 
                     <Border

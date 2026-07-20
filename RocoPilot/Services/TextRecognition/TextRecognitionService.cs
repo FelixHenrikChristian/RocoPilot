@@ -11,20 +11,17 @@ public sealed class TextRecognitionService : ITextRecognitionService
 {
     private static readonly IReadOnlyDictionary<TextRecognitionMethod, int> MethodPriority = new Dictionary<TextRecognitionMethod, int>
     {
-        [TextRecognitionMethod.PaddleOcrV5] = 0,
-        [TextRecognitionMethod.TesseractOcr] = 1,
-        [TextRecognitionMethod.WindowsOcr] = 2
+        [TextRecognitionMethod.OnnxOcrV5] = 0,
+        [TextRecognitionMethod.PaddleOcrV5] = 1,
+        [TextRecognitionMethod.TesseractOcr] = 2,
+        [TextRecognitionMethod.WindowsOcr] = 3
     };
 
     private readonly IReadOnlyDictionary<TextRecognitionMethod, ITextRecognitionBackend> _backends;
-    private readonly IReadOnlyList<ISingleLineTextRecognitionBackend> _singleLineBackends;
 
-    public TextRecognitionService(
-        IEnumerable<ITextRecognitionBackend> backends,
-        IEnumerable<ISingleLineTextRecognitionBackend>? singleLineBackends = null)
+    public TextRecognitionService(IEnumerable<ITextRecognitionBackend> backends)
     {
         _backends = backends.ToDictionary(backend => backend.Method);
-        _singleLineBackends = singleLineBackends?.ToList() ?? [];
     }
 
     public IReadOnlyList<TextRecognitionMethodOption> GetMethods()
@@ -64,7 +61,6 @@ public sealed class TextRecognitionService : ITextRecognitionService
     public async Task<TextRecognitionResult> RecognizeAsync(
         CapturedFrame frame,
         RecognitionRegion region,
-        TextRecognitionLayout layout,
         TextRecognitionMethod method,
         CancellationToken cancellationToken = default)
     {
@@ -76,17 +72,9 @@ public sealed class TextRecognitionService : ITextRecognitionService
             throw new NotSupportedException($"Unsupported text recognition method: {method}");
         }
 
-        var singleLineBackend = layout == TextRecognitionLayout.SingleLine
-            ? _singleLineBackends.FirstOrDefault(candidate => candidate.Method == method && candidate.IsAvailable)
-            : null;
-        if (singleLineBackend is not null)
-        {
-            return await singleLineBackend.RecognizeAsync(frame, region, cancellationToken);
-        }
-
         if (backend is IFrameTextRecognitionBackend frameBackend)
         {
-            return await frameBackend.RecognizeAsync(frame, region, layout, cancellationToken);
+            return await frameBackend.RecognizeAsync(frame, region, cancellationToken);
         }
 
         var imageBytes = await RecognitionRegionImageHelper.EncodePngAsync(

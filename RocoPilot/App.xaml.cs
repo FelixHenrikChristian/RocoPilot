@@ -121,9 +121,7 @@ public partial class App : Application
             services.AddSingleton<ITextRecognitionBackend, WindowsOcrTextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, TesseractTextRecognitionBackend>();
             services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionBackend>();
-            services.AddSingleton<ISingleLineTextRecognitionBackend>(provider =>
-                provider.GetRequiredService<OnnxOcrV5SingleLineTextRecognitionBackend>());
-            services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionTestBackend>();
+            services.AddSingleton<ITextRecognitionBackend, OnnxOcrV5TextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionService, TextRecognitionService>();
 
             // Core Services

@@ -49,13 +49,13 @@ public sealed class TextRecognitionTestPageTests
             "BuildRecognitionMethods",
             BindingFlags.NonPublic | BindingFlags.Static,
             binder: null,
-            types: [typeof(IReadOnlyList<TextRecognitionMethodOption>), typeof(TextRecognitionMethodOption)],
+            types: [typeof(IReadOnlyList<TextRecognitionMethodOption>)],
             modifiers: null);
 
         Assert.IsNotNull(orderingMethod, "测试页应优先展示 ONNX 单行 OCR。");
         var methods = (IReadOnlyList<TextRecognitionMethodOption>)orderingMethod.Invoke(
             null,
-            new object?[] { new[] { paddleOption }, onnxOption })!;
+            new object?[] { new[] { paddleOption, onnxOption } })!;
 
         Assert.AreEqual(TextRecognitionMethod.OnnxOcrV5, methods[0].Method);
         Assert.AreEqual(TextRecognitionMethod.PaddleOcrV5, methods[1].Method);

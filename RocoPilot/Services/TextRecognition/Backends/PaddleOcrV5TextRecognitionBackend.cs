@@ -73,7 +73,6 @@ public sealed class PaddleOcrV5TextRecognitionBackend : ITextRecognitionBackend,
     public async Task<TextRecognitionResult> RecognizeAsync(
         CapturedFrame frame,
         RecognitionRegion region,
-        TextRecognitionLayout layout,
         CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_isDisposed, this);
@@ -100,11 +99,7 @@ public sealed class PaddleOcrV5TextRecognitionBackend : ITextRecognitionBackend,
             using var image = new Mat();
             Cv2.CvtColor(sourceRegion, image, ColorConversionCodes.BGRA2BGR);
 
-            var text = await Task.Run(
-                () => layout == TextRecognitionLayout.SingleLine
-                    ? _engine.Value.Recognizer.Run(image).Text
-                    : _engine.Value.Run(image).Text,
-                cancellationToken);
+            var text = await Task.Run(() => _engine.Value.Run(image).Text, cancellationToken);
             return TextRecognitionResultFactory.Create(Method, MethodName, LanguageName, text);
         }
         finally

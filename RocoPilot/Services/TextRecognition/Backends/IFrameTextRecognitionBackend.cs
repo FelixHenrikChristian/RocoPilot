@@ -9,6 +9,5 @@ public interface IFrameTextRecognitionBackend
     Task<TextRecognitionResult> RecognizeAsync(
         CapturedFrame frame,
         RecognitionRegion region,
-        TextRecognitionLayout layout,
         CancellationToken cancellationToken);
 }

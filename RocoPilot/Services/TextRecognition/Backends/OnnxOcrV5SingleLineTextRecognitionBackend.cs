@@ -64,7 +64,6 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextR
         var recognizer = _recognizer.Value
             ?? throw new InvalidOperationException("The ONNX OCR recognizer is unavailable.");
 
-        await _recognitionLock.WaitAsync(cancellationToken);
         GCHandle pixelHandle = default;
         try
         {
@@ -77,9 +76,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextR
             using var sourceRegion = new Mat(source, new Rect(region.X, region.Y, region.Width, region.Height));
             using var image = new Mat();
             Cv2.CvtColor(sourceRegion, image, ColorConversionCodes.BGRA2BGR);
-
-            var text = await Task.Run(() => recognizer.Recognize(image), cancellationToken);
-            return TextRecognitionResultFactory.Create(Method, MethodName, LanguageName, text);
+            return await RecognizeImageAsync(image, recognizer, cancellationToken);
         }
         finally
         {
@@ -87,9 +84,30 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextR
             {
                 pixelHandle.Free();
             }
-
-            _recognitionLock.Release();
         }
+    }
+
+    public async Task<TextRecognitionResult> RecognizeAsync(
+        byte[] imageBytes,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_isDisposed, this);
+        ArgumentNullException.ThrowIfNull(imageBytes);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (imageBytes.Length == 0)
+        {
+            throw new ArgumentException("OCR input image is empty.", nameof(imageBytes));
+        }
+
+        var recognizer = _recognizer.Value
+            ?? throw new InvalidOperationException("The ONNX OCR recognizer is unavailable.");
+        using var image = Cv2.ImDecode(imageBytes, ImreadModes.Color);
+        if (image.Empty())
+        {
+            throw new InvalidDataException("OCR input image could not be decoded.");
+        }
+
+        return await RecognizeImageAsync(image, recognizer, cancellationToken);
     }
 
     public void Dispose()
@@ -147,6 +165,23 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : ISingleLineTextR
             || region.Y > frame.Height - region.Height)
         {
             throw new ArgumentOutOfRangeException(nameof(region), "Recognition region must be inside the captured frame.");
+        }
+    }
+
+    private async Task<TextRecognitionResult> RecognizeImageAsync(
+        Mat image,
+        OnnxOcrV5Recognizer recognizer,
+        CancellationToken cancellationToken)
+    {
+        await _recognitionLock.WaitAsync(cancellationToken);
+        try
+        {
+            var text = await Task.Run(() => recognizer.Recognize(image), cancellationToken);
+            return TextRecognitionResultFactory.Create(Method, MethodName, LanguageName, text);
+        }
+        finally
+        {
+            _recognitionLock.Release();
         }
     }
 

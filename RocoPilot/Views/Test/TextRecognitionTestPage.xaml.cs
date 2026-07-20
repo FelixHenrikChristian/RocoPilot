@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 using Microsoft.UI.Xaml.Controls;
@@ -6,6 +8,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using RocoPilot.Helpers;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.TextRecognition;
+using RocoPilot.Services.TextRecognition.Backends;
 
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Streams;
@@ -17,6 +20,7 @@ public sealed partial class TextRecognitionTestPage : Page
     private const int ScreenClipClipboardTimeoutSeconds = 30;
 
     private readonly ITextRecognitionService _textRecognitionService;
+    private readonly OnnxOcrV5SingleLineTextRecognitionTestBackend _onnxOcrV5SingleLineTestBackend;
     private IReadOnlyList<TextRecognitionMethodOption> _recognitionMethods = Array.Empty<TextRecognitionMethodOption>();
     private byte[]? _loadedImageBytes;
     private string? _loadedSourceName;
@@ -27,6 +31,7 @@ public sealed partial class TextRecognitionTestPage : Page
     public TextRecognitionTestPage()
     {
         _textRecognitionService = App.GetService<ITextRecognitionService>();
+        _onnxOcrV5SingleLineTestBackend = App.GetService<OnnxOcrV5SingleLineTextRecognitionTestBackend>();
 
         InitializeComponent();
 
@@ -37,12 +42,25 @@ public sealed partial class TextRecognitionTestPage : Page
 
     private void LoadRecognitionMethods()
     {
-        _recognitionMethods = _textRecognitionService.GetMethods();
+        _recognitionMethods = BuildRecognitionMethods(
+            _textRecognitionService.GetMethods(),
+            _onnxOcrV5SingleLineTestBackend.GetOption());
         RecognitionMethodComboBox.ItemsSource = _recognitionMethods;
         RecognitionMethodComboBox.SelectedItem = _recognitionMethods.FirstOrDefault(method => method.IsAvailable)
             ?? _recognitionMethods.FirstOrDefault();
 
         UpdateRecognitionMethodStatus();
+    }
+
+    private static IReadOnlyList<TextRecognitionMethodOption> BuildRecognitionMethods(
+        IReadOnlyList<TextRecognitionMethodOption> methods,
+        TextRecognitionMethodOption onnxSingleLineOption)
+    {
+        return
+        [
+            onnxSingleLineOption,
+            .. methods.Where(method => method.Method != TextRecognitionMethod.OnnxOcrV5)
+        ];
     }
 
     private async void ImportImageButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -140,12 +158,16 @@ public sealed partial class TextRecognitionTestPage : Page
 
         try
         {
-            var result = await _textRecognitionService.RecognizeAsync(_loadedImageBytes, selectedMethod.Method);
+            var recognitionStartedAt = Stopwatch.GetTimestamp();
+            var result = selectedMethod.Method == TextRecognitionMethod.OnnxOcrV5
+                ? await _onnxOcrV5SingleLineTestBackend.RecognizeAsync(_loadedImageBytes)
+                : await _textRecognitionService.RecognizeAsync(_loadedImageBytes, selectedMethod.Method);
+            var recognitionElapsed = Stopwatch.GetElapsedTime(recognitionStartedAt);
             ResultTextBox.Text = result.Text;
 
             ResultStatusText.Text = result.Text.Length == 0
-                ? BuildFinishedStatus("未识别到文字", result)
-                : BuildFinishedStatus($"识别完成：{result.Lines.Count} 行，{result.WordCount} 个词", result);
+                ? BuildFinishedStatus("未识别到文字", result, recognitionElapsed)
+                : BuildFinishedStatus($"识别完成：{result.Lines.Count} 行，{result.WordCount} 个词", result, recognitionElapsed);
         }
         catch (Exception ex)
         {
@@ -398,11 +420,15 @@ public sealed partial class TextRecognitionTestPage : Page
         SetRecognitionBusy(_isRecognizing);
     }
 
-    private static string BuildFinishedStatus(string prefix, TextRecognitionResult result)
+    private static string BuildFinishedStatus(
+        string prefix,
+        TextRecognitionResult result,
+        TimeSpan recognitionElapsed)
     {
-        return string.IsNullOrWhiteSpace(result.LanguageName)
+        var status = string.IsNullOrWhiteSpace(result.LanguageName)
             ? $"{prefix} · {result.MethodName}"
             : $"{prefix} · {result.MethodName} · 识别语言：{result.LanguageName}";
+        return $"{status} · 耗时 {recognitionElapsed.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture)} ms";
     }
 
     private void SetRecognitionBusy(bool isRecognizing)

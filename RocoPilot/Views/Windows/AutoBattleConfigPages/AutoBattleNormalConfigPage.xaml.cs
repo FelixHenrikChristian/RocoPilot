@@ -47,15 +47,13 @@ public sealed partial class AutoBattleNormalConfigPage : Page
             return;
         }
 
-        var deleteItem = new MenuFlyoutItem
-        {
-            Text = "删除"
-        };
-        deleteItem.Click += (_, _) => Editor.RemoveNormalReleaseItem(item);
-
-        var flyout = new MenuFlyout();
-        flyout.Items.Add(deleteItem);
-        flyout.ShowAt(element);
+        ShowReleaseItemMenu(
+            element,
+            canMoveEarlier: Editor.CanMoveNormalReleaseItemEarlier(item),
+            canMoveLater: Editor.CanMoveNormalReleaseItemLater(item),
+            moveEarlier: () => Editor.MoveNormalReleaseItemEarlier(item),
+            moveLater: () => Editor.MoveNormalReleaseItemLater(item),
+            delete: () => Editor.RemoveNormalReleaseItem(item));
         e.Handled = true;
     }
 
@@ -70,5 +68,41 @@ public sealed partial class AutoBattleNormalConfigPage : Page
         {
             _owner.ShowMessage(error.Title, error.Message);
         }
+    }
+
+    private static void ShowReleaseItemMenu(
+        FrameworkElement element,
+        bool canMoveEarlier,
+        bool canMoveLater,
+        Action moveEarlier,
+        Action moveLater,
+        Action delete)
+    {
+        var moveEarlierItem = new MenuFlyoutItem
+        {
+            Text = "前移",
+            IsEnabled = canMoveEarlier
+        };
+        moveEarlierItem.Click += (_, _) => moveEarlier();
+
+        var moveLaterItem = new MenuFlyoutItem
+        {
+            Text = "后移",
+            IsEnabled = canMoveLater
+        };
+        moveLaterItem.Click += (_, _) => moveLater();
+
+        var deleteItem = new MenuFlyoutItem
+        {
+            Text = "删除"
+        };
+        deleteItem.Click += (_, _) => delete();
+
+        var flyout = new MenuFlyout();
+        flyout.Items.Add(moveEarlierItem);
+        flyout.Items.Add(moveLaterItem);
+        flyout.Items.Add(new MenuFlyoutSeparator());
+        flyout.Items.Add(deleteItem);
+        flyout.ShowAt(element);
     }
 }

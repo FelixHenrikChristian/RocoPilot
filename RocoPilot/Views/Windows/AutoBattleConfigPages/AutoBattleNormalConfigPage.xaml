@@ -37,7 +37,7 @@
                             <TextBlock Style="{StaticResource SectionTitleStyle}" Text="释放顺序" />
                             <TextBlock
                                 Style="{StaticResource SectionDescriptionStyle}"
-                                Text="从左到右循环执行；拖动可重排，右键可删除。" />
+                                Text="从左到右循环执行；右键可调整顺序或删除。" />
                         </StackPanel>
                         <StackPanel
                             Grid.Column="2"
@@ -113,9 +113,7 @@
                             CornerRadius="8">
                             <Grid>
                                 <GridView
-                                    AllowDrop="True"
-                                    CanDragItems="True"
-                                    CanReorderItems="True"
+                                    IsItemClickEnabled="False"
                                     IsSwipeEnabled="False"
                                     ItemsSource="{x:Bind Editor.NormalReleaseItems, Mode=OneWay}"
                                     SelectionMode="None">

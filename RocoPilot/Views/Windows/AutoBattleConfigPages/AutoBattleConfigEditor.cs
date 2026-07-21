@@ -103,6 +103,18 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         NormalReleaseItems.Remove(item);
     }
 
+    public bool CanMoveNormalReleaseItemEarlier(AutoBattleReleaseEditorItem item)
+        => CanMoveItemEarlier(NormalReleaseItems, item);
+
+    public bool CanMoveNormalReleaseItemLater(AutoBattleReleaseEditorItem item)
+        => CanMoveItemLater(NormalReleaseItems, item);
+
+    public void MoveNormalReleaseItemEarlier(AutoBattleReleaseEditorItem item)
+        => MoveItemEarlier(NormalReleaseItems, item);
+
+    public void MoveNormalReleaseItemLater(AutoBattleReleaseEditorItem item)
+        => MoveItemLater(NormalReleaseItems, item);
+
     public void AppendBossSkill(string? skillKey)
     {
         if (NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
@@ -129,6 +141,18 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     {
         BossReleaseItems.Remove(item);
     }
+
+    public bool CanMoveBossReleaseItemEarlier(AutoBattleReleaseEditorItem item)
+        => CanMoveItemEarlier(BossReleaseItems, item);
+
+    public bool CanMoveBossReleaseItemLater(AutoBattleReleaseEditorItem item)
+        => CanMoveItemLater(BossReleaseItems, item);
+
+    public void MoveBossReleaseItemEarlier(AutoBattleReleaseEditorItem item)
+        => MoveItemEarlier(BossReleaseItems, item);
+
+    public void MoveBossReleaseItemLater(AutoBattleReleaseEditorItem item)
+        => MoveItemLater(BossReleaseItems, item);
 
     public void AddSharedPreset()
     {
@@ -206,6 +230,18 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     {
         BossComboItems.Remove(item);
     }
+
+    public bool CanMoveBossComboItemEarlier(AutoBattleReleaseEditorItem item)
+        => CanMoveItemEarlier(BossComboItems, item);
+
+    public bool CanMoveBossComboItemLater(AutoBattleReleaseEditorItem item)
+        => CanMoveItemLater(BossComboItems, item);
+
+    public void MoveBossComboItemEarlier(AutoBattleReleaseEditorItem item)
+        => MoveItemEarlier(BossComboItems, item);
+
+    public void MoveBossComboItemLater(AutoBattleReleaseEditorItem item)
+        => MoveItemLater(BossComboItems, item);
 
     public bool TryBuildSettings(
         AutoBattleSettings source,
@@ -440,6 +476,43 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     {
         OnPropertyChanged(nameof(SharedPresetEmptyVisibility));
         OnPropertyChanged(nameof(SharedPresetSummary));
+    }
+
+    private static bool CanMoveItemEarlier(
+        ObservableCollection<AutoBattleReleaseEditorItem> items,
+        AutoBattleReleaseEditorItem item)
+    {
+        return items.IndexOf(item) > 0;
+    }
+
+    private static bool CanMoveItemLater(
+        ObservableCollection<AutoBattleReleaseEditorItem> items,
+        AutoBattleReleaseEditorItem item)
+    {
+        var index = items.IndexOf(item);
+        return index >= 0 && index < items.Count - 1;
+    }
+
+    private static void MoveItemEarlier(
+        ObservableCollection<AutoBattleReleaseEditorItem> items,
+        AutoBattleReleaseEditorItem item)
+    {
+        var index = items.IndexOf(item);
+        if (index > 0)
+        {
+            items.Move(index, index - 1);
+        }
+    }
+
+    private static void MoveItemLater(
+        ObservableCollection<AutoBattleReleaseEditorItem> items,
+        AutoBattleReleaseEditorItem item)
+    {
+        var index = items.IndexOf(item);
+        if (index >= 0 && index < items.Count - 1)
+        {
+            items.Move(index, index + 1);
+        }
     }
 
     private static void RefreshReleaseIndexes(

@@ -19,6 +19,7 @@ public sealed partial class RuntimeTaskService
     private const string CaptureButtonDisabledTemplateName = "battle-button-capture-disabled.png";
     private const string CaptureButtonDisabledMarkerTemplateName = "battle-button-capture-disabled-marker.png";
     private const string S3SeasonId = "S3";
+    private const int S3EncounterTipMinimumTextLength = 5;
     private const string ShinyTipText = "发现异色精灵";
     private const double ShinyTipMatchThreshold = 0.78;
     private const int ShinyTipMinimumTextLength = 4;
@@ -208,12 +209,13 @@ public sealed partial class RuntimeTaskService
             BattleS3EncounterTipRegionIds,
             cancellationToken,
             "S3 奇遇提示");
-        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
+        if (TextMatchingHelper.CleanRecognizedText(tipText).Length < S3EncounterTipMinimumTextLength
+            || !TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
         {
             return;
         }
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "S3 奇遇血脉提示：{TipText}",
             FormatLogText(tipText));
     }

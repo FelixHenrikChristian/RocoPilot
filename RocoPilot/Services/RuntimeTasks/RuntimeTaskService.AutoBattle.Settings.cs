@@ -7,7 +7,9 @@ public sealed partial class RuntimeTaskService
 {
     private AutoBattleReleaseStep GetCurrentAutoBattleReleaseStep(AutoBattleSettings settings)
     {
-        var releaseSequence = NormalizeAutoBattleReleaseSequence(settings);
+        var releaseSequence = IsAutoBattleBossBattle
+            ? NormalizeAutoBattleBossReleaseSequence(settings)
+            : NormalizeAutoBattleReleaseSequence(settings);
         if (_autoBattleRoundIndex >= releaseSequence.Count)
         {
             _autoBattleRoundIndex = 0;
@@ -144,6 +146,9 @@ public sealed partial class RuntimeTaskService
         normalized.ReleaseSequence = NormalizeAutoBattleReleaseSequence(normalized)
             .Select(step => step.Clone())
             .ToList();
+        normalized.BossReleaseSequence = NormalizeAutoBattleBossReleaseSequence(normalized)
+            .Select(step => step.Clone())
+            .ToList();
         normalized.TurnSequencePresets = NormalizeAutoBattleTurnSequencePresets(normalized.TurnSequencePresets);
         if (!Enum.IsDefined(normalized.EncounterRelievedAction))
         {
@@ -216,6 +221,19 @@ public sealed partial class RuntimeTaskService
         return ParseAutoBattleRoundOrder(settings.RoundOrder)
             .Select(AutoBattleReleaseStep.CreateSkill)
             .ToArray();
+    }
+
+    internal static IReadOnlyList<AutoBattleReleaseStep> NormalizeAutoBattleBossReleaseSequence(
+        AutoBattleSettings settings)
+    {
+        var releaseSequence = (settings.BossReleaseSequence ?? [])
+            .Select(NormalizeAutoBattleReleaseStep)
+            .OfType<AutoBattleReleaseStep>()
+            .ToArray();
+
+        return releaseSequence.Length > 0
+            ? releaseSequence
+            : NormalizeAutoBattleReleaseSequence(settings);
     }
 
     private static bool IsDefaultAutoBattleReleaseSequence(IReadOnlyList<AutoBattleReleaseStep> releaseSequence)

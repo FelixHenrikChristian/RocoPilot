@@ -51,7 +51,9 @@ public sealed partial class RuntimeTaskService
             _ => null
         };
 
-    private bool TryActivateAutoBattleBossBattle(string? bossNameText)
+    private bool TryActivateAutoBattleBossBattle(
+        string? bossNameText,
+        AutoBattleSettings settings)
     {
         if (_autoBattleType == AutoBattleType.Normal
             || !BossBattleRecognition.HasRecognizedName(bossNameText))
@@ -62,12 +64,15 @@ public sealed partial class RuntimeTaskService
         if (_autoBattleType != AutoBattleType.Boss)
         {
             _autoBattleType = AutoBattleType.Boss;
+            _autoBattleRoundIndex = 0;
+            _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
             ResetAutoBattleEncounterRelievedActionState();
             ResetAutoBattleShinySuspendState();
             ClearPendingShinyDetection();
             _logger.LogInformation(
-                "自动战斗：普通精灵名未匹配，首领名称区域识别到文字，已进入首领战斗。BossName={BossName}",
-                FormatLogText(bossNameText));
+                "自动战斗：普通精灵名未匹配，首领名称区域识别到文字，已进入首领战斗并切换到独立释放序列。BossName={BossName}, ReleaseStep={ReleaseStep}",
+                FormatLogText(bossNameText),
+                GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep));
         }
 
         return true;

@@ -9,7 +9,6 @@ public sealed class AutoBattleSettings
     public const string DefaultRoundOrder = "1, 2, 3, 4, X";
     public const string DefaultTurnSequence = "{skill}";
     public const string DefaultBossComboSequence = "1, X, 2, X, 3, X";
-    public const int BossComboSkillCount = 6;
     public const int DefaultSkillSelectionActionDelayMs = 500;
     public const int DefaultSkillSelectionRetryDelayMs = 4000;
     public const int DefaultKeyboardHoldDurationMs = 100;

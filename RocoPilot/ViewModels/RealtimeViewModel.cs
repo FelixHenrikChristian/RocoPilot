@@ -176,12 +176,8 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
     }
 
-    public string AutoBattleConfigurationSummary => BuildAutoBattleConfigurationSummary(
-        _autoBattleReleaseSequence,
-        _autoBattleBossReleaseSequence,
-        _autoBattleBossComboSequence,
-        SelectedAutoBattleEncounterRelievedAction,
-        SelectedAutoBattleKeyboardInputMethod);
+    public string AutoBattleConfigurationSummary =>
+        "配置普通/首领战斗的释放顺序、首领连招，以及可复用的公共执行序列。";
 
     public string AutoBattleOtherConfigurationSummary =>
         "包含高级时序选项；如无明确需求，建议保持默认设置。";
@@ -195,7 +191,6 @@ public partial class RealtimeViewModel : ObservableRecipient
                 && SetProperty(ref _selectedAutoBattleEncounterRelievedActionOption, value))
             {
                 SaveAutoBattleSettings();
-                OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
                 OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
             }
         }
@@ -213,7 +208,6 @@ public partial class RealtimeViewModel : ObservableRecipient
                 && SetProperty(ref _selectedAutoBattleKeyboardInputMethodOption, value))
             {
                 SaveAutoBattleSettings();
-                OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
                 OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
             }
         }
@@ -446,8 +440,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
         OnPropertyChanged(nameof(SelectedAutoBattleKeyboardInputMethodOption));
         OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
-        OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
-        OnPropertyChanged(nameof(AutoBattleOtherConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }
 
@@ -464,8 +456,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             _runtimeTaskService.SetAutoBattleSettings(BuildAutoBattleSettings());
         }
 
-        OnPropertyChanged(nameof(AutoBattleConfigurationSummary));
-        OnPropertyChanged(nameof(AutoBattleOtherConfigurationSummary));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }
 
@@ -490,40 +480,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         };
     }
 
-    private static string BuildAutoBattleConfigurationSummary(
-        IReadOnlyList<AutoBattleReleaseStep> releaseSequence,
-        IReadOnlyList<AutoBattleReleaseStep> bossReleaseSequence,
-        string bossComboSequence,
-        AutoBattleEncounterRelievedAction encounterRelievedAction,
-        KeyboardInputMethod inputMethod)
-    {
-        var encounterRelievedActionText = GetAutoBattleEncounterRelievedActionSummary(encounterRelievedAction);
-        var inputMethodText = GetAutoBattleKeyboardInputMethodSummary(inputMethod);
-        var bossComboText = string.Join(" → ", BossBattleComboSequence.ParseOrDefault(bossComboSequence));
-        var normalReleaseText = BuildAutoBattleReleaseSequenceSummary(releaseSequence);
-        var bossReleaseText = BuildAutoBattleReleaseSequenceSummary(bossReleaseSequence);
-        return $"普通 {normalReleaseText} · 首领 {bossReleaseText} / 连招 {bossComboText} → Space · {encounterRelievedActionText} · {inputMethodText}";
-    }
-
-    private static string BuildAutoBattleReleaseSequenceSummary(
-        IReadOnlyList<AutoBattleReleaseStep> releaseSequence)
-    {
-        if (releaseSequence.Count == 0)
-        {
-            return "未配置";
-        }
-
-        var previewItems = releaseSequence
-            .Take(4)
-            .Select(step => step.IsCustom
-                ? $"[{(string.IsNullOrWhiteSpace(step.Name) ? "自定义" : step.Name)}]"
-                : step.SkillKey);
-        var preview = string.Join(" → ", previewItems);
-        return releaseSequence.Count > 4
-            ? $"{preview} 等 {releaseSequence.Count} 步"
-            : $"{preview} · {releaseSequence.Count} 步";
-    }
-
     private AutoBattleEncounterRelievedActionOption FindAutoBattleEncounterRelievedActionOption(
         AutoBattleEncounterRelievedAction action)
     {
@@ -536,29 +492,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         return AutoBattleKeyboardInputMethodOptions.FirstOrDefault(option => option.Method == method)
             ?? AutoBattleKeyboardInputMethodOptions.First(option => option.Method == KeyboardInputMethod.PostMessage);
-    }
-
-    private static string GetAutoBattleEncounterRelievedActionSummary(AutoBattleEncounterRelievedAction action)
-    {
-        return action switch
-        {
-            AutoBattleEncounterRelievedAction.NoAction => "奇遇解除后无操作",
-            AutoBattleEncounterRelievedAction.RecoverEnergy => "奇遇解除后回能",
-            AutoBattleEncounterRelievedAction.ReleaseSkill => "始终战技",
-            AutoBattleEncounterRelievedAction.Capture => "奇遇解除后捕捉",
-            _ => "奇遇解除后回能"
-        };
-    }
-
-    private static string GetAutoBattleKeyboardInputMethodSummary(KeyboardInputMethod method)
-    {
-        return method switch
-        {
-            KeyboardInputMethod.PostMessage => "PostMessage",
-            KeyboardInputMethod.SendInput => "SendInput",
-            KeyboardInputMethod.Interception => "Interception",
-            _ => "PostMessage"
-        };
     }
 }
 

@@ -17,7 +17,7 @@ public sealed class AutoBattleConfigEditorTests
         [
             new AutoBattleTurnSequencePreset
             {
-                Name = "通用连招",
+                Name = "通用序列",
                 Sequence = "1, X, 2, X, 3, X"
             }
         ];
@@ -27,18 +27,16 @@ public sealed class AutoBattleConfigEditorTests
 
         Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(sharedPreset, out _));
         Assert.IsTrue(editor.TryInsertSharedPresetIntoBossRelease(sharedPreset, out _));
-        Assert.IsTrue(editor.TryApplySharedPresetToBossCombo(sharedPreset, out _));
         Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
 
         var insertedStep = result.ReleaseSequence[^1];
         Assert.IsTrue(insertedStep.IsCustom);
-        Assert.AreEqual("通用连招", insertedStep.Name);
+        Assert.AreEqual("通用序列", insertedStep.Name);
         Assert.AreEqual("1, X, 2, X, 3, X", insertedStep.Sequence);
         var insertedBossStep = result.BossReleaseSequence[^1];
         Assert.IsTrue(insertedBossStep.IsCustom);
-        Assert.AreEqual("通用连招", insertedBossStep.Name);
+        Assert.AreEqual("通用序列", insertedBossStep.Name);
         Assert.AreEqual("1, X, 2, X, 3, X", insertedBossStep.Sequence);
-        Assert.AreEqual("1, X, 2, X, 3, X", result.BossComboSequence);
         Assert.AreEqual(1, result.TurnSequencePresets.Count);
     }
 
@@ -57,13 +55,17 @@ public sealed class AutoBattleConfigEditorTests
 
         var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
         var sharedPreset = editor.SharedPresetItems.Single();
-        sharedPreset.Name = "首领模板";
-        sharedPreset.Sequence = "4 3 2 1 X X";
+        sharedPreset.Name = "更新后的序列";
+        sharedPreset.Sequence = "4, 3, 2";
 
-        Assert.IsTrue(editor.TryApplySharedPresetToBossCombo(sharedPreset, out _));
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(sharedPreset, out _));
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoBossRelease(sharedPreset, out _));
         Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
-        Assert.AreEqual("首领模板", result.TurnSequencePresets.Single().Name);
-        Assert.AreEqual("4 3 2 1 X X", result.TurnSequencePresets.Single().Sequence);
-        Assert.AreEqual("4, 3, 2, 1, X, X", result.BossComboSequence);
+        Assert.AreEqual("更新后的序列", result.TurnSequencePresets.Single().Name);
+        Assert.AreEqual("4, 3, 2", result.TurnSequencePresets.Single().Sequence);
+        Assert.AreEqual("更新后的序列", result.ReleaseSequence[^1].Name);
+        Assert.AreEqual("4, 3, 2", result.ReleaseSequence[^1].Sequence);
+        Assert.AreEqual("更新后的序列", result.BossReleaseSequence[^1].Name);
+        Assert.AreEqual("4, 3, 2", result.BossReleaseSequence[^1].Sequence);
     }
 }

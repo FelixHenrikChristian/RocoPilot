@@ -31,7 +31,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         get;
     } = [];
 
-    public ObservableCollection<AutoBattleBossComboSlotEditorItem> BossComboItems
+    public ObservableCollection<AutoBattleReleaseEditorItem> BossComboItems
     {
         get;
     } = [];
@@ -44,6 +44,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         ? Visibility.Visible
         : Visibility.Collapsed;
 
+    public Visibility BossComboEmptyVisibility => BossComboItems.Count == 0
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     public Visibility SharedPresetEmptyVisibility => SharedPresetItems.Count == 0
         ? Visibility.Visible
         : Visibility.Collapsed;
@@ -51,6 +55,8 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     public string NormalReleaseSummary => BuildReleaseSummary(NormalReleaseItems);
 
     public string BossReleaseSummary => BuildReleaseSummary(BossReleaseItems);
+
+    public string BossComboSummary => BuildReleaseSummary(BossComboItems, emptyText: "未配置首领连招");
 
     public string SharedPresetSummary => SharedPresetItems.Count == 0
         ? "尚未创建公共序列"
@@ -64,6 +70,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
         NormalReleaseItems.CollectionChanged += NormalReleaseItems_CollectionChanged;
         BossReleaseItems.CollectionChanged += BossReleaseItems_CollectionChanged;
+        BossComboItems.CollectionChanged += BossComboItems_CollectionChanged;
         SharedPresetItems.CollectionChanged += SharedPresetItems_CollectionChanged;
 
         LoadSettings(settings);
@@ -157,33 +164,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         return true;
     }
 
-    public bool TryApplySharedPresetToBossCombo(
-        AutoBattlePresetEditorItem preset,
-        out AutoBattleConfigValidationError error)
-    {
-        if (!TryValidateNamedSequence(
-                preset.Name,
-                preset.Sequence,
-                "公共单回合执行序列",
-                AutoBattleConfigSection.SharedSequences,
-                out error))
-        {
-            return false;
-        }
-
-        if (!BossBattleComboSequence.TryNormalize(preset.Sequence, out var sequence))
-        {
-            error = new AutoBattleConfigValidationError(
-                "序列不适用于首领战斗",
-                "首领连招需要恰好 6 个按键，且每个按键只能是技能 1-4 或 X 回能。",
-                AutoBattleConfigSection.Boss);
-            return false;
-        }
-
-        ApplyBossComboSequence(sequence);
-        return true;
-    }
-
     public bool TryInsertSharedPresetIntoBossRelease(
         AutoBattlePresetEditorItem preset,
         out AutoBattleConfigValidationError error)
@@ -204,9 +184,27 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         return true;
     }
 
+    public void AppendBossComboSkill(string? skillKey)
+    {
+        if (NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
+        {
+            BossComboItems.Add(AutoBattleReleaseEditorItem.CreateSkill(normalizedSkillKey));
+        }
+    }
+
     public void ResetBossComboSequence()
     {
         ApplyBossComboSequence(AutoBattleSettings.DefaultBossComboSequence);
+    }
+
+    public void ClearBossComboSequence()
+    {
+        BossComboItems.Clear();
+    }
+
+    public void RemoveBossComboItem(AutoBattleReleaseEditorItem item)
+    {
+        BossComboItems.Remove(item);
     }
 
     public bool TryBuildSettings(
@@ -260,16 +258,17 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         }
 
         var bossComboSkillKeys = BossComboItems
-            .Select(item => item.SelectedSkillKey)
+            .Where(item => !item.IsCustom)
+            .Select(item => item.SkillKey)
             .ToArray();
-        if (bossComboSkillKeys.Any(string.IsNullOrWhiteSpace)
+        if (bossComboSkillKeys.Length == 0
             || !BossBattleComboSequence.TryNormalize(
                 string.Join(", ", bossComboSkillKeys),
                 out var bossComboSequence))
         {
             error = new AutoBattleConfigValidationError(
                 "首领连招无效",
-                "请为首领连招的 6 个位置分别选择技能 1-4 或 X 回能。",
+                "请至少追加一个技能 1-4 或 X 回能。",
                 AutoBattleConfigSection.Boss);
             return false;
         }
@@ -362,21 +361,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     private void ApplyBossComboSequence(string? sequence)
     {
-        var skillKeys = BossBattleComboSequence.ParseOrDefault(sequence);
-        if (BossComboItems.Count == AutoBattleSettings.BossComboSkillCount)
-        {
-            for (var index = 0; index < BossComboItems.Count; index++)
-            {
-                BossComboItems[index].SelectedSkillKey = skillKeys[index];
-            }
-
-            return;
-        }
-
         BossComboItems.Clear();
-        for (var index = 0; index < skillKeys.Count; index++)
+        foreach (var skillKey in BossBattleComboSequence.ParseOrDefault(sequence))
         {
-            BossComboItems.Add(new AutoBattleBossComboSlotEditorItem(index + 1, skillKeys[index]));
+            BossComboItems.Add(AutoBattleReleaseEditorItem.CreateSkill(skillKey));
         }
     }
 
@@ -441,6 +429,13 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         OnPropertyChanged(nameof(BossReleaseSummary));
     }
 
+    private void BossComboItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        RefreshReleaseIndexes(BossComboItems);
+        OnPropertyChanged(nameof(BossComboEmptyVisibility));
+        OnPropertyChanged(nameof(BossComboSummary));
+    }
+
     private void SharedPresetItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         OnPropertyChanged(nameof(SharedPresetEmptyVisibility));
@@ -457,11 +452,12 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     }
 
     private static string BuildReleaseSummary(
-        IReadOnlyCollection<AutoBattleReleaseEditorItem> releaseItems)
+        IReadOnlyCollection<AutoBattleReleaseEditorItem> releaseItems,
+        string emptyText = "未配置释放顺序")
     {
         if (releaseItems.Count == 0)
         {
-            return "未配置释放顺序";
+            return emptyText;
         }
 
         var preview = string.Join(" → ", releaseItems.Take(8).Select(item => item.DisplayText));
@@ -635,31 +631,4 @@ internal sealed class AutoBattlePresetEditorItem : ObservableObject
     }
 }
 
-internal sealed class AutoBattleBossComboSlotEditorItem : ObservableObject
-{
-    private string _selectedSkillKey;
 
-    public int Position
-    {
-        get;
-    }
-
-    public string PositionText => $"#{Position}";
-
-    public IReadOnlyList<string> SkillOptions
-    {
-        get;
-    } = ["1", "2", "3", "4", "X"];
-
-    public string SelectedSkillKey
-    {
-        get => _selectedSkillKey;
-        set => SetProperty(ref _selectedSkillKey, value);
-    }
-
-    public AutoBattleBossComboSlotEditorItem(int position, string selectedSkillKey)
-    {
-        Position = position;
-        _selectedSkillKey = selectedSkillKey;
-    }
-}

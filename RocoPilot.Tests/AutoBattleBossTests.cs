@@ -52,7 +52,7 @@ public sealed class AutoBattleBossTests
     }
 
     [TestMethod]
-    public void NormalizesExactlySixBossComboSkills()
+    public void NormalizesVariableLengthBossComboSkills()
     {
         Assert.IsTrue(BossBattleComboSequence.TryNormalize(
             "1 2;3\n1,4\t2",
@@ -61,6 +61,14 @@ public sealed class AutoBattleBossTests
         Assert.AreEqual(
             "1, 2, 3, 1, 4, 2, Space",
             BossBattleComboSequence.BuildConfirmedSequence(normalizedSequence));
+
+        Assert.IsTrue(BossBattleComboSequence.TryNormalize(
+            "4, 3, 2",
+            out var shortSequence));
+        Assert.AreEqual("4, 3, 2", shortSequence);
+        Assert.AreEqual(
+            "4, 3, 2, Space",
+            BossBattleComboSequence.BuildConfirmedSequence(shortSequence));
     }
 
     [TestMethod]
@@ -73,10 +81,9 @@ public sealed class AutoBattleBossTests
     }
 
     [TestMethod]
-    [DataRow("1, 2, 3, 4, 1")]
-    [DataRow("1, 2, 3, 4, 1, 2, 3")]
-    [DataRow("1, 2, 3, 5, 1, 2")]
+    [DataRow("1, 2, 3, 5")]
     [DataRow("")]
+    [DataRow("Space")]
     public void RejectsInvalidBossComboSequence(string sequence)
     {
         Assert.IsFalse(BossBattleComboSequence.TryNormalize(sequence, out _));

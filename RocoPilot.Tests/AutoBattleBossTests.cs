@@ -81,4 +81,41 @@ public sealed class AutoBattleBossTests
     {
         Assert.IsFalse(BossBattleComboSequence.TryNormalize(sequence, out _));
     }
+
+    [TestMethod]
+    public void MigratesMissingBossReleaseSequenceFromNormalBattle()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        settings.ReleaseSequence =
+        [
+            AutoBattleReleaseStep.CreateSkill("4"),
+            AutoBattleReleaseStep.CreateCustom("收尾", "2, Space")
+        ];
+        settings.BossReleaseSequence = [];
+
+        var bossReleaseSequence = RuntimeTaskService.NormalizeAutoBattleBossReleaseSequence(settings);
+
+        Assert.AreEqual(2, bossReleaseSequence.Count);
+        Assert.AreEqual("4", bossReleaseSequence[0].SkillKey);
+        Assert.IsTrue(bossReleaseSequence[1].IsCustom);
+        Assert.AreEqual("收尾", bossReleaseSequence[1].Name);
+    }
+
+    [TestMethod]
+    public void KeepsBossReleaseSequenceIndependentFromNormalBattle()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        settings.ReleaseSequence = [AutoBattleReleaseStep.CreateSkill("1")];
+        settings.BossReleaseSequence =
+        [
+            AutoBattleReleaseStep.CreateSkill("3"),
+            AutoBattleReleaseStep.CreateSkill("X")
+        ];
+
+        var bossReleaseSequence = RuntimeTaskService.NormalizeAutoBattleBossReleaseSequence(settings);
+
+        CollectionAssert.AreEqual(
+            new[] { "3", "X" },
+            bossReleaseSequence.Select(step => step.SkillKey).ToArray());
+    }
 }

@@ -54,6 +54,13 @@ public sealed class AutoBattleSettings
     } = CreateDefaultReleaseSequence();
 
     [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<AutoBattleReleaseStep> BossReleaseSequence
+    {
+        get;
+        set;
+    } = [];
+
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<AutoBattleTurnSequencePreset> TurnSequencePresets
     {
         get;
@@ -111,6 +118,7 @@ public sealed class AutoBattleSettings
             TurnSequence = DefaultTurnSequence,
             BossComboSequence = DefaultBossComboSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
+            BossReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
             KeyboardInputMethod = KeyboardInputMethod.PostMessage,
@@ -143,6 +151,7 @@ public sealed class AutoBattleSettings
             TurnSequence = TurnSequence,
             BossComboSequence = BossComboSequence,
             ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
+            BossReleaseSequence = (BossReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = EncounterRelievedAction,
             KeyboardInputMethod = KeyboardInputMethod,

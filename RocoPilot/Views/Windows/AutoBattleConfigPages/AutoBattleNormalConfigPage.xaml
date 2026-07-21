@@ -1,0 +1,246 @@
+<Page
+    x:Class="RocoPilot.Views.Windows.AutoBattleConfigPages.AutoBattleNormalConfigPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <ScrollViewer
+        HorizontalContentAlignment="Stretch"
+        HorizontalScrollBarVisibility="Disabled"
+        HorizontalScrollMode="Disabled"
+        VerticalScrollBarVisibility="Auto"
+        VerticalScrollMode="Auto">
+        <StackPanel Padding="20,16,20,24" Spacing="12">
+            <StackPanel Spacing="4">
+                <TextBlock
+                    Style="{StaticResource SubtitleTextBlockStyle}"
+                    Text="普通战斗" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="配置普通战斗中每个可释放技能回合的循环动作。"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="230" />
+                    </Grid.RowDefinitions>
+
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock
+                                FontWeight="SemiBold"
+                                Text="释放顺序" />
+                            <TextBlock
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="从左到右循环执行；拖动可重排，右键可删除。"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Text="{x:Bind Editor.NormalReleaseSummary, Mode=OneWay}"
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Button
+                                Click="ResetReleaseSequenceButton_Click"
+                                ToolTipService.ToolTip="恢复默认顺序">
+                                <FontIcon FontSize="14" Glyph="&#xE777;" />
+                            </Button>
+                            <Button
+                                Click="ClearReleaseSequenceButton_Click"
+                                ToolTipService.ToolTip="清空释放顺序">
+                                <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel
+                        Grid.Row="1"
+                        Orientation="Horizontal"
+                        Spacing="8">
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="追加技能" />
+                        <Button MinWidth="36" Height="32" Click="AppendSkillButton_Click" Content="1" Tag="1" />
+                        <Button MinWidth="36" Height="32" Click="AppendSkillButton_Click" Content="2" Tag="2" />
+                        <Button MinWidth="36" Height="32" Click="AppendSkillButton_Click" Content="3" Tag="3" />
+                        <Button MinWidth="36" Height="32" Click="AppendSkillButton_Click" Content="4" Tag="4" />
+                        <Button MinWidth="36" Height="32" Click="AppendSkillButton_Click" Content="X" Tag="X" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="2">
+                        <GridView
+                            AllowDrop="True"
+                            CanDragItems="True"
+                            CanReorderItems="True"
+                            IsSwipeEnabled="False"
+                            ItemsSource="{x:Bind Editor.NormalReleaseItems, Mode=OneWay}"
+                            SelectionMode="None">
+                            <GridView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsWrapGrid Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </GridView.ItemsPanel>
+                            <GridView.ItemContainerStyle>
+                                <Style TargetType="GridViewItem">
+                                    <Setter Property="Margin" Value="0,0,8,8" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </GridView.ItemContainerStyle>
+                            <GridView.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid RightTapped="ReleaseItem_RightTapped">
+                                        <Border
+                                            Width="104"
+                                            Height="58"
+                                            Padding="8"
+                                            Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8">
+                                            <Grid>
+                                                <TextBlock
+                                                    HorizontalAlignment="Right"
+                                                    FontSize="11"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Text="{Binding PositionText}" />
+                                                <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                    <TextBlock
+                                                        FontSize="18"
+                                                        FontWeight="SemiBold"
+                                                        Text="{Binding DisplayText}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock
+                                                        FontSize="11"
+                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                        Text="{Binding DetailText}"
+                                                        TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate>
+                            </GridView.ItemTemplate>
+                        </GridView>
+
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8"
+                            Visibility="{x:Bind Editor.NormalReleaseEmptyVisibility, Mode=OneWay}">
+                            <FontIcon
+                                HorizontalAlignment="Center"
+                                FontSize="32"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                Glyph="&#xE710;" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="释放顺序为空" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}">
+                <Grid RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="200" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Spacing="2">
+                        <TextBlock
+                            FontWeight="SemiBold"
+                            Text="使用公共单回合执行序列" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="公共序列只保存一份；在“公共执行序列”页面修改后，这里会立即同步。选择“插入”可加入上方普通战斗释放顺序。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Grid Grid.Row="1">
+                        <ListView
+                            ItemsSource="{x:Bind Editor.SharedPresetItems, Mode=OneWay}"
+                            SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="Margin" Value="0,0,0,8" />
+                                    <Setter Property="Padding" Value="0" />
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border
+                                        Padding="10"
+                                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                        <Grid ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                VerticalAlignment="Center"
+                                                FontWeight="SemiBold"
+                                                Text="{Binding Name}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                VerticalAlignment="Center"
+                                                FontFamily="Consolas"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Text="{Binding Sequence}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <Button
+                                                Grid.Column="2"
+                                                Click="InsertPresetButton_Click"
+                                                Content="插入" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <StackPanel
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8"
+                            Visibility="{x:Bind Editor.SharedPresetEmptyVisibility, Mode=OneWay}">
+                            <FontIcon
+                                HorizontalAlignment="Center"
+                                FontSize="30"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                Glyph="&#xE8A5;" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="暂无公共序列，请先到“公共执行序列”页面创建" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

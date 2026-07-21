@@ -470,7 +470,7 @@ public sealed partial class RuntimeTaskService
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
-            if (TryActivateAutoBattleBossBattle(result.BossNameRawText))
+            if (TryActivateAutoBattleBossBattle(result.BossNameRawText, settings))
             {
                 _hasAutoBattleSkillSelectionEnemyNameResult = true;
                 return true;
@@ -483,7 +483,7 @@ public sealed partial class RuntimeTaskService
 
         if (string.IsNullOrWhiteSpace(result.MatchedName))
         {
-            if (TryActivateAutoBattleBossBattle(result.BossNameRawText))
+            if (TryActivateAutoBattleBossBattle(result.BossNameRawText, settings))
             {
                 _hasAutoBattleSkillSelectionEnemyNameResult = true;
                 return true;

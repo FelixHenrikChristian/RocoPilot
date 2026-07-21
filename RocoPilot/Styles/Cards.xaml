@@ -34,4 +34,85 @@
         <Setter Property="MinHeight" Value="56" />
     </Style>
 
+    <Style x:Key="SectionCardStyle" TargetType="Border" BasedOn="{StaticResource CardStyle}">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="MinHeight" Value="0" />
+    </Style>
+
+    <Style x:Key="SectionCardHeaderStyle" TargetType="Grid">
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="ColumnSpacing" Value="12" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+    </Style>
+
+    <Style x:Key="SectionCardBodyStyle" TargetType="StackPanel">
+        <Setter Property="Padding" Value="16,14" />
+        <Setter Property="Spacing" Value="12" />
+    </Style>
+
+    <Style x:Key="ConfigPageRootStyle" TargetType="StackPanel">
+        <Setter Property="Padding" Value="24,20,24,28" />
+        <Setter Property="Spacing" Value="16" />
+    </Style>
+
+    <Style x:Key="ConfigPageTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="ConfigPageDescriptionStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="SectionDescriptionStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="ConfigSummaryTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+    </Style>
+
+    <Style x:Key="SkillKeyButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinWidth" Value="36" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="CornerRadius" Value="4" />
+    </Style>
+
+    <Style x:Key="ReleaseStepChipStyle" TargetType="Border">
+        <Setter Property="Width" Value="108" />
+        <Setter Property="Height" Value="64" />
+        <Setter Property="Padding" Value="10,8" />
+        <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style x:Key="PresetRowStyle" TargetType="Border">
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
+    <Style x:Key="EmptyStatePanelStyle" TargetType="StackPanel">
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Spacing" Value="8" />
+    </Style>
+
 </ResourceDictionary>

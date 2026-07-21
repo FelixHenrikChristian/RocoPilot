@@ -468,7 +468,7 @@ public sealed partial class RuntimeTaskService
             _logger.LogInformation(
                 "首领战斗：第 {Step}/{StepCount} 个连招技能 {SkillKey} 提示能量不足，已临时插入 X 回能，继续下一配置槽。",
                 index + 1,
-                AutoBattleSettings.BossComboSkillCount,
+                skillKeys.Count,
                 skillKey);
         }
 

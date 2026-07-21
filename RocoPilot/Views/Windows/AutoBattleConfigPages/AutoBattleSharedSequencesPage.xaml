@@ -5,35 +5,61 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
-    <ScrollViewer
-        HorizontalContentAlignment="Stretch"
-        HorizontalScrollBarVisibility="Disabled"
-        HorizontalScrollMode="Disabled"
-        VerticalScrollBarVisibility="Auto"
-        VerticalScrollMode="Auto">
-        <StackPanel Padding="20,16,20,24" Spacing="12">
-            <StackPanel Spacing="4">
-                <TextBlock
-                    Style="{StaticResource SubtitleTextBlockStyle}"
-                    Text="公共执行序列" />
-                <TextBlock
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="集中管理可被不同战斗类型复用的单回合按键组合。"
-                    TextWrapping="Wrap" />
-            </StackPanel>
+    <Grid Padding="24,20,24,20" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
 
-            <InfoBar
-                IsClosable="False"
-                IsOpen="True"
-                Message="这些序列只保存一份。普通战斗和首领战斗可分别将它插入各自的释放序列；符合六技能槽规则的序列还可以直接套用为首领连招。"
-                Severity="Informational"
-                Title="跨页面共享" />
+        <StackPanel Spacing="4">
+            <TextBlock Style="{StaticResource ConfigPageTitleStyle}" Text="公共执行序列" />
+            <TextBlock
+                Style="{StaticResource ConfigPageDescriptionStyle}"
+                Text="集中管理可被不同战斗类型复用的单回合按键组合，只保存一份。" />
+        </StackPanel>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid RowSpacing="12">
+        <Border Grid.Row="1" Style="{StaticResource SectionCardStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon
+                        VerticalAlignment="Center"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="18"
+                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                        Glyph="&#xE8F1;" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Style="{StaticResource SectionTitleStyle}" Text="序列列表" />
+                        <TextBlock
+                            Style="{StaticResource SectionDescriptionStyle}"
+                            Text="用逗号、空格或换行分隔，如 1, Space；组合键用 +，如 Ctrl+1。" />
+                    </StackPanel>
+                    <Button
+                        Grid.Column="2"
+                        VerticalAlignment="Center"
+                        Click="AddPresetButton_Click"
+                        ToolTipService.ToolTip="新增公共序列">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontSize="14" Glyph="&#xE710;" />
+                            <TextBlock Text="新增" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Grid Grid.Row="1" Padding="16,14" RowSpacing="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="430" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <Grid ColumnSpacing="12">
@@ -41,30 +67,16 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="单回合执行序列" />
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="用逗号、空格或换行分隔，如 1, Space；组合键用 +，如 Ctrl+1。支持 A-Z、0-9、F1-F24、方向键、Space、Enter、Esc、Tab 等。"
-                                TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,2,0,0"
-                                FontSize="12"
-                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                Text="{x:Bind Editor.SharedPresetSummary, Mode=OneWay}" />
-                        </StackPanel>
-                        <Button
+                        <TextBlock
+                            VerticalAlignment="Center"
+                            Style="{StaticResource ConfigSummaryTextStyle}"
+                            Text="{x:Bind Editor.SharedPresetSummary, Mode=OneWay}" />
+                        <TextBlock
                             Grid.Column="1"
-                            Click="AddPresetButton_Click"
-                            ToolTipService.ToolTip="新增公共序列">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon FontSize="14" Glyph="&#xE710;" />
-                                <TextBlock Text="新增" />
-                            </StackPanel>
-                        </Button>
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Text="支持 A-Z、0-9、F1-F24、方向键、Space、Enter 等" />
                     </Grid>
 
                     <Grid Grid.Row="1">
@@ -76,25 +88,21 @@
                                     <Setter Property="Margin" Value="0,0,0,10" />
                                     <Setter Property="Padding" Value="0" />
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="MinHeight" Value="0" />
                                 </Style>
                             </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
-                                    <Border
-                                        Padding="10"
-                                        Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8">
-                                        <Grid ColumnSpacing="10">
+                                    <Border Style="{StaticResource PresetRowStyle}">
+                                        <Grid ColumnSpacing="12">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="190" />
+                                                <ColumnDefinition Width="180" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBox
                                                 Header="名称"
-                                                PlaceholderText="爆发"
+                                                PlaceholderText="例如：爆发"
                                                 Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <TextBox
                                                 Grid.Column="1"
@@ -105,7 +113,7 @@
                                                 Grid.Column="2"
                                                 VerticalAlignment="Bottom"
                                                 Click="DeletePresetButton_Click"
-                                                ToolTipService.ToolTip="删除公共序列">
+                                                ToolTipService.ToolTip="删除">
                                                 <FontIcon FontSize="14" Glyph="&#xE74D;" />
                                             </Button>
                                         </Grid>
@@ -115,23 +123,49 @@
                         </ListView>
 
                         <StackPanel
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="8"
+                            Style="{StaticResource EmptyStatePanelStyle}"
                             Visibility="{x:Bind Editor.SharedPresetEmptyVisibility, Mode=OneWay}">
                             <FontIcon
                                 HorizontalAlignment="Center"
-                                FontSize="32"
+                                FontSize="28"
                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                 Glyph="&#xE8A5;" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="暂无公共执行序列" />
-                            <Button Click="AddPresetButton_Click" Content="创建第一个序列" />
+                            <Button
+                                Margin="0,4,0,0"
+                                Click="AddPresetButton_Click"
+                                Content="创建第一个序列" />
                         </StackPanel>
                     </Grid>
                 </Grid>
-            </Border>
-        </StackPanel>
-    </ScrollViewer>
+
+                <Border
+                    Grid.Row="2"
+                    Margin="16,0,16,14"
+                    Padding="12,10"
+                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                    CornerRadius="8">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontSize="14"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE946;" />
+                        <TextBlock
+                            Grid.Column="1"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="普通战斗与首领战斗可分别将序列插入各自的释放顺序。"
+                            TextWrapping="Wrap" />
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
 </Page>

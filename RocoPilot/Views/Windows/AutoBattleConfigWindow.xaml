@@ -8,8 +8,8 @@
     xmlns:windowex="using:WinUIEx"
     Width="1040"
     Height="760"
-    MinWidth="760"
-    MinHeight="620"
+    MinWidth="800"
+    MinHeight="640"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -27,19 +27,20 @@
             IsBackButtonVisible="Collapsed"
             IsPaneToggleButtonVisible="False"
             IsSettingsVisible="False"
-            OpenPaneLength="210"
+            OpenPaneLength="168"
             PaneDisplayMode="Left"
             SelectionChanged="BattleNavigationView_SelectionChanged">
             <NavigationView.MenuItems>
+                <NavigationViewItemHeader Content="资源" />
                 <NavigationViewItem
                     x:Name="SharedSequencesNavigationItem"
                     Content="公共执行序列"
                     Tag="SharedSequences">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE8FD;" />
+                        <FontIcon Glyph="&#xE8F1;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItemSeparator />
+                <NavigationViewItemHeader Content="战斗类型" />
                 <NavigationViewItem
                     x:Name="NormalBattleNavigationItem"
                     Content="普通战斗"
@@ -63,18 +64,22 @@
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE734;" />
                     </NavigationViewItem.Icon>
-                    <NavigationViewItem.InfoBadge>
-                        <InfoBadge Value="-1" />
-                    </NavigationViewItem.InfoBadge>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <ContentPresenter x:Name="ConfigPageHost" />
+            <Border
+                Margin="0,4,8,8"
+                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1"
+                CornerRadius="8">
+                <ContentPresenter x:Name="ConfigPageHost" />
+            </Border>
         </NavigationView>
 
         <Grid
             Grid.Row="1"
-            Padding="12"
+            Padding="16,12"
             Background="{ThemeResource LayerFillColorDefaultBrush}"
             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
             BorderThickness="0,1,0,0"
@@ -96,12 +101,12 @@
 
             <Button
                 Grid.Column="1"
-                MinWidth="92"
+                MinWidth="96"
                 Click="CancelButton_Click"
                 Content="取消" />
             <Button
                 Grid.Column="2"
-                MinWidth="92"
+                MinWidth="96"
                 Click="SaveButton_Click"
                 Content="保存"
                 Style="{ThemeResource AccentButtonStyle}" />

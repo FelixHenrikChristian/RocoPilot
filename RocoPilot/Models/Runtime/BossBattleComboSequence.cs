@@ -7,7 +7,7 @@ internal static class BossBattleComboSequence
     public static bool TryNormalize(string? sequence, out string normalizedSequence)
     {
         var skillKeys = Parse(sequence);
-        if (skillKeys.Count != AutoBattleSettings.BossComboSkillCount
+        if (skillKeys.Count == 0
             || skillKeys.Any(skillKey => skillKey is not ("1" or "2" or "3" or "4" or "X")))
         {
             normalizedSequence = string.Empty;

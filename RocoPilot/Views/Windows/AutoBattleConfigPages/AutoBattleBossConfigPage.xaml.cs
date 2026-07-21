@@ -22,11 +22,6 @@ public sealed partial class AutoBattleBossConfigPage : Page
         InitializeComponent();
     }
 
-    private void ResetBossComboButton_Click(object sender, RoutedEventArgs e)
-    {
-        Editor.ResetBossComboSequence();
-    }
-
     private void AppendBossSkillButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: string skillKey })
@@ -64,6 +59,43 @@ public sealed partial class AutoBattleBossConfigPage : Page
         e.Handled = true;
     }
 
+    private void AppendBossComboSkillButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: string skillKey })
+        {
+            Editor.AppendBossComboSkill(skillKey);
+        }
+    }
+
+    private void ResetBossComboButton_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.ResetBossComboSequence();
+    }
+
+    private void ClearBossComboButton_Click(object sender, RoutedEventArgs e)
+    {
+        Editor.ClearBossComboSequence();
+    }
+
+    private void BossComboItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: AutoBattleReleaseEditorItem item } element)
+        {
+            return;
+        }
+
+        var deleteItem = new MenuFlyoutItem
+        {
+            Text = "删除"
+        };
+        deleteItem.Click += (_, _) => Editor.RemoveBossComboItem(item);
+
+        var flyout = new MenuFlyout();
+        flyout.Items.Add(deleteItem);
+        flyout.ShowAt(element);
+        e.Handled = true;
+    }
+
     private void InsertBossReleasePresetButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: AutoBattlePresetEditorItem preset })
@@ -75,24 +107,5 @@ public sealed partial class AutoBattleBossConfigPage : Page
         {
             _owner.ShowMessage(error.Title, error.Message);
         }
-    }
-
-    private void ApplyPresetButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not FrameworkElement { DataContext: AutoBattlePresetEditorItem preset })
-        {
-            return;
-        }
-
-        if (!Editor.TryApplySharedPresetToBossCombo(preset, out var error))
-        {
-            _owner.ShowMessage(error.Title, error.Message);
-            return;
-        }
-
-        _owner.ShowMessage(
-            "已套用公共序列",
-            $"“{preset.Name.Trim()}”已同步到首领连招。",
-            InfoBarSeverity.Success);
     }
 }

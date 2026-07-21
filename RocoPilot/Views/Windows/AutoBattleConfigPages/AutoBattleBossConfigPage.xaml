@@ -11,49 +11,39 @@
         HorizontalScrollMode="Disabled"
         VerticalScrollBarVisibility="Auto"
         VerticalScrollMode="Auto">
-        <StackPanel Padding="20,16,20,24" Spacing="12">
+        <StackPanel Style="{StaticResource ConfigPageRootStyle}">
             <StackPanel Spacing="4">
+                <TextBlock Style="{StaticResource ConfigPageTitleStyle}" Text="首领战斗" />
                 <TextBlock
-                    Style="{StaticResource SubtitleTextBlockStyle}"
-                    Text="首领战斗" />
-                <TextBlock
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="独立配置连招提示出现前的循环释放序列，以及提示出现后的六个连招技能槽。"
-                    TextWrapping="Wrap" />
+                    Style="{StaticResource ConfigPageDescriptionStyle}"
+                    Text="独立配置连招提示出现前的循环释放序列，以及提示出现后的首领连招。" />
             </StackPanel>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid RowSpacing="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="230" />
-                    </Grid.RowDefinitions>
-
-                    <Grid ColumnSpacing="12">
+            <Border Style="{StaticResource SectionCardStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0" Spacing="2">
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            Glyph="&#xE8FD;" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="连招前释放序列" />
                             <TextBlock
-                                FontWeight="SemiBold"
-                                Text="技能释放序列（连招前）" />
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="首领战斗前半段从左到右循环执行；此序列与普通战斗完全独立。拖动可重排，右键可删除。"
-                                TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,2,0,0"
-                                FontSize="12"
-                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                Text="{x:Bind Editor.BossReleaseSummary, Mode=OneWay}"
-                                TextTrimming="CharacterEllipsis" />
+                                Style="{StaticResource SectionDescriptionStyle}"
+                                Text="与普通战斗完全独立；从左到右循环执行，拖动可重排，右键可删除。" />
                         </StackPanel>
-
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <StackPanel
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="6">
                             <Button
                                 Click="ResetBossReleaseSequenceButton_Click"
                                 ToolTipService.ToolTip="恢复默认释放序列">
@@ -67,193 +57,338 @@
                         </StackPanel>
                     </Grid>
 
-                    <StackPanel
-                        Grid.Row="1"
-                        Orientation="Horizontal"
-                        Spacing="8">
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            FontSize="12"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="追加技能" />
-                        <Button MinWidth="36" Height="32" Click="AppendBossSkillButton_Click" Content="1" Tag="1" />
-                        <Button MinWidth="36" Height="32" Click="AppendBossSkillButton_Click" Content="2" Tag="2" />
-                        <Button MinWidth="36" Height="32" Click="AppendBossSkillButton_Click" Content="3" Tag="3" />
-                        <Button MinWidth="36" Height="32" Click="AppendBossSkillButton_Click" Content="4" Tag="4" />
-                        <Button MinWidth="36" Height="32" Click="AppendBossSkillButton_Click" Content="X" Tag="X" />
-                    </StackPanel>
-
-                    <Grid Grid.Row="2">
-                        <GridView
-                            AllowDrop="True"
-                            CanDragItems="True"
-                            CanReorderItems="True"
-                            IsSwipeEnabled="False"
-                            ItemsSource="{x:Bind Editor.BossReleaseItems, Mode=OneWay}"
-                            SelectionMode="None">
-                            <GridView.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <ItemsWrapGrid Orientation="Horizontal" />
-                                </ItemsPanelTemplate>
-                            </GridView.ItemsPanel>
-                            <GridView.ItemContainerStyle>
-                                <Style TargetType="GridViewItem">
-                                    <Setter Property="Margin" Value="0,0,8,8" />
-                                    <Setter Property="Padding" Value="0" />
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                                </Style>
-                            </GridView.ItemContainerStyle>
-                            <GridView.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid RightTapped="BossReleaseItem_RightTapped">
-                                        <Border
-                                            Width="104"
-                                            Height="58"
-                                            Padding="8"
-                                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                            BorderThickness="1"
-                                            CornerRadius="8">
-                                            <Grid>
-                                                <TextBlock
-                                                    HorizontalAlignment="Right"
-                                                    FontSize="11"
-                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                    Text="{Binding PositionText}" />
-                                                <StackPanel VerticalAlignment="Center" Spacing="2">
-                                                    <TextBlock
-                                                        FontSize="18"
-                                                        FontWeight="SemiBold"
-                                                        Text="{Binding DisplayText}"
-                                                        TextTrimming="CharacterEllipsis" />
-                                                    <TextBlock
-                                                        FontSize="11"
-                                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                        Text="{Binding DetailText}"
-                                                        TextTrimming="CharacterEllipsis" />
-                                                </StackPanel>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
-                                </DataTemplate>
-                            </GridView.ItemTemplate>
-                        </GridView>
-
-                        <StackPanel
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="8"
-                            Visibility="{x:Bind Editor.BossReleaseEmptyVisibility, Mode=OneWay}">
-                            <FontIcon
-                                HorizontalAlignment="Center"
-                                FontSize="32"
-                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                Glyph="&#xE710;" />
+                    <StackPanel Style="{StaticResource SectionCardBodyStyle}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
                             <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="首领战斗释放序列为空" />
-                        </StackPanel>
-                    </Grid>
-                </Grid>
+                                VerticalAlignment="Center"
+                                Style="{StaticResource ConfigSummaryTextStyle}"
+                                Text="{x:Bind Editor.BossReleaseSummary, Mode=OneWay}" />
+                            <StackPanel
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="6">
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="追加" />
+                                <Button
+                                    Click="AppendBossSkillButton_Click"
+                                    Content="1"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="1" />
+                                <Button
+                                    Click="AppendBossSkillButton_Click"
+                                    Content="2"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="2" />
+                                <Button
+                                    Click="AppendBossSkillButton_Click"
+                                    Content="3"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="3" />
+                                <Button
+                                    Click="AppendBossSkillButton_Click"
+                                    Content="4"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="4" />
+                                <Button
+                                    Click="AppendBossSkillButton_Click"
+                                    Content="X"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="X" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border
+                            MinHeight="180"
+                            Padding="10"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid>
+                                <GridView
+                                    AllowDrop="True"
+                                    CanDragItems="True"
+                                    CanReorderItems="True"
+                                    IsSwipeEnabled="False"
+                                    ItemsSource="{x:Bind Editor.BossReleaseItems, Mode=OneWay}"
+                                    SelectionMode="None">
+                                    <GridView.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <ItemsWrapGrid Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </GridView.ItemsPanel>
+                                    <GridView.ItemContainerStyle>
+                                        <Style TargetType="GridViewItem">
+                                            <Setter Property="Margin" Value="0,0,8,8" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </GridView.ItemContainerStyle>
+                                    <GridView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid RightTapped="BossReleaseItem_RightTapped">
+                                                <Border Style="{StaticResource ReleaseStepChipStyle}">
+                                                    <Grid>
+                                                        <TextBlock
+                                                            HorizontalAlignment="Right"
+                                                            FontSize="11"
+                                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                            Text="{Binding PositionText}" />
+                                                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                            <TextBlock
+                                                                FontSize="18"
+                                                                FontWeight="SemiBold"
+                                                                Text="{Binding DisplayText}"
+                                                                TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                Text="{Binding DetailText}"
+                                                                TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </GridView.ItemTemplate>
+                                </GridView>
+
+                                <StackPanel
+                                    Style="{StaticResource EmptyStatePanelStyle}"
+                                    Visibility="{x:Bind Editor.BossReleaseEmptyVisibility, Mode=OneWay}">
+                                    <FontIcon
+                                        HorizontalAlignment="Center"
+                                        FontSize="28"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Glyph="&#xE710;" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="点击上方技能键追加步骤" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid RowSpacing="14">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Grid ColumnSpacing="12">
+            <Border Style="{StaticResource SectionCardStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="2">
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            Glyph="&#xE7FC;" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="首领连招" />
                             <TextBlock
-                                FontWeight="SemiBold"
-                                Text="首领连招" />
-                            <TextBlock
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="依次发送 6 个配置按键，最后自动按 Space 确认；能量不足时会临时插入 X 回能。"
-                                TextWrapping="Wrap" />
+                                Style="{StaticResource SectionDescriptionStyle}"
+                                Text="按顺序发送配置的技能键，最后自动按 Space 确认；拖动可重排，右键可删除。" />
                         </StackPanel>
-                        <Button
-                            Grid.Column="1"
-                            Click="ResetBossComboButton_Click"
-                            ToolTipService.ToolTip="恢复默认首领连招">
-                            <FontIcon FontSize="14" Glyph="&#xE777;" />
-                        </Button>
+                        <StackPanel
+                            Grid.Column="2"
+                            VerticalAlignment="Center"
+                            Orientation="Horizontal"
+                            Spacing="6">
+                            <Button
+                                Click="ResetBossComboButton_Click"
+                                ToolTipService.ToolTip="恢复默认首领连招">
+                                <FontIcon FontSize="14" Glyph="&#xE777;" />
+                            </Button>
+                            <Button
+                                Click="ClearBossComboButton_Click"
+                                ToolTipService.ToolTip="清空首领连招">
+                                <FontIcon FontSize="14" Glyph="&#xE74D;" />
+                            </Button>
+                        </StackPanel>
                     </Grid>
 
-                    <ItemsControl
-                        Grid.Row="1"
-                        ItemsSource="{x:Bind Editor.BossComboItems, Mode=OneWay}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <ItemsWrapGrid Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Margin="0,0,10,10" Orientation="Horizontal" Spacing="10">
-                                    <ComboBox
-                                        Width="74"
-                                        Header="{Binding PositionText}"
-                                        ItemsSource="{Binding SkillOptions}"
-                                        SelectedItem="{Binding SelectedSkillKey, Mode=TwoWay}" />
-                                    <TextBlock
-                                        Margin="0,24,0,0"
-                                        VerticalAlignment="Center"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="→" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <Border
-                        Grid.Row="2"
-                        Padding="12"
-                        Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                        CornerRadius="8">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <FontIcon
-                                VerticalAlignment="Center"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Glyph="&#xE73E;" />
+                    <StackPanel Style="{StaticResource SectionCardBodyStyle}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
                             <TextBlock
                                 VerticalAlignment="Center"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="完成六个技能槽后自动发送 Space；等待 5 分钟仍未结束时尝试自动解卡。"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
+                                Style="{StaticResource ConfigSummaryTextStyle}"
+                                Text="{x:Bind Editor.BossComboSummary, Mode=OneWay}" />
+                            <StackPanel
+                                Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="6">
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="追加" />
+                                <Button
+                                    Click="AppendBossComboSkillButton_Click"
+                                    Content="1"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="1" />
+                                <Button
+                                    Click="AppendBossComboSkillButton_Click"
+                                    Content="2"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="2" />
+                                <Button
+                                    Click="AppendBossComboSkillButton_Click"
+                                    Content="3"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="3" />
+                                <Button
+                                    Click="AppendBossComboSkillButton_Click"
+                                    Content="4"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="4" />
+                                <Button
+                                    Click="AppendBossComboSkillButton_Click"
+                                    Content="X"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="X" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border
+                            MinHeight="140"
+                            Padding="10"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <Grid>
+                                <GridView
+                                    AllowDrop="True"
+                                    CanDragItems="True"
+                                    CanReorderItems="True"
+                                    IsSwipeEnabled="False"
+                                    ItemsSource="{x:Bind Editor.BossComboItems, Mode=OneWay}"
+                                    SelectionMode="None">
+                                    <GridView.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <ItemsWrapGrid Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </GridView.ItemsPanel>
+                                    <GridView.ItemContainerStyle>
+                                        <Style TargetType="GridViewItem">
+                                            <Setter Property="Margin" Value="0,0,8,8" />
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                                        </Style>
+                                    </GridView.ItemContainerStyle>
+                                    <GridView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid RightTapped="BossComboItem_RightTapped">
+                                                <Border Style="{StaticResource ReleaseStepChipStyle}">
+                                                    <Grid>
+                                                        <TextBlock
+                                                            HorizontalAlignment="Right"
+                                                            FontSize="11"
+                                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                            Text="{Binding PositionText}" />
+                                                        <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                            <TextBlock
+                                                                FontSize="18"
+                                                                FontWeight="SemiBold"
+                                                                Text="{Binding DisplayText}"
+                                                                TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock
+                                                                FontSize="11"
+                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                Text="{Binding DetailText}"
+                                                                TextTrimming="CharacterEllipsis" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </GridView.ItemTemplate>
+                                </GridView>
+
+                                <StackPanel
+                                    Style="{StaticResource EmptyStatePanelStyle}"
+                                    Visibility="{x:Bind Editor.BossComboEmptyVisibility, Mode=OneWay}">
+                                    <FontIcon
+                                        HorizontalAlignment="Center"
+                                        FontSize="28"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Glyph="&#xE710;" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="点击上方技能键追加连招步骤" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border
+                            Padding="12,10"
+                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                            CornerRadius="8">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border
+                                    Padding="10,4"
+                                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                                    CornerRadius="6">
+                                    <TextBlock
+                                        FontWeight="SemiBold"
+                                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                                        Text="Space" />
+                                </Border>
+                                <TextBlock
+                                    Grid.Column="1"
+                                    VerticalAlignment="Center"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="连招结束后自动发送确认；能量不足时会临时插入 X 回能。等待 5 分钟仍未结束时尝试自动解卡。"
+                                    TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource CardStyle}">
-                <Grid RowSpacing="10">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="260" />
-                    </Grid.RowDefinitions>
+            <Border Style="{StaticResource SectionCardStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            Glyph="&#xE8F1;" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="公共执行序列" />
+                            <TextBlock
+                                Style="{StaticResource SectionDescriptionStyle}"
+                                Text="将公共序列作为一个动作插入上方释放顺序；在“公共执行序列”页修改后会即时同步。" />
+                        </StackPanel>
+                    </Grid>
 
-                    <StackPanel Spacing="2">
-                        <TextBlock
-                            FontWeight="SemiBold"
-                            Text="使用公共单回合执行序列" />
-                        <TextBlock
-                            FontSize="12"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="公共序列可作为一个动作插入上方首领释放序列；恰好包含 6 个技能 1-4 或 X 时，也可直接套用为六段首领连招。"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <Grid Grid.Row="1">
+                    <Grid MinHeight="180" Padding="16,14">
                         <ListView
                             ItemsSource="{x:Bind Editor.SharedPresetItems, Mode=OneWay}"
                             SelectionMode="None">
@@ -262,21 +397,16 @@
                                     <Setter Property="Margin" Value="0,0,0,8" />
                                     <Setter Property="Padding" Value="0" />
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="MinHeight" Value="0" />
                                 </Style>
                             </ListView.ItemContainerStyle>
                             <ListView.ItemTemplate>
                                 <DataTemplate>
-                                    <Border
-                                        Padding="10"
-                                        Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="8">
+                                    <Border Style="{StaticResource PresetRowStyle}">
                                         <Grid ColumnSpacing="12">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="160" />
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock
@@ -288,17 +418,15 @@
                                                 Grid.Column="1"
                                                 VerticalAlignment="Center"
                                                 FontFamily="Consolas"
+                                                FontSize="13"
                                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                 Text="{Binding Sequence}"
                                                 TextTrimming="CharacterEllipsis" />
                                             <Button
                                                 Grid.Column="2"
+                                                MinWidth="72"
                                                 Click="InsertBossReleasePresetButton_Click"
-                                                Content="插入前半段" />
-                                            <Button
-                                                Grid.Column="3"
-                                                Click="ApplyPresetButton_Click"
-                                                Content="套用连招" />
+                                                Content="插入" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -306,21 +434,19 @@
                         </ListView>
 
                         <StackPanel
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Spacing="8"
+                            Style="{StaticResource EmptyStatePanelStyle}"
                             Visibility="{x:Bind Editor.SharedPresetEmptyVisibility, Mode=OneWay}">
                             <FontIcon
                                 HorizontalAlignment="Center"
-                                FontSize="30"
+                                FontSize="28"
                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                 Glyph="&#xE8A5;" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="暂无可使用的公共序列" />
+                                Text="暂无公共序列，请先到左侧页面创建" />
                         </StackPanel>
                     </Grid>
-                </Grid>
+                </StackPanel>
             </Border>
         </StackPanel>
     </ScrollViewer>

@@ -347,7 +347,7 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private void LogAdoptedEncounterCaptureButtonObservationForCurrentTurn()
+    private void LogEncounterCaptureButtonDecisionForCurrentTurn(string decision)
     {
         if (IsAutoBattleBossBattle
             || _hasLoggedCurrentAutoBattleCaptureButtonObservation)
@@ -370,12 +370,15 @@ public sealed partial class RuntimeTaskService
             ? _currentAutoBattleTurnNumber
             : 1;
         _logger.LogDebug(
-            "自动战斗：第 {TurnNumber} 回合采用捕捉按钮识别结果：State={State}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}",
+            "自动战斗：第 {TurnNumber} 回合捕捉按钮判定：State={State}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}, Decision={Decision}",
             turnNumber,
             observation.State,
             observation.EnabledScore,
             observation.DisabledScore,
-            observation.DisabledMarkerScore);
+            observation.DisabledMarkerScore,
+            _encounterCaptureButtonStateTracker.EnabledConfirmationCount,
+            EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount,
+            decision);
         _hasLoggedCurrentAutoBattleCaptureButtonObservation = true;
     }
 

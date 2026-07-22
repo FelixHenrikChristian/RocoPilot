@@ -184,6 +184,8 @@ public sealed partial class RuntimeTaskService
             if (plan.Action == AutoBattleSkillSelectionAction.Skill
                 && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
             {
+                LogEncounterCaptureButtonDecisionForCurrentTurn(
+                    "HoldForUnconfirmedEncounterRelief");
                 return;
             }
 
@@ -196,7 +198,7 @@ public sealed partial class RuntimeTaskService
 
                 _autoBattleSkillSelectionAction = plan.Action;
                 _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
-                LogAdoptedEncounterCaptureButtonObservationForCurrentTurn();
+                LogEncounterCaptureButtonDecisionForCurrentTurn(plan.Action.ToString());
                 return;
             }
 
@@ -233,7 +235,7 @@ public sealed partial class RuntimeTaskService
 
             _autoBattleSkillSelectionAction = plan.Action;
             _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
-            LogAdoptedEncounterCaptureButtonObservationForCurrentTurn();
+            LogEncounterCaptureButtonDecisionForCurrentTurn(plan.Action.ToString());
             if (IsAutoBattleBossBattle)
             {
                 ResetAutoBattleBossSkillSelectionState();
@@ -263,18 +265,8 @@ public sealed partial class RuntimeTaskService
 
     private bool ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief()
     {
-        if (IsAutoBattleBossBattle
-            || !_encounterCaptureButtonStateTracker.ShouldHoldAttackForUnconfirmedRelief)
-        {
-            return false;
-        }
-
-        LogDebugOncePerValue(
-            CreateDebugLogKey("auto-battle-encounter-relief-unconfirmed-hold"),
-            _currentAutoBattleTurnNumber.ToString(),
-            "自动战斗：本场已识别到禁用捕捉按钮，但奇遇解除状态尚未确认；第 {TurnNumber} 回合暂停攻击并等待下一次快速扫描。",
-            _currentAutoBattleTurnNumber > 0 ? _currentAutoBattleTurnNumber : 1);
-        return true;
+        return !IsAutoBattleBossBattle
+            && _encounterCaptureButtonStateTracker.ShouldHoldAttackForUnconfirmedRelief;
     }
 
     private async Task HandleAutoBattlePetSwitchingAsync(

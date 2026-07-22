@@ -36,7 +36,7 @@ internal static class EncounterCaptureButtonRecognition
 
 internal sealed class EncounterCaptureButtonStateTracker
 {
-    private const int RequiredEnabledConfirmationCount = 2;
+    public const int RequiredEnabledConfirmationCount = 2;
 
     private readonly object _syncRoot = new();
     private bool _hasSeenDisabled;
@@ -73,6 +73,17 @@ internal sealed class EncounterCaptureButtonStateTracker
             lock (_syncRoot)
             {
                 return _isRelieved;
+            }
+        }
+    }
+
+    public int EnabledConfirmationCount
+    {
+        get
+        {
+            lock (_syncRoot)
+            {
+                return _consecutiveEnabledCount;
             }
         }
     }

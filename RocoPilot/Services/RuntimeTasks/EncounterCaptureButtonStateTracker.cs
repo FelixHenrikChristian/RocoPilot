@@ -9,8 +9,7 @@ internal enum EncounterCaptureButtonState
 
 internal static class EncounterCaptureButtonRecognition
 {
-    public const double EnabledPresentScore = 0.88;
-    public const double DisabledPresentScore = 0.92;
+    public const double ButtonPresentScore = 0.88;
     public const double DisabledMarkerPresentScore = 0.88;
     public const double DisabledMarkerAbsentScore = 0.78;
 
@@ -19,19 +18,20 @@ internal static class EncounterCaptureButtonRecognition
         double disabledScore,
         double disabledMarkerScore)
     {
-        if (disabledScore >= DisabledPresentScore
-            && disabledMarkerScore >= DisabledMarkerPresentScore)
+        var buttonScore = Math.Max(enabledScore, disabledScore);
+        if (buttonScore < ButtonPresentScore)
+        {
+            return EncounterCaptureButtonState.Unknown;
+        }
+
+        if (disabledMarkerScore >= DisabledMarkerPresentScore)
         {
             return EncounterCaptureButtonState.Disabled;
         }
 
-        if (enabledScore >= EnabledPresentScore
-            && disabledMarkerScore <= DisabledMarkerAbsentScore)
-        {
-            return EncounterCaptureButtonState.Enabled;
-        }
-
-        return EncounterCaptureButtonState.Unknown;
+        return disabledMarkerScore <= DisabledMarkerAbsentScore
+            ? EncounterCaptureButtonState.Enabled
+            : EncounterCaptureButtonState.Unknown;
     }
 }
 

@@ -50,8 +50,12 @@ public sealed class EncounterCaptureButtonStateTrackerTests
         Assert.IsTrue(tracker.HasSeenDisabled);
         Assert.AreEqual(EncounterCaptureButtonState.Disabled, tracker.CurrentState);
         Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Enabled));
+        Assert.AreEqual(1, tracker.EnabledConfirmationCount);
         Assert.IsTrue(tracker.ShouldHoldAttackForUnconfirmedRelief);
         Assert.IsTrue(tracker.Observe(EncounterCaptureButtonState.Enabled));
+        Assert.AreEqual(
+            EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount,
+            tracker.EnabledConfirmationCount);
         Assert.IsTrue(tracker.IsRelieved);
         Assert.AreEqual(EncounterCaptureButtonState.Enabled, tracker.CurrentState);
         Assert.IsFalse(tracker.ShouldHoldAttackForUnconfirmedRelief);
@@ -71,6 +75,7 @@ public sealed class EncounterCaptureButtonStateTrackerTests
         Assert.IsFalse(tracker.HasSeenDisabled);
         Assert.IsFalse(tracker.IsRelieved);
         Assert.AreEqual(EncounterCaptureButtonState.Unknown, tracker.CurrentState);
+        Assert.AreEqual(0, tracker.EnabledConfirmationCount);
         Assert.IsFalse(tracker.Observe(EncounterCaptureButtonState.Enabled));
     }
 

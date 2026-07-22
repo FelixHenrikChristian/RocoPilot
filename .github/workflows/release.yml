@@ -1,13 +1,6 @@
 name: Build and Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      prerelease:
-        description: "Mark the GitHub release as prerelease."
-        required: false
-        default: false
-        type: boolean
   push:
     branches:
       - master
@@ -48,7 +41,6 @@ jobs:
         id: version
         shell: pwsh
         env:
-          EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
@@ -203,13 +195,9 @@ jobs:
           }
 
           if ($tagExists -and $env:REF_TYPE -ne "tag") {
-            if ($env:EVENT_NAME -eq "push") {
-              "should_release=false" >> $env:GITHUB_OUTPUT
-              Write-Host "Tag '$tag' already exists. This branch push is not a new release; skipping."
-              exit 0
-            }
-
-            throw "Tag '$tag' already exists. Bump the application version before starting a manual release."
+            "should_release=false" >> $env:GITHUB_OUTPUT
+            Write-Host "Tag '$tag' already exists. This branch push is not a new release; skipping."
+            exit 0
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -353,7 +341,7 @@ jobs:
           tag_name: ${{ needs.build_release_assets.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: RocoPilot ${{ needs.build_release_assets.outputs.version }}
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          prerelease: false
           draft: true
           token: ${{ github.token }}
           body: |

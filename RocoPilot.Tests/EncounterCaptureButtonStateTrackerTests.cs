@@ -61,7 +61,7 @@ public sealed class EncounterCaptureButtonStateTrackerTests
     {
         Assert.AreEqual(
             EncounterCaptureButtonState.Unknown,
-            EncounterCaptureButtonRecognition.Classify(0.87, 0.86, 0.97));
+            EncounterCaptureButtonRecognition.Classify(0.849, 0.84, 0.97));
         Assert.AreEqual(
             EncounterCaptureButtonState.Unknown,
             EncounterCaptureButtonRecognition.Classify(0.94, 0.93, 0.85));
@@ -71,6 +71,20 @@ public sealed class EncounterCaptureButtonStateTrackerTests
         Assert.AreEqual(
             EncounterCaptureButtonState.Disabled,
             EncounterCaptureButtonRecognition.Classify(0.90, 0.919, 0.95));
+    }
+
+    [TestMethod]
+    public void ClassifiesThresholdBoundaries()
+    {
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Enabled,
+            EncounterCaptureButtonRecognition.Classify(0.85, 0.84, 0.80));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Disabled,
+            EncounterCaptureButtonRecognition.Classify(0.84, 0.85, 0.88));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonRecognition.Classify(0.85, 0.84, 0.81));
     }
 
     [TestMethod]

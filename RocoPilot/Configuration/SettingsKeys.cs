@@ -15,4 +15,6 @@ internal static class SettingsKeys
     public const string RuntimeRecognitionSettings = "RuntimeRecognitionSettings";
 
     public const string HotkeySettings = "HotkeySettings";
+
+    public const string ImageMatchAlgorithm = "ImageMatchAlgorithm";
 }

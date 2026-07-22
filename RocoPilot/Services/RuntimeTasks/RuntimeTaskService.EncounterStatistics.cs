@@ -6,6 +6,7 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Overlay;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Services;
@@ -45,9 +46,15 @@ public sealed partial class RuntimeTaskService
     [
         RecognitionRegionIds.BattleCaptureButton
     ];
-    private static readonly ImageMatchOptions CaptureButtonMatchOptions = new()
+    private static readonly ImageMatchOptions CaptureButtonEnabledMatchOptions = new()
     {
-        MinimumScore = EncounterCaptureButtonRecognition.MinimumVisibilityScore,
+        MinimumScore = EncounterCaptureButtonRecognition.EnabledPresentScore,
+        AlphaThreshold = 16,
+        SearchStep = 1
+    };
+    private static readonly ImageMatchOptions CaptureButtonDisabledMatchOptions = new()
+    {
+        MinimumScore = EncounterCaptureButtonRecognition.DisabledPresentScore,
         AlphaThreshold = 16,
         SearchStep = 1
     };
@@ -266,7 +273,7 @@ public sealed partial class RuntimeTaskService
             frame,
             cancellationToken);
         RememberEncounterCaptureButtonObservation(observation);
-        ApplyEncounterCaptureButtonState(season, observation.State);
+        ApplyEncounterCaptureButtonState(season, observation);
     }
 
     private async Task<EncounterCaptureButtonObservation> RecognizeEncounterCaptureButtonStateAsync(
@@ -274,6 +281,7 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
+        var matchAlgorithm = _imageMatchingService.DefaultAlgorithm;
         var disabledMarkerTemplatePath = GetResolutionTemplatePath(
             state.RecognitionRegionConfig,
             CaptureButtonDisabledMarkerTemplateName);
@@ -290,15 +298,27 @@ public sealed partial class RuntimeTaskService
                 EncounterCaptureButtonState.Unknown,
                 0,
                 0,
-                0);
+                0,
+                matchAlgorithm);
         }
+
+        var enabledMatchOptions = CloneImageMatchOptions(
+            CaptureButtonEnabledMatchOptions,
+            1,
+            1);
+        enabledMatchOptions.Algorithm = matchAlgorithm;
+        var disabledMatchOptions = CloneImageMatchOptions(
+            CaptureButtonDisabledMatchOptions,
+            1,
+            1);
+        disabledMatchOptions.Algorithm = matchAlgorithm;
 
         var enabledMatchTask = MatchRuntimeTemplateResultAsync(
             state,
             frame,
             BattleCaptureButtonRegionIds,
             CaptureButtonEnabledTemplateName,
-            CaptureButtonMatchOptions,
+            enabledMatchOptions,
             "奇遇识别",
             "可捕捉按钮",
             cancellationToken);
@@ -307,27 +327,49 @@ public sealed partial class RuntimeTaskService
             frame,
             BattleCaptureButtonRegionIds,
             CaptureButtonDisabledTemplateName,
-            CaptureButtonMatchOptions,
+            disabledMatchOptions,
             "奇遇识别",
             "禁用捕捉按钮",
             cancellationToken);
-        var disabledMarkerMatchTask = MatchRuntimeTemplateResultAsync(
-            state,
-            frame,
-            BattleCaptureButtonRegionIds,
-            CaptureButtonDisabledMarkerTemplateName,
-            CaptureButtonDisabledMarkerMatchOptions,
-            "奇遇识别",
-            "捕捉按钮禁用标志",
-            cancellationToken);
-
         await Task.WhenAll(
             enabledMatchTask,
-            disabledMatchTask,
-            disabledMarkerMatchTask);
+            disabledMatchTask);
         var enabledMatch = await enabledMatchTask;
         var disabledMatch = await disabledMatchTask;
-        var disabledMarkerMatch = await disabledMarkerMatchTask;
+        var anchorMatch = enabledMatch.Score >= disabledMatch.Score
+            ? enabledMatch
+            : disabledMatch;
+        var alignedMarkerRegion = new RecognitionRegion
+        {
+            Id = RecognitionRegionIds.BattleCaptureButton,
+            X = anchorMatch.X,
+            Y = anchorMatch.Y,
+            Width = anchorMatch.Width,
+            Height = anchorMatch.Height,
+            Enabled = true
+        };
+        var disabledMarkerBaseOptions = CloneImageMatchOptions(
+            CaptureButtonDisabledMarkerMatchOptions,
+            1,
+            1);
+        disabledMarkerBaseOptions.Algorithm = matchAlgorithm;
+        var disabledMarkerMatchOptions = CreateScaledImageMatchOptions(
+            disabledMarkerBaseOptions,
+            frame,
+            state.TargetWindow,
+            state.RecognitionRegionConfig);
+        var disabledMarkerMatch = await _imageMatchingService.MatchAsync(
+            frame,
+            alignedMarkerRegion,
+            disabledMarkerTemplatePath,
+            disabledMarkerMatchOptions,
+            cancellationToken);
+        var captureButtonRegion = FindRegion(
+            state.RecognitionRegionConfig,
+            BattleCaptureButtonRegionIds);
+        _recognitionOverlayService.ShowImageMatchResult(
+            captureButtonRegion.Id,
+            disabledMarkerMatch.Score);
         var buttonState = EncounterCaptureButtonRecognition.Classify(
             enabledMatch.Score,
             disabledMatch.Score,
@@ -336,7 +378,8 @@ public sealed partial class RuntimeTaskService
             buttonState,
             enabledMatch.Score,
             disabledMatch.Score,
-            disabledMarkerMatch.Score);
+            disabledMarkerMatch.Score,
+            matchAlgorithm);
     }
 
     private void RememberEncounterCaptureButtonObservation(
@@ -371,9 +414,10 @@ public sealed partial class RuntimeTaskService
             ? _currentAutoBattleTurnNumber
             : 1;
         _logger.LogDebug(
-            "自动战斗：第 {TurnNumber} 回合捕捉按钮判定：State={State}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}, Decision={Decision}",
+            "自动战斗：第 {TurnNumber} 回合捕捉按钮判定：State={State}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}, Decision={Decision}",
             turnNumber,
             observation.State,
+            observation.Algorithm,
             observation.EnabledScore,
             observation.DisabledScore,
             observation.DisabledMarkerScore,
@@ -385,13 +429,19 @@ public sealed partial class RuntimeTaskService
 
     private void ApplyEncounterCaptureButtonState(
         EncounterSeasonDefinition season,
-        EncounterCaptureButtonState buttonState)
+        EncounterCaptureButtonObservation observation)
     {
-        if (_encounterCaptureButtonStateTracker.Observe(buttonState))
+        if (_encounterCaptureButtonStateTracker.Observe(observation.State))
         {
             _logger.LogInformation(
-                "奇遇识别：捕捉按钮已由禁用变为可用，判定本场奇遇效果解除。Season={SeasonId}",
-                season.Id);
+                "奇遇识别：捕捉按钮已由禁用变为可用，判定本场奇遇效果解除。Season={SeasonId}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}",
+                season.Id,
+                observation.Algorithm,
+                observation.EnabledScore,
+                observation.DisabledScore,
+                observation.DisabledMarkerScore,
+                _encounterCaptureButtonStateTracker.EnabledConfirmationCount,
+                EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount);
             ApplyAutoBattleEncounterRelievedDetection("捕捉按钮状态");
         }
     }
@@ -842,5 +892,6 @@ public sealed partial class RuntimeTaskService
         EncounterCaptureButtonState State,
         double EnabledScore,
         double DisabledScore,
-        double DisabledMarkerScore);
+        double DisabledMarkerScore,
+        ImageMatchAlgorithm Algorithm);
 }

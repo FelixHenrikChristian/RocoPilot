@@ -23,6 +23,12 @@ public sealed partial class MainPage : Page
         InitializeComponent();
     }
 
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= OnLoaded;
+        await ViewModel.LoadImageMatchAlgorithmAsync();
+    }
+
     private void CoverContainer_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         if (e.NewSize.Width <= 0)

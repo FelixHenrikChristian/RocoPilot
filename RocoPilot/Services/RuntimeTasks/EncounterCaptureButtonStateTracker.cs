@@ -9,9 +9,9 @@ internal enum EncounterCaptureButtonState
 
 internal static class EncounterCaptureButtonRecognition
 {
-    public const double ButtonPresentScore = 0.88;
+    public const double ButtonPresentScore = 0.85;
     public const double DisabledMarkerPresentScore = 0.88;
-    public const double DisabledMarkerAbsentScore = 0.78;
+    public const double DisabledMarkerAbsentScore = 0.80;
 
     public static EncounterCaptureButtonState Classify(
         double enabledScore,

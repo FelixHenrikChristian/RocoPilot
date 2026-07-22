@@ -19,7 +19,7 @@ public sealed partial class RuntimeTaskService
     private const string CaptureButtonDisabledTemplateName = "battle-button-capture-disabled.png";
     private const string CaptureButtonDisabledMarkerTemplateName = "battle-button-capture-disabled-marker.png";
     private const string S3SeasonId = "S3";
-    private const int S3EncounterTipMinimumTextLength = 5;
+    private const int AuxiliaryTipMinimumChineseCharacterCount = 3;
     private const string ShinyTipText = "发现异色精灵";
     private const double ShinyTipMatchThreshold = 0.78;
     private const int ShinyTipMinimumTextLength = 4;
@@ -181,7 +181,8 @@ public sealed partial class RuntimeTaskService
             BattleTipRegionIds,
             cancellationToken,
             "战斗提示");
-        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleMessageTip, tipText))
+        if (TextMatchingHelper.CountChineseCharacters(tipText) < AuxiliaryTipMinimumChineseCharacterCount
+            || !TryRememberAuxiliaryTip(RecognitionRegionIds.BattleMessageTip, tipText))
         {
             return;
         }
@@ -209,7 +210,7 @@ public sealed partial class RuntimeTaskService
             BattleS3EncounterTipRegionIds,
             cancellationToken,
             "S3 奇遇提示");
-        if (TextMatchingHelper.CleanRecognizedText(tipText).Length < S3EncounterTipMinimumTextLength
+        if (TextMatchingHelper.CountChineseCharacters(tipText) < AuxiliaryTipMinimumChineseCharacterCount
             || !TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
         {
             return;

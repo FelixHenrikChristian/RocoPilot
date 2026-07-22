@@ -40,6 +40,25 @@ public static class TextMatchingHelper
         return builder.ToString();
     }
 
+    public static int CountChineseCharacters(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 0;
+        }
+
+        var count = 0;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (IsChineseIdeograph(rune.Value))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     public static string CleanSpiritName(string? text)
     {
         return NormalizeSpiritNameInput(text);
@@ -148,6 +167,15 @@ public static class TextMatchingHelper
             or UnicodeCategory.DecimalDigitNumber
             or UnicodeCategory.LetterNumber
             or UnicodeCategory.OtherNumber;
+    }
+
+    private static bool IsChineseIdeograph(int value)
+    {
+        return value is >= 0x3400 and <= 0x4DBF
+            or >= 0x4E00 and <= 0x9FFF
+            or >= 0xF900 and <= 0xFAFF
+            or >= 0x20000 and <= 0x2EE5F
+            or >= 0x30000 and <= 0x323AF;
     }
 
     private static double CalculateNormalizedLevenshteinSimilarity(string source, string target)

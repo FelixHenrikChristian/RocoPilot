@@ -27,6 +27,25 @@ public sealed class EncounterCaptureButtonStateTrackerTests
     }
 
     [TestMethod]
+    [DataRow(0.899160, 0.885388, 0.651184, "Enabled")]
+    [DataRow(0.850437, 0.948442, 0.932972, "Disabled")]
+    [DataRow(0.867888, 0.966959, 0.943713, "Disabled")]
+    [DataRow(0.915796, 0.905370, 0.701815, "Enabled")]
+    public void ClassifiesCaptured1600x900Samples(
+        double enabledScore,
+        double disabledScore,
+        double disabledMarkerScore,
+        string expected)
+    {
+        Assert.AreEqual(
+            Enum.Parse<EncounterCaptureButtonState>(expected),
+            EncounterCaptureButtonRecognition.Classify(
+                enabledScore,
+                disabledScore,
+                disabledMarkerScore));
+    }
+
+    [TestMethod]
     public void RejectsInvisibleButtonOrAmbiguousDisabledMarker()
     {
         Assert.AreEqual(
@@ -35,6 +54,12 @@ public sealed class EncounterCaptureButtonStateTrackerTests
         Assert.AreEqual(
             EncounterCaptureButtonState.Unknown,
             EncounterCaptureButtonRecognition.Classify(0.94, 0.93, 0.85));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonRecognition.Classify(0.879, 0.91, 0.70));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonRecognition.Classify(0.90, 0.919, 0.95));
     }
 
     [TestMethod]

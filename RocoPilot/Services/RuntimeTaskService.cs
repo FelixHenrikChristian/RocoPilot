@@ -135,6 +135,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             var savedRuntimeRecognitionSettings =
                 await _localSettingsService.ReadSettingAsync<RuntimeRecognitionSettings>(SettingsKeys.RuntimeRecognitionSettings);
             _runtimeRecognitionSettings = NormalizeRuntimeRecognitionSettings(savedRuntimeRecognitionSettings);
+            await _imageMatchingService.InitializeAsync(cancellationToken);
             await _hotkeyService.LoadSettingsAsync(cancellationToken);
             _settingsLoaded = true;
         }
@@ -284,7 +285,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
             _logger.LogInformation("实时任务：已启动（窗口 {Window}）", targetWindow.DisplayName);
             _logger.LogDebug(
-                "实时任务启动详情：Window={Window}, Client={ClientWidth}x{ClientHeight}, FirstFrame={FrameWidth}x{FrameHeight}, CaptureMethod={CaptureMethod}, OCR={TextRecognitionMethod}, ConfigPath={ConfigPath}",
+                "实时任务启动详情：Window={Window}, Client={ClientWidth}x{ClientHeight}, FirstFrame={FrameWidth}x{FrameHeight}, CaptureMethod={CaptureMethod}, OCR={TextRecognitionMethod}, ImageMatching={ImageMatchAlgorithm}, ConfigPath={ConfigPath}",
                 targetWindow.DisplayName,
                 configResolutionWidth,
                 configResolutionHeight,
@@ -292,6 +293,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 firstFrame.Height,
                 options.CaptureMethod,
                 options.TextRecognitionMethod,
+                _imageMatchingService.DefaultAlgorithm,
                 recognitionRegionConfig.SourcePath);
 
             _logger.LogDebug(
@@ -1164,6 +1166,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     {
         return new ImageMatchOptions
         {
+            Algorithm = options.Algorithm,
             MinimumScore = options.MinimumScore,
             AlphaThreshold = options.AlphaThreshold,
             SearchStep = options.SearchStep,

@@ -1,7 +1,20 @@
 namespace RocoPilot.Models.ImageMatching;
 
+public enum ImageMatchAlgorithm
+{
+    UseGlobalDefault,
+    WeightedRgbError,
+    OpenCvSqDiffNormalized
+}
+
 public sealed class ImageMatchOptions
 {
+    public ImageMatchAlgorithm Algorithm
+    {
+        get;
+        set;
+    } = ImageMatchAlgorithm.UseGlobalDefault;
+
     public double MinimumScore
     {
         get;

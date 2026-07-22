@@ -6,12 +6,23 @@ namespace RocoPilot.Contracts.Services.ImageMatching;
 
 public interface IImageMatchingService
 {
+    ImageMatchAlgorithm DefaultAlgorithm
+    {
+        get;
+    }
+
     string TemplateDirectory
     {
         get;
     }
 
     IReadOnlyList<string> ListTemplatePaths();
+
+    Task InitializeAsync(CancellationToken cancellationToken = default);
+
+    Task SetDefaultAlgorithmAsync(
+        ImageMatchAlgorithm algorithm,
+        CancellationToken cancellationToken = default);
 
     Task<ImageMatchResult> MatchAsync(
         CapturedFrame frame,

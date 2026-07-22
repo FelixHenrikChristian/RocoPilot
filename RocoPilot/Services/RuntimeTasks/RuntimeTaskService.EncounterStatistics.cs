@@ -48,13 +48,13 @@ public sealed partial class RuntimeTaskService
     ];
     private static readonly ImageMatchOptions CaptureButtonEnabledMatchOptions = new()
     {
-        MinimumScore = EncounterCaptureButtonRecognition.EnabledPresentScore,
+        MinimumScore = EncounterCaptureButtonRecognition.ButtonPresentScore,
         AlphaThreshold = 16,
         SearchStep = 1
     };
     private static readonly ImageMatchOptions CaptureButtonDisabledMatchOptions = new()
     {
-        MinimumScore = EncounterCaptureButtonRecognition.DisabledPresentScore,
+        MinimumScore = EncounterCaptureButtonRecognition.ButtonPresentScore,
         AlphaThreshold = 16,
         SearchStep = 1
     };

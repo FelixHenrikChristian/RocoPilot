@@ -8,7 +8,7 @@ namespace RocoPilot.Tests;
 public sealed class EncounterCaptureButtonStateTrackerTests
 {
     [TestMethod]
-    public void ClassifiesVisibleButtonByDisabledMarker()
+    public void ClassifiesVisibleButtonOnlyByDisabledMarker()
     {
         Assert.AreEqual(
             EncounterCaptureButtonState.Enabled,
@@ -24,6 +24,17 @@ public sealed class EncounterCaptureButtonStateTrackerTests
         Assert.AreEqual(
             EncounterCaptureButtonState.Enabled,
             EncounterCaptureButtonRecognition.Classify(0.898, 0.916, 0.737));
+    }
+
+    [TestMethod]
+    public void FullButtonTemplateWinnerDoesNotDetermineState()
+    {
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Enabled,
+            EncounterCaptureButtonRecognition.Classify(0.87, 0.93, 0.70));
+        Assert.AreEqual(
+            EncounterCaptureButtonState.Disabled,
+            EncounterCaptureButtonRecognition.Classify(0.93, 0.87, 0.95));
     }
 
     [TestMethod]
@@ -55,10 +66,10 @@ public sealed class EncounterCaptureButtonStateTrackerTests
             EncounterCaptureButtonState.Unknown,
             EncounterCaptureButtonRecognition.Classify(0.94, 0.93, 0.85));
         Assert.AreEqual(
-            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonState.Enabled,
             EncounterCaptureButtonRecognition.Classify(0.879, 0.91, 0.70));
         Assert.AreEqual(
-            EncounterCaptureButtonState.Unknown,
+            EncounterCaptureButtonState.Disabled,
             EncounterCaptureButtonRecognition.Classify(0.90, 0.919, 0.95));
     }
 

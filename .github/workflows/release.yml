@@ -9,16 +9,25 @@ on:
         default: false
         type: boolean
   push:
+    branches:
+      - master
     tags:
-      - "v*"
+      - "v*.*.*"
+    paths:
+      - ".github/workflows/release.yml"
+      - "RocoPilot/RocoPilot.csproj"
+      - "RocoPilot/Package.appxmanifest"
+      - "RocoPilot/app.manifest"
 
 permissions:
   contents: read
 
 env:
   ROCO_R2_PUBLIC_URL: https://pub-749777b9646245b7bc1b15efee2b9b24.r2.dev
-  CLOUDFLARE_ACCOUNT_ID: 20049c2f69ed4c795000cb90655ca4d4
-  CLOUDFLARE_BUCKET_NAME: rocopilot-release
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build_release_assets:
@@ -27,6 +36,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      should_release: ${{ steps.version.outputs.should_release }}
 
     steps:
       - name: Checkout repository
@@ -38,6 +48,7 @@ jobs:
         id: version
         shell: pwsh
         env:
+          EVENT_NAME: ${{ github.event_name }}
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
@@ -49,6 +60,34 @@ jobs:
             throw "RocoPilot.csproj does not contain a <Version> value."
           }
 
+          $fileVersion = [string](($projectXml.Project.PropertyGroup | Where-Object { $_.FileVersion } | Select-Object -First 1).FileVersion)
+          $assemblyVersion = [string](($projectXml.Project.PropertyGroup | Where-Object { $_.AssemblyVersion } | Select-Object -First 1).AssemblyVersion)
+
+          [xml]$packageXml = Get-Content "RocoPilot/Package.appxmanifest" -Raw
+          $packageIdentity = $packageXml.SelectSingleNode("/*[local-name()='Package']/*[local-name()='Identity']")
+          $packageVersion = [string]$packageIdentity.Version
+
+          [xml]$applicationManifestXml = Get-Content "RocoPilot/app.manifest" -Raw
+          $applicationIdentity = $applicationManifestXml.SelectSingleNode("/*[local-name()='assembly']/*[local-name()='assemblyIdentity']")
+          $applicationVersion = [string]$applicationIdentity.version
+
+          if ($projectVersion -notmatch '^\d+\.\d+\.\d+$') {
+            throw "RocoPilot.csproj version '$projectVersion' must use the x.y.z format."
+          }
+
+          $windowsVersion = "$projectVersion.0"
+          $versionValues = [ordered]@{
+            "RocoPilot.csproj FileVersion" = $fileVersion
+            "RocoPilot.csproj AssemblyVersion" = $assemblyVersion
+            "Package.appxmanifest Identity Version" = $packageVersion
+            "app.manifest assemblyIdentity version" = $applicationVersion
+          }
+          foreach ($entry in $versionValues.GetEnumerator()) {
+            if ($entry.Value -ne $windowsVersion) {
+              throw "$($entry.Key) '$($entry.Value)' does not match expected version '$windowsVersion'."
+            }
+          }
+
           if ($env:REF_TYPE -eq "tag") {
             $version = $env:REF_NAME -replace "^v", ""
             if ($version -ne $projectVersion) {
@@ -57,10 +96,6 @@ jobs:
           }
           else {
             $version = $projectVersion
-          }
-
-          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
-            throw "Version '$version' is not a supported release version."
           }
 
           $tag = "v$version"
@@ -152,10 +187,11 @@ jobs:
           }
 
           $newerVersion = $null
+          $tagExists = $false
           foreach ($existingVersion in $existingVersions) {
             $comparison = Compare-SemVer $existingVersion $version
-            if ($comparison -eq 0 -and $env:REF_TYPE -ne "tag") {
-              throw "Tag 'v$existingVersion' already exists. Bump RocoPilot.csproj <Version> before releasing."
+            if ($comparison -eq 0) {
+              $tagExists = $true
             }
             if ($comparison -gt 0 -and ($null -eq $newerVersion -or (Compare-SemVer $existingVersion $newerVersion) -gt 0)) {
               $newerVersion = $existingVersion
@@ -166,22 +202,36 @@ jobs:
             throw "Existing release tag 'v$newerVersion' is newer than '$tag'. Bump RocoPilot.csproj <Version> before releasing."
           }
 
+          if ($tagExists -and $env:REF_TYPE -ne "tag") {
+            if ($env:EVENT_NAME -eq "push") {
+              "should_release=false" >> $env:GITHUB_OUTPUT
+              Write-Host "Tag '$tag' already exists. This branch push is not a new release; skipping."
+              exit 0
+            }
+
+            throw "Tag '$tag' already exists. Bump the application version before starting a manual release."
+          }
+
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
+          "should_release=true" >> $env:GITHUB_OUTPUT
           "APP_VERSION=$version" >> $env:GITHUB_ENV
           Write-Host "Release version: $version"
           Write-Host "Release tag: $tag"
 
       - name: Setup .NET 10 SDK
+        if: steps.version.outputs.should_release == 'true'
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
 
       - name: Restore RocoPilot
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         run: dotnet restore RocoPilot/RocoPilot.csproj
 
       - name: Download Kachina builder
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         env:
           KACHINA_BUILDER_URL: ${{ vars.KACHINA_BUILDER_URL }}
@@ -197,6 +247,7 @@ jobs:
           Unblock-File -LiteralPath "update/kachina-builder.exe" -ErrorAction SilentlyContinue
 
       - name: Configure Kachina R2 source
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -206,14 +257,17 @@ jobs:
           Write-Host "Kachina R2 source: $cloudflareUrl"
 
       - name: Build Kachina updater
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         run: .\update\build-kachina.ps1 -Version "$env:APP_VERSION" -UpdaterOnly
 
       - name: Build MicaSetup installer and publish app
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         run: .\build\build-installer.ps1 -RequireUpdater
 
       - name: Build Kachina offline installer
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -224,6 +278,7 @@ jobs:
             -SkipUpdaterBuild
 
       - name: Collect release assets
+        if: steps.version.outputs.should_release == 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
@@ -243,6 +298,7 @@ jobs:
           Get-ChildItem "artifacts" -File | Format-Table Name, Length
 
       - name: Upload release assets
+        if: steps.version.outputs.should_release == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: release-assets
@@ -253,25 +309,18 @@ jobs:
   create_github_release:
     name: Create GitHub release
     needs: build_release_assets
+    if: needs.build_release_assets.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
-      - name: Check release publish token
-        shell: bash
-        env:
-          HAS_RELEASE_PUBLISH_TOKEN: ${{ secrets.RELEASE_PUBLISH_TOKEN != '' }}
-        run: |
-          if [ "${HAS_RELEASE_PUBLISH_TOKEN}" != "true" ]; then
-            echo "::warning title=RELEASE_PUBLISH_TOKEN is not configured::GitHub release will fall back to github.token, so release-edited workflows may still not trigger."
-          fi
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_PUBLISH_TOKEN || github.token }}
+          # Tags created by GITHUB_TOKEN do not recursively trigger another release run.
+          token: ${{ github.token }}
 
       - name: Create release tag
         shell: bash
@@ -306,7 +355,7 @@ jobs:
           name: RocoPilot ${{ needs.build_release_assets.outputs.version }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           draft: true
-          token: ${{ secrets.RELEASE_PUBLISH_TOKEN || github.token }}
+          token: ${{ github.token }}
           body: |
             # RocoPilot ${{ needs.build_release_assets.outputs.version }}
 
@@ -331,109 +380,3 @@ jobs:
 
             </details>
           files: artifacts/*
-
-  upload_to_r2:
-    name: Upload release assets to Cloudflare R2
-    needs: [build_release_assets, create_github_release]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download release assets
-        uses: actions/download-artifact@v4
-        with:
-          name: release-assets
-          path: artifacts
-
-      - name: Install AWS CLI
-        run: |
-          python3 -m pip install --user awscli
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Generate update metadata
-        env:
-          RELEASE_TAG: ${{ needs.build_release_assets.outputs.tag }}
-          RELEASE_VERSION: ${{ needs.build_release_assets.outputs.version }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-
-          tag = os.environ["RELEASE_TAG"]
-          version = os.environ["RELEASE_VERSION"]
-          repo = os.environ["GITHUB_REPOSITORY"]
-          body = f"""# RocoPilot {version}
-
-          ## 🎉 特性：
-          - **待补充**：填写本次新增的主要功能。
-
-          ## ✨ 优化：
-          - **待补充**：填写体验、性能、流程、界面等优化内容。
-
-          ## 🔧 修复：
-          - **待补充**：填写本次修复的问题。
-
-          ## ⚠️ 注意：
-          - 暂无
-
-          <details>
-          <summary>📦 安装包说明</summary>
-
-          - `RocoPilot-Setup.exe`：完整安装程序，推荐首次安装或手动安装使用。
-          - `RocoPilot.update.exe`：应用内更新器，用于自动下载并执行更新。
-          - `RocoPilot.Install.exe`：应用内更新所需的安装包，由更新器使用。
-
-          </details>
-          """
-
-          metadata = {
-              "tag_name": tag,
-              "name": f"RocoPilot {version}",
-              "body": body,
-              "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-              "html_url": f"https://github.com/{repo}/releases/tag/{tag}",
-          }
-
-          with open("artifacts/latest.json", "w", encoding="utf-8") as file:
-              json.dump(metadata, file, ensure_ascii=False, indent=2)
-              file.write("\n")
-          PY
-
-      - name: Upload RocoPilot.Install.exe
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          aws s3 cp artifacts/RocoPilot.Install.exe \
-            "s3://${CLOUDFLARE_BUCKET_NAME}/RocoPilot.Install.exe" \
-            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-      - name: Upload update metadata
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          aws s3 cp artifacts/latest.json \
-            "s3://${CLOUDFLARE_BUCKET_NAME}/latest.json" \
-            --content-type "application/json; charset=utf-8" \
-            --cache-control "no-cache" \
-            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
-
-      - name: Upload MicaSetup installer
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-        run: |
-          mica_installer="artifacts/RocoPilot-Setup.exe"
-          if [ ! -f "$mica_installer" ]; then
-            echo "MicaSetup installer was not found."
-            exit 1
-          fi
-
-          aws s3 cp "$mica_installer" \
-            "s3://${CLOUDFLARE_BUCKET_NAME}/RocoPilot-Setup.exe" \
-            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"

@@ -1,4 +1,4 @@
-name: Sync Release Metadata to R2
+name: Publish Release to R2
 
 on:
   release:
@@ -74,6 +74,33 @@ jobs:
         run: |
           python3 -m pip install --user awscli
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Download published release assets
+        if: github.event_name == 'release' && github.event.action == 'published' && steps.release.outputs.should_sync == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.latest_tag }}
+        run: |
+          mkdir -p artifacts
+          gh release download "$RELEASE_TAG" \
+            --dir artifacts \
+            --pattern "RocoPilot.Install.exe" \
+            --pattern "RocoPilot-Setup.exe"
+
+      - name: Upload published installers
+        if: github.event_name == 'release' && github.event.action == 'published' && steps.release.outputs.should_sync == 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          aws s3 cp artifacts/RocoPilot.Install.exe \
+            "s3://${CLOUDFLARE_BUCKET_NAME}/RocoPilot.Install.exe" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          aws s3 cp artifacts/RocoPilot-Setup.exe \
+            "s3://${CLOUDFLARE_BUCKET_NAME}/RocoPilot-Setup.exe" \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
       - name: Upload latest.json to R2
         if: steps.release.outputs.should_sync == 'true'

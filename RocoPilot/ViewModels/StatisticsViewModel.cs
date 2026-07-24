@@ -28,6 +28,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     };
 
     private readonly IStatisticsService _statisticsService;
+    private readonly IStatisticsUidCoordinatorService _statisticsUidCoordinatorService;
     private readonly IStatisticsSyncService _statisticsSyncService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
@@ -76,6 +77,17 @@ public partial class StatisticsViewModel : ObservableRecipient
     }
 
     public string SelectedAccountDisplayName => SelectedAccount?.DisplayName ?? "未选择账号";
+
+    public StatisticsUidConfirmationRequest? PendingUidConfirmation =>
+        _statisticsUidCoordinatorService.PendingConfirmation;
+
+    public Visibility UidConfirmationWarningVisibility =>
+        PendingUidConfirmation is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string UidConfirmationWarningToolTip =>
+        PendingUidConfirmation?.Message ?? "统计账号尚未确认";
+
+    public event EventHandler? UidConfirmationChanged;
 
     public IReadOnlyList<ShinyScopeOption> ShinyScopes
     {
@@ -258,12 +270,14 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public StatisticsViewModel(
         IStatisticsService statisticsService,
+        IStatisticsUidCoordinatorService statisticsUidCoordinatorService,
         IStatisticsSyncService statisticsSyncService,
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         ILogger<StatisticsViewModel> logger)
     {
         _statisticsService = statisticsService;
+        _statisticsUidCoordinatorService = statisticsUidCoordinatorService;
         _statisticsSyncService = statisticsSyncService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
@@ -272,9 +286,29 @@ public partial class StatisticsViewModel : ObservableRecipient
         _document = _statisticsService.CurrentDocument;
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
         _statisticsService.SelectedAccountChanged += StatisticsService_SelectedAccountChanged;
+        _statisticsUidCoordinatorService.PendingConfirmationChanged +=
+            StatisticsUidCoordinatorService_PendingConfirmationChanged;
         _statisticsSyncService.StatusChanged += StatisticsSyncService_StatusChanged;
         ApplyDocument(_document);
         ApplySyncStatus(_statisticsSyncService.CurrentStatus);
+    }
+
+    public void MarkPendingUidConfirmationPresented()
+    {
+        _statisticsUidCoordinatorService.MarkPendingConfirmationPresented();
+    }
+
+    public Task<StatisticsUidDetectionResult> RetryUidDetectionAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return _statisticsUidCoordinatorService.RetryDetectionAsync(cancellationToken);
+    }
+
+    public Task<string> ConfirmUidAsync(
+        string uid,
+        CancellationToken cancellationToken = default)
+    {
+        return _statisticsUidCoordinatorService.ConfirmUidAsync(uid, cancellationToken);
     }
 
     public async Task LoadAsync()
@@ -607,6 +641,27 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
 
         _dispatcherQueue.TryEnqueue(() => ApplySelectedAccountUid(selectedUid));
+    }
+
+    private void StatisticsUidCoordinatorService_PendingConfirmationChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        {
+            NotifyUidConfirmationChanged();
+            return;
+        }
+
+        _dispatcherQueue.TryEnqueue(NotifyUidConfirmationChanged);
+    }
+
+    private void NotifyUidConfirmationChanged()
+    {
+        OnPropertyChanged(nameof(PendingUidConfirmation));
+        OnPropertyChanged(nameof(UidConfirmationWarningVisibility));
+        OnPropertyChanged(nameof(UidConfirmationWarningToolTip));
+        UidConfirmationChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ApplySelectedAccountUid(string? uid)

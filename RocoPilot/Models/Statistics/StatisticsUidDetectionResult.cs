@@ -38,15 +38,55 @@ public static class StatisticsUidRules
             return false;
         }
 
-        var normalized = new string(value.Where(character => !char.IsWhiteSpace(character)).ToArray());
+        var normalized = new string(
+            value.Where(character => character is >= '0' and <= '9').ToArray());
         if (normalized.Length == 0
-            || normalized.Length > MaximumUidLength
-            || normalized.Any(character => character is < '0' or > '9'))
+            || normalized.Length > MaximumUidLength)
         {
             return false;
         }
 
         uid = normalized;
         return true;
+    }
+}
+
+public enum StatisticsUidSelectionAction
+{
+    UseRecognizedUid,
+    RequireConfirmation
+}
+
+public sealed record StatisticsUidSelectionDecision(
+    StatisticsUidSelectionAction Action,
+    string? SuggestedUid,
+    string Message);
+
+public static class StatisticsUidSelectionRules
+{
+    public static StatisticsUidSelectionDecision Decide(
+        StatisticsUidDetectionResult detectionResult,
+        string? selectedAccountUid)
+    {
+        ArgumentNullException.ThrowIfNull(detectionResult);
+
+        if (detectionResult.Success
+            && !string.IsNullOrWhiteSpace(detectionResult.Uid)
+            && !string.IsNullOrWhiteSpace(selectedAccountUid)
+            && string.Equals(
+                detectionResult.Uid,
+                selectedAccountUid,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new StatisticsUidSelectionDecision(
+                StatisticsUidSelectionAction.UseRecognizedUid,
+                detectionResult.Uid,
+                detectionResult.Message);
+        }
+
+        return new StatisticsUidSelectionDecision(
+            StatisticsUidSelectionAction.RequireConfirmation,
+            detectionResult.Success ? detectionResult.Uid : null,
+            detectionResult.Message);
     }
 }

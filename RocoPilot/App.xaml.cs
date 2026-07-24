@@ -98,7 +98,11 @@ public partial class App : Application
             services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();
-            services.AddSingleton<IRuntimeTaskService, StatisticsUidRuntimeTaskService>();
+            services.AddSingleton<StatisticsUidRuntimeTaskService>();
+            services.AddSingleton<IRuntimeTaskService>(
+                provider => provider.GetRequiredService<StatisticsUidRuntimeTaskService>());
+            services.AddSingleton<IStatisticsUidCoordinatorService>(
+                provider => provider.GetRequiredService<StatisticsUidRuntimeTaskService>());
             services.AddSingleton<IHotkeyService, HotkeyService>();
             services.AddSingleton<IRecognitionOverlayService, RecognitionOverlayService>();
             services.AddSingleton<InfoOverlayService>();

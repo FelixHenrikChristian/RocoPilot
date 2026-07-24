@@ -21,6 +21,8 @@ public sealed partial class StatisticsPage : Page
     private StatisticDetailAction _requestedShinyDetailAction = StatisticDetailAction.None;
     private ShinyCaptureDetailItem? _requestedShinyDetailItem;
     private StatisticsSyncWindow? _statisticsSyncWindow;
+    private bool _uidConfirmationDialogOpen;
+    private bool _uidConfirmationSubscribed;
 
     public StatisticsViewModel ViewModel
     {
@@ -32,22 +34,126 @@ public sealed partial class StatisticsPage : Page
         ViewModel = App.GetService<StatisticsViewModel>();
         InitializeComponent();
         Loaded += StatisticsPage_Loaded;
+        Unloaded += StatisticsPage_Unloaded;
     }
 
     private async void StatisticsPage_Loaded(object sender, RoutedEventArgs e)
     {
+        if (!_uidConfirmationSubscribed)
+        {
+            ViewModel.UidConfirmationChanged += ViewModel_UidConfirmationChanged;
+            _uidConfirmationSubscribed = true;
+        }
+
         await ViewModel.LoadAsync();
+        await ShowPendingUidConfirmationAsync(force: false, retryFirst: false);
     }
 
-    private void AccountListView_ItemClick(object sender, ItemClickEventArgs e)
+    private void StatisticsPage_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (!_uidConfirmationSubscribed)
+        {
+            return;
+        }
+
+        ViewModel.UidConfirmationChanged -= ViewModel_UidConfirmationChanged;
+        _uidConfirmationSubscribed = false;
+    }
+
+    private async void ViewModel_UidConfirmationChanged(object? sender, EventArgs e)
+    {
+        await ShowPendingUidConfirmationAsync(force: false, retryFirst: false);
+    }
+
+    private async void AccountListView_ItemClick(object sender, ItemClickEventArgs e)
     {
         if (e.ClickedItem is not AccountStatisticsOption account)
         {
             return;
         }
 
-        ViewModel.SelectedAccount = account;
+        if (ViewModel.PendingUidConfirmation is not null)
+        {
+            await ViewModel.ConfirmUidAsync(account.Uid);
+        }
+        else
+        {
+            ViewModel.SelectedAccount = account;
+        }
+
         AccountSelectorFlyout.Hide();
+    }
+
+    private void UidWarningButton_PointerEntered(
+        object sender,
+        Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (ViewModel.PendingUidConfirmation is not null)
+        {
+            UidWarningFlyout.ShowAt(UidWarningButton);
+        }
+    }
+
+    private async void RetryUidConfirmationMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        await ShowPendingUidConfirmationAsync(force: true, retryFirst: true);
+    }
+
+    private async void ManualUidConfirmationMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        await ShowPendingUidConfirmationAsync(force: true, retryFirst: false);
+    }
+
+    private async Task ShowPendingUidConfirmationAsync(bool force, bool retryFirst)
+    {
+        var pending = ViewModel.PendingUidConfirmation;
+        if (_uidConfirmationDialogOpen
+            || pending is null
+            || (!force && pending.WasPresented))
+        {
+            return;
+        }
+
+        _uidConfirmationDialogOpen = true;
+        try
+        {
+            if (retryFirst)
+            {
+                await ViewModel.RetryUidDetectionAsync();
+            }
+            else
+            {
+                ViewModel.MarkPendingUidConfirmationPresented();
+            }
+
+            while (ViewModel.PendingUidConfirmation is { } request)
+            {
+                var result = await StatisticsUidConfirmationDialog.ShowAsync(
+                    XamlRoot,
+                    request);
+                if (result.Action == StatisticsUidConfirmationDialogAction.Retry)
+                {
+                    await ViewModel.RetryUidDetectionAsync();
+                    continue;
+                }
+
+                if (result.Action == StatisticsUidConfirmationDialogAction.Confirm
+                    && result.Uid is { } uid)
+                {
+                    await ViewModel.ConfirmUidAsync(uid);
+                }
+
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ShowOperationFailed("统计账号确认失败", ex);
+        }
+        finally
+        {
+            _uidConfirmationDialogOpen = false;
+        }
     }
 
     private async void AddAccountButton_Click(object sender, RoutedEventArgs e)
@@ -82,6 +188,11 @@ public sealed partial class StatisticsPage : Page
 
         if (await ViewModel.AddAccountAsync(uidTextBox.Text))
         {
+            if (ViewModel.PendingUidConfirmation is not null)
+            {
+                await ViewModel.ConfirmUidAsync(uidTextBox.Text);
+            }
+
             AccountSelectorFlyout.Hide();
         }
     }

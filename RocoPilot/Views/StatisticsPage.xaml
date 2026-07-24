@@ -415,6 +415,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <StackPanel
@@ -456,6 +457,39 @@
 
             <Button
                 Grid.Column="2"
+                x:Name="UidWarningButton"
+                Width="32"
+                Height="32"
+                Padding="0"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                AutomationProperties.Name="统计账号尚未确认"
+                Background="Transparent"
+                BorderThickness="0"
+                PointerEntered="UidWarningButton_PointerEntered"
+                ToolTipService.ToolTip="{x:Bind ViewModel.UidConfirmationWarningToolTip, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.UidConfirmationWarningVisibility, Mode=OneWay}">
+                <FontIcon
+                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontSize="17"
+                    Foreground="#FFE6A700"
+                    Glyph="&#xE7BA;" />
+                <Button.Flyout>
+                    <MenuFlyout x:Name="UidWarningFlyout">
+                        <MenuFlyoutItem
+                            Click="RetryUidConfirmationMenuItem_Click"
+                            Icon="Refresh"
+                            Text="重新识别并确认" />
+                        <MenuFlyoutItem
+                            Click="ManualUidConfirmationMenuItem_Click"
+                            Icon="Edit"
+                            Text="手动确认账号" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+
+            <Button
+                Grid.Column="3"
                 Width="220"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center"
@@ -532,7 +566,7 @@
             </Button>
 
             <Button
-                Grid.Column="3"
+                Grid.Column="4"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="8">

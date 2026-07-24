@@ -191,7 +191,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
 
         public OnnxOcrV5Recognizer(string modelPath, string configurationPath)
         {
-            _labels = LoadLabels(configurationPath);
+            _labels = OnnxOcrV5LabelDictionary.Load(configurationPath);
             using var options = new SessionOptions
             {
                 GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -244,39 +244,6 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
         public void Dispose()
         {
             _session.Dispose();
-        }
-
-        private static IReadOnlyList<string> LoadLabels(string configurationPath)
-        {
-            var labels = new List<string>();
-            var readingCharacterDictionary = false;
-            foreach (var line in File.ReadLines(configurationPath))
-            {
-                if (line.Trim() == "character_dict:")
-                {
-                    readingCharacterDictionary = true;
-                    continue;
-                }
-
-                if (!readingCharacterDictionary)
-                {
-                    continue;
-                }
-
-                if (!line.StartsWith("  - ", StringComparison.Ordinal))
-                {
-                    break;
-                }
-
-                labels.Add(line[4..]);
-            }
-
-            if (labels.Count == 0)
-            {
-                throw new InvalidDataException("The ONNX OCR label dictionary is empty.");
-            }
-
-            return labels;
         }
     }
 }

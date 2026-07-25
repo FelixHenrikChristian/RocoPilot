@@ -36,19 +36,29 @@ jobs:
 
           latest_tag = latest_release["tag_name"]
           should_sync = True
+          event_name = os.environ["GITHUB_EVENT_NAME"]
+          event_action = ""
 
-          if os.environ["GITHUB_EVENT_NAME"] == "release":
+          if event_name == "release":
               with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as file:
                   event = json.load(file)
 
+              event_action = event.get("action") or ""
               event_tag = event["release"]["tag_name"]
               if event_tag != latest_tag:
-                should_sync = False
-                print(f"Release {event_tag} is not the latest release ({latest_tag}). Skipping R2 sync.")
+                  should_sync = False
+                  print(f"Release {event_tag} is not the latest release ({latest_tag}). Skipping R2 sync.")
+
+          # Installers only on first publish or manual dispatch; edited only refreshes latest.json.
+          should_upload_installers = should_sync and (
+              event_name == "workflow_dispatch"
+              or (event_name == "release" and event_action == "published")
+          )
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"latest_tag={latest_tag}\n")
               output.write(f"should_sync={str(should_sync).lower()}\n")
+              output.write(f"should_upload_installers={str(should_upload_installers).lower()}\n")
 
           if not should_sync:
               raise SystemExit(0)
@@ -76,19 +86,20 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Download published release assets
-        if: github.event_name == 'release' && github.event.action == 'published' && steps.release.outputs.should_sync == 'true'
+        if: steps.release.outputs.should_upload_installers == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.latest_tag }}
         run: |
           mkdir -p artifacts
           gh release download "$RELEASE_TAG" \
+            -R "$GITHUB_REPOSITORY" \
             --dir artifacts \
             --pattern "RocoPilot.Install.exe" \
             --pattern "RocoPilot-Setup.exe"
 
       - name: Upload published installers
-        if: github.event_name == 'release' && github.event.action == 'published' && steps.release.outputs.should_sync == 'true'
+        if: steps.release.outputs.should_upload_installers == 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_SECRET_ACCESS_KEY }}

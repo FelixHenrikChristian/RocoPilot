@@ -80,6 +80,13 @@ public sealed partial class RuntimeTaskService
     private bool _isAutoBattleSuspendedForShiny;
     private DateTimeOffset _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
 
+    // 血脉筛选会话状态（识别结果由当前赛季实现写入，如 S3EncounterBloodlineRecognition）
+    private static readonly TimeSpan BloodlineTipWaitTimeout = TimeSpan.FromSeconds(4);
+    private readonly object _bloodlineStateLock = new();
+    private bool _hasEncounterBloodlineTip;
+    private EncounterBloodlineKind _encounterBloodlineKind = EncounterBloodlineKind.Unrecognized;
+    private DateTimeOffset? _bloodlineTipWaitStartedAt;
+
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
     public void SetAutoBattleSettings(AutoBattleSettings settings)
@@ -189,6 +196,13 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            // 血脉筛选等待提示：不推进回合、不写入重试时间，下一帧继续判定。
+            if (plan.Action == AutoBattleSkillSelectionAction.None)
+            {
+                LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForBloodlineTip");
+                return;
+            }
+
             if (!plan.ShouldSendKeys)
             {
                 if (_autoBattleSkillSelectionAction != plan.Action)
@@ -267,6 +281,79 @@ public sealed partial class RuntimeTaskService
     {
         return !IsAutoBattleBossBattle
             && _encounterCaptureButtonStateTracker.ShouldHoldAttackForUnconfirmedRelief;
+    }
+
+    private void RememberEncounterBloodlineTip(EncounterBloodlineKind kind)
+    {
+        lock (_bloodlineStateLock)
+        {
+            _hasEncounterBloodlineTip = true;
+            _encounterBloodlineKind = kind;
+            _bloodlineTipWaitStartedAt = null;
+        }
+    }
+
+    private bool TryResolveBloodlineCaptureDecision(
+        BloodlineCaptureFilterSettings filter,
+        out EncounterBloodlineKind kind,
+        out bool shouldCapture)
+    {
+        lock (_bloodlineStateLock)
+        {
+            if (_hasEncounterBloodlineTip)
+            {
+                kind = _encounterBloodlineKind;
+                shouldCapture = filter.ShouldCapture(kind);
+                return true;
+            }
+
+            // 当前赛季没有可用血脉识别实现时，直接按未识别处理（含旧赛季残留奇遇）。
+            if (!IsCurrentSeasonBloodlineTipAvailable())
+            {
+                kind = EncounterBloodlineKind.Unrecognized;
+                shouldCapture = filter.ShouldCapture(kind);
+                return true;
+            }
+
+            _bloodlineTipWaitStartedAt ??= DateTimeOffset.Now;
+            if (DateTimeOffset.Now - _bloodlineTipWaitStartedAt.Value >= BloodlineTipWaitTimeout)
+            {
+                kind = EncounterBloodlineKind.Unrecognized;
+                shouldCapture = filter.ShouldCapture(kind);
+                return true;
+            }
+
+            kind = EncounterBloodlineKind.Unrecognized;
+            shouldCapture = false;
+            return false;
+        }
+    }
+
+    private bool IsCurrentSeasonBloodlineTipAvailable()
+    {
+        // 赛季血脉识别实现入口：目前仅 S3；下赛季可替换或删除。
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        return season is not null
+            && string.Equals(
+                season.Id,
+                S3EncounterBloodlineRecognition.SeasonId,
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetEncounterBloodlineDisplayName(EncounterBloodlineKind kind)
+    {
+        // 展示名由当前赛季识别实现提供；无实现时使用通用文案。
+        return S3EncounterBloodlineRecognition.GetDisplayName(kind);
+    }
+
+    private void ResetEncounterBloodlineState()
+    {
+        lock (_bloodlineStateLock)
+        {
+            _hasEncounterBloodlineTip = false;
+            _encounterBloodlineKind = EncounterBloodlineKind.Unrecognized;
+            _bloodlineTipWaitStartedAt = null;
+        }
     }
 
     private async Task HandleAutoBattlePetSwitchingAsync(
@@ -893,6 +980,7 @@ public sealed partial class RuntimeTaskService
     private void ResetAutoBattleEncounterRelievedActionState()
     {
         _isAutoBattleEncounterRelieved = false;
+        ResetEncounterBloodlineState();
     }
 
     private void ResetAutoBattleShinySuspendState()

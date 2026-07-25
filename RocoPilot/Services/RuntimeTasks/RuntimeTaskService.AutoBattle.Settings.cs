@@ -79,18 +79,66 @@ public sealed partial class RuntimeTaskService
                     InputOptions: CreateAutoBattleKeyboardInputOptions(settings),
                     Description: "奇遇解除后回能 X",
                     DisplayKey: "X"),
-                AutoBattleEncounterRelievedAction.Capture => new AutoBattleSkillSelectionPlan(
-                    AutoBattleSkillSelectionAction.Capture,
-                    ShouldSendKeys: true,
-                    Sequence: AutoBattleCaptureSequence,
-                    InputOptions: CreateAutoBattleCaptureKeyboardInputOptions(settings),
-                    Description: "奇遇解除后捕捉 W, 1, Space",
-                    DisplayKey: "W, 1, Space"),
+                AutoBattleEncounterRelievedAction.Capture => BuildAutoBattleCapturePlan(
+                    settings,
+                    releaseStep),
                 _ => BuildAutoBattleReleaseSkillPlan(settings, releaseStep)
             };
         }
 
         return BuildAutoBattleReleaseSkillPlan(settings, releaseStep);
+    }
+
+    private AutoBattleSkillSelectionPlan BuildAutoBattleCapturePlan(
+        AutoBattleSettings settings,
+        AutoBattleReleaseStep releaseStep)
+    {
+        var filter = settings.BloodlineCaptureFilter
+            ?? BloodlineCaptureFilterSettings.CreateDefault();
+        if (!filter.IsEnabled)
+        {
+            return CreateAutoBattleCapturePlan(
+                settings,
+                "奇遇解除后捕捉 W, 1, Space");
+        }
+
+        if (!TryResolveBloodlineCaptureDecision(filter, out var kind, out var shouldCapture))
+        {
+            return new AutoBattleSkillSelectionPlan(
+                AutoBattleSkillSelectionAction.None,
+                ShouldSendKeys: false,
+                Sequence: string.Empty,
+                InputOptions: CreateAutoBattleKeyboardInputOptions(settings),
+                Description: "等待血脉提示识别",
+                DisplayKey: "-");
+        }
+
+        var bloodlineName = GetEncounterBloodlineDisplayName(kind);
+        if (shouldCapture)
+        {
+            return CreateAutoBattleCapturePlan(
+                settings,
+                $"奇遇解除后捕捉（血脉：{bloodlineName}） W, 1, Space");
+        }
+
+        var skillPlan = BuildAutoBattleReleaseSkillPlan(settings, releaseStep);
+        return skillPlan with
+        {
+            Description = $"奇遇解除后血脉不符（{bloodlineName}），释放战技"
+        };
+    }
+
+    private static AutoBattleSkillSelectionPlan CreateAutoBattleCapturePlan(
+        AutoBattleSettings settings,
+        string description)
+    {
+        return new AutoBattleSkillSelectionPlan(
+            AutoBattleSkillSelectionAction.Capture,
+            ShouldSendKeys: true,
+            Sequence: AutoBattleCaptureSequence,
+            InputOptions: CreateAutoBattleCaptureKeyboardInputOptions(settings),
+            Description: description,
+            DisplayKey: "W, 1, Space");
     }
 
     private static AutoBattleSkillSelectionPlan BuildAutoBattleReleaseSkillPlan(
@@ -180,6 +228,9 @@ public sealed partial class RuntimeTaskService
             normalized.CaptureKeyboardIntervalMs,
             AutoBattleSettings.MinimumDelayMs,
             AutoBattleSettings.MaximumDelayMs);
+        normalized.BloodlineCaptureFilter =
+            (normalized.BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault())
+            .Clone();
 
         return normalized;
     }

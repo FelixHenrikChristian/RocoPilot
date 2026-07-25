@@ -39,7 +39,8 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
             [AutoBattleConfigSection.Normal] = new AutoBattleNormalConfigPage(_editor, this),
             [AutoBattleConfigSection.Boss] = new AutoBattleBossConfigPage(_editor, this),
             [AutoBattleConfigSection.Legendary] = new AutoBattleLegendaryConfigPage(_editor),
-            [AutoBattleConfigSection.SharedSequences] = new AutoBattleSharedSequencesPage(_editor)
+            [AutoBattleConfigSection.SharedSequences] = new AutoBattleSharedSequencesPage(_editor),
+            [AutoBattleConfigSection.BloodlineCapture] = new AutoBattleBloodlineCaptureConfigPage(_editor)
         };
 
         BattleNavigationView.SelectedItem = SharedSequencesNavigationItem;
@@ -82,6 +83,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
             AutoBattleConfigSection.Boss => BossBattleNavigationItem,
             AutoBattleConfigSection.Legendary => LegendaryBattleNavigationItem,
             AutoBattleConfigSection.SharedSequences => SharedSequencesNavigationItem,
+            AutoBattleConfigSection.BloodlineCapture => BloodlineCaptureNavigationItem,
             _ => NormalBattleNavigationItem
         };
     }

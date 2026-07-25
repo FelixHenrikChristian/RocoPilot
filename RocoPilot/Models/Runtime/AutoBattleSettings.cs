@@ -108,6 +108,15 @@ public sealed class AutoBattleSettings
         set;
     } = DefaultCaptureKeyboardIntervalMs;
 
+    /// <summary>
+    /// 奇遇解除后按血脉筛选是否捕捉。识别实现可按赛季替换；本配置与 UI 保持通用。
+    /// </summary>
+    public BloodlineCaptureFilterSettings BloodlineCaptureFilter
+    {
+        get;
+        set;
+    } = BloodlineCaptureFilterSettings.CreateDefault();
+
     public static AutoBattleSettings CreateDefault()
     {
         return new AutoBattleSettings
@@ -125,7 +134,8 @@ public sealed class AutoBattleSettings
             SkillSelectionRetryDelayMs = DefaultSkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = DefaultKeyboardHoldDurationMs,
             KeyboardIntervalMs = DefaultKeyboardIntervalMs,
-            CaptureKeyboardIntervalMs = DefaultCaptureKeyboardIntervalMs
+            CaptureKeyboardIntervalMs = DefaultCaptureKeyboardIntervalMs,
+            BloodlineCaptureFilter = BloodlineCaptureFilterSettings.CreateDefault()
         };
     }
 
@@ -158,7 +168,8 @@ public sealed class AutoBattleSettings
             SkillSelectionRetryDelayMs = SkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = KeyboardHoldDurationMs,
             KeyboardIntervalMs = KeyboardIntervalMs,
-            CaptureKeyboardIntervalMs = CaptureKeyboardIntervalMs
+            CaptureKeyboardIntervalMs = CaptureKeyboardIntervalMs,
+            BloodlineCaptureFilter = (BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone()
         };
     }
 }
@@ -169,6 +180,98 @@ public enum AutoBattleEncounterRelievedAction
     RecoverEnergy = 1,
     ReleaseSkill = 2,
     Capture = 3
+}
+
+/// <summary>
+/// 奇遇解除后的血脉捕捉筛选（配置与 UI 通用，与具体赛季识别实现解耦）。
+/// </summary>
+public sealed class BloodlineCaptureFilterSettings
+{
+    public bool IsEnabled
+    {
+        get;
+        set;
+    } = true;
+
+    public bool CaptureQiYi
+    {
+        get;
+        set;
+    } = true;
+
+    public bool CaptureHunXue
+    {
+        get;
+        set;
+    }
+
+    public bool CaptureWuRan
+    {
+        get;
+        set;
+    } = true;
+
+    public bool CaptureNormal
+    {
+        get;
+        set;
+    }
+
+    /// <summary>
+    /// 未识别出血脉时是否捕捉。旧赛季等无法识别血脉的奇遇也会走此选项。
+    /// </summary>
+    public bool CaptureUnrecognized
+    {
+        get;
+        set;
+    } = true;
+
+    public static BloodlineCaptureFilterSettings CreateDefault()
+    {
+        return new BloodlineCaptureFilterSettings();
+    }
+
+    public BloodlineCaptureFilterSettings Clone()
+    {
+        return new BloodlineCaptureFilterSettings
+        {
+            IsEnabled = IsEnabled,
+            CaptureQiYi = CaptureQiYi,
+            CaptureHunXue = CaptureHunXue,
+            CaptureWuRan = CaptureWuRan,
+            CaptureNormal = CaptureNormal,
+            CaptureUnrecognized = CaptureUnrecognized
+        };
+    }
+
+    public bool ShouldCapture(EncounterBloodlineKind kind)
+    {
+        if (!IsEnabled)
+        {
+            return true;
+        }
+
+        return kind switch
+        {
+            EncounterBloodlineKind.QiYi => CaptureQiYi,
+            EncounterBloodlineKind.HunXue => CaptureHunXue,
+            EncounterBloodlineKind.WuRan => CaptureWuRan,
+            EncounterBloodlineKind.Normal => CaptureNormal,
+            _ => CaptureUnrecognized
+        };
+    }
+}
+
+/// <summary>
+/// 血脉种类（配置层通用；具体赛季识别实现映射到此枚举）。
+/// </summary>
+public enum EncounterBloodlineKind
+{
+    Unrecognized = 0,
+    Normal = 1,
+    QiYi = 2,
+    HunXue = 3,
+    WuRan = 4
 }
 
 public sealed class AutoBattleReleaseStep

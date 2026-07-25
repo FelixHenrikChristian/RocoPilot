@@ -206,6 +206,7 @@ public sealed partial class RuntimeTaskService
         EncounterSeasonDefinition season,
         CancellationToken cancellationToken)
     {
+        // S3 血脉提示：下赛季可删除本方法、S3SeasonId 与 battle-tip-encounter-s3 区域。
         if (!string.Equals(season.Id, S3SeasonId, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -217,15 +218,24 @@ public sealed partial class RuntimeTaskService
             BattleS3EncounterTipRegionIds,
             cancellationToken,
             "S3 奇遇提示");
-        if (TextMatchingHelper.CountChineseCharacters(tipText) < AuxiliaryTipMinimumChineseCharacterCount
-            || !TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
+        if (TextMatchingHelper.CountChineseCharacters(tipText) < AuxiliaryTipMinimumChineseCharacterCount)
+        {
+            return;
+        }
+
+        var hasParsedKind = S3EncounterBloodlineRecognition.TryParse(tipText, out var kind);
+        RememberEncounterBloodlineTip(
+            hasParsedKind ? kind : EncounterBloodlineKind.Unrecognized);
+        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
         {
             return;
         }
 
         _logger.LogDebug(
-            "S3 奇遇血脉提示：{TipText}",
-            FormatLogText(tipText));
+            "S3 奇遇血脉提示：{TipText}，Bloodline={Bloodline}",
+            FormatLogText(tipText),
+            S3EncounterBloodlineRecognition.GetDisplayName(
+                hasParsedKind ? kind : EncounterBloodlineKind.Unrecognized));
     }
 
     private bool TryRememberAuxiliaryTip(string regionId, string tipText)

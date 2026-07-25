@@ -36,6 +36,129 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         get;
     } = [];
 
+    private bool _bloodlineCaptureFilterEnabled = true;
+    private bool _captureBloodlineQiYi = true;
+    private bool _captureBloodlineHunXue;
+    private bool _captureBloodlineWuRan = true;
+    private bool _captureBloodlineNormal;
+    private bool _captureBloodlineUnrecognized = true;
+
+    public bool BloodlineCaptureFilterEnabled
+    {
+        get => _bloodlineCaptureFilterEnabled;
+        set
+        {
+            if (SetProperty(ref _bloodlineCaptureFilterEnabled, value))
+            {
+                OnPropertyChanged(nameof(BloodlineCaptureFilterOptionsEnabled));
+                OnPropertyChanged(nameof(BloodlineCaptureFilterSummary));
+            }
+        }
+    }
+
+    public bool CaptureBloodlineQiYi
+    {
+        get => _captureBloodlineQiYi;
+        set
+        {
+            if (SetProperty(ref _captureBloodlineQiYi, value))
+            {
+                OnPropertyChanged(nameof(BloodlineCaptureFilterSummary));
+            }
+        }
+    }
+
+    public bool CaptureBloodlineHunXue
+    {
+        get => _captureBloodlineHunXue;
+        set
+        {
+            if (SetProperty(ref _captureBloodlineHunXue, value))
+            {
+                OnPropertyChanged(nameof(BloodlineCaptureFilterSummary));
+            }
+        }
+    }
+
+    public bool CaptureBloodlineWuRan
+    {
+        get => _captureBloodlineWuRan;
+        set
+        {
+            if (SetProperty(ref _captureBloodlineWuRan, value))
+            {
+                OnPropertyChanged(nameof(BloodlineCaptureFilterSummary));
+            }
+        }
+    }
+
+    public bool CaptureBloodlineNormal
+    {
+        get => _captureBloodlineNormal;
+        set
+        {
+            if (SetProperty(ref _captureBloodlineNormal, value))
+            {
+                OnPropertyChanged(nameof(BloodlineCaptureFilterSummary));
+            }
+        }
+    }
+
+    public bool CaptureBloodlineUnrecognized
+    {
+        get => _captureBloodlineUnrecognized;
+        set
+        {
+            if (SetProperty(ref _captureBloodlineUnrecognized, value))
+            {
+                OnPropertyChanged(nameof(BloodlineCaptureFilterSummary));
+            }
+        }
+    }
+
+    public bool BloodlineCaptureFilterOptionsEnabled => BloodlineCaptureFilterEnabled;
+
+    public string BloodlineCaptureFilterSummary
+    {
+        get
+        {
+            if (!BloodlineCaptureFilterEnabled)
+            {
+                return "已关闭：奇遇解除选择捕捉时不按血脉筛选";
+            }
+
+            var selected = new List<string>();
+            if (CaptureBloodlineQiYi)
+            {
+                selected.Add("奇异");
+            }
+
+            if (CaptureBloodlineHunXue)
+            {
+                selected.Add("混血");
+            }
+
+            if (CaptureBloodlineWuRan)
+            {
+                selected.Add("污染");
+            }
+
+            if (CaptureBloodlineNormal)
+            {
+                selected.Add("普通");
+            }
+
+            if (CaptureBloodlineUnrecognized)
+            {
+                selected.Add("未识别");
+            }
+
+            return selected.Count == 0
+                ? "已启用：不捕捉任何血脉，一律释放战技"
+                : $"已启用：仅捕捉 {string.Join("、", selected)}";
+        }
+    }
+
     public Visibility NormalReleaseEmptyVisibility => NormalReleaseItems.Count == 0
         ? Visibility.Visible
         : Visibility.Collapsed;
@@ -315,6 +438,15 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         settings.BossReleaseSequence = bossReleaseSequence;
         settings.TurnSequencePresets = presets;
         settings.BossComboSequence = bossComboSequence;
+        settings.BloodlineCaptureFilter = new BloodlineCaptureFilterSettings
+        {
+            IsEnabled = BloodlineCaptureFilterEnabled,
+            CaptureQiYi = CaptureBloodlineQiYi,
+            CaptureHunXue = CaptureBloodlineHunXue,
+            CaptureWuRan = CaptureBloodlineWuRan,
+            CaptureNormal = CaptureBloodlineNormal,
+            CaptureUnrecognized = CaptureBloodlineUnrecognized
+        };
         error = default;
         return true;
     }
@@ -349,6 +481,15 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         ApplyBossComboSequence(settings.BossComboSequence);
         RefreshReleaseIndexes(NormalReleaseItems);
         RefreshReleaseIndexes(BossReleaseItems);
+
+        var bloodlineFilter = settings.BloodlineCaptureFilter
+            ?? BloodlineCaptureFilterSettings.CreateDefault();
+        BloodlineCaptureFilterEnabled = bloodlineFilter.IsEnabled;
+        CaptureBloodlineQiYi = bloodlineFilter.CaptureQiYi;
+        CaptureBloodlineHunXue = bloodlineFilter.CaptureHunXue;
+        CaptureBloodlineWuRan = bloodlineFilter.CaptureWuRan;
+        CaptureBloodlineNormal = bloodlineFilter.CaptureNormal;
+        CaptureBloodlineUnrecognized = bloodlineFilter.CaptureUnrecognized;
     }
 
     private bool TryBuildReleaseSequence(
@@ -609,7 +750,8 @@ internal enum AutoBattleConfigSection
     Normal,
     Boss,
     Legendary,
-    SharedSequences
+    SharedSequences,
+    BloodlineCapture
 }
 
 internal readonly record struct AutoBattleConfigValidationError(

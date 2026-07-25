@@ -68,4 +68,43 @@ public sealed class AutoBattleConfigEditorTests
         Assert.AreEqual("更新后的序列", result.BossReleaseSequence[^1].Name);
         Assert.AreEqual("4, 3, 2", result.BossReleaseSequence[^1].Sequence);
     }
+
+    [TestMethod]
+    public void BuildsDefaultBloodlineCaptureFilterSettings()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+
+        Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
+        Assert.IsNotNull(result.BloodlineCaptureFilter);
+        Assert.IsTrue(result.BloodlineCaptureFilter.IsEnabled);
+        Assert.IsTrue(result.BloodlineCaptureFilter.CaptureQiYi);
+        Assert.IsFalse(result.BloodlineCaptureFilter.CaptureHunXue);
+        Assert.IsTrue(result.BloodlineCaptureFilter.CaptureWuRan);
+        Assert.IsFalse(result.BloodlineCaptureFilter.CaptureNormal);
+        Assert.IsTrue(result.BloodlineCaptureFilter.CaptureUnrecognized);
+    }
+
+    [TestMethod]
+    public void PersistsEditedBloodlineCaptureFilterSettings()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService())
+        {
+            BloodlineCaptureFilterEnabled = true,
+            CaptureBloodlineQiYi = false,
+            CaptureBloodlineHunXue = true,
+            CaptureBloodlineWuRan = false,
+            CaptureBloodlineNormal = true,
+            CaptureBloodlineUnrecognized = false
+        };
+
+        Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
+        Assert.IsTrue(result.BloodlineCaptureFilter.IsEnabled);
+        Assert.IsFalse(result.BloodlineCaptureFilter.CaptureQiYi);
+        Assert.IsTrue(result.BloodlineCaptureFilter.CaptureHunXue);
+        Assert.IsFalse(result.BloodlineCaptureFilter.CaptureWuRan);
+        Assert.IsTrue(result.BloodlineCaptureFilter.CaptureNormal);
+        Assert.IsFalse(result.BloodlineCaptureFilter.CaptureUnrecognized);
+    }
 }

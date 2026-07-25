@@ -43,6 +43,8 @@ public partial class RealtimeViewModel : ObservableRecipient
     private int _autoBattleKeyboardHoldDurationMs = AutoBattleSettings.DefaultKeyboardHoldDurationMs;
     private int _autoBattleKeyboardIntervalMs = AutoBattleSettings.DefaultKeyboardIntervalMs;
     private int _autoBattleCaptureKeyboardIntervalMs = AutoBattleSettings.DefaultCaptureKeyboardIntervalMs;
+    private BloodlineCaptureFilterSettings _bloodlineCaptureFilter =
+        BloodlineCaptureFilterSettings.CreateDefault();
 
     public IReadOnlyList<AutoBattleEncounterRelievedActionOption> AutoBattleEncounterRelievedActionOptions
     {
@@ -432,6 +434,8 @@ public partial class RealtimeViewModel : ObservableRecipient
         _autoBattleKeyboardHoldDurationMs = settings.KeyboardHoldDurationMs;
         _autoBattleKeyboardIntervalMs = settings.KeyboardIntervalMs;
         _autoBattleCaptureKeyboardIntervalMs = settings.CaptureKeyboardIntervalMs;
+        _bloodlineCaptureFilter = (settings.BloodlineCaptureFilter
+            ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone();
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(AutoBattleRoundOrder));
@@ -476,7 +480,8 @@ public partial class RealtimeViewModel : ObservableRecipient
             SkillSelectionRetryDelayMs = _autoBattleSkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = _autoBattleKeyboardHoldDurationMs,
             KeyboardIntervalMs = _autoBattleKeyboardIntervalMs,
-            CaptureKeyboardIntervalMs = _autoBattleCaptureKeyboardIntervalMs
+            CaptureKeyboardIntervalMs = _autoBattleCaptureKeyboardIntervalMs,
+            BloodlineCaptureFilter = _bloodlineCaptureFilter.Clone()
         };
     }
 
@@ -519,7 +524,7 @@ public sealed record AutoBattleEncounterRelievedActionOption(
             new(
                 AutoBattleEncounterRelievedAction.Capture,
                 "捕捉",
-                "识别到奇遇解除后进入技能选择界面会依次按 W、1、Space。")
+                "识别到奇遇解除后进入技能选择界面会依次按 W、1、Space。可在战斗配置「捕捉血脉」中按血脉筛选是否捕捉。")
         ];
     }
 }

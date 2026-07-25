@@ -1,0 +1,112 @@
+<Page
+    x:Class="RocoPilot.Views.Windows.AutoBattleConfigPages.AutoBattleBloodlineCaptureConfigPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <ScrollViewer
+        HorizontalContentAlignment="Stretch"
+        HorizontalScrollBarVisibility="Disabled"
+        HorizontalScrollMode="Disabled"
+        VerticalScrollBarVisibility="Auto"
+        VerticalScrollMode="Auto">
+        <StackPanel Style="{StaticResource ConfigPageRootStyle}">
+            <StackPanel Spacing="4">
+                <TextBlock Style="{StaticResource ConfigPageTitleStyle}" Text="捕捉血脉" />
+                <TextBlock
+                    Style="{StaticResource ConfigPageDescriptionStyle}"
+                    Text="仅在「奇遇解除操作」选择捕捉时生效。识别到血脉后，只捕捉勾选的种类，其余释放战技。" />
+            </StackPanel>
+
+            <Border Style="{StaticResource SectionCardStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            Glyph="&#xE8D7;" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="启用血脉筛选" />
+                            <TextBlock
+                                Style="{StaticResource SectionDescriptionStyle}"
+                                Text="{x:Bind Editor.BloodlineCaptureFilterSummary, Mode=OneWay}" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            Grid.Column="2"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            IsOn="{x:Bind Editor.BloodlineCaptureFilterEnabled, Mode=TwoWay}"
+                            OffContent=""
+                            OnContent="" />
+                    </Grid>
+
+                    <StackPanel Style="{StaticResource SectionCardBodyStyle}">
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="勾选后会尝试捕捉该血脉；未勾选则按普通战斗配置释放战技。"
+                            TextWrapping="Wrap" />
+
+                        <Grid ColumnSpacing="12" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <CheckBox
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                Content="奇异"
+                                IsChecked="{x:Bind Editor.CaptureBloodlineQiYi, Mode=TwoWay}"
+                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <CheckBox
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Content="污染"
+                                IsChecked="{x:Bind Editor.CaptureBloodlineWuRan, Mode=TwoWay}"
+                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <CheckBox
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Content="混血"
+                                IsChecked="{x:Bind Editor.CaptureBloodlineHunXue, Mode=TwoWay}"
+                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <CheckBox
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Content="普通"
+                                IsChecked="{x:Bind Editor.CaptureBloodlineNormal, Mode=TwoWay}"
+                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <CheckBox
+                                Grid.Row="2"
+                                Grid.Column="0"
+                                Grid.ColumnSpan="2"
+                                Content="未识别"
+                                IsChecked="{x:Bind Editor.CaptureBloodlineUnrecognized, Mode=TwoWay}"
+                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                        </Grid>
+
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="旧赛季奇遇不会识别血脉，会根据「未识别」选项决定捕捉或释放战技。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

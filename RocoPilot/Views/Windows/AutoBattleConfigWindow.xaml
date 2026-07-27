@@ -85,13 +85,7 @@
             </Border>
         </NavigationView>
 
-        <Grid
-            Grid.Row="1"
-            Padding="16,12"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-            BorderThickness="0,1,0,0"
-            ColumnSpacing="10">
+        <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -101,23 +95,20 @@
             <InfoBar
                 x:Name="MessageBar"
                 Grid.Column="0"
-                MaxWidth="620"
-                HorizontalAlignment="Left"
                 helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-                IsClosable="False"
-                IsOpen="False" />
+                IsOpen="False"
+                Style="{StaticResource DialogFooterMessageBarStyle}" />
 
             <Button
                 Grid.Column="1"
-                MinWidth="96"
                 Click="CancelButton_Click"
-                Content="取消" />
+                Content="取消"
+                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
             <Button
                 Grid.Column="2"
-                MinWidth="96"
                 Click="SaveButton_Click"
                 Content="保存"
-                Style="{ThemeResource AccentButtonStyle}" />
+                Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
         </Grid>
     </Grid>
 </windowex:WindowEx>

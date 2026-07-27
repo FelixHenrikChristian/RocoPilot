@@ -14,207 +14,208 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid
-        x:Name="ContentRoot"
-        Padding="18"
-        RowSpacing="12">
+    <Grid x:Name="ContentRoot">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid ColumnSpacing="14">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <Grid
+            Grid.Row="0"
+            Padding="20,16,20,12"
+            RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
 
-            <Border
-                Width="42"
-                Height="42"
-                VerticalAlignment="Center"
-                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="8">
-                <FontIcon
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                    FontSize="21"
-                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                    Glyph="&#xE774;" />
-            </Border>
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                <TextBlock
-                    FontSize="20"
-                    FontWeight="SemiBold"
-                    Text="Cloudflare R2 同步教程" />
-                <TextBlock
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="创建一个 R2 Bucket 和 API 令牌，然后填入云同步配置。"
-                    TextTrimming="CharacterEllipsis"
-                    TextWrapping="NoWrap" />
-            </StackPanel>
+                <Border
+                    Width="44"
+                    Height="44"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                    CornerRadius="10">
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="20"
+                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                        Glyph="&#xE897;" />
+                </Border>
+
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock
+                        FontSize="20"
+                        FontWeight="SemiBold"
+                        Text="Cloudflare R2 同步教程" />
+                    <TextBlock
+                        FontSize="13"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="创建一个 R2 Bucket 和 API 令牌，然后填入云同步配置。"
+                        TextTrimming="CharacterEllipsis"
+                        TextWrapping="NoWrap" />
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer
+                Grid.Row="1"
+                HorizontalScrollBarVisibility="Disabled"
+                HorizontalScrollMode="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                VerticalScrollMode="Auto">
+                <StackPanel Spacing="12" Padding="0,0,0,4">
+                    <Border Style="{StaticResource CardStyle}" Padding="0">
+                        <Grid Padding="16" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Width="36"
+                                Height="36"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    Text="1" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock FontWeight="SemiBold" Text="创建 Bucket" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="登录 Cloudflare Dashboard，进入 R2，创建一个 Bucket，例如 roco-pilot。"
+                                    TextWrapping="WrapWholeWords" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="同时记下 Cloudflare 账户的 Account ID。"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource CardStyle}" Padding="0">
+                        <Grid Padding="16" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Width="36"
+                                Height="36"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    Text="2" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock FontWeight="SemiBold" Text="创建 R2 API 令牌" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="在 R2 页面进入 Manage R2 API tokens，创建一个只作用于该 Bucket 的读写令牌。"
+                                    TextWrapping="WrapWholeWords" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="复制 Access Key ID 和 Secret Access Key。Secret 只显示一次。"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource CardStyle}" Padding="0">
+                        <Grid Padding="16" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Width="36"
+                                Height="36"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    FontWeight="SemiBold"
+                                    Text="3" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock FontWeight="SemiBold" Text="填写 RocoPilot 配置" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="回到云同步窗口，填写 Account ID、Bucket、Access Key ID 和 Secret Access Key。"
+                                    TextWrapping="WrapWholeWords" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="保存后点击测试连接。通过后再启用同步。"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border Style="{StaticResource CardStyle}" Padding="0">
+                        <Grid Padding="16" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border
+                                Width="36"
+                                Height="36"
+                                VerticalAlignment="Top"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                CornerRadius="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="18"
+                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                    Glyph="&#xE895;" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock FontWeight="SemiBold" Text="同步行为" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="RocoPilot 会把统计文件保存为 RocoPilot/statistics.json。启用同步后，应用启动时会检查云端更新，本地统计变化会延迟约 8 秒自动上传。"
+                                    TextWrapping="WrapWholeWords" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="上传前会再次检查；发现云端已更新时会先下载合并，再通过条件写入安全上传，无需手动安排同步顺序。"
+                                    TextWrapping="WrapWholeWords" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
 
-        <ScrollViewer
-            Grid.Row="1"
-            HorizontalScrollBarVisibility="Disabled"
-            HorizontalScrollMode="Disabled"
-            VerticalScrollBarVisibility="Auto"
-            VerticalScrollMode="Auto">
-            <StackPanel Spacing="12">
-                <Border Style="{StaticResource CardStyle}" Padding="0">
-                    <Grid Padding="16" ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border
-                            Width="36"
-                            Height="36"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                            CornerRadius="8">
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                FontWeight="SemiBold"
-                                Text="1" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="创建 Bucket" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="登录 Cloudflare Dashboard，进入 R2，创建一个 Bucket，例如 roco-pilot。"
-                                TextWrapping="WrapWholeWords" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="同时记下 Cloudflare 账户的 Account ID。"
-                                TextWrapping="WrapWholeWords" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <Border Style="{StaticResource CardStyle}" Padding="0">
-                    <Grid Padding="16" ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border
-                            Width="36"
-                            Height="36"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                            CornerRadius="8">
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                FontWeight="SemiBold"
-                                Text="2" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="创建 R2 API 令牌" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="在 R2 页面进入 Manage R2 API tokens，创建一个只作用于该 Bucket 的读写令牌。"
-                                TextWrapping="WrapWholeWords" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="复制 Access Key ID 和 Secret Access Key。Secret 只显示一次。"
-                                TextWrapping="WrapWholeWords" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <Border Style="{StaticResource CardStyle}" Padding="0">
-                    <Grid Padding="16" ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border
-                            Width="36"
-                            Height="36"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                            CornerRadius="8">
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                FontWeight="SemiBold"
-                                Text="3" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="填写 RocoPilot 配置" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="回到云同步窗口，填写 Account ID、Bucket、Access Key ID 和 Secret Access Key。"
-                                TextWrapping="WrapWholeWords" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="保存后点击测试连接。通过后再启用同步。"
-                                TextWrapping="WrapWholeWords" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
-                <Border Style="{StaticResource CardStyle}" Padding="0">
-                    <Grid Padding="16" ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Border
-                            Width="36"
-                            Height="36"
-                            VerticalAlignment="Top"
-                            Background="{ThemeResource ControlFillColorDefaultBrush}"
-                            CornerRadius="8">
-                            <FontIcon
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                FontSize="18"
-                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                Glyph="&#xE895;" />
-                        </Border>
-
-                        <StackPanel Grid.Column="1" Spacing="6">
-                            <TextBlock
-                                FontWeight="SemiBold"
-                                Text="同步行为" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="RocoPilot 会把统计文件保存为 RocoPilot/statistics.json。启用同步后，应用启动时会检查云端更新，本地统计变化会延迟约 8 秒自动上传。"
-                                TextWrapping="WrapWholeWords" />
-                            <TextBlock
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="上传前会再次检查；发现云端已更新时会先下载合并，再通过条件写入安全上传，无需手动安排同步顺序。"
-                                TextWrapping="WrapWholeWords" />
-                        </StackPanel>
-                    </Grid>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-
-        <Button
-            Grid.Row="2"
-            HorizontalAlignment="Right"
-            Click="CloseButton_Click"
-            Content="关闭" />
+        <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">
+            <Button
+                HorizontalAlignment="Right"
+                Click="CloseButton_Click"
+                Content="关闭"
+                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
+        </Grid>
     </Grid>
 </windowex:WindowEx>

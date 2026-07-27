@@ -490,7 +490,7 @@
 
             <Button
                 Grid.Column="3"
-                Width="220"
+                Width="160"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center"
                 HorizontalContentAlignment="Stretch">
@@ -514,7 +514,7 @@
                 </Button.Content>
                 <Button.Flyout>
                     <Flyout x:Name="AccountSelectorFlyout" Placement="BottomEdgeAlignedRight">
-                        <StackPanel Width="220" Spacing="6">
+                        <StackPanel Width="160" Spacing="6">
                             <ListView
                                 MaxHeight="260"
                                 IsItemClickEnabled="True"

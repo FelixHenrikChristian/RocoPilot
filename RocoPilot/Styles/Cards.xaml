@@ -115,6 +115,33 @@
         <Setter Property="CornerRadius" Value="8" />
     </Style>
 
+    <Thickness x:Key="DialogFooterPadding">20,12</Thickness>
+    <x:Double x:Key="DialogFooterButtonMinWidth">96</x:Double>
+    <x:Double x:Key="DialogFooterMessageBarMaxWidth">480</x:Double>
+
+    <Style x:Key="DialogFooterStyle" TargetType="Grid">
+        <Setter Property="Padding" Value="{StaticResource DialogFooterPadding}" />
+        <Setter Property="Background" Value="{ThemeResource LayerFillColorDefaultBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+        <Setter Property="BorderThickness" Value="0,1,0,0" />
+        <Setter Property="ColumnSpacing" Value="10" />
+    </Style>
+
+    <Style x:Key="DialogFooterPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+        <Setter Property="MinWidth" Value="{StaticResource DialogFooterButtonMinWidth}" />
+    </Style>
+
+    <Style x:Key="DialogFooterSecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+        <Setter Property="MinWidth" Value="{StaticResource DialogFooterButtonMinWidth}" />
+    </Style>
+
+    <Style x:Key="DialogFooterMessageBarStyle" TargetType="InfoBar">
+        <Setter Property="MaxWidth" Value="{StaticResource DialogFooterMessageBarMaxWidth}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="IsClosable" Value="False" />
+    </Style>
+
     <Style x:Key="EmptyStatePanelStyle" TargetType="StackPanel">
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />

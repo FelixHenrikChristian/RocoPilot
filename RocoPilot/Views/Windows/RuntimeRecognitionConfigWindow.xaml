@@ -189,13 +189,7 @@
             </ScrollViewer>
         </Grid>
 
-        <Grid
-            Grid.Row="1"
-            Padding="20,12"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-            BorderThickness="0,1,0,0"
-            ColumnSpacing="10">
+        <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -205,24 +199,24 @@
 
             <Button
                 Click="RestoreDefaultsButton_Click"
-                Content="恢复默认值" />
+                Content="恢复默认值"
+                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
             <InfoBar
                 x:Name="MessageBar"
                 Grid.Column="1"
                 helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-                IsClosable="False"
-                IsOpen="False" />
+                IsOpen="False"
+                Style="{StaticResource DialogFooterMessageBarStyle}" />
             <Button
                 Grid.Column="2"
-                MinWidth="96"
                 Click="CancelButton_Click"
-                Content="取消" />
+                Content="取消"
+                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
             <Button
                 Grid.Column="3"
-                MinWidth="96"
                 Click="SaveButton_Click"
                 Content="保存"
-                Style="{ThemeResource AccentButtonStyle}" />
+                Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
         </Grid>
     </Grid>
 </windowex:WindowEx>

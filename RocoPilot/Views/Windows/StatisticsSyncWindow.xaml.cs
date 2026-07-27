@@ -39,7 +39,7 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(720, 640));
+        AppWindow.Resize(new SizeInt32(680, 620));
 
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         Closed += StatisticsSyncWindow_Closed;
@@ -175,11 +175,6 @@ public sealed partial class StatisticsSyncWindow : WindowEx
             await _viewModel.DownloadStatisticsFromCloudAsync();
             ShowMessage("合并完成", "已将云端统计数据合并到本地记录。", InfoBarSeverity.Success);
         });
-    }
-
-    private void CloseButton_Click(object sender, RoutedEventArgs e)
-    {
-        Close();
     }
 
     private void TutorialButton_Click(object sender, RoutedEventArgs e)

@@ -24,7 +24,7 @@ public sealed partial class RuntimeRecognitionConfigWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(720, 520));
+        AppWindow.Resize(new SizeInt32(680, 480));
 
         LoadSettings(_viewModel.RuntimeRecognitionSettings);
     }

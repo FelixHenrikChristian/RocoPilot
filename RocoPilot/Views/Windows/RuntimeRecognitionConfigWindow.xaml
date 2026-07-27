@@ -4,24 +4,27 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:windowex="using:WinUIEx"
-    Width="720"
-    Height="520"
-    MinWidth="620"
-    MinHeight="460">
+    Width="680"
+    Height="480"
+    MinWidth="600"
+    MinHeight="420">
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid
-        x:Name="ContentRoot"
-        Padding="12"
-        RowSpacing="10">
+    <Grid x:Name="ContentRoot">
         <Grid.Resources>
             <Style x:Key="SettingRowStyle" TargetType="Grid">
-                <Setter Property="MinHeight" Value="92" />
+                <Setter Property="MinHeight" Value="72" />
                 <Setter Property="Padding" Value="16,12" />
+                <Setter Property="ColumnSpacing" Value="16" />
+            </Style>
+            <Style x:Key="SettingTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
             <Style x:Key="SettingDescriptionStyle" TargetType="TextBlock">
+                <Setter Property="Margin" Value="0,2,0,0" />
                 <Setter Property="FontSize" Value="12" />
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
@@ -33,56 +36,73 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ScrollViewer Grid.Row="0">
-            <StackPanel Spacing="10">
+        <Grid
+            Grid.Row="0"
+            Padding="20,16,20,12"
+            RowSpacing="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
                 <Border
-                    Padding="18,16"
-                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                    BorderThickness="1"
-                    CornerRadius="8">
-                    <Grid ColumnSpacing="14">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border
-                            Width="40"
-                            Height="40"
-                            Background="{ThemeResource AccentFillColorSecondaryBrush}"
-                            CornerRadius="8">
-                            <FontIcon
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                FontSize="18"
-                                Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                                Glyph="&#xE823;" />
-                        </Border>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
-                            <TextBlock
-                                FontSize="18"
-                                FontWeight="SemiBold"
-                                Text="运行频率" />
-                            <TextBlock
-                                Style="{StaticResource SettingDescriptionStyle}"
-                                Text="控制实时任务共享的画面采集、图像状态匹配和后台文字识别节奏。" />
-                        </StackPanel>
-                    </Grid>
+                    Width="44"
+                    Height="44"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                    CornerRadius="10">
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="20"
+                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                        Glyph="&#xE823;" />
                 </Border>
 
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock
+                        FontSize="20"
+                        FontWeight="SemiBold"
+                        Text="运行频率" />
+                    <TextBlock
+                        FontSize="13"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="控制实时任务的画面采集、状态匹配和 OCR 节奏。"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
+
+            <ScrollViewer
+                Grid.Row="1"
+                HorizontalScrollBarVisibility="Disabled"
+                HorizontalScrollMode="Disabled"
+                VerticalScrollBarVisibility="Auto"
+                VerticalScrollMode="Auto">
                 <Border Padding="0" Style="{StaticResource CardStyle}">
                     <StackPanel>
-                        <Grid ColumnSpacing="12" Style="{StaticResource SettingRowStyle}">
+                        <Grid Style="{StaticResource SettingRowStyle}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="180" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center" Spacing="3">
-                                <TextBlock FontWeight="SemiBold" Text="画面捕获间隔" />
-                                <TextBlock Style="{StaticResource SettingDescriptionStyle}" Text="连续截图之间的目标间隔；数值越小刷新越及时，资源开销越高。" />
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingTitleStyle}" Text="画面捕获间隔" />
+                                <TextBlock
+                                    Style="{StaticResource SettingDescriptionStyle}"
+                                    Text="连续截图之间的目标间隔；越小越及时，资源占用越高。" />
                             </StackPanel>
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
                                 <NumberBox
                                     x:Name="FrameCaptureIntervalNumberBox"
                                     Width="140"
@@ -90,61 +110,92 @@
                                     Minimum="16"
                                     SmallChange="10"
                                     SpinButtonPlacementMode="Compact" />
-                                <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="ms" />
                             </StackPanel>
                         </Grid>
 
-                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
-                            <Grid ColumnSpacing="12" Style="{StaticResource SettingRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock FontWeight="SemiBold" Text="状态识别间隔" />
-                                    <TextBlock Style="{StaticResource SettingDescriptionStyle}" Text="魔力值、技能选择、切换精灵和战斗聊天等图像状态的扫描间隔。" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
-                                    <NumberBox
-                                        x:Name="GameStateScanIntervalNumberBox"
-                                        Width="140"
-                                        Maximum="30000"
-                                        Minimum="100"
-                                        SmallChange="100"
-                                        SpinButtonPlacementMode="Compact" />
-                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
 
-                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0">
-                            <Grid ColumnSpacing="12" Style="{StaticResource SettingRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center" Spacing="3">
-                                    <TextBlock FontWeight="SemiBold" Text="OCR 识别间隔" />
-                                    <TextBlock Style="{StaticResource SettingDescriptionStyle}" Text="奇遇、异色和精灵名称等后台文字识别的扫描间隔。" />
-                                </StackPanel>
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
-                                    <NumberBox
-                                        x:Name="OcrScanIntervalNumberBox"
-                                        Width="140"
-                                        Maximum="30000"
-                                        Minimum="250"
-                                        SmallChange="250"
-                                        SpinButtonPlacementMode="Compact" />
-                                    <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="ms" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="180" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingTitleStyle}" Text="状态识别间隔" />
+                                <TextBlock
+                                    Style="{StaticResource SettingDescriptionStyle}"
+                                    Text="魔力值、技能选择、切换精灵和战斗聊天等图像状态的扫描间隔。" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <NumberBox
+                                    x:Name="GameStateScanIntervalNumberBox"
+                                    Width="140"
+                                    Maximum="30000"
+                                    Minimum="100"
+                                    SmallChange="100"
+                                    SpinButtonPlacementMode="Compact" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="ms" />
+                            </StackPanel>
+                        </Grid>
+
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <Grid Style="{StaticResource SettingRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="180" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Style="{StaticResource SettingTitleStyle}" Text="OCR 识别间隔" />
+                                <TextBlock
+                                    Style="{StaticResource SettingDescriptionStyle}"
+                                    Text="奇遇、异色和精灵名称等后台文字识别的扫描间隔。" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <NumberBox
+                                    x:Name="OcrScanIntervalNumberBox"
+                                    Width="140"
+                                    Maximum="30000"
+                                    Minimum="250"
+                                    SmallChange="250"
+                                    SpinButtonPlacementMode="Compact" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="ms" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Border>
-            </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+        </Grid>
 
-        <Grid Grid.Row="1" ColumnSpacing="10">
+        <Grid
+            Grid.Row="1"
+            Padding="20,12"
+            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0"
+            ColumnSpacing="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -152,7 +203,9 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Button Click="RestoreDefaultsButton_Click" Content="恢复默认值" />
+            <Button
+                Click="RestoreDefaultsButton_Click"
+                Content="恢复默认值" />
             <InfoBar
                 x:Name="MessageBar"
                 Grid.Column="1"
@@ -161,12 +214,12 @@
                 IsOpen="False" />
             <Button
                 Grid.Column="2"
-                MinWidth="92"
+                MinWidth="96"
                 Click="CancelButton_Click"
                 Content="取消" />
             <Button
                 Grid.Column="3"
-                MinWidth="92"
+                MinWidth="96"
                 Click="SaveButton_Click"
                 Content="保存"
                 Style="{ThemeResource AccentButtonStyle}" />

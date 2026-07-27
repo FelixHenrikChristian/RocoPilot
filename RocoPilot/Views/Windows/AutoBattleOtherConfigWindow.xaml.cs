@@ -27,7 +27,7 @@ public sealed partial class AutoBattleOtherConfigWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(720, 600));
+        AppWindow.Resize(new SizeInt32(680, 580));
 
         LoadSettings(_viewModel.AutoBattleSettings);
     }

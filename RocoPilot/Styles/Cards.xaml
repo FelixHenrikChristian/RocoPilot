@@ -109,6 +109,12 @@
         <Setter Property="CornerRadius" Value="8" />
     </Style>
 
+    <Style x:Key="ConfigHintBarStyle" TargetType="Border">
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="8" />
+    </Style>
+
     <Style x:Key="EmptyStatePanelStyle" TargetType="StackPanel">
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Center" />

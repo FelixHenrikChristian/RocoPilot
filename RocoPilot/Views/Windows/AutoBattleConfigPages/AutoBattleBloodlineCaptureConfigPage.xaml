@@ -55,7 +55,7 @@
                             Text="勾选后会尝试捕捉该血脉；未勾选则按普通战斗配置释放战技。"
                             TextWrapping="Wrap" />
 
-                        <Grid ColumnSpacing="12" RowSpacing="10">
+                        <Grid ColumnSpacing="10" RowSpacing="10">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -66,44 +66,93 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <CheckBox
+                            <Border
                                 Grid.Row="0"
                                 Grid.Column="0"
-                                Content="奇异"
-                                IsChecked="{x:Bind Editor.CaptureBloodlineQiYi, Mode=TwoWay}"
-                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            <CheckBox
+                                Padding="14,12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                                <CheckBox
+                                    Content="奇异"
+                                    IsChecked="{x:Bind Editor.CaptureBloodlineQiYi, Mode=TwoWay}"
+                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            </Border>
+                            <Border
                                 Grid.Row="0"
                                 Grid.Column="1"
-                                Content="污染"
-                                IsChecked="{x:Bind Editor.CaptureBloodlineWuRan, Mode=TwoWay}"
-                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            <CheckBox
+                                Padding="14,12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                                <CheckBox
+                                    Content="污染"
+                                    IsChecked="{x:Bind Editor.CaptureBloodlineWuRan, Mode=TwoWay}"
+                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            </Border>
+                            <Border
                                 Grid.Row="1"
                                 Grid.Column="0"
-                                Content="混血"
-                                IsChecked="{x:Bind Editor.CaptureBloodlineHunXue, Mode=TwoWay}"
-                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            <CheckBox
+                                Padding="14,12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                                <CheckBox
+                                    Content="混血"
+                                    IsChecked="{x:Bind Editor.CaptureBloodlineHunXue, Mode=TwoWay}"
+                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            </Border>
+                            <Border
                                 Grid.Row="1"
                                 Grid.Column="1"
-                                Content="普通"
-                                IsChecked="{x:Bind Editor.CaptureBloodlineNormal, Mode=TwoWay}"
-                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            <CheckBox
+                                Padding="14,12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                                <CheckBox
+                                    Content="普通"
+                                    IsChecked="{x:Bind Editor.CaptureBloodlineNormal, Mode=TwoWay}"
+                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            </Border>
+                            <Border
                                 Grid.Row="2"
                                 Grid.Column="0"
                                 Grid.ColumnSpan="2"
-                                Content="未识别"
-                                IsChecked="{x:Bind Editor.CaptureBloodlineUnrecognized, Mode=TwoWay}"
-                                IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                                Padding="14,12"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                                <CheckBox
+                                    Content="未识别"
+                                    IsChecked="{x:Bind Editor.CaptureBloodlineUnrecognized, Mode=TwoWay}"
+                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            </Border>
                         </Grid>
 
-                        <TextBlock
-                            FontSize="12"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="旧赛季奇遇不会识别血脉，会根据「未识别」选项决定捕捉或释放战技。"
-                            TextWrapping="Wrap" />
+                        <Border Style="{StaticResource ConfigHintBarStyle}">
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon
+                                    VerticalAlignment="Center"
+                                    FontSize="14"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Glyph="&#xE946;" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="旧赛季奇遇不会识别血脉，会根据「未识别」选项决定捕捉或释放战技。"
+                                    TextWrapping="Wrap" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </StackPanel>
             </Border>

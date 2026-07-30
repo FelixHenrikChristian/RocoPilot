@@ -86,6 +86,9 @@ public sealed partial class RuntimeTaskService
     private bool _hasEncounterBloodlineTip;
     private EncounterBloodlineKind _encounterBloodlineKind = EncounterBloodlineKind.Unrecognized;
     private DateTimeOffset? _bloodlineTipWaitStartedAt;
+    private bool _hasLockedBloodlineCaptureDecision;
+    private EncounterBloodlineKind _lockedBloodlineKind = EncounterBloodlineKind.Unrecognized;
+    private bool _lockedShouldCapture;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
@@ -287,6 +290,13 @@ public sealed partial class RuntimeTaskService
     {
         lock (_bloodlineStateLock)
         {
+            if (_hasEncounterBloodlineTip
+                || _hasLockedBloodlineCaptureDecision
+                || kind == EncounterBloodlineKind.Unrecognized)
+            {
+                return;
+            }
+
             _hasEncounterBloodlineTip = true;
             _encounterBloodlineKind = kind;
             _bloodlineTipWaitStartedAt = null;
@@ -300,10 +310,18 @@ public sealed partial class RuntimeTaskService
     {
         lock (_bloodlineStateLock)
         {
+            if (_hasLockedBloodlineCaptureDecision)
+            {
+                kind = _lockedBloodlineKind;
+                shouldCapture = _lockedShouldCapture;
+                return true;
+            }
+
             if (_hasEncounterBloodlineTip)
             {
                 kind = _encounterBloodlineKind;
                 shouldCapture = filter.ShouldCapture(kind);
+                LockBloodlineCaptureDecision(kind, shouldCapture);
                 return true;
             }
 
@@ -312,6 +330,7 @@ public sealed partial class RuntimeTaskService
             {
                 kind = EncounterBloodlineKind.Unrecognized;
                 shouldCapture = filter.ShouldCapture(kind);
+                LockBloodlineCaptureDecision(kind, shouldCapture);
                 return true;
             }
 
@@ -320,6 +339,7 @@ public sealed partial class RuntimeTaskService
             {
                 kind = EncounterBloodlineKind.Unrecognized;
                 shouldCapture = filter.ShouldCapture(kind);
+                LockBloodlineCaptureDecision(kind, shouldCapture);
                 return true;
             }
 
@@ -327,6 +347,13 @@ public sealed partial class RuntimeTaskService
             shouldCapture = false;
             return false;
         }
+    }
+
+    private void LockBloodlineCaptureDecision(EncounterBloodlineKind kind, bool shouldCapture)
+    {
+        _hasLockedBloodlineCaptureDecision = true;
+        _lockedBloodlineKind = kind;
+        _lockedShouldCapture = shouldCapture;
     }
 
     private bool IsCurrentSeasonBloodlineTipAvailable()
@@ -353,6 +380,9 @@ public sealed partial class RuntimeTaskService
             _hasEncounterBloodlineTip = false;
             _encounterBloodlineKind = EncounterBloodlineKind.Unrecognized;
             _bloodlineTipWaitStartedAt = null;
+            _hasLockedBloodlineCaptureDecision = false;
+            _lockedBloodlineKind = EncounterBloodlineKind.Unrecognized;
+            _lockedShouldCapture = false;
         }
     }
 

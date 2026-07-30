@@ -24,7 +24,7 @@ internal static class StatisticsProjection
         var seasons = MergeConfiguredSeasons(account?.Seasons ?? [], seasonConfig)
             .Select(season => ToSeasonStatisticsGroup(season.Data, avatarResolver))
             .OrderByDescending(season => IsCurrentSeason(season, seasonConfig))
-            .ThenBy(season => GetConfiguredSeasonOrder(season, seasonConfig))
+            .ThenByDescending(season => GetConfiguredSeasonOrder(season, seasonConfig))
             .ThenByDescending(season => season.LatestCapturedAt)
             .ThenBy(season => season.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();

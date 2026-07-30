@@ -224,8 +224,11 @@ public sealed partial class RuntimeTaskService
         }
 
         var hasParsedKind = S3EncounterBloodlineRecognition.TryParse(tipText, out var kind);
-        RememberEncounterBloodlineTip(
-            hasParsedKind ? kind : EncounterBloodlineKind.Unrecognized);
+        if (hasParsedKind)
+        {
+            RememberEncounterBloodlineTip(kind);
+        }
+
         if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
         {
             return;

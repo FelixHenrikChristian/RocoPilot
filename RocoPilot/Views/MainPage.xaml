@@ -136,6 +136,7 @@
                         <ComboBox
                             Grid.Column="2"
                             HorizontalAlignment="Stretch"
+                            IsEnabled="{x:Bind ViewModel.IsLaunchConfigurationEnabled, Mode=OneWay}"
                             VerticalAlignment="Center"
                             DisplayMemberPath="Name"
                             ItemsSource="{x:Bind ViewModel.CaptureMethods}"
@@ -208,6 +209,7 @@
                         <ComboBox
                             Grid.Column="2"
                             HorizontalAlignment="Stretch"
+                            IsEnabled="{x:Bind ViewModel.IsLaunchConfigurationEnabled, Mode=OneWay}"
                             VerticalAlignment="Center"
                             DisplayMemberPath="Name"
                             ItemsSource="{x:Bind ViewModel.TextRecognitionMethods}"

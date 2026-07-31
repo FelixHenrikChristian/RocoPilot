@@ -35,7 +35,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     ];
     private static readonly ImageMatchOptions MagicPointMatchOptions = new()
     {
-        MinimumScore = 0.92,
+        MinimumScore = 0.96,
         AlphaThreshold = 16,
         SearchStep = 1
     };

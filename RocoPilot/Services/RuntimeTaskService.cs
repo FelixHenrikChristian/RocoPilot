@@ -688,20 +688,19 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                     cancellationToken);
             }
 
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny
-                    ? "战斗中 - 异色保护"
-                    : IsAutoBattleBossBattle
-                        ? _isAutoBattleBossComboPromptMatchedForCurrentTurn
-                            ? "首领战斗 - 连招配置"
-                            : "首领战斗 - 技能选择"
-                        : "战斗中 - 技能选择",
-                DateTimeOffset.Now));
+            // 先完成类型识别/动作，再写遮罩，避免 Unknown 时先显示“战斗中”。
             if (!handledSkillFailure)
             {
                 await HandleAutoBattleSkillSelectionAsync(state, frame, cancellationToken);
             }
 
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+                isAutoBattleSuspendedForShiny
+                    ? "战斗中 - 异色保护"
+                    : IsAutoBattleBossBattle && _isAutoBattleBossComboPromptMatchedForCurrentTurn
+                        ? BuildAutoBattleStatusOverlayText("连招配置")
+                        : BuildAutoBattleStatusOverlayText("技能选择"),
+                DateTimeOffset.Now));
             return GameStateScanResult.Battle;
         }
 
@@ -709,17 +708,18 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         if (isPetSwitchingVisible)
         {
             var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny
-                    ? "战斗中 - 异色保护"
-                    : IsAutoBattleBossBattle ? "首领战斗 - 切换精灵" : "战斗中 - 切换精灵",
-                DateTimeOffset.Now));
             CompleteAutoBattleSkillSelectionState();
-            if (!isAutoBattleSuspendedForShiny)
+            // 类型未定时不执行换精灵，等识别完成后再处理。
+            if (!isAutoBattleSuspendedForShiny && IsAutoBattleTypeResolved)
             {
                 await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
             }
 
+            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
+                isAutoBattleSuspendedForShiny
+                    ? "战斗中 - 异色保护"
+                    : BuildAutoBattleStatusOverlayText("切换精灵"),
+                DateTimeOffset.Now));
             return GameStateScanResult.Battle;
         }
 
@@ -737,14 +737,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 isAutoBattleSuspendedForShiny
                     ? "战斗中 - 异色保护"
-                    : IsAutoBattleBossBattle ? "首领战斗" : "战斗中",
+                    : BuildAutoBattleStatusOverlayText(),
                 DateTimeOffset.Now));
             return GameStateScanResult.Battle;
         }
 
         CompleteAutoBattleSkillSelectionState();
         UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-            IsAutoBattleBossBattle ? "首领战斗" : "战斗中",
+            BuildAutoBattleStatusOverlayText(),
             DateTimeOffset.Now));
         return GameStateScanResult.Battle;
     }

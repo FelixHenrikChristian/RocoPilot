@@ -9,6 +9,7 @@ namespace RocoPilot.Services;
 public sealed partial class RuntimeTaskService
 {
     private const string AutoBattleBossComboRecoverySequence = "X, X, X, X, X, X, Space";
+    private const int AutoBattleBossNameRequiredRecognitionCount = 3;
 
     private static readonly TimeSpan AutoBattleBossComboEnergyTipDelay = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan AutoBattleBossComboWatchdogInterval = TimeSpan.FromMinutes(5);
@@ -33,6 +34,7 @@ public sealed partial class RuntimeTaskService
     private long _autoBattleBossComboWatchdogDueAtUtcTicks;
     private int _autoBattleBossComboWatchdogAction;
     private int _autoBattleBossComboActiveAttempt;
+    private int _autoBattleBossNameRecognitionCount;
 
     private bool IsAutoBattleTypeResolved => _autoBattleType != AutoBattleType.Unknown;
 
@@ -80,11 +82,32 @@ public sealed partial class RuntimeTaskService
 
     private bool TryActivateAutoBattleBossBattle(
         string? bossNameText,
-        AutoBattleSettings settings)
+        AutoBattleSettings settings,
+        out bool isPendingConfirmation)
     {
-        if (_autoBattleType == AutoBattleType.Normal
-            || !BossBattleRecognition.HasRecognizedName(bossNameText))
+        isPendingConfirmation = false;
+        if (_autoBattleType == AutoBattleType.Normal)
         {
+            return false;
+        }
+
+        _autoBattleBossNameRecognitionCount =
+            BossBattleRecognition.UpdateConsecutiveNameRecognitionCount(
+                bossNameText,
+                _autoBattleBossNameRecognitionCount);
+        if (_autoBattleBossNameRecognitionCount == 0)
+        {
+            return false;
+        }
+
+        if (_autoBattleBossNameRecognitionCount < AutoBattleBossNameRequiredRecognitionCount)
+        {
+            isPendingConfirmation = true;
+            _logger.LogDebug(
+                "自动战斗：首领名称区域识别到有效中文名称，等待连续确认。BossName={BossName}, RecognitionCount={RecognitionCount}, RequiredCount={RequiredCount}",
+                FormatLogText(bossNameText),
+                _autoBattleBossNameRecognitionCount,
+                AutoBattleBossNameRequiredRecognitionCount);
             return false;
         }
 
@@ -97,7 +120,8 @@ public sealed partial class RuntimeTaskService
             ResetAutoBattleShinySuspendState();
             ClearPendingShinyDetection();
             _logger.LogInformation(
-                "自动战斗：普通精灵名未匹配，首领名称区域识别到文字，已进入首领战斗并切换到独立释放序列。BossName={BossName}, ReleaseStep={ReleaseStep}",
+                "自动战斗：普通精灵名未匹配，首领名称区域连续 {RecognitionCount} 次识别到有效中文名称，已进入首领战斗并切换到独立释放序列。BossName={BossName}, ReleaseStep={ReleaseStep}",
+                _autoBattleBossNameRecognitionCount,
                 FormatLogText(bossNameText),
                 GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep));
         }
@@ -110,6 +134,7 @@ public sealed partial class RuntimeTaskService
         if (_autoBattleType == AutoBattleType.Unknown)
         {
             _autoBattleType = AutoBattleType.Normal;
+            _autoBattleBossNameRecognitionCount = 0;
         }
     }
 
@@ -603,6 +628,7 @@ public sealed partial class RuntimeTaskService
     private void ResetAutoBattleBossBattleState()
     {
         _autoBattleType = AutoBattleType.Unknown;
+        _autoBattleBossNameRecognitionCount = 0;
         Volatile.Write(ref _autoBattleBossComboWatchdogDueAtUtcTicks, 0);
         Volatile.Write(
             ref _autoBattleBossComboActiveAttempt,

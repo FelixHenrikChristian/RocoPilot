@@ -63,11 +63,11 @@ jobs:
           $applicationIdentity = $applicationManifestXml.SelectSingleNode("/*[local-name()='assembly']/*[local-name()='assemblyIdentity']")
           $applicationVersion = [string]$applicationIdentity.version
 
-          if ($projectVersion -notmatch '^\d+\.\d+\.\d+$') {
-            throw "RocoPilot.csproj version '$projectVersion' must use the x.y.z format."
+          if ($projectVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "RocoPilot.csproj version '$projectVersion' must use the w.x.y.z format."
           }
 
-          $windowsVersion = "$projectVersion.0"
+          $windowsVersion = $projectVersion
           $versionValues = [ordered]@{
             "RocoPilot.csproj FileVersion" = $fileVersion
             "RocoPilot.csproj AssemblyVersion" = $assemblyVersion
@@ -91,7 +91,7 @@ jobs:
           }
 
           $tag = "v$version"
-          function Split-SemVer {
+          function Split-AppVersion {
             param([string]$Value)
 
             $versionWithoutBuild = ($Value -split "\+", 2)[0]
@@ -102,20 +102,21 @@ jobs:
               Major = [int]$coreParts[0]
               Minor = [int]$coreParts[1]
               Patch = [int]$coreParts[2]
+              Revision = if ($coreParts.Count -gt 3) { [int]$coreParts[3] } else { 0 }
               PreRelease = if ($versionParts.Count -gt 1) { $versionParts[1] } else { $null }
             }
           }
 
-          function Compare-SemVer {
+          function Compare-AppVersion {
             param(
               [string]$Left,
               [string]$Right
             )
 
-            $leftVersion = Split-SemVer $Left
-            $rightVersion = Split-SemVer $Right
+            $leftVersion = Split-AppVersion $Left
+            $rightVersion = Split-AppVersion $Right
 
-            foreach ($part in @("Major", "Minor", "Patch")) {
+            foreach ($part in @("Major", "Minor", "Patch", "Revision")) {
               if ($leftVersion.$part -lt $rightVersion.$part) { return -1 }
               if ($leftVersion.$part -gt $rightVersion.$part) { return 1 }
             }
@@ -169,7 +170,7 @@ jobs:
           $existingVersions = @(
             git tag --list "v*" |
               ForEach-Object {
-                if ($_ -match '^v(?<version>\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)$') {
+                if ($_ -match '^v(?<version>\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$') {
                   $Matches.version
                 }
               }
@@ -181,11 +182,11 @@ jobs:
           $newerVersion = $null
           $tagExists = $false
           foreach ($existingVersion in $existingVersions) {
-            $comparison = Compare-SemVer $existingVersion $version
+            $comparison = Compare-AppVersion $existingVersion $version
             if ($comparison -eq 0) {
               $tagExists = $true
             }
-            if ($comparison -gt 0 -and ($null -eq $newerVersion -or (Compare-SemVer $existingVersion $newerVersion) -gt 0)) {
+            if ($comparison -gt 0 -and ($null -eq $newerVersion -or (Compare-AppVersion $existingVersion $newerVersion) -gt 0)) {
               $newerVersion = $existingVersion
             }
           }

@@ -34,7 +34,11 @@ public sealed partial class RuntimeTaskService
     private int _autoBattleBossComboWatchdogAction;
     private int _autoBattleBossComboActiveAttempt;
 
+    private bool IsAutoBattleTypeResolved => _autoBattleType != AutoBattleType.Unknown;
+
     private bool IsAutoBattleBossBattle => _autoBattleType == AutoBattleType.Boss;
+
+    private bool IsAutoBattleLegendaryBattle => _autoBattleType == AutoBattleType.Legendary;
 
     private bool HasAutoBattleBossComboStarted =>
         Volatile.Read(ref _autoBattleBossComboActionState) != (int)AutoBattleBossComboActionState.Ready;
@@ -45,11 +49,34 @@ public sealed partial class RuntimeTaskService
             AutoBattleBossComboActionState.Executing =>
                 (AutoBattleBossComboAttempt)Volatile.Read(ref _autoBattleBossComboActiveAttempt)
                     == AutoBattleBossComboAttempt.Recovery
-                    ? "首领战斗 - 连招解卡"
-                    : "首领战斗 - 连招配置",
-            AutoBattleBossComboActionState.AwaitingBattleExit => "首领战斗 - 等待连招结算",
+                    ? BuildAutoBattleStatusOverlayText("连招解卡")
+                    : BuildAutoBattleStatusOverlayText("连招配置"),
+            AutoBattleBossComboActionState.AwaitingBattleExit => BuildAutoBattleStatusOverlayText("等待连招结算"),
             _ => null
         };
+
+    private string BuildAutoBattleStatusOverlayText(string? detail = null)
+    {
+        var prefix = _autoBattleType switch
+        {
+            AutoBattleType.Boss => "首领战斗",
+            AutoBattleType.Legendary => "传说战斗",
+            AutoBattleType.Normal => "战斗中",
+            _ => "识别战斗类型中"
+        };
+
+        return string.IsNullOrWhiteSpace(detail)
+            ? prefix
+            : $"{prefix} - {detail.Trim()}";
+    }
+
+    private void EnsureAutoBattleReleaseStepCached(AutoBattleSettings settings)
+    {
+        if (_currentAutoBattleReleaseStep is null && IsAutoBattleTypeResolved)
+        {
+            _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
+        }
+    }
 
     private bool TryActivateAutoBattleBossBattle(
         string? bossNameText,
@@ -601,7 +628,8 @@ public sealed partial class RuntimeTaskService
     {
         Unknown,
         Normal,
-        Boss
+        Boss,
+        Legendary
     }
 
     private enum AutoBattleBossComboActionState

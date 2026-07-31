@@ -102,7 +102,7 @@ jobs:
               Major = [int]$coreParts[0]
               Minor = [int]$coreParts[1]
               Patch = [int]$coreParts[2]
-              Revision = if ($coreParts.Count -gt 3) { [int]$coreParts[3] } else { 0 }
+              Revision = [int]$coreParts[3]
               PreRelease = if ($versionParts.Count -gt 1) { $versionParts[1] } else { $null }
             }
           }
@@ -170,7 +170,7 @@ jobs:
           $existingVersions = @(
             git tag --list "v*" |
               ForEach-Object {
-                if ($_ -match '^v(?<version>\d+\.\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$') {
+                if ($_ -match '^v(?<version>\d+\.\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$') {
                   $Matches.version
                 }
               }

@@ -13,9 +13,39 @@ public sealed class AutoBattleBossTests
     {
         Assert.IsTrue(BossBattleRecognition.HasRecognizedName("岩甲首领"));
         Assert.IsTrue(BossBattleRecognition.HasRecognizedName("  岩甲 首领  \r\n"));
+        Assert.IsTrue(BossBattleRecognition.HasRecognizedName("岩-甲 Boss"));
         Assert.IsFalse(BossBattleRecognition.HasRecognizedName(null));
         Assert.IsFalse(BossBattleRecognition.HasRecognizedName("|"));
         Assert.IsFalse(BossBattleRecognition.HasRecognizedName("领"));
+        Assert.IsFalse(BossBattleRecognition.HasRecognizedName("Boss-HP12"));
+        Assert.IsFalse(BossBattleRecognition.HasRecognizedName("首-A1"));
+    }
+
+    [TestMethod]
+    public void RequiresConsecutiveMeaningfulBossNameResults()
+    {
+        var recognitionCount = 0;
+
+        recognitionCount = BossBattleRecognition.UpdateConsecutiveNameRecognitionCount(
+            "岩甲首领",
+            recognitionCount);
+        Assert.AreEqual(1, recognitionCount);
+
+        recognitionCount = BossBattleRecognition.UpdateConsecutiveNameRecognitionCount(
+            "Boss-HP12",
+            recognitionCount);
+        Assert.AreEqual(0, recognitionCount);
+
+        recognitionCount = BossBattleRecognition.UpdateConsecutiveNameRecognitionCount(
+            "岩甲首领",
+            recognitionCount);
+        recognitionCount = BossBattleRecognition.UpdateConsecutiveNameRecognitionCount(
+            "岩甲首领",
+            recognitionCount);
+        recognitionCount = BossBattleRecognition.UpdateConsecutiveNameRecognitionCount(
+            "岩甲首领",
+            recognitionCount);
+        Assert.AreEqual(3, recognitionCount);
     }
 
     [TestMethod]

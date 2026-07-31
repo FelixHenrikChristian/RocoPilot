@@ -590,10 +590,19 @@ public sealed partial class RuntimeTaskService
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
-            if (TryActivateAutoBattleBossBattle(result.BossNameRawText, settings))
+            if (TryActivateAutoBattleBossBattle(
+                    result.BossNameRawText,
+                    settings,
+                    out var isBossNamePendingConfirmation))
             {
                 _hasAutoBattleSkillSelectionEnemyNameResult = true;
                 return true;
+            }
+
+            if (isBossNamePendingConfirmation)
+            {
+                ResetAutoBattleSkillSelectionEnemyNameTask();
+                return false;
             }
 
             ActivateNormalAutoBattleIfUnknown();
@@ -604,10 +613,19 @@ public sealed partial class RuntimeTaskService
 
         if (string.IsNullOrWhiteSpace(result.MatchedName))
         {
-            if (TryActivateAutoBattleBossBattle(result.BossNameRawText, settings))
+            if (TryActivateAutoBattleBossBattle(
+                    result.BossNameRawText,
+                    settings,
+                    out var isBossNamePendingConfirmation))
             {
                 _hasAutoBattleSkillSelectionEnemyNameResult = true;
                 return true;
+            }
+
+            if (isBossNamePendingConfirmation)
+            {
+                ResetAutoBattleSkillSelectionEnemyNameTask();
+                return false;
             }
 
             if (_encounterCaptureButtonStateTracker.HasSeenDisabled)

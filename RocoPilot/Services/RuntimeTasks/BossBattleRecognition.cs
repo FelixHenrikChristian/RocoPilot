@@ -9,14 +9,22 @@ internal static class BossBattleRecognition
     public const string EnergyInsufficientText = "能量不足";
     public const double EnergyInsufficientMatchThreshold = 0.7;
 
-    private const int MinimumBossNameTextLength = 2;
+    private const int MinimumBossNameChineseCharacterCount = 2;
     private const int MinimumComboPromptTextLength = 6;
     private const int MinimumEnergyInsufficientTextLength = 3;
 
     public static bool HasRecognizedName(string? text)
     {
         var cleanedText = TextMatchingHelper.CleanRecognizedText(text);
-        return cleanedText.Count(char.IsLetterOrDigit) >= MinimumBossNameTextLength;
+        return TextMatchingHelper.CountChineseCharacters(cleanedText)
+            >= MinimumBossNameChineseCharacterCount;
+    }
+
+    public static int UpdateConsecutiveNameRecognitionCount(string? text, int currentCount)
+    {
+        return HasRecognizedName(text)
+            ? Math.Max(0, currentCount) + 1
+            : 0;
     }
 
     public static bool IsComboPrompt(string? text, out double similarity)

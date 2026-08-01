@@ -61,7 +61,7 @@ public partial class SettingsViewModel : ObservableRecipient
         _localSettingsService = localSettingsService;
         _updateService = updateService;
         _logger = logger;
-        AppVersion = GetShortAppVersion();
+        AppVersion = GetAppVersionText();
         UpdateStatusText = "从 GitHub Releases 获取最新版本信息";
     }
 
@@ -198,7 +198,7 @@ public partial class SettingsViewModel : ObservableRecipient
         };
     }
 
-    private static string GetShortAppVersion()
+    private static string GetAppVersionText()
     {
         Version version;
 
@@ -213,6 +213,11 @@ public partial class SettingsViewModel : ObservableRecipient
             version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0);
         }
 
-        return $"v{version.Major}.{version.Minor}.{version.Build}";
+        return FormatAppVersion(version);
+    }
+
+    internal static string FormatAppVersion(Version version)
+    {
+        return $"v{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}.{Math.Max(0, version.Revision)}";
     }
 }

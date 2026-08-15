@@ -10,7 +10,7 @@ namespace RocoPilot.Tests;
 public sealed class AutoBattleConfigEditorTests
 {
     [TestMethod]
-    public void SharesPresetBetweenNormalAndBossPages()
+    public void SharesPresetAcrossPages()
     {
         var settings = AutoBattleSettings.CreateDefault();
         settings.TurnSequencePresets =
@@ -26,17 +26,12 @@ public sealed class AutoBattleConfigEditorTests
         var sharedPreset = editor.SharedPresetItems.Single();
 
         Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(sharedPreset, out _));
-        Assert.IsTrue(editor.TryInsertSharedPresetIntoBossRelease(sharedPreset, out _));
         Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
 
         var insertedStep = result.ReleaseSequence[^1];
         Assert.IsTrue(insertedStep.IsCustom);
         Assert.AreEqual("通用序列", insertedStep.Name);
         Assert.AreEqual("1, X, 2, X, 3, X", insertedStep.Sequence);
-        var insertedBossStep = result.BossReleaseSequence[^1];
-        Assert.IsTrue(insertedBossStep.IsCustom);
-        Assert.AreEqual("通用序列", insertedBossStep.Name);
-        Assert.AreEqual("1, X, 2, X, 3, X", insertedBossStep.Sequence);
         Assert.AreEqual(1, result.TurnSequencePresets.Count);
     }
 
@@ -59,14 +54,11 @@ public sealed class AutoBattleConfigEditorTests
         sharedPreset.Sequence = "4, 3, 2";
 
         Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(sharedPreset, out _));
-        Assert.IsTrue(editor.TryInsertSharedPresetIntoBossRelease(sharedPreset, out _));
         Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
         Assert.AreEqual("更新后的序列", result.TurnSequencePresets.Single().Name);
         Assert.AreEqual("4, 3, 2", result.TurnSequencePresets.Single().Sequence);
         Assert.AreEqual("更新后的序列", result.ReleaseSequence[^1].Name);
         Assert.AreEqual("4, 3, 2", result.ReleaseSequence[^1].Sequence);
-        Assert.AreEqual("更新后的序列", result.BossReleaseSequence[^1].Name);
-        Assert.AreEqual("4, 3, 2", result.BossReleaseSequence[^1].Sequence);
     }
 
     [TestMethod]

@@ -161,7 +161,7 @@
                             Grid.Column="1"
                             FontSize="12"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="普通战斗与首领战斗可分别将序列插入各自的释放顺序。"
+                            Text="普通战斗可将序列插入自己的释放顺序。"
                             TextWrapping="Wrap" />
                     </Grid>
                 </Border>

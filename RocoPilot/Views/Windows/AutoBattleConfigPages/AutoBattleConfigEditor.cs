@@ -21,17 +21,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         get;
     } = [];
 
-    public ObservableCollection<AutoBattleReleaseEditorItem> BossReleaseItems
-    {
-        get;
-    } = [];
-
     public ObservableCollection<AutoBattlePresetEditorItem> SharedPresetItems
-    {
-        get;
-    } = [];
-
-    public ObservableCollection<AutoBattleReleaseEditorItem> BossComboItems
     {
         get;
     } = [];
@@ -163,23 +153,11 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         ? Visibility.Visible
         : Visibility.Collapsed;
 
-    public Visibility BossReleaseEmptyVisibility => BossReleaseItems.Count == 0
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
-    public Visibility BossComboEmptyVisibility => BossComboItems.Count == 0
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
     public Visibility SharedPresetEmptyVisibility => SharedPresetItems.Count == 0
         ? Visibility.Visible
         : Visibility.Collapsed;
 
     public string NormalReleaseSummary => BuildReleaseSummary(NormalReleaseItems);
-
-    public string BossReleaseSummary => BuildReleaseSummary(BossReleaseItems);
-
-    public string BossComboSummary => BuildReleaseSummary(BossComboItems, emptyText: "未配置首领连招");
 
     public string SharedPresetSummary => SharedPresetItems.Count == 0
         ? "尚未创建公共序列"
@@ -192,8 +170,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         _keyboardInputService = keyboardInputService;
 
         NormalReleaseItems.CollectionChanged += NormalReleaseItems_CollectionChanged;
-        BossReleaseItems.CollectionChanged += BossReleaseItems_CollectionChanged;
-        BossComboItems.CollectionChanged += BossComboItems_CollectionChanged;
         SharedPresetItems.CollectionChanged += SharedPresetItems_CollectionChanged;
 
         LoadSettings(settings);
@@ -238,45 +214,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     public void MoveNormalReleaseItemLater(AutoBattleReleaseEditorItem item)
         => MoveItemLater(NormalReleaseItems, item);
 
-    public void AppendBossSkill(string? skillKey)
-    {
-        if (NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
-        {
-            BossReleaseItems.Add(AutoBattleReleaseEditorItem.CreateSkill(normalizedSkillKey));
-        }
-    }
-
-    public void ResetBossReleaseSequence()
-    {
-        BossReleaseItems.Clear();
-        foreach (var step in AutoBattleSettings.CreateDefaultReleaseSequence())
-        {
-            BossReleaseItems.Add(AutoBattleReleaseEditorItem.CreateSkill(step.SkillKey));
-        }
-    }
-
-    public void ClearBossReleaseSequence()
-    {
-        BossReleaseItems.Clear();
-    }
-
-    public void RemoveBossReleaseItem(AutoBattleReleaseEditorItem item)
-    {
-        BossReleaseItems.Remove(item);
-    }
-
-    public bool CanMoveBossReleaseItemEarlier(AutoBattleReleaseEditorItem item)
-        => CanMoveItemEarlier(BossReleaseItems, item);
-
-    public bool CanMoveBossReleaseItemLater(AutoBattleReleaseEditorItem item)
-        => CanMoveItemLater(BossReleaseItems, item);
-
-    public void MoveBossReleaseItemEarlier(AutoBattleReleaseEditorItem item)
-        => MoveItemEarlier(BossReleaseItems, item);
-
-    public void MoveBossReleaseItemLater(AutoBattleReleaseEditorItem item)
-        => MoveItemLater(BossReleaseItems, item);
-
     public void AddSharedPreset()
     {
         SharedPresetItems.Add(new AutoBattlePresetEditorItem
@@ -311,61 +248,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         return true;
     }
 
-    public bool TryInsertSharedPresetIntoBossRelease(
-        AutoBattlePresetEditorItem preset,
-        out AutoBattleConfigValidationError error)
-    {
-        if (!TryValidateNamedSequence(
-                preset.Name,
-                preset.Sequence,
-                "公共单回合执行序列",
-                AutoBattleConfigSection.SharedSequences,
-                out error))
-        {
-            return false;
-        }
-
-        BossReleaseItems.Add(AutoBattleReleaseEditorItem.CreateCustom(
-            preset.Name.Trim(),
-            preset.Sequence.Trim()));
-        return true;
-    }
-
-    public void AppendBossComboSkill(string? skillKey)
-    {
-        if (NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
-        {
-            BossComboItems.Add(AutoBattleReleaseEditorItem.CreateSkill(normalizedSkillKey));
-        }
-    }
-
-    public void ResetBossComboSequence()
-    {
-        ApplyBossComboSequence(AutoBattleSettings.DefaultBossComboSequence);
-    }
-
-    public void ClearBossComboSequence()
-    {
-        BossComboItems.Clear();
-    }
-
-    public void RemoveBossComboItem(AutoBattleReleaseEditorItem item)
-    {
-        BossComboItems.Remove(item);
-    }
-
-    public bool CanMoveBossComboItemEarlier(AutoBattleReleaseEditorItem item)
-        => CanMoveItemEarlier(BossComboItems, item);
-
-    public bool CanMoveBossComboItemLater(AutoBattleReleaseEditorItem item)
-        => CanMoveItemLater(BossComboItems, item);
-
-    public void MoveBossComboItemEarlier(AutoBattleReleaseEditorItem item)
-        => MoveItemEarlier(BossComboItems, item);
-
-    public void MoveBossComboItemLater(AutoBattleReleaseEditorItem item)
-        => MoveItemLater(BossComboItems, item);
-
     public bool TryBuildSettings(
         AutoBattleSettings source,
         out AutoBattleSettings settings,
@@ -378,12 +260,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
                 "普通战斗",
                 AutoBattleConfigSection.Normal,
                 out var releaseSequence,
-                out error)
-            || !TryBuildReleaseSequence(
-                BossReleaseItems,
-                "首领战斗",
-                AutoBattleConfigSection.Boss,
-                out var bossReleaseSequence,
                 out error))
         {
             return false;
@@ -416,28 +292,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             });
         }
 
-        var bossComboSkillKeys = BossComboItems
-            .Where(item => !item.IsCustom)
-            .Select(item => item.SkillKey)
-            .ToArray();
-        if (bossComboSkillKeys.Length == 0
-            || !BossBattleComboSequence.TryNormalize(
-                string.Join(", ", bossComboSkillKeys),
-                out var bossComboSequence))
-        {
-            error = new AutoBattleConfigValidationError(
-                "首领连招无效",
-                "请至少追加一个技能 1-4 或 X 回能。",
-                AutoBattleConfigSection.Boss);
-            return false;
-        }
-
         settings.RoundOrder = BuildRoundOrder(releaseSequence);
         settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         settings.ReleaseSequence = releaseSequence;
-        settings.BossReleaseSequence = bossReleaseSequence;
         settings.TurnSequencePresets = presets;
-        settings.BossComboSequence = bossComboSequence;
         settings.BloodlineCaptureFilter = new BloodlineCaptureFilterSettings
         {
             IsEnabled = BloodlineCaptureFilterEnabled,
@@ -461,14 +319,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             NormalReleaseItems.Add(CreateReleaseEditorItem(step, settings.TurnSequence));
         }
 
-        var bossReleaseSequence = settings.BossReleaseSequence is { Count: > 0 }
-            ? settings.BossReleaseSequence
-            : releaseSequence;
-        foreach (var step in bossReleaseSequence)
-        {
-            BossReleaseItems.Add(CreateReleaseEditorItem(step, settings.TurnSequence));
-        }
-
         foreach (var preset in settings.TurnSequencePresets ?? [])
         {
             SharedPresetItems.Add(new AutoBattlePresetEditorItem
@@ -478,9 +328,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             });
         }
 
-        ApplyBossComboSequence(settings.BossComboSequence);
         RefreshReleaseIndexes(NormalReleaseItems);
-        RefreshReleaseIndexes(BossReleaseItems);
 
         var bloodlineFilter = settings.BloodlineCaptureFilter
             ?? BloodlineCaptureFilterSettings.CreateDefault();
@@ -536,15 +384,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         return true;
     }
 
-    private void ApplyBossComboSequence(string? sequence)
-    {
-        BossComboItems.Clear();
-        foreach (var skillKey in BossBattleComboSequence.ParseOrDefault(sequence))
-        {
-            BossComboItems.Add(AutoBattleReleaseEditorItem.CreateSkill(skillKey));
-        }
-    }
-
     private bool TryValidateNamedSequence(
         string name,
         string sequence,
@@ -597,20 +436,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         RefreshReleaseIndexes(NormalReleaseItems);
         OnPropertyChanged(nameof(NormalReleaseEmptyVisibility));
         OnPropertyChanged(nameof(NormalReleaseSummary));
-    }
-
-    private void BossReleaseItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        RefreshReleaseIndexes(BossReleaseItems);
-        OnPropertyChanged(nameof(BossReleaseEmptyVisibility));
-        OnPropertyChanged(nameof(BossReleaseSummary));
-    }
-
-    private void BossComboItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        RefreshReleaseIndexes(BossComboItems);
-        OnPropertyChanged(nameof(BossComboEmptyVisibility));
-        OnPropertyChanged(nameof(BossComboSummary));
     }
 
     private void SharedPresetItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -748,8 +573,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 internal enum AutoBattleConfigSection
 {
     Normal,
-    Boss,
-    Legendary,
     SharedSequences,
     BloodlineCapture
 }

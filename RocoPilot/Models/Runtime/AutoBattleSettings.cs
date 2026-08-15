@@ -8,7 +8,6 @@ public sealed class AutoBattleSettings
 {
     public const string DefaultRoundOrder = "1, 2, 3, 4, X";
     public const string DefaultTurnSequence = "{skill}";
-    public const string DefaultBossComboSequence = "1, X, 2, X, 3, X";
     public const int DefaultSkillSelectionActionDelayMs = 500;
     public const int DefaultSkillSelectionRetryDelayMs = 4000;
     public const int DefaultKeyboardHoldDurationMs = 100;
@@ -39,25 +38,12 @@ public sealed class AutoBattleSettings
         set;
     } = DefaultTurnSequence;
 
-    public string BossComboSequence
-    {
-        get;
-        set;
-    } = DefaultBossComboSequence;
-
     [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<AutoBattleReleaseStep> ReleaseSequence
     {
         get;
         set;
     } = CreateDefaultReleaseSequence();
-
-    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
-    public List<AutoBattleReleaseStep> BossReleaseSequence
-    {
-        get;
-        set;
-    } = [];
 
     [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<AutoBattleTurnSequencePreset> TurnSequencePresets
@@ -124,9 +110,7 @@ public sealed class AutoBattleSettings
             IsEnabled = false,
             RoundOrder = DefaultRoundOrder,
             TurnSequence = DefaultTurnSequence,
-            BossComboSequence = DefaultBossComboSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
-            BossReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
             KeyboardInputMethod = KeyboardInputMethod.PostMessage,
@@ -158,9 +142,7 @@ public sealed class AutoBattleSettings
             IsEnabled = IsEnabled,
             RoundOrder = RoundOrder,
             TurnSequence = TurnSequence,
-            BossComboSequence = BossComboSequence,
             ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
-            BossReleaseSequence = (BossReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = EncounterRelievedAction,
             KeyboardInputMethod = KeyboardInputMethod,

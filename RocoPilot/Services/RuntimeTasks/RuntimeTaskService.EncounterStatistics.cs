@@ -270,11 +270,6 @@ public sealed partial class RuntimeTaskService
         CapturedFrame frame,
         CancellationToken cancellationToken)
     {
-        if (IsAutoBattleBossBattle)
-        {
-            return;
-        }
-
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
@@ -406,8 +401,7 @@ public sealed partial class RuntimeTaskService
 
     private void LogEncounterCaptureButtonDecisionForCurrentTurn(string decision)
     {
-        if (IsAutoBattleBossBattle
-            || _hasLoggedCurrentAutoBattleCaptureButtonObservation)
+        if (_hasLoggedCurrentAutoBattleCaptureButtonObservation)
         {
             return;
         }

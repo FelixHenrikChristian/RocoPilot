@@ -57,22 +57,6 @@
                         <FontIcon Glyph="&#xE768;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem
-                    x:Name="BossBattleNavigationItem"
-                    Content="首领战斗"
-                    Tag="Boss">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE7FC;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-                <NavigationViewItem
-                    x:Name="LegendaryBattleNavigationItem"
-                    Content="传说精灵挑战"
-                    Tag="Legendary">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE734;" />
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <Border

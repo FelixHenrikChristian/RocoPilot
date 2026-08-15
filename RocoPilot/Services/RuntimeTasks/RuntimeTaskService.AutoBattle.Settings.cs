@@ -7,9 +7,7 @@ public sealed partial class RuntimeTaskService
 {
     private AutoBattleReleaseStep GetCurrentAutoBattleReleaseStep(AutoBattleSettings settings)
     {
-        var releaseSequence = IsAutoBattleBossBattle
-            ? NormalizeAutoBattleBossReleaseSequence(settings)
-            : NormalizeAutoBattleReleaseSequence(settings);
+        var releaseSequence = NormalizeAutoBattleReleaseSequence(settings);
         if (_autoBattleRoundIndex >= releaseSequence.Count)
         {
             _autoBattleRoundIndex = 0;
@@ -56,7 +54,7 @@ public sealed partial class RuntimeTaskService
         return BuildAutoBattleTurnSequence(settings, releaseStep.SkillKey);
     }
 
-    private AutoBattleSkillSelectionPlan BuildNormalAutoBattleSkillSelectionPlan(
+    private AutoBattleSkillSelectionPlan BuildAutoBattleSkillSelectionPlan(
         AutoBattleSettings settings,
         AutoBattleReleaseStep releaseStep)
     {
@@ -188,13 +186,7 @@ public sealed partial class RuntimeTaskService
             normalized.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         }
 
-        normalized.BossComboSequence = BossBattleComboSequence.NormalizeOrDefault(
-            normalized.BossComboSequence);
-
         normalized.ReleaseSequence = NormalizeAutoBattleReleaseSequence(normalized)
-            .Select(step => step.Clone())
-            .ToList();
-        normalized.BossReleaseSequence = NormalizeAutoBattleBossReleaseSequence(normalized)
             .Select(step => step.Clone())
             .ToList();
         normalized.TurnSequencePresets = NormalizeAutoBattleTurnSequencePresets(normalized.TurnSequencePresets);
@@ -272,19 +264,6 @@ public sealed partial class RuntimeTaskService
         return ParseAutoBattleRoundOrder(settings.RoundOrder)
             .Select(AutoBattleReleaseStep.CreateSkill)
             .ToArray();
-    }
-
-    internal static IReadOnlyList<AutoBattleReleaseStep> NormalizeAutoBattleBossReleaseSequence(
-        AutoBattleSettings settings)
-    {
-        var releaseSequence = (settings.BossReleaseSequence ?? [])
-            .Select(NormalizeAutoBattleReleaseStep)
-            .OfType<AutoBattleReleaseStep>()
-            .ToArray();
-
-        return releaseSequence.Length > 0
-            ? releaseSequence
-            : NormalizeAutoBattleReleaseSequence(settings);
     }
 
     private static bool IsDefaultAutoBattleReleaseSequence(IReadOnlyList<AutoBattleReleaseStep> releaseSequence)

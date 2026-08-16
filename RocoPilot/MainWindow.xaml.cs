@@ -50,6 +50,18 @@ public sealed partial class MainWindow : WindowEx
 
         try
         {
+            var independentTaskService = App.GetService<IIndependentTaskService>();
+            if (independentTaskService.IsRunning)
+            {
+                await independentTaskService.StopAsync();
+            }
+        }
+        catch
+        {
+        }
+
+        try
+        {
             var runtimeTaskService = App.GetService<IRuntimeTaskService>();
             if (runtimeTaskService.IsRunning)
             {

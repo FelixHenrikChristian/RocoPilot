@@ -19,6 +19,7 @@ namespace RocoPilot.ViewModels;
 public partial class MainViewModel : ObservableRecipient
 {
     private readonly IRuntimeTaskService _runtimeTaskService;
+    private readonly IIndependentTaskService _independentTaskService;
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly IImageMatchingService _imageMatchingService;
     private readonly ITextRecognitionService _textRecognitionService;
@@ -109,12 +110,14 @@ public partial class MainViewModel : ObservableRecipient
 
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,
+        IIndependentTaskService independentTaskService,
         IInfoOverlayService infoOverlayService,
         IImageMatchingService imageMatchingService,
         ITextRecognitionService textRecognitionService,
         ILogger<MainViewModel> logger)
     {
         _runtimeTaskService = runtimeTaskService;
+        _independentTaskService = independentTaskService;
         _infoOverlayService = infoOverlayService;
         _imageMatchingService = imageMatchingService;
         _textRecognitionService = textRecognitionService;
@@ -164,6 +167,12 @@ public partial class MainViewModel : ObservableRecipient
     {
         if (_runtimeTaskService.IsRunning)
         {
+            // 独立任务依赖本会话运行，停止实时任务前先结束它。
+            if (_independentTaskService.IsRunning)
+            {
+                await _independentTaskService.StopAsync();
+            }
+
             await _runtimeTaskService.StopAsync();
             IsRealtimeCaptureRunning = false;
             TargetGameWindow = null;

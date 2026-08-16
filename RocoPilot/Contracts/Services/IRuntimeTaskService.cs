@@ -11,6 +11,11 @@ public interface IRuntimeTaskService
         get;
     }
 
+    bool IsSuspended
+    {
+        get;
+    }
+
     RuntimeTaskState? CurrentState
     {
         get;
@@ -50,4 +55,12 @@ public interface IRuntimeTaskService
     void SetRuntimeRecognitionSettings(RuntimeRecognitionSettings settings);
 
     Task StopAsync();
+
+    /// <summary>
+    /// 挂起实时任务循环：暂停截图、识别与按键，但保持任务处于运行状态。
+    /// 供独立任务等临时接管游戏窗口的场景使用，结束后调用 <see cref="Resume"/> 恢复。
+    /// </summary>
+    void Suspend(string reason);
+
+    void Resume();
 }

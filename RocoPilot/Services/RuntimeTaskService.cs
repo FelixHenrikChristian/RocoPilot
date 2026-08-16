@@ -28,6 +28,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 {
     private const int MagicPointSlotCount = 6;
     private const string MagicPointTemplateName = "magic-point.png";
+    private const int SuspensionPollIntervalMs = 200;
     private static readonly TimeSpan UnrecognizedStateConfirmDelay = TimeSpan.FromSeconds(2);
     private static readonly string[] MagicPointRegionIds =
     [
@@ -67,6 +68,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private bool _settingsLoaded;
     private bool _isBattleStateActive;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
+    private volatile bool _isSuspended;
+    private string? _suspendedReason;
 
     public event EventHandler? SettingsChanged;
 
@@ -77,6 +80,39 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     }
 
     public bool IsRunning => CurrentState is not null;
+
+    public bool IsSuspended => _isSuspended;
+
+    public void Suspend(string reason)
+    {
+        if (_isSuspended)
+        {
+            return;
+        }
+
+        _suspendedReason = reason;
+        _isSuspended = true;
+        if (IsRunning)
+        {
+            _logger.LogInformation("实时任务：已挂起（{Reason}），截图与识别暂停。", reason);
+        }
+    }
+
+    public void Resume()
+    {
+        if (!_isSuspended)
+        {
+            return;
+        }
+
+        var reason = _suspendedReason;
+        _suspendedReason = null;
+        _isSuspended = false;
+        if (IsRunning)
+        {
+            _logger.LogInformation("实时任务：已恢复运行（{Reason}）。", reason);
+        }
+    }
 
     public RuntimeRecognitionSettings RuntimeRecognitionSettings =>
         Volatile.Read(ref _runtimeRecognitionSettings).Clone();
@@ -268,6 +304,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             CurrentState = state;
             _isBattleStateActive = false;
             _unrecognizedStateDetectedAt = null;
+            _isSuspended = false;
+            _suspendedReason = null;
             ResetDeduplicatedDebugLogs();
             ResetAutoBattleBattleState();
             ResetEncounterRecordSuppression();
@@ -394,11 +432,30 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private async Task CaptureLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
         var nextGameStateScanAt = DateTimeOffset.MinValue;
+        var wasSuspended = false;
 
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                if (_isSuspended)
+                {
+                    if (!wasSuspended)
+                    {
+                        wasSuspended = true;
+                        EnterCaptureLoopSuspension(state);
+                    }
+
+                    await DelayAsync(SuspensionPollIntervalMs, cancellationToken);
+                    continue;
+                }
+
+                if (wasSuspended)
+                {
+                    wasSuspended = false;
+                    ExitCaptureLoopSuspension(state);
+                }
+
                 var frameStart = Stopwatch.GetTimestamp();
                 CapturedFrame? frame = null;
 
@@ -458,6 +515,29 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
     }
 
+    // 挂起清理在截图循环线程内执行，避免与扫描逻辑并发修改战斗状态。
+    private void EnterCaptureLoopSuspension(RuntimeTaskState state)
+    {
+        _isBattleStateActive = false;
+        _unrecognizedStateDetectedAt = null;
+        CompleteAutoBattleSkillSelectionState();
+        ResetAutoBattleBattleState();
+        ResetEncounterRecordSuppression();
+        ClearLatestRuntimeOcrFrame();
+        _recognitionOverlayService.Hide();
+        _logger.LogDebug("实时任务：截图循环进入挂起状态。");
+    }
+
+    private void ExitCaptureLoopSuspension(RuntimeTaskState state)
+    {
+        if (state.Options.RecognitionOverlayEnabled)
+        {
+            _recognitionOverlayService.Show(state);
+        }
+
+        _logger.LogDebug("实时任务：截图循环退出挂起状态，重新开始识别。");
+    }
+
     private async Task RuntimeOcrLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
         Task? activeScanTask = null;
@@ -496,7 +576,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                     }
                 }
 
-                if (!_isBattleStateActive)
+                if (_isSuspended || !_isBattleStateActive)
                 {
                     continue;
                 }

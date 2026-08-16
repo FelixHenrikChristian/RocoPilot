@@ -41,14 +41,17 @@
                                 <TextBlock
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="按配置次数自动挑战每日首领；需先在启动页启动任务，运行期间实时识别自动暂停。"
+                                    Text="开发中"
                                     TextWrapping="Wrap" />
                             </StackPanel>
 
+                            <!--  执行逻辑尚未接入，发布版本临时禁用启动入口  -->
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
-                                Command="{x:Bind ViewModel.ToggleBossBattleCommand}">
+                                Command="{x:Bind ViewModel.ToggleBossBattleCommand}"
+                                IsEnabled="False"
+                                ToolTipService.ToolTip="功能开发中，暂未开放。">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
@@ -138,14 +141,17 @@
                                 <TextBlock
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="按配置次数自动挑战传说精灵；需先在启动页启动任务，运行期间实时识别自动暂停。"
+                                    Text="开发中"
                                     TextWrapping="Wrap" />
                             </StackPanel>
 
+                            <!--  执行逻辑尚未接入，发布版本临时禁用启动入口  -->
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
-                                Command="{x:Bind ViewModel.ToggleLegendaryChallengeCommand}">
+                                Command="{x:Bind ViewModel.ToggleLegendaryChallengeCommand}"
+                                IsEnabled="False"
+                                ToolTipService.ToolTip="功能开发中，暂未开放。">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"

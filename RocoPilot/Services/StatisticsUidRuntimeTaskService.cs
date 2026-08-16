@@ -43,6 +43,8 @@ public sealed class StatisticsUidRuntimeTaskService :
 
     public bool IsRunning => _runtimeTaskService.IsRunning;
 
+    public bool IsSuspended => _runtimeTaskService.IsSuspended;
+
     public RuntimeTaskState? CurrentState => _runtimeTaskService.CurrentState;
 
     public bool EncounterStatisticsEnabled => _runtimeTaskService.EncounterStatisticsEnabled;
@@ -158,6 +160,16 @@ public sealed class StatisticsUidRuntimeTaskService :
         ClearPendingConfirmation();
         _infoOverlayNotificationService.UpdateUidNotice(null);
         await _runtimeTaskService.StopAsync();
+    }
+
+    public void Suspend(string reason)
+    {
+        _runtimeTaskService.Suspend(reason);
+    }
+
+    public void Resume()
+    {
+        _runtimeTaskService.Resume();
     }
 
     public void MarkPendingConfirmationPresented()

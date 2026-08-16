@@ -12,6 +12,8 @@ internal static class SettingsKeys
 
     public const string AutoBattleSettings = "AutoBattleSettings";
 
+    public const string IndependentTaskSettings = "IndependentTaskSettings";
+
     public const string RuntimeRecognitionSettings = "RuntimeRecognitionSettings";
 
     public const string HotkeySettings = "HotkeySettings";

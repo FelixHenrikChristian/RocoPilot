@@ -103,6 +103,7 @@ public partial class App : Application
                 provider => provider.GetRequiredService<StatisticsUidRuntimeTaskService>());
             services.AddSingleton<IStatisticsUidCoordinatorService>(
                 provider => provider.GetRequiredService<StatisticsUidRuntimeTaskService>());
+            services.AddSingleton<IIndependentTaskService, IndependentTaskService>();
             services.AddSingleton<IHotkeyService, HotkeyService>();
             services.AddSingleton<IRecognitionOverlayService, RecognitionOverlayService>();
             services.AddSingleton<InfoOverlayService>();
@@ -138,6 +139,8 @@ public partial class App : Application
             services.AddTransient<MainPage>();
             services.AddSingleton<RealtimeViewModel>();
             services.AddTransient<RealtimePage>();
+            services.AddSingleton<TasksViewModel>();
+            services.AddTransient<TasksPage>();
             services.AddSingleton<StatisticsViewModel>();
             services.AddTransient<StatisticsPage>();
             services.AddSingleton<LogViewModel>();

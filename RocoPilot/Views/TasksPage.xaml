@@ -1,0 +1,223 @@
+<Page
+    x:Class="RocoPilot.Views.TasksPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:helpers="using:RocoPilot.Helpers"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
+            <StackPanel
+                Padding="{StaticResource NavigationViewPageContentPadding}"
+                Spacing="16">
+
+                <Expander Style="{StaticResource CardExpanderStyle}">
+                    <Expander.Header>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <FontIcon
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="20"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE7FC;" />
+
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="3">
+                                <TextBlock
+                                    FontWeight="SemiBold"
+                                    Text="首领战斗"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="按配置次数自动挑战每日首领；需先在启动页启动任务，运行期间实时识别自动暂停。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Command="{x:Bind ViewModel.ToggleBossBattleCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="{x:Bind ViewModel.BossBattleButtonGlyph, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.BossBattleButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Expander.Header>
+
+                    <StackPanel Spacing="0">
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE8EE;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="执行次数" TextWrapping="Wrap" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="单次启动连续挑战的场数；每日体力通常仅支持 3 次。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <NumberBox
+                                    Width="140"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{x:Bind ViewModel.IsBossBattleConfigurationEnabled, Mode=OneWay}"
+                                    Maximum="99"
+                                    Minimum="1"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    Value="{x:Bind ViewModel.BossBattleRunCount, Mode=TwoWay}" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="次" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+
+                <Expander Style="{StaticResource CardExpanderStyle}">
+                    <Expander.Header>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <FontIcon
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="20"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xE734;" />
+
+                            <StackPanel
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Spacing="3">
+                                <TextBlock
+                                    FontWeight="SemiBold"
+                                    Text="传说精灵挑战"
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="按配置次数自动挑战传说精灵；需先在启动页启动任务，运行期间实时识别自动暂停。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Command="{x:Bind ViewModel.ToggleLegendaryChallengeCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="{x:Bind ViewModel.LegendaryChallengeButtonGlyph, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.LegendaryChallengeButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Expander.Header>
+
+                    <StackPanel Spacing="0">
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                Grid.Column="0"
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE8EE;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="执行次数" TextWrapping="Wrap" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="单次启动连续挑战的场数；每周体力通常仅支持 3 次。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <NumberBox
+                                    Width="140"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                    Maximum="99"
+                                    Minimum="1"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    Value="{x:Bind ViewModel.LegendaryChallengeRunCount, Mode=TwoWay}" />
+                                <TextBlock
+                                    VerticalAlignment="Center"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="次" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+
+        <InfoBar
+            Margin="{StaticResource NavigationViewPageContentPadding}"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Bottom"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsClosable="False"
+            IsOpen="{x:Bind ViewModel.IsTaskNotificationOpen, Mode=TwoWay}"
+            Message="{x:Bind ViewModel.TaskNotificationMessage, Mode=OneWay}"
+            Severity="{x:Bind ViewModel.TaskNotificationSeverity, Mode=OneWay}"
+            Title="{x:Bind ViewModel.TaskNotificationTitle, Mode=OneWay}" />
+    </Grid>
+</Page>

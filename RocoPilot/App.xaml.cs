@@ -23,6 +23,7 @@ using RocoPilot.Services.Capture.Backends;
 using RocoPilot.Services.Encounters;
 using RocoPilot.Services.ImageMatching;
 using RocoPilot.Services.Recognition;
+using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.Spirits;
 using RocoPilot.Services.Statistics;
 using RocoPilot.Services.TextRecognition;
@@ -98,11 +99,18 @@ public partial class App : Application
             services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();
-            services.AddSingleton<StatisticsUidRuntimeTaskService>();
-            services.AddSingleton<IRuntimeTaskService>(
-                provider => provider.GetRequiredService<StatisticsUidRuntimeTaskService>());
+            services.AddSingleton<RuntimeDebugLogger>();
+            services.AddSingleton<RuntimeFrameRecognizer>();
+            services.AddSingleton<BattleScreenRecognizer>();
+            services.AddSingleton<AutoBattleInputExecutor>();
+            services.AddSingleton<StatisticsUidCoordinatorService>();
+            services.AddSingleton<IRuntimeSessionControl>(provider => provider.GetRequiredService<RuntimeTaskService>());
+            services.AddSingleton<IRuntimeTaskService>(provider => new RuntimeCoordinator(
+                provider.GetRequiredService<RuntimeTaskService>(),
+                provider.GetRequiredService<IIndependentTaskService>(),
+                provider.GetRequiredService<StatisticsUidCoordinatorService>()));
             services.AddSingleton<IStatisticsUidCoordinatorService>(
-                provider => provider.GetRequiredService<StatisticsUidRuntimeTaskService>());
+                provider => provider.GetRequiredService<StatisticsUidCoordinatorService>());
             services.AddSingleton<IIndependentTaskService, IndependentTaskService>();
             services.AddSingleton<IHotkeyService, HotkeyService>();
             services.AddSingleton<IRecognitionOverlayService, RecognitionOverlayService>();

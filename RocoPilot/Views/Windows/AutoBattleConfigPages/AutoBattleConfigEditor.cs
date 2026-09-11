@@ -172,12 +172,12 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         NormalReleaseItems.CollectionChanged += NormalReleaseItems_CollectionChanged;
         SharedPresetItems.CollectionChanged += SharedPresetItems_CollectionChanged;
 
-        LoadSettings(settings);
+        LoadSettings(AutoBattleSettingsRules.Normalize(settings));
     }
 
     public void AppendNormalSkill(string? skillKey)
     {
-        if (NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
+        if (AutoBattleSettingsRules.NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
         {
             NormalReleaseItems.Add(AutoBattleReleaseEditorItem.CreateSkill(normalizedSkillKey));
         }
@@ -515,7 +515,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             return AutoBattleReleaseEditorItem.CreateCustom(step.Name, step.Sequence);
         }
 
-        var skillKey = NormalizeSkillKey(step.SkillKey) ?? "1";
+        var skillKey = AutoBattleSettingsRules.NormalizeSkillKey(step.SkillKey) ?? "1";
         if (!string.IsNullOrWhiteSpace(turnSequence)
             && !string.Equals(
                 turnSequence.Trim(),
@@ -524,7 +524,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         {
             return AutoBattleReleaseEditorItem.CreateCustom(
                 skillKey,
-                ApplyTurnSequence(turnSequence, skillKey));
+                AutoBattleSettingsRules.BuildTurnSequence(turnSequence, skillKey));
         }
 
         return AutoBattleReleaseEditorItem.CreateSkill(skillKey);
@@ -535,7 +535,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         var skillKeys = releaseSequence
             .Where(step => !step.IsCustom)
             .Select(step => step.SkillKey)
-            .Where(skillKey => NormalizeSkillKey(skillKey) is not null)
+            .Where(skillKey => AutoBattleSettingsRules.NormalizeSkillKey(skillKey) is not null)
             .ToArray();
 
         return skillKeys.Length == 0
@@ -543,31 +543,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             : string.Join(", ", skillKeys);
     }
 
-    private static string ApplyTurnSequence(string turnSequence, string skillKey)
-    {
-        var normalized = string.IsNullOrWhiteSpace(turnSequence)
-            ? AutoBattleSettings.DefaultTurnSequence
-            : turnSequence.Trim();
-        return normalized.Contains(SkillPlaceholder, StringComparison.OrdinalIgnoreCase)
-            ? normalized.Replace(
-                SkillPlaceholder,
-                skillKey,
-                StringComparison.OrdinalIgnoreCase)
-            : normalized;
-    }
-
-    private static string? NormalizeSkillKey(string? skillKey)
-    {
-        if (string.IsNullOrWhiteSpace(skillKey))
-        {
-            return null;
-        }
-
-        var normalized = skillKey.Trim().ToUpperInvariant();
-        return normalized is "1" or "2" or "3" or "4" or "X"
-            ? normalized
-            : null;
-    }
 }
 
 internal enum AutoBattleConfigSection
@@ -668,5 +643,4 @@ internal sealed class AutoBattlePresetEditorItem : ObservableObject
         set => SetProperty(ref _sequence, value);
     }
 }
-
 

@@ -1,102 +1,36 @@
 using Microsoft.Extensions.Logging;
-
 using RocoPilot.Configuration;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.RuntimeTasks;
+using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
+using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
 
 public sealed partial class RuntimeTaskService
 {
-    private const string BattleChatTemplateName = "battle-chat.png";
-    private const string BattleSkillTemplateName = "battle-button-skill.png";
-    private const string BattleChangeTemplateName = "battle-button-change.png";
-    private const string AutoBattleCaptureSequence = "W, 1, Space";
-    private const string AutoBattleSkillPlaceholder = "{skill}";
-
-    private static readonly TimeSpan AutoBattleSkillReleaseFailureCheckDelay = TimeSpan.FromMilliseconds(500);
-    private static readonly TimeSpan AutoBattleShinySuspendScanInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan AutoBattlePetSwitchConfirmDelay = TimeSpan.FromMilliseconds(1500);
     private static readonly TimeSpan AutoBattlePetSwitchStateCheckDelay = TimeSpan.FromMilliseconds(1500);
-    private static readonly string[] AutoBattleDefaultRoundOrder =
-    [
-        "1",
-        "2",
-        "3",
-        "4",
-        "X"
-    ];
-    private static readonly string[] BattleChatRegionIds =
-    [
-        RecognitionRegionIds.BattleChatButton
-    ];
-    private static readonly string[] BattleSkillRegionIds =
-    [
-        RecognitionRegionIds.BattleSkillButton
-    ];
-    private static readonly string[] BattleChangeRegionIds =
-    [
-        RecognitionRegionIds.BattleChangeButton
-    ];
-    private static readonly ImageMatchOptions BattleChatMatchOptions = new()
-    {
-        MinimumScore = 0.88,
-        AlphaThreshold = 16,
-        SearchStep = 1
-    };
-    private static readonly ImageMatchOptions BattleSkillMatchOptions = new()
-    {
-        MinimumScore = 0.88,
-        AlphaThreshold = 16,
-        SearchStep = 1
-    };
-    private static readonly ImageMatchOptions BattleChangeMatchOptions = new()
-    {
-        MinimumScore = 0.88,
-        AlphaThreshold = 16,
-        SearchStep = 1
-    };
 
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
-    private int _autoBattleRoundIndex;
-    private int _autoBattleTurnNumber;
-    private int _currentAutoBattleTurnNumber;
-    private bool _wasAutoBattleSkillSelectionVisible;
-    private bool _wasAutoBattlePetSwitchingVisible;
+    private readonly AutoBattleController _battle = new();
     private bool _hasLoggedCurrentAutoBattleTurnAction;
     private bool _hasLoggedCurrentAutoBattleCaptureButtonObservation;
-    private DateTimeOffset? _autoBattleSkillSelectionVisibleSince;
-    private DateTimeOffset? _lastAutoBattleSkillSelectionActionAt;
-    private AutoBattleReleaseStep? _currentAutoBattleReleaseStep;
-    private AutoBattleSkillSelectionAction _autoBattleSkillSelectionAction;
-    private Task<AutoBattleSkillSelectionEnemyNameResult>? _autoBattleSkillSelectionEnemyNameTask;
-    private int _autoBattleSkillSelectionEnemyNameTaskTurnNumber;
-    private bool _hasAutoBattleSkillSelectionEnemyNameResult;
     private bool _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction;
-    private bool _isAutoBattleEncounterRelieved;
-    private bool _isAutoBattleSuspendedForShiny;
-    private DateTimeOffset _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
-
-    // 血脉筛选会话状态（识别结果由当前赛季实现写入，如 S3EncounterBloodlineRecognition）
-    private static readonly TimeSpan BloodlineTipWaitTimeout = TimeSpan.FromSeconds(4);
-    private readonly object _bloodlineStateLock = new();
-    private bool _hasEncounterBloodlineTip;
-    private EncounterBloodlineKind _encounterBloodlineKind = EncounterBloodlineKind.Unrecognized;
-    private DateTimeOffset? _bloodlineTipWaitStartedAt;
-    private bool _hasLockedBloodlineCaptureDecision;
-    private EncounterBloodlineKind _lockedBloodlineKind = EncounterBloodlineKind.Unrecognized;
-    private bool _lockedShouldCapture;
+    private Task<AutoBattleSkillSelectionEnemyNameResult>? _autoBattleSkillSelectionEnemyNameTask;
+    private long _autoBattleSkillSelectionEnemyNameTaskTurnId;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
     public void SetAutoBattleSettings(AutoBattleSettings settings)
     {
         var previousIsEnabled = _autoBattleSettings.IsEnabled;
-        _autoBattleSettings = NormalizeAutoBattleSettings(settings);
-        if (!RequiresAutoBattleEncounterRelieveDetection(_autoBattleSettings.EncounterRelievedAction))
+        _autoBattleSettings = AutoBattleSettingsRules.Normalize(settings);
+        if (!AutoBattleSettingsRules.RequiresReliefDetection(_autoBattleSettings.EncounterRelievedAction))
         {
             ResetAutoBattleEncounterRelievedActionState();
         }
@@ -122,217 +56,51 @@ public sealed partial class RuntimeTaskService
     }
 
     private async Task HandleAutoBattleSkillSelectionAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
+        RuntimeTaskState state, CapturedFrame frame, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.Now;
-        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-
-        if (!_wasAutoBattleSkillSelectionVisible)
+        var settings = _autoBattleSettings;
+        if (_battle.Phase != AutoBattlePhase.SkillSelection)
         {
             BeginAutoBattleSkillSelectionTurn(settings, now);
             return;
         }
 
-        if (!await EnsureAutoBattleSkillSelectionEnemyNameResultAsync(
-            state,
-            frame,
-            settings,
-            now,
-            cancellationToken))
-        {
-            return;
-        }
-
-        if (_isAutoBattleSuspendedForShiny || !settings.IsEnabled)
-        {
-            return;
-        }
-
-        if (!ShouldRunAutoBattleSkillSelectionAction(settings, now))
-        {
-            return;
-        }
-
-        if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
-        {
-            return;
-        }
+        if (!await EnsureAutoBattleSkillSelectionEnemyNameResultAsync(state, frame, settings, now, cancellationToken)
+            || !_battle.CanAct(settings, now)
+            || !await _autoBattleActionLock.WaitAsync(0, cancellationToken)) return;
 
         try
         {
-            if (_isAutoBattleSuspendedForShiny)
+            var turn = _battle.CurrentTurn;
+            if (turn is null || _battle.IsSuspendedForShiny) return;
+            var plan = _battle.PlanSkillSelection(settings, IsCurrentSeasonBloodlineTipAvailable(), now);
+            if (plan.Action == AutoBattleAction.Skill && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
             {
+                LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForUnconfirmedEncounterRelief");
                 return;
             }
-
-            if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
-            {
-                _logger.LogWarning("自动战斗未执行：目标游戏窗口句柄已失效。");
-                return;
-            }
-
-            var releaseStep = _currentAutoBattleReleaseStep ?? GetCurrentAutoBattleReleaseStep(settings);
-            var plan = BuildAutoBattleSkillSelectionPlan(settings, releaseStep);
-            if (plan.Action == AutoBattleSkillSelectionAction.Skill
-                && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
-            {
-                LogEncounterCaptureButtonDecisionForCurrentTurn(
-                    "HoldForUnconfirmedEncounterRelief");
-                return;
-            }
-
-            // 血脉筛选等待提示：不推进回合、不写入重试时间，下一帧继续判定。
-            if (plan.Action == AutoBattleSkillSelectionAction.None)
+            if (plan.Action == AutoBattleAction.None)
             {
                 LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForBloodlineTip");
                 return;
             }
+            if (plan.ShouldSendKeys
+                && !await _battleInput.ExecuteAsync(state.TargetWindow.Hwnd, settings, plan, cancellationToken)) return;
+            if (!_battle.RecordAction(turn.Id, plan.Action, DateTimeOffset.Now)) return;
 
-            if (!plan.ShouldSendKeys)
-            {
-                if (_autoBattleSkillSelectionAction != plan.Action)
-                {
-                    LogAutoBattleTurnAction(plan.Description);
-                }
-
-                _autoBattleSkillSelectionAction = plan.Action;
-                _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
-                LogEncounterCaptureButtonDecisionForCurrentTurn(plan.Action.ToString());
-                return;
-            }
-
-            if (!_keyboardInputService.TryParseSequence(plan.Sequence, out var keyStrokes, out var parseError)
-                || keyStrokes.Count == 0)
-            {
-                _logger.LogWarning(
-                    "自动战斗单回合序列无效。ReleaseStep={ReleaseStep}, Sequence={Sequence}, Error={Error}",
-                    GetAutoBattleReleaseStepDisplay(releaseStep),
-                    plan.Sequence,
-                    parseError);
-                keyStrokes = plan.Action == AutoBattleSkillSelectionAction.Skill
-                    && !releaseStep.IsCustom
-                    && _keyboardInputService.TryParseSequence(releaseStep.SkillKey, out var fallbackStrokes, out _)
-                    ? fallbackStrokes
-                    : [];
-            }
-
-            if (keyStrokes.Count == 0)
-            {
-                return;
-            }
-
-            if (ShouldSkipAutoBattleKeyboardInput(state, settings))
-            {
-                return;
-            }
-
-            await _keyboardInputService.SendSequenceAsync(
-                state.TargetWindow.Hwnd,
-                keyStrokes,
-                plan.InputOptions,
-                cancellationToken);
-
-            _autoBattleSkillSelectionAction = plan.Action;
-            _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
             LogEncounterCaptureButtonDecisionForCurrentTurn(plan.Action.ToString());
-
-            LogAutoBattleTurnAction(plan.Description, plan.Sequence);
-            _logger.LogDebug(
-                "自动战斗按键已发送：ReleaseStep={ReleaseStep}, Sequence={Sequence}, Action={Action}, KeyStrokeCount={KeyStrokeCount}, RoundIndex={RoundIndex}",
-                plan.DisplayKey,
-                plan.Sequence,
-                _autoBattleSkillSelectionAction,
-                keyStrokes.Count,
-                _autoBattleRoundIndex);
+            if (plan.ShouldSendKeys || turn.Action != plan.Action)
+                LogAutoBattleTurnAction(plan.Description, plan.ShouldSendKeys ? plan.Sequence : null);
         }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "自动战斗技能释放失败。");
-        }
-        finally
-        {
-            _autoBattleActionLock.Release();
-        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { _logger.LogWarning(ex, "自动战斗技能释放失败。"); }
+        finally { _autoBattleActionLock.Release(); }
     }
 
     private bool ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief()
     {
         return _encounterCaptureButtonStateTracker.ShouldHoldAttackForUnconfirmedRelief;
-    }
-
-    private void RememberEncounterBloodlineTip(EncounterBloodlineKind kind)
-    {
-        lock (_bloodlineStateLock)
-        {
-            if (_hasEncounterBloodlineTip
-                || _hasLockedBloodlineCaptureDecision
-                || kind == EncounterBloodlineKind.Unrecognized)
-            {
-                return;
-            }
-
-            _hasEncounterBloodlineTip = true;
-            _encounterBloodlineKind = kind;
-            _bloodlineTipWaitStartedAt = null;
-        }
-    }
-
-    private bool TryResolveBloodlineCaptureDecision(
-        BloodlineCaptureFilterSettings filter,
-        out EncounterBloodlineKind kind,
-        out bool shouldCapture)
-    {
-        lock (_bloodlineStateLock)
-        {
-            if (_hasLockedBloodlineCaptureDecision)
-            {
-                kind = _lockedBloodlineKind;
-                shouldCapture = _lockedShouldCapture;
-                return true;
-            }
-
-            if (_hasEncounterBloodlineTip)
-            {
-                kind = _encounterBloodlineKind;
-                shouldCapture = filter.ShouldCapture(kind);
-                LockBloodlineCaptureDecision(kind, shouldCapture);
-                return true;
-            }
-
-            // 当前赛季没有可用血脉识别实现时，直接按未识别处理（含旧赛季残留奇遇）。
-            if (!IsCurrentSeasonBloodlineTipAvailable())
-            {
-                kind = EncounterBloodlineKind.Unrecognized;
-                shouldCapture = filter.ShouldCapture(kind);
-                LockBloodlineCaptureDecision(kind, shouldCapture);
-                return true;
-            }
-
-            _bloodlineTipWaitStartedAt ??= DateTimeOffset.Now;
-            if (DateTimeOffset.Now - _bloodlineTipWaitStartedAt.Value >= BloodlineTipWaitTimeout)
-            {
-                kind = EncounterBloodlineKind.Unrecognized;
-                shouldCapture = filter.ShouldCapture(kind);
-                LockBloodlineCaptureDecision(kind, shouldCapture);
-                return true;
-            }
-
-            kind = EncounterBloodlineKind.Unrecognized;
-            shouldCapture = false;
-            return false;
-        }
-    }
-
-    private void LockBloodlineCaptureDecision(EncounterBloodlineKind kind, bool shouldCapture)
-    {
-        _hasLockedBloodlineCaptureDecision = true;
-        _lockedBloodlineKind = kind;
-        _lockedShouldCapture = shouldCapture;
     }
 
     private bool IsCurrentSeasonBloodlineTipAvailable()
@@ -346,43 +114,24 @@ public sealed partial class RuntimeTaskService
                 StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string GetEncounterBloodlineDisplayName(EncounterBloodlineKind kind)
-    {
-        // 展示名由当前赛季识别实现提供；无实现时使用通用文案。
-        return S3EncounterBloodlineRecognition.GetDisplayName(kind);
-    }
-
-    private void ResetEncounterBloodlineState()
-    {
-        lock (_bloodlineStateLock)
-        {
-            _hasEncounterBloodlineTip = false;
-            _encounterBloodlineKind = EncounterBloodlineKind.Unrecognized;
-            _bloodlineTipWaitStartedAt = null;
-            _hasLockedBloodlineCaptureDecision = false;
-            _lockedBloodlineKind = EncounterBloodlineKind.Unrecognized;
-            _lockedShouldCapture = false;
-        }
-    }
-
     private async Task HandleAutoBattlePetSwitchingAsync(
         RuntimeTaskState state,
         CancellationToken cancellationToken)
     {
-        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
+        var settings = _autoBattleSettings;
         if (!settings.IsEnabled)
         {
-            _wasAutoBattlePetSwitchingVisible = true;
+            _battle.ObservePetSwitching(true);
             return;
         }
 
-        if (_isAutoBattleSuspendedForShiny)
+        if (_battle.IsSuspendedForShiny)
         {
-            _wasAutoBattlePetSwitchingVisible = true;
+            _battle.ObservePetSwitching(true);
             return;
         }
 
-        if (_wasAutoBattlePetSwitchingVisible)
+        if (_battle.Phase == AutoBattlePhase.PetSwitching)
         {
             return;
         }
@@ -406,16 +155,16 @@ public sealed partial class RuntimeTaskService
             }
 
             BeginAutoBattlePetSwitchingTurn(settings);
-            _wasAutoBattlePetSwitchingVisible = true;
+            _battle.ObservePetSwitching(true);
 
-            var keyboardInputOptions = CreateAutoBattleKeyboardInputOptions(settings);
+            var keyboardInputOptions = AutoBattleInputExecutor.CreateOptions(settings);
             for (var slot = 1; slot <= 6; slot++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (ShouldSkipAutoBattleKeyboardInput(state, settings))
                 {
-                    _wasAutoBattlePetSwitchingVisible = false;
+                    _battle.ObservePetSwitching(false);
                     return;
                 }
 
@@ -431,7 +180,7 @@ public sealed partial class RuntimeTaskService
 
                 if (ShouldSkipAutoBattleKeyboardInput(state, settings))
                 {
-                    _wasAutoBattlePetSwitchingVisible = false;
+                    _battle.ObservePetSwitching(false);
                     return;
                 }
 
@@ -450,7 +199,7 @@ public sealed partial class RuntimeTaskService
                     return;
                 }
 
-                if (await IsBattlePetSwitchingAsync(state, frame, cancellationToken))
+                if (await _battleScreen.IsBattlePetSwitchingAsync(state, frame, cancellationToken))
                 {
                     _logger.LogDebug("自动战斗换精灵：第 {Slot} 只精灵确认后仍在切换界面，继续尝试下一只", slot);
                     continue;
@@ -477,21 +226,12 @@ public sealed partial class RuntimeTaskService
 
     private void BeginAutoBattleSkillSelectionTurn(AutoBattleSettings settings, DateTimeOffset now)
     {
-        _autoBattleTurnNumber++;
-        _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
-        _hasLoggedCurrentAutoBattleTurnAction = false;
-        _hasLoggedCurrentAutoBattleCaptureButtonObservation = false;
-        _wasAutoBattleSkillSelectionVisible = true;
-        _autoBattleSkillSelectionVisibleSince = now;
-        _lastAutoBattleSkillSelectionActionAt = null;
-        _currentAutoBattleReleaseStep = GetCurrentAutoBattleReleaseStep(settings);
-        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
+        ClearAutoBattleTurnWork();
+        var turn = _battle.BeginSkillSelection(settings, now);
         _logger.LogDebug(
             "自动战斗：进入第 {TurnNumber} 回合技能选择，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
-            _currentAutoBattleTurnNumber,
-            settings.SkillSelectionActionDelayMs,
-            GetAutoBattleReleaseStepDisplay(_currentAutoBattleReleaseStep),
-            _autoBattleRoundIndex);
+            turn.Number, settings.SkillSelectionActionDelayMs,
+            AutoBattleSettingsRules.GetReleaseStepDisplay(turn.ReleaseStep), _battle.RoundIndex);
     }
 
     private async Task<bool> EnsureAutoBattleSkillSelectionEnemyNameResultAsync(
@@ -501,31 +241,19 @@ public sealed partial class RuntimeTaskService
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (_hasAutoBattleSkillSelectionEnemyNameResult)
-        {
-            return true;
-        }
-
-        if (!_autoBattleSkillSelectionVisibleSince.HasValue)
-        {
-            _autoBattleSkillSelectionVisibleSince = now;
-            return false;
-        }
-
-        if (now - _autoBattleSkillSelectionVisibleSince.Value
-            < TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs))
-        {
-            return false;
-        }
+        var turn = _battle.CurrentTurn;
+        if (turn is null) return false;
+        if (turn.EnemyNameResolved) return true;
+        if (!_battle.IsEnemyNameRecognitionDue(settings, now)) return false;
 
         if (_autoBattleSkillSelectionEnemyNameTask is null
-            || _autoBattleSkillSelectionEnemyNameTaskTurnNumber != _currentAutoBattleTurnNumber)
+            || _autoBattleSkillSelectionEnemyNameTaskTurnId != turn.Id)
         {
             _autoBattleSkillSelectionEnemyNameTask = StartAutoBattleSkillSelectionEnemyNameRecognitionAsync(
                 state,
                 frame,
                 cancellationToken);
-            _autoBattleSkillSelectionEnemyNameTaskTurnNumber = _currentAutoBattleTurnNumber;
+            _autoBattleSkillSelectionEnemyNameTaskTurnId = turn.Id;
             return false;
         }
 
@@ -550,10 +278,11 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
+        if (_battle.CurrentTurn?.Id != turn.Id) return false;
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
-            _hasAutoBattleSkillSelectionEnemyNameResult = true;
+            _battle.ConfirmEnemyName(turn.Id);
             return true;
         }
 
@@ -561,14 +290,14 @@ public sealed partial class RuntimeTaskService
         {
             if (_encounterCaptureButtonStateTracker.HasSeenDisabled)
             {
-                _hasAutoBattleSkillSelectionEnemyNameResult = true;
+                _battle.ConfirmEnemyName(turn.Id);
                 _logger.LogDebug(
                     "自动战斗：捕捉按钮处于禁用阶段，按奇遇第一形态继续普通战斗。EnemyNameRaw={EnemyNameRaw}",
                     FormatLogText(result.RawText));
                 return true;
             }
 
-            LogDebugOncePerValue(
+            _debugLog.Write(
                 CreateDebugLogKey("auto-battle-skill-selection-enemy-missing", season.Id),
                 CreateTextDebugFingerprint(result.RawText),
                 "自动战斗技能选择精灵名筛选：EnemyNameRaw={EnemyNameRaw}, 未匹配到有效精灵名，等待下一轮 OCR。",
@@ -581,7 +310,7 @@ public sealed partial class RuntimeTaskService
             season,
             result,
             cancellationToken);
-        _hasAutoBattleSkillSelectionEnemyNameResult = true;
+        _battle.ConfirmEnemyName(turn.Id);
         return true;
     }
 
@@ -602,12 +331,13 @@ public sealed partial class RuntimeTaskService
                 string.Empty));
         }
 
-        return Task.Run(
+        var session = _session ?? throw new InvalidOperationException("运行会话已结束。");
+        return session.RunBackground(
             async () =>
             {
                 using (frameReference)
                 {
-                    var rawText = await RecognizeRegionTextAsync(
+                    var rawText = await _frameRecognizer.RecognizeRegionTextAsync(
                         state,
                         frameReference,
                         BattleEnemyNameRegionIds,
@@ -621,8 +351,7 @@ public sealed partial class RuntimeTaskService
                         rawText,
                         matchedName);
                 }
-            },
-            cancellationToken);
+            });
     }
 
     private async Task ApplyAutoBattleSkillSelectionEnemyNameResultAsync(
@@ -632,7 +361,7 @@ public sealed partial class RuntimeTaskService
     {
         var matchedName = result.MatchedName;
         var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
-        LogDebugOncePerValue(
+        _debugLog.Write(
             CreateDebugLogKey("auto-battle-skill-selection-enemy", season.Id),
             string.Join(
                 "|",
@@ -653,63 +382,23 @@ public sealed partial class RuntimeTaskService
     private void ResetAutoBattleSkillSelectionEnemyNameTask()
     {
         _autoBattleSkillSelectionEnemyNameTask = null;
-        _autoBattleSkillSelectionEnemyNameTaskTurnNumber = 0;
+        _autoBattleSkillSelectionEnemyNameTaskTurnId = 0;
     }
 
     private void BeginAutoBattlePetSwitchingTurn(AutoBattleSettings settings)
     {
-        var releaseStep = GetCurrentAutoBattleReleaseStep(settings);
-        _autoBattleTurnNumber++;
-        _currentAutoBattleTurnNumber = _autoBattleTurnNumber;
+        var step = _battle.BeginPetSwitching(settings);
         _hasLoggedCurrentAutoBattleTurnAction = false;
-        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
-
-        LogAutoBattleTurnAction(
-            $"切换精灵，本回合不释放技能，下回合继续 {GetAutoBattleReleaseStepDisplay(releaseStep)}");
-        _logger.LogDebug(
-            "自动战斗：进入第 {TurnNumber} 回合切换精灵，不推进释放顺序。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
-            _currentAutoBattleTurnNumber,
-            GetAutoBattleReleaseStepDisplay(releaseStep),
-            _autoBattleRoundIndex);
+        LogAutoBattleTurnAction($"切换精灵，本回合不释放技能，下回合继续 {AutoBattleSettingsRules.GetReleaseStepDisplay(step)}");
     }
 
     private async Task<bool> TryHandleAutoBattleSkillReleaseFailureAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
+        RuntimeTaskState state, CapturedFrame frame, CancellationToken cancellationToken)
     {
-        var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-        if (!settings.IsEnabled
-            || _isAutoBattleSuspendedForShiny
-            || _autoBattleSkillSelectionAction != AutoBattleSkillSelectionAction.Skill)
-        {
-            return false;
-        }
-
-        if (!_lastAutoBattleSkillSelectionActionAt.HasValue)
-        {
-            return false;
-        }
-
-        var now = DateTimeOffset.Now;
-        if (now - _lastAutoBattleSkillSelectionActionAt.Value < AutoBattleSkillReleaseFailureCheckDelay)
-        {
-            return false;
-        }
-
-        QueueAutoBattleSkillFailureTipRecognition(state, frame, _currentAutoBattleTurnNumber, cancellationToken);
-
-        if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken))
-        {
-            return false;
-        }
-
-        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.EnergyRecovery;
-
-        LogAutoBattleTurnAction(
-            "技能未离开选择界面，临时回能 X，原技能延后",
-            "X",
-            forceInformation: true);
+        if (!_battle.ShouldRecoverAfterSkillFailure(_autoBattleSettings, DateTimeOffset.Now)) return false;
+        QueueAutoBattleSkillFailureTipRecognition(state, frame, _battle.TurnNumber, cancellationToken);
+        if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken)) return false;
+        LogAutoBattleTurnAction("技能未离开选择界面，临时回能 X，原技能延后", "X", forceInformation: true);
         return true;
     }
 
@@ -744,14 +433,14 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        _ = Task.Run(
+        var recognitionTask = Task.Run(
             async () =>
             {
                 using (frameReference)
                 {
                     try
                     {
-                        var tipText = await RecognizeRegionTextAsync(
+                        var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
                             state,
                             frameReference,
                             BattleTipRegionIds,
@@ -779,81 +468,29 @@ public sealed partial class RuntimeTaskService
                     }
                 }
             });
+        _session?.Track(recognitionTask);
     }
 
     private bool ShouldSkipAutoBattleKeyboardInput(RuntimeTaskState state, AutoBattleSettings settings)
     {
-        if (!settings.IsEnabled
-            || !_keyboardInputService.RequiresForeground(settings.KeyboardInputMethod))
-        {
-            return false;
-        }
-
-        if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
-        {
-            return false;
-        }
-
-        if (_keyboardInputService.IsWindowForeground(state.TargetWindow.Hwnd))
-        {
-            return false;
-        }
-
-        _logger.LogDebug(
-            "自动战斗按键未发送：{InputMethod} 需要游戏窗口处于前台。",
-            settings.KeyboardInputMethod);
-        return true;
+        return _battle.IsSuspendedForShiny || !_autoBattleSettings.IsEnabled
+            || !_battleInput.CanSend(state.TargetWindow.Hwnd, settings);
     }
 
-    private async Task<bool> TrySendAutoBattleEnergyRecoveryAsync(
-        RuntimeTaskState state,
-        CancellationToken cancellationToken)
+    private async Task<bool> TrySendAutoBattleEnergyRecoveryAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
-        if (_isAutoBattleSuspendedForShiny)
-        {
-            return false;
-        }
-
-        if (!await _autoBattleActionLock.WaitAsync(0, cancellationToken))
-        {
-            return false;
-        }
-
+        if (_battle.IsSuspendedForShiny || !await _autoBattleActionLock.WaitAsync(0, cancellationToken)) return false;
         try
         {
-            if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
-            {
-                _logger.LogWarning("自动战斗回能未执行：目标游戏窗口句柄已失效。");
-                return false;
-            }
-
-            var settings = NormalizeAutoBattleSettings(_autoBattleSettings);
-            if (ShouldSkipAutoBattleKeyboardInput(state, settings))
-            {
-                return false;
-            }
-
-            await _keyboardInputService.SendSequenceAsync(
-                state.TargetWindow.Hwnd,
-                "X",
-                CreateAutoBattleKeyboardInputOptions(settings),
-                cancellationToken);
-            _lastAutoBattleSkillSelectionActionAt = DateTimeOffset.Now;
-            return true;
+            var turn = _battle.CurrentTurn;
+            if (turn is null || _battle.IsSuspendedForShiny) return false;
+            var plan = new AutoBattlePlan(AutoBattleAction.EnergyRecovery, "X", "临时回能", "X");
+            return await _battleInput.ExecuteAsync(state.TargetWindow.Hwnd, _autoBattleSettings, plan, cancellationToken)
+                && _battle.RecordAction(turn.Id, AutoBattleAction.EnergyRecovery, DateTimeOffset.Now);
         }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "自动战斗回能失败。");
-            return false;
-        }
-        finally
-        {
-            _autoBattleActionLock.Release();
-        }
+        catch (OperationCanceledException) { return false; }
+        catch (Exception ex) { _logger.LogWarning(ex, "自动战斗回能失败。"); return false; }
+        finally { _autoBattleActionLock.Release(); }
     }
 
     private void LogAutoBattleTurnAction(
@@ -861,13 +498,7 @@ public sealed partial class RuntimeTaskService
         string? sequence = null,
         bool forceInformation = false)
     {
-        var turnNumber = _currentAutoBattleTurnNumber > 0
-            ? _currentAutoBattleTurnNumber
-            : _autoBattleTurnNumber;
-        if (turnNumber <= 0)
-        {
-            turnNumber = 1;
-        }
+        var turnNumber = Math.Max(1, _battle.TurnNumber);
 
         if (!_hasLoggedCurrentAutoBattleTurnAction || forceInformation)
         {
@@ -904,78 +535,23 @@ public sealed partial class RuntimeTaskService
 
     private void CompleteAutoBattleSkillSelectionState()
     {
-        if (ShouldAdvanceAutoBattleReleaseSequence(_autoBattleSkillSelectionAction))
-        {
-            _autoBattleRoundIndex++;
-        }
-
-        ResetAutoBattleSkillSelectionState();
-    }
-
-    private static bool ShouldAdvanceAutoBattleReleaseSequence(AutoBattleSkillSelectionAction action)
-    {
-        return action == AutoBattleSkillSelectionAction.Skill;
-    }
-
-    private bool ShouldRunAutoBattleSkillSelectionAction(
-        AutoBattleSettings settings,
-        DateTimeOffset now)
-    {
-        if (!_autoBattleSkillSelectionVisibleSince.HasValue)
-        {
-            _autoBattleSkillSelectionVisibleSince = now;
-            return false;
-        }
-
-        var actionDelay = TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs);
-        if (now - _autoBattleSkillSelectionVisibleSince.Value < actionDelay)
-        {
-            return false;
-        }
-
-        if (!_lastAutoBattleSkillSelectionActionAt.HasValue)
-        {
-            return true;
-        }
-
-        return now - _lastAutoBattleSkillSelectionActionAt.Value
-            >= TimeSpan.FromMilliseconds(settings.SkillSelectionRetryDelayMs);
+        _battle.CompleteSkillSelection();
+        ClearAutoBattleTurnWork();
     }
 
     private void ResetAutoBattleBattleState()
     {
-        _autoBattleRoundIndex = 0;
-        _autoBattleTurnNumber = 0;
-        ResetAutoBattleSkillSelectionState();
-        ResetAutoBattleEncounterRelievedActionState();
-        ResetAutoBattleShinySuspendState();
-        _wasAutoBattlePetSwitchingVisible = false;
+        _battle.ResetBattle();
+        ClearAutoBattleTurnWork();
     }
 
-    private void ResetAutoBattleEncounterRelievedActionState()
-    {
-        _isAutoBattleEncounterRelieved = false;
-        ResetEncounterBloodlineState();
-    }
+    private void ResetAutoBattleEncounterRelievedActionState() => _battle.ResetEncounterRelief();
 
-    private void ResetAutoBattleShinySuspendState()
+    private void ClearAutoBattleTurnWork()
     {
-        _isAutoBattleSuspendedForShiny = false;
-        _nextAutoBattleShinySuspendScanAt = DateTimeOffset.MinValue;
-    }
-
-    private void ResetAutoBattleSkillSelectionState()
-    {
-        _wasAutoBattleSkillSelectionVisible = false;
-        _autoBattleSkillSelectionVisibleSince = null;
-        _lastAutoBattleSkillSelectionActionAt = null;
-        _currentAutoBattleReleaseStep = null;
-        _currentAutoBattleTurnNumber = 0;
+        ResetAutoBattleSkillSelectionEnemyNameTask();
         _hasLoggedCurrentAutoBattleTurnAction = false;
         _hasLoggedCurrentAutoBattleCaptureButtonObservation = false;
-        _autoBattleSkillSelectionAction = AutoBattleSkillSelectionAction.None;
-        ResetAutoBattleSkillSelectionEnemyNameTask();
-        _hasAutoBattleSkillSelectionEnemyNameResult = false;
         _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
     }
 

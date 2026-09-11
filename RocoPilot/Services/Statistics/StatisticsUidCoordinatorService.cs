@@ -8,168 +8,61 @@ using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Services;
 
-public sealed class StatisticsUidRuntimeTaskService :
-    IRuntimeTaskService,
+public sealed class StatisticsUidCoordinatorService :
     IStatisticsUidCoordinatorService
 {
-    private readonly RuntimeTaskService _runtimeTaskService;
     private readonly IStatisticsUidDetectionService _statisticsUidDetectionService;
     private readonly IStatisticsService _statisticsService;
     private readonly IInfoOverlayNotificationService _infoOverlayNotificationService;
-    private readonly ILogger<StatisticsUidRuntimeTaskService> _logger;
+    private readonly ILogger<StatisticsUidCoordinatorService> _logger;
     private StatisticsUidConfirmationRequest? _pendingConfirmation;
 
-    public StatisticsUidRuntimeTaskService(
-        RuntimeTaskService runtimeTaskService,
+    public StatisticsUidCoordinatorService(
         IStatisticsUidDetectionService statisticsUidDetectionService,
         IStatisticsService statisticsService,
         IInfoOverlayNotificationService infoOverlayNotificationService,
-        ILogger<StatisticsUidRuntimeTaskService> logger)
+        ILogger<StatisticsUidCoordinatorService> logger)
     {
-        _runtimeTaskService = runtimeTaskService;
         _statisticsUidDetectionService = statisticsUidDetectionService;
         _statisticsService = statisticsService;
         _infoOverlayNotificationService = infoOverlayNotificationService;
         _logger = logger;
     }
 
-    public event EventHandler? SettingsChanged
-    {
-        add => _runtimeTaskService.SettingsChanged += value;
-        remove => _runtimeTaskService.SettingsChanged -= value;
-    }
-
     public event EventHandler? PendingConfirmationChanged;
 
-    public bool IsRunning => _runtimeTaskService.IsRunning;
+    public StatisticsUidConfirmationRequest? PendingConfirmation => Volatile.Read(ref _pendingConfirmation);
 
-    public bool IsSuspended => _runtimeTaskService.IsSuspended;
-
-    public RuntimeTaskState? CurrentState => _runtimeTaskService.CurrentState;
-
-    public bool EncounterStatisticsEnabled => _runtimeTaskService.EncounterStatisticsEnabled;
-
-    public AutoBattleSettings AutoBattleSettings => _runtimeTaskService.AutoBattleSettings;
-
-    public RuntimeRecognitionSettings RuntimeRecognitionSettings =>
-        _runtimeTaskService.RuntimeRecognitionSettings;
-
-    public StatisticsUidConfirmationRequest? PendingConfirmation =>
-        Volatile.Read(ref _pendingConfirmation);
-
-    public async Task<RuntimeTaskStartResult> StartAsync(
-        RuntimeTaskStartOptions options,
-        CancellationToken cancellationToken = default)
+    internal async Task<StatisticsUidPreparation?> PrepareStartAsync(RuntimeTaskStartOptions options, CancellationToken cancellationToken)
     {
-        if (_runtimeTaskService.IsRunning)
-        {
-            return await _runtimeTaskService.StartAsync(options, cancellationToken);
-        }
-
-        ClearPendingConfirmation();
-        _infoOverlayNotificationService.UpdateUidNotice(null);
-        if (!options.EncounterStatisticsEnabled)
-        {
-            return await _runtimeTaskService.StartAsync(options, cancellationToken);
-        }
-
+        Clear();
+        if (!options.EncounterStatisticsEnabled) return null;
         var selectedAccountUid = await ResolveSelectedAccountUidAsync();
         _statisticsService.RequireActiveAccountSelection();
-        StatisticsUidPreparation preparation;
         try
         {
-            preparation = await PrepareStatisticsUidAsync(
-                options,
-                selectedAccountUid,
-                cancellationToken);
+            return await PrepareStatisticsUidAsync(options, selectedAccountUid, cancellationToken);
         }
-        catch (OperationCanceledException)
-        {
-            return RuntimeTaskStartResult.Failed("启动任务已取消。");
-        }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "准备首页启动使用的统计账号 UID 失败。");
-            preparation = new StatisticsUidPreparation(
+            return new StatisticsUidPreparation(
                 StatisticsUidDetectionResult.Failed("UID 识别准备失败。"),
-                new StatisticsUidSelectionDecision(
-                    StatisticsUidSelectionAction.RequireConfirmation,
-                    null,
-                    "UID 识别准备失败。"),
-                options.CaptureMethod,
-                options.TextRecognitionMethod);
-        }
-
-        var startResult = await _runtimeTaskService.StartAsync(options, cancellationToken);
-        if (!startResult.Success || startResult.State is null)
-        {
-            ClearPendingConfirmation();
-            _infoOverlayNotificationService.UpdateUidNotice(null);
-            return startResult;
-        }
-
-        var uidMessage = CompleteStatisticsUidSelection(preparation);
-        var message = string.IsNullOrWhiteSpace(uidMessage)
-            ? startResult.Message
-            : $"{startResult.Message} {uidMessage}";
-        return RuntimeTaskStartResult.Started(startResult.State, message);
-    }
-
-    public Task LoadSettingsAsync(CancellationToken cancellationToken = default)
-    {
-        return _runtimeTaskService.LoadSettingsAsync(cancellationToken);
-    }
-
-    public void SetEncounterStatisticsEnabled(bool isEnabled)
-    {
-        _runtimeTaskService.SetEncounterStatisticsEnabled(isEnabled);
-        if (!isEnabled)
-        {
-            ClearPendingConfirmation();
-            _infoOverlayNotificationService.UpdateUidNotice(null);
+                new StatisticsUidSelectionDecision(StatisticsUidSelectionAction.RequireConfirmation, null, "UID 识别准备失败。"),
+                options.CaptureMethod, options.TextRecognitionMethod);
         }
     }
 
-    public void SetRecognitionOverlayEnabled(bool isEnabled)
+    internal string CompleteStart(StatisticsUidPreparation? preparation)
     {
-        _runtimeTaskService.SetRecognitionOverlayEnabled(isEnabled);
+        return preparation is null ? string.Empty : CompleteStatisticsUidSelection(preparation);
     }
 
-    public void SetInfoOverlayEnabled(bool isEnabled)
-    {
-        _runtimeTaskService.SetInfoOverlayEnabled(isEnabled);
-    }
-
-    public void SetInfoOverlayLocked(bool isLocked)
-    {
-        _runtimeTaskService.SetInfoOverlayLocked(isLocked);
-    }
-
-    public void SetAutoBattleSettings(AutoBattleSettings settings)
-    {
-        _runtimeTaskService.SetAutoBattleSettings(settings);
-    }
-
-    public void SetRuntimeRecognitionSettings(RuntimeRecognitionSettings settings)
-    {
-        _runtimeTaskService.SetRuntimeRecognitionSettings(settings);
-    }
-
-    public async Task StopAsync()
+    internal void Clear()
     {
         ClearPendingConfirmation();
         _infoOverlayNotificationService.UpdateUidNotice(null);
-        await _runtimeTaskService.StopAsync();
-    }
-
-    public void Suspend(string reason)
-    {
-        _runtimeTaskService.Suspend(reason);
-    }
-
-    public void Resume()
-    {
-        _runtimeTaskService.Resume();
     }
 
     public void MarkPendingConfirmationPresented()
@@ -355,7 +248,7 @@ public sealed class StatisticsUidRuntimeTaskService :
         PendingConfirmationChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private sealed record StatisticsUidPreparation(
+    internal sealed record StatisticsUidPreparation(
         StatisticsUidDetectionResult DetectionResult,
         StatisticsUidSelectionDecision Decision,
         Models.Capture.CaptureMethod CaptureMethod,

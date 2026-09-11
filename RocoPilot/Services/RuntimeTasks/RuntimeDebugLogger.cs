@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 
 using RocoPilot.Helpers;
 
-namespace RocoPilot.Services;
+namespace RocoPilot.Services.RuntimeTasks;
 
-public sealed partial class RuntimeTaskService
+public sealed class RuntimeDebugLogger(ILogger<RuntimeDebugLogger> logger)
 {
     private const int DeduplicatedDebugLogSummaryMinimumRepeatCount = 3;
     private static readonly HashSet<string> SuppressedRecognitionDebugLogCategories = new(StringComparer.Ordinal)
@@ -44,7 +44,7 @@ public sealed partial class RuntimeTaskService
     private readonly object _deduplicatedDebugLogLock = new();
     private readonly Dictionary<string, DeduplicatedDebugLogState> _deduplicatedDebugLogs = [];
 
-    private void LogDebugOncePerValue(
+    public void Write(
         string key,
         string fingerprint,
         string message,
@@ -89,7 +89,7 @@ public sealed partial class RuntimeTaskService
 
         if (suppressedRepeatCount > 0)
         {
-            _logger.LogDebug(
+            logger.LogDebug(
                 "重复 Debug 日志已折叠：Key={LogKey}, Value={Value}, RepeatCount={RepeatCount}",
                 key,
                 suppressedFingerprint,
@@ -98,11 +98,11 @@ public sealed partial class RuntimeTaskService
 
         if (shouldLog)
         {
-            _logger.LogDebug(message, args);
+            logger.LogDebug(message, args);
         }
     }
 
-    private void ResetDeduplicatedDebugLogs()
+    public void Reset()
     {
         lock (_deduplicatedDebugLogLock)
         {
@@ -110,7 +110,7 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private static string CreateDebugLogKey(string category, params object?[] parts)
+    public static string CreateDebugLogKey(string category, params object?[] parts)
     {
         return $"{category}:{string.Join("|", parts.Select(part => part?.ToString() ?? "<null>"))}";
     }
@@ -124,23 +124,23 @@ public sealed partial class RuntimeTaskService
         return SuppressedRecognitionDebugLogCategories.Contains(category);
     }
 
-    private static string CreateTextDebugFingerprint(string? text)
+    public static string CreateTextDebugFingerprint(string? text)
     {
         var cleaned = TextMatchingHelper.CleanRecognizedText(text);
         return cleaned.Length == 0 ? "<empty>" : cleaned;
     }
 
-    private static string CreateBooleanDebugFingerprint(bool value)
+    public static string CreateBooleanDebugFingerprint(bool value)
     {
         return value ? "true" : "false";
     }
 
-    private static string CreateSimilarityDebugFingerprint(double value)
+    public static string CreateSimilarityDebugFingerprint(double value)
     {
         return Math.Clamp(value, 0, 1).ToString("F3", CultureInfo.InvariantCulture);
     }
 
-    private static string CreateMatchFilterDebugFingerprint(
+    public static string CreateMatchFilterDebugFingerprint(
         string? text,
         double similarity,
         bool isMatch)
@@ -158,4 +158,21 @@ public sealed partial class RuntimeTaskService
 
         public int RepeatCount { get; set; }
     }
+    public static string FormatLogText(string? text, int maximumLength = 120)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "<empty>";
+        }
+
+        var normalized = string.Join(
+            " ",
+            text
+                .Trim()
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= maximumLength
+            ? normalized
+            : $"{normalized[..maximumLength]}...";
+    }
+
 }

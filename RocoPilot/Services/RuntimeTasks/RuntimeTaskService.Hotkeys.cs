@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-
 using RocoPilot.Models.Hotkeys;
 using RocoPilot.Models.Runtime;
 

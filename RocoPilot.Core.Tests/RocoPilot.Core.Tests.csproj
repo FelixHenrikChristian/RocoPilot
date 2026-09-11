@@ -1,0 +1,12 @@
+<Project Sdk="MSTest.Sdk/4.3.0">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <UseVSTest>true</UseVSTest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../RocoPilot.Core/RocoPilot.Core.csproj" />
+  </ItemGroup>
+</Project>

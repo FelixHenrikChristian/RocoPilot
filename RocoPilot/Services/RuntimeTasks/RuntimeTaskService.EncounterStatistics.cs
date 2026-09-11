@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-
 using RocoPilot.Configuration;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
@@ -8,6 +7,9 @@ using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.RuntimeTasks;
+using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
+using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
 
@@ -141,6 +143,7 @@ public sealed partial class RuntimeTaskService
     private async Task UpdateRuntimeEncounterOcrSignalsAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
+        long battleId,
         CancellationToken cancellationToken)
     {
         var season = _encounterSeasonConfigService.GetCurrentSeason();
@@ -153,26 +156,30 @@ public sealed partial class RuntimeTaskService
             state,
             frame,
             season,
+            battleId,
             cancellationToken);
         var battleTipTask = TryLogBattleTipAsync(
             state,
             frame,
             season,
             cancellationToken);
-        var s3EncounterTipTask = TryLogS3EncounterTipAsync(
+        var s3EncounterTipTask = RecognizeAndApplyBloodlineTipAsync(
             state,
             frame,
             season,
+            battleId,
             cancellationToken);
 
         await Task.WhenAll(
             shinyTipTask,
             battleTipTask,
             s3EncounterTipTask);
+        if (battleId != _battle.BattleId) return;
         await TryRecordEncounterAfterRelievedAsync(
             state,
             frame,
             season,
+            battleId,
             cancellationToken);
     }
 
@@ -182,7 +189,7 @@ public sealed partial class RuntimeTaskService
         EncounterSeasonDefinition season,
         CancellationToken cancellationToken)
     {
-        var tipText = await RecognizeRegionTextAsync(
+        var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
             BattleTipRegionIds,
@@ -200,10 +207,11 @@ public sealed partial class RuntimeTaskService
             season.Id);
     }
 
-    private async Task TryLogS3EncounterTipAsync(
+    private async Task RecognizeAndApplyBloodlineTipAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         EncounterSeasonDefinition season,
+        long battleId,
         CancellationToken cancellationToken)
     {
         // S3 血脉提示：下赛季可删除本方法、S3SeasonId 与 battle-tip-encounter-s3 区域。
@@ -212,7 +220,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var tipText = await RecognizeRegionTextAsync(
+        var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
             BattleS3EncounterTipRegionIds,
@@ -226,7 +234,7 @@ public sealed partial class RuntimeTaskService
         var hasParsedKind = S3EncounterBloodlineRecognition.TryParse(tipText, out var kind);
         if (hasParsedKind)
         {
-            RememberEncounterBloodlineTip(kind);
+            _battle.ObserveBloodline(battleId, kind);
         }
 
         if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
@@ -293,9 +301,9 @@ public sealed partial class RuntimeTaskService
         var disabledMarkerTemplatePath = GetResolutionTemplatePath(
             state.RecognitionRegionConfig,
             CaptureButtonDisabledMarkerTemplateName);
-        if (!TemplateExists(disabledMarkerTemplatePath))
+        if (!_frameRecognizer.TemplateExists(disabledMarkerTemplatePath))
         {
-            LogDebugOncePerValue(
+            _debugLog.Write(
                 CreateDebugLogKey(
                     "encounter-capture-button-disabled-marker-missing",
                     disabledMarkerTemplatePath),
@@ -321,7 +329,7 @@ public sealed partial class RuntimeTaskService
             1);
         disabledMatchOptions.Algorithm = matchAlgorithm;
 
-        var enabledMatchTask = MatchRuntimeTemplateResultAsync(
+        var enabledMatchTask = _frameRecognizer.MatchRuntimeTemplateResultAsync(
             state,
             frame,
             BattleCaptureButtonRegionIds,
@@ -330,7 +338,7 @@ public sealed partial class RuntimeTaskService
             "奇遇识别",
             "可捕捉按钮",
             cancellationToken);
-        var disabledMatchTask = MatchRuntimeTemplateResultAsync(
+        var disabledMatchTask = _frameRecognizer.MatchRuntimeTemplateResultAsync(
             state,
             frame,
             BattleCaptureButtonRegionIds,
@@ -417,8 +425,8 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var turnNumber = _currentAutoBattleTurnNumber > 0
-            ? _currentAutoBattleTurnNumber
+        var turnNumber = _battle.TurnNumber > 0
+            ? _battle.TurnNumber
             : 1;
         _logger.LogDebug(
             "自动战斗：第 {TurnNumber} 回合捕捉按钮判定：State={State}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}, Decision={Decision}",
@@ -457,6 +465,7 @@ public sealed partial class RuntimeTaskService
         RuntimeTaskState state,
         CapturedFrame frame,
         EncounterSeasonDefinition season,
+        long battleId,
         CancellationToken cancellationToken)
     {
         if (!EncounterStatisticsEnabled
@@ -466,7 +475,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var enemyNameText = await RecognizeRegionTextAsync(
+        var enemyNameText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
             BattleEnemyNameRegionIds,
@@ -474,7 +483,7 @@ public sealed partial class RuntimeTaskService
             "奇遇解除精灵名");
         var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
         var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
-        LogDebugOncePerValue(
+        _debugLog.Write(
             CreateDebugLogKey("encounter-relieved-enemy-filter", season.Id),
             string.Join(
                 "|",
@@ -486,7 +495,7 @@ public sealed partial class RuntimeTaskService
             enemyName,
             !string.IsNullOrWhiteSpace(enemyName),
             spiritNameMatchThreshold);
-        if (string.IsNullOrWhiteSpace(enemyName))
+        if (battleId != _battle.BattleId || string.IsNullOrWhiteSpace(enemyName))
         {
             return;
         }
@@ -502,9 +511,10 @@ public sealed partial class RuntimeTaskService
         RuntimeTaskState state,
         CapturedFrame frame,
         EncounterSeasonDefinition season,
+        long battleId,
         CancellationToken cancellationToken)
     {
-        var tipText = await RecognizeRegionTextAsync(
+        var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
             BattleShinyTipRegionIds,
@@ -512,7 +522,7 @@ public sealed partial class RuntimeTaskService
             "异色识别");
 
         var isTipMatch = IsShinyTip(tipText, out var similarity);
-        LogDebugOncePerValue(
+        _debugLog.Write(
             CreateDebugLogKey("runtime-shiny-tip-filter", season.Id),
             CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
             "异色识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
@@ -526,8 +536,9 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
+        if (battleId != _battle.BattleId) return false;
         RememberPendingShinyDetection(season.Id, similarity);
-        ApplyAutoBattleShinySuspension(tipText, "异色识别");
+        ApplyAutoBattleShinySuspension(tipText, "异色识别", battleId);
         return true;
     }
 
@@ -601,84 +612,6 @@ public sealed partial class RuntimeTaskService
             enemyName);
     }
 
-    private async Task TryUpdatePendingShinyCaptureAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        EncounterSeasonDefinition season,
-        CancellationToken cancellationToken)
-    {
-        var tipText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleShinyTipRegionIds,
-            cancellationToken,
-            "异色识别");
-
-        var isTipMatch = IsShinyTip(tipText, out var similarity);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("shiny-tip-filter", season.Id),
-            CreateMatchFilterDebugFingerprint(tipText, similarity, isTipMatch),
-            "异色识别筛选：TipText={TipText}, Expected={ExpectedTipText}, Similarity={Similarity:P1}, Threshold={Threshold:P1}, IsMatch={IsMatch}",
-            FormatLogText(tipText),
-            ShinyTipText,
-            similarity,
-            ShinyTipMatchThreshold,
-            isTipMatch);
-        if (!isTipMatch)
-        {
-            return;
-        }
-
-        ApplyAutoBattleShinySuspension(tipText, "异色识别");
-
-        var enemyNameText = await RecognizeRegionTextAsync(
-            state,
-            frame,
-            BattleEnemyNameRegionIds,
-            cancellationToken,
-            "异色识别");
-        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
-        var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
-        LogDebugOncePerValue(
-            CreateDebugLogKey("shiny-enemy-filter", season.Id),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(enemyNameText),
-                CreateTextDebugFingerprint(enemyName),
-                CreateBooleanDebugFingerprint(!string.IsNullOrWhiteSpace(enemyName))),
-            "异色识别筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, IsValid={IsValid}, MatchThreshold={MatchThreshold:P1}",
-            FormatLogText(enemyNameText),
-            enemyName,
-            !string.IsNullOrWhiteSpace(enemyName),
-            spiritNameMatchThreshold);
-        if (string.IsNullOrWhiteSpace(enemyName))
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("shiny-missing-enemy", season.Id),
-                CreateSimilarityDebugFingerprint(similarity),
-                "已匹配异色提示，但 battle-enemy-name 区域未识别到精灵名。相似度：{Similarity:P1}",
-                similarity);
-            return;
-        }
-
-        enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
-        if (string.IsNullOrWhiteSpace(enemyName))
-        {
-            return;
-        }
-
-        var now = DateTimeOffset.Now;
-        if (!TryReservePendingShinyRecord(season.Id, enemyName, now))
-        {
-            return;
-        }
-
-        await _statisticsService.AddPendingShinyCaptureAsync(season, enemyName, now);
-        _logger.LogInformation(
-            "异色识别：{SpiritName} 已暂存，等待统计页面确认后计入异色并清空对应赛季奇遇计数。",
-            enemyName);
-    }
-
     private bool TryReserveEncounterRecord(string seasonId, string spiritName, DateTimeOffset now)
     {
         lock (_encounterRecordLock)
@@ -689,7 +622,7 @@ public sealed partial class RuntimeTaskService
                 var remaining = _hasActiveEncounterRecord
                     ? EncounterDuplicateSuppressWindow
                     : EncounterDuplicateSuppressWindow - (now - _lastRecordedEncounterAt);
-                LogDebugOncePerValue(
+                _debugLog.Write(
                     CreateDebugLogKey("encounter-duplicate-suppression", seasonId),
                     string.Join(
                         "|",
@@ -729,7 +662,7 @@ public sealed partial class RuntimeTaskService
                 var remaining = _hasActivePendingShinyRecord
                     ? PendingShinyDuplicateSuppressWindow
                     : PendingShinyDuplicateSuppressWindow - (now - _lastPendingShinyAt);
-                LogDebugOncePerValue(
+                _debugLog.Write(
                     CreateDebugLogKey("shiny-duplicate-suppression", seasonId),
                     string.Join(
                         "|",

@@ -1,30 +1,27 @@
 using System.Diagnostics;
-
 using Microsoft.Extensions.Logging;
-
 using RocoPilot.Configuration;
-using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Recognition;
 using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
-using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
-using RocoPilot.Models.Input;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
-using RocoPilot.Models.TextRecognition;
 using RocoPilot.Services.Recognition;
-using RocoPilot.Services.TextRecognition;
+using RocoPilot.Services.RuntimeTasks;
+using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
+using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
 
-public sealed partial class RuntimeTaskService : IRuntimeTaskService
+public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSessionControl
 {
     private const int MagicPointSlotCount = 6;
     private const string MagicPointTemplateName = "magic-point.png";
@@ -46,7 +43,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly IScreenCaptureService _screenCaptureService;
     private readonly IRecognitionRegionConfigService _recognitionRegionConfigService;
     private readonly IImageMatchingService _imageMatchingService;
-    private readonly ITextRecognitionService _textRecognitionService;
+    private readonly RuntimeFrameRecognizer _frameRecognizer;
+    private readonly BattleScreenRecognizer _battleScreen;
+    private readonly AutoBattleInputExecutor _battleInput;
+    private readonly RuntimeDebugLogger _debugLog;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly IStatisticsService _statisticsService;
@@ -57,12 +57,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
-    private readonly object _latestRuntimeOcrFrameLock = new();
 
-    private CancellationTokenSource? _captureCancellationTokenSource;
-    private Task? _captureTask;
-    private Task? _runtimeOcrTask;
-    private CapturedFrame? _latestRuntimeOcrFrame;
+    private RuntimeSession? _session;
     private RuntimeRecognitionSettings _runtimeRecognitionSettings = RuntimeRecognitionSettings.CreateDefault();
     private int _queuedAutoBattleSkillFailureTipRecognition;
     private bool _settingsLoaded;
@@ -73,11 +69,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
     public event EventHandler? SettingsChanged;
 
-    public RuntimeTaskState? CurrentState
-    {
-        get;
-        private set;
-    }
+    public RuntimeTaskState? CurrentState => _session?.State;
 
     public bool IsRunning => CurrentState is not null;
 
@@ -123,7 +115,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         IScreenCaptureService screenCaptureService,
         IRecognitionRegionConfigService recognitionRegionConfigService,
         IImageMatchingService imageMatchingService,
-        ITextRecognitionService textRecognitionService,
+        RuntimeFrameRecognizer frameRecognizer,
+        BattleScreenRecognizer battleScreen,
+        AutoBattleInputExecutor battleInput,
+        RuntimeDebugLogger debugLog,
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         IStatisticsService statisticsService,
@@ -138,7 +133,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         _screenCaptureService = screenCaptureService;
         _recognitionRegionConfigService = recognitionRegionConfigService;
         _imageMatchingService = imageMatchingService;
-        _textRecognitionService = textRecognitionService;
+        _frameRecognizer = frameRecognizer;
+        _battleScreen = battleScreen;
+        _battleInput = battleInput;
+        _debugLog = debugLog;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _statisticsService = statisticsService;
@@ -166,7 +164,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
             var savedAutoBattleSettings =
                 await _localSettingsService.ReadSettingAsync<AutoBattleSettings>(SettingsKeys.AutoBattleSettings);
-            _autoBattleSettings = NormalizeAutoBattleSettings(savedAutoBattleSettings);
+            _autoBattleSettings = AutoBattleSettingsRules.Normalize(savedAutoBattleSettings);
 
             var savedRuntimeRecognitionSettings =
                 await _localSettingsService.ReadSettingAsync<RuntimeRecognitionSettings>(SettingsKeys.RuntimeRecognitionSettings);
@@ -194,6 +192,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         await _statisticsService.LoadAsync();
 
         await _lifecycleLock.WaitAsync(cancellationToken);
+        CaptureTargetWindow? preparingWindow = null;
         try
         {
             if (CurrentState is not null)
@@ -201,7 +200,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 return RuntimeTaskStartResult.Started(CurrentState);
             }
 
-            var autoBattleSettings = NormalizeAutoBattleSettings(options.AutoBattleSettings);
+            var autoBattleSettings = AutoBattleSettingsRules.Normalize(options.AutoBattleSettings);
             var targetWindow = _gameWindowService.FindGameWindow();
             if (targetWindow is null)
             {
@@ -232,6 +231,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 }
             }
 
+            preparingWindow = targetWindow;
             using var firstFrame = await CaptureFrameAsync(targetWindow, options.CaptureMethod, cancellationToken);
             if (firstFrame is null)
             {
@@ -299,14 +299,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 recognitionRegionConfig,
                 options,
                 DateTimeOffset.Now);
-            var cancellationTokenSource = new CancellationTokenSource();
-            _captureCancellationTokenSource = cancellationTokenSource;
-            CurrentState = state;
+            var session = new RuntimeSession(state, _screenCaptureService);
+            _session = session;
+            preparingWindow = null;
             _isBattleStateActive = false;
             _unrecognizedStateDetectedAt = null;
             _isSuspended = false;
             _suspendedReason = null;
-            ResetDeduplicatedDebugLogs();
+            _debugLog.Reset();
             ResetAutoBattleBattleState();
             ResetEncounterRecordSuppression();
             _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
@@ -314,12 +314,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             _recognitionOverlayService.Show(state);
             _infoOverlayService.Show(state);
             UpdateInfoOverlayTaskIndicators();
-            _captureTask = Task.Run(
-                () => CaptureLoopAsync(state, cancellationTokenSource.Token),
-                cancellationTokenSource.Token);
-            _runtimeOcrTask = Task.Run(
-                () => RuntimeOcrLoopAsync(state, cancellationTokenSource.Token),
-                cancellationTokenSource.Token);
+            session.Start(CaptureLoopAsync, RuntimeOcrLoopAsync);
 
             _logger.LogInformation("实时任务：已启动（窗口 {Window}）", targetWindow.DisplayName);
             _logger.LogDebug(
@@ -351,10 +346,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
         catch (OperationCanceledException)
         {
+            if (preparingWindow is not null) _screenCaptureService.Release(preparingWindow, options.CaptureMethod);
+            await StopSessionCoreAsync();
             return RuntimeTaskStartResult.Failed("启动任务已取消。");
         }
         catch (Exception ex)
         {
+            if (preparingWindow is not null) _screenCaptureService.Release(preparingWindow, options.CaptureMethod);
+            await StopSessionCoreAsync();
             _logger.LogError(ex, "启动运行任务失败");
             return RuntimeTaskStartResult.Failed($"启动失败：{ex.Message}");
         }
@@ -372,65 +371,38 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
 
     public async Task StopAsync()
     {
-        CancellationTokenSource? cancellationTokenSource = null;
-        Task? captureTask = null;
-        Task? runtimeOcrTask = null;
-        RuntimeTaskState? state = null;
-
         await _lifecycleLock.WaitAsync();
+        try { await StopSessionCoreAsync(); }
+        finally { _lifecycleLock.Release(); }
+    }
+
+    private async Task StopSessionCoreAsync()
+    {
+        var session = _session;
+        if (session is null) return;
         try
         {
-            if (CurrentState is null)
+            try
             {
-                return;
+                _recognitionOverlayService.Hide();
+                _infoOverlayService.Hide();
             }
-
-            cancellationTokenSource = _captureCancellationTokenSource;
-            captureTask = _captureTask;
-            runtimeOcrTask = _runtimeOcrTask;
-            state = CurrentState;
-            _captureCancellationTokenSource = null;
-            _captureTask = null;
-            _runtimeOcrTask = null;
-            CurrentState = null;
-            cancellationTokenSource?.Cancel();
-            _recognitionOverlayService.Hide();
-            _infoOverlayService.Hide();
+            finally
+            {
+                await session.DisposeAsync();
+            }
         }
         finally
         {
-            _lifecycleLock.Release();
-        }
-
-        try
-        {
-            var runningTasks = new[] { captureTask, runtimeOcrTask }
-                .Where(task => task is not null)
-                .Cast<Task>()
-                .ToArray();
-            if (runningTasks.Length > 0)
-            {
-                await Task.WhenAll(runningTasks);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            ClearLatestRuntimeOcrFrame();
-            if (state is not null)
-            {
-                _screenCaptureService.Release(state.TargetWindow, state.Options.CaptureMethod);
-            }
-
-            cancellationTokenSource?.Dispose();
+            _session = null;
+            ResetAutoBattleBattleState();
             _logger.LogInformation("实时任务：已停止");
         }
     }
 
-    private async Task CaptureLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
+    private async Task CaptureLoopAsync(RuntimeSession session, CancellationToken cancellationToken)
     {
+        var state = session.State;
         var nextGameStateScanAt = DateTimeOffset.MinValue;
         var wasSuspended = false;
 
@@ -443,7 +415,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                     if (!wasSuspended)
                     {
                         wasSuspended = true;
-                        EnterCaptureLoopSuspension(state);
+                        EnterCaptureLoopSuspension(session);
                     }
 
                     await DelayAsync(SuspensionPollIntervalMs, cancellationToken);
@@ -473,7 +445,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 {
                     if (frame is not null)
                     {
-                        PublishLatestRuntimeOcrFrame(frame);
+                        session.PublishFrame(frame, _battle.BattleId);
 
                         var now = DateTimeOffset.Now;
                         if (now >= nextGameStateScanAt)
@@ -484,7 +456,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                             var gameStateScanResult = GameStateScanResult.UnrecognizedPending;
                             try
                             {
-                                gameStateScanResult = await UpdateGameStateSnapshotAsync(state, frame, cancellationToken);
+                                gameStateScanResult = await ProcessFrameAsync(state, frame, cancellationToken);
                             }
                             catch (Exception ex) when (ex is not OperationCanceledException)
                             {
@@ -511,19 +483,19 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
         finally
         {
-            _screenCaptureService.Release(state.TargetWindow, state.Options.CaptureMethod);
+            session.ClearFrame();
         }
     }
 
     // 挂起清理在截图循环线程内执行，避免与扫描逻辑并发修改战斗状态。
-    private void EnterCaptureLoopSuspension(RuntimeTaskState state)
+    private void EnterCaptureLoopSuspension(RuntimeSession session)
     {
         _isBattleStateActive = false;
         _unrecognizedStateDetectedAt = null;
         CompleteAutoBattleSkillSelectionState();
         ResetAutoBattleBattleState();
         ResetEncounterRecordSuppression();
-        ClearLatestRuntimeOcrFrame();
+        session.ClearFrame();
         _recognitionOverlayService.Hide();
         _logger.LogDebug("实时任务：截图循环进入挂起状态。");
     }
@@ -538,8 +510,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         _logger.LogDebug("实时任务：截图循环退出挂起状态，重新开始识别。");
     }
 
-    private async Task RuntimeOcrLoopAsync(RuntimeTaskState state, CancellationToken cancellationToken)
+    private async Task RuntimeOcrLoopAsync(RuntimeSession session, CancellationToken cancellationToken)
     {
+        var state = session.State;
         Task? activeScanTask = null;
         try
         {
@@ -568,7 +541,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                     }
                     else
                     {
-                        LogDebugOncePerValue(
+                        _debugLog.Write(
                             CreateDebugLogKey("runtime-ocr-skip-busy"),
                             "busy",
                             "后台 OCR 本轮跳过：上一次 OCR 仍在执行。");
@@ -581,13 +554,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                     continue;
                 }
 
-                var frame = RentLatestRuntimeOcrFrame();
+                var battleId = _battle.BattleId;
+                var frame = session.RentFrame(battleId);
                 if (frame is null)
                 {
                     continue;
                 }
 
-                activeScanTask = RunRuntimeOcrScanAsync(state, frame, cancellationToken);
+                activeScanTask = RunRuntimeOcrScanAsync(state, frame, battleId, cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -610,20 +584,21 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
                 }
             }
 
-            ClearLatestRuntimeOcrFrame();
+            session.ClearFrame();
         }
     }
 
     private async Task RunRuntimeOcrScanAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
+        long battleId,
         CancellationToken cancellationToken)
     {
         using (frame)
         {
             try
             {
-                await UpdateRuntimeOcrSignalsAsync(state, frame, cancellationToken);
+                await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, battleId, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -635,64 +610,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         }
     }
 
-    private async Task UpdateRuntimeOcrSignalsAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
-    {
-        await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, cancellationToken);
-    }
-
-    private void PublishLatestRuntimeOcrFrame(CapturedFrame frame)
-    {
-        CapturedFrame frameReference;
-        try
-        {
-            frameReference = frame.AddReference();
-        }
-        catch (ObjectDisposedException)
-        {
-            return;
-        }
-
-        CapturedFrame? previousFrame;
-        lock (_latestRuntimeOcrFrameLock)
-        {
-            previousFrame = _latestRuntimeOcrFrame;
-            _latestRuntimeOcrFrame = frameReference;
-        }
-
-        previousFrame?.Dispose();
-    }
-
-    private CapturedFrame? RentLatestRuntimeOcrFrame()
-    {
-        lock (_latestRuntimeOcrFrameLock)
-        {
-            try
-            {
-                return _latestRuntimeOcrFrame?.AddReference();
-            }
-            catch (ObjectDisposedException)
-            {
-                return null;
-            }
-        }
-    }
-
-    private void ClearLatestRuntimeOcrFrame()
-    {
-        CapturedFrame? frame;
-        lock (_latestRuntimeOcrFrameLock)
-        {
-            frame = _latestRuntimeOcrFrame;
-            _latestRuntimeOcrFrame = null;
-        }
-
-        frame?.Dispose();
-    }
-
-    private async Task<GameStateScanResult> UpdateGameStateSnapshotAsync(
+    private async Task<GameStateScanResult> ProcessFrameAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         CancellationToken cancellationToken)
@@ -702,11 +620,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             CompleteAutoBattleSkillSelectionState();
             ResetAutoBattleBattleState();
 
-            if (await IsBattleChatVisibleAsync(state, frame, cancellationToken))
+            if (await _battleScreen.IsBattleChatVisibleAsync(state, frame, cancellationToken))
             {
                 _isBattleStateActive = true;
-                ResetDeduplicatedDebugLogs();
-                return await UpdateActiveBattleSnapshotAsync(
+                _debugLog.Reset();
+                return await ProcessBattleFrameAsync(
                     state,
                     frame,
                     isBattleChatVisible: true,
@@ -724,89 +642,50 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             return GameStateScanResult.NonBattle;
         }
 
-        return await UpdateActiveBattleSnapshotAsync(
+        return await ProcessBattleFrameAsync(
             state,
             frame,
             isBattleChatVisible: null,
             cancellationToken);
     }
 
-    private async Task<GameStateScanResult> UpdateActiveBattleSnapshotAsync(
+    private async Task<GameStateScanResult> ProcessBattleFrameAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         bool? isBattleChatVisible,
         CancellationToken cancellationToken)
     {
         await UpdateEncounterCaptureButtonStateAsync(state, frame, cancellationToken);
+        var screen = await _battleScreen.RecognizeAsync(state, frame, isBattleChatVisible, cancellationToken);
+        if (screen != BattleScreen.PetSwitching) _battle.ObservePetSwitching(false);
 
-        var isSkillSelectionVisible = await IsBattleSkillSelectionVisibleAsync(state, frame, cancellationToken);
-        if (isSkillSelectionVisible)
+        switch (screen)
         {
-            _wasAutoBattlePetSwitchingVisible = false;
-            var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
-            var handledSkillFailure = false;
-            if (!isAutoBattleSuspendedForShiny)
-            {
-                handledSkillFailure = await TryHandleAutoBattleSkillReleaseFailureAsync(
-                    state,
-                    frame,
-                    cancellationToken);
-            }
-
-            if (!handledSkillFailure)
-            {
-                await HandleAutoBattleSkillSelectionAsync(state, frame, cancellationToken);
-            }
-
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny
-                    ? "战斗中 - 异色保护"
-                    : "战斗中 - 技能选择",
-                DateTimeOffset.Now));
-            return GameStateScanResult.Battle;
-        }
-
-        var isPetSwitchingVisible = await IsBattlePetSwitchingAsync(state, frame, cancellationToken);
-        if (isPetSwitchingVisible)
-        {
-            var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
-            CompleteAutoBattleSkillSelectionState();
-            if (!isAutoBattleSuspendedForShiny)
-            {
-                await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
-            }
-
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny
-                    ? "战斗中 - 异色保护"
-                    : "战斗中 - 切换精灵",
-                DateTimeOffset.Now));
-            return GameStateScanResult.Battle;
-        }
-
-        _wasAutoBattlePetSwitchingVisible = false;
-
-        var chatVisible = isBattleChatVisible ?? await IsBattleChatVisibleAsync(state, frame, cancellationToken);
-        if (chatVisible)
-        {
-            var isAutoBattleSuspendedForShiny = _isAutoBattleSuspendedForShiny;
-            if (!isAutoBattleSuspendedForShiny)
-            {
+            case BattleScreen.SkillSelection:
+                var recovered = !_battle.IsSuspendedForShiny
+                    && await TryHandleAutoBattleSkillReleaseFailureAsync(state, frame, cancellationToken);
+                if (!recovered) await HandleAutoBattleSkillSelectionAsync(state, frame, cancellationToken);
+                break;
+            case BattleScreen.PetSwitching:
                 CompleteAutoBattleSkillSelectionState();
-            }
-
-            UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-                isAutoBattleSuspendedForShiny
-                    ? "战斗中 - 异色保护"
-                    : "战斗中",
-                DateTimeOffset.Now));
-            return GameStateScanResult.Battle;
+                if (!_battle.IsSuspendedForShiny) await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
+                break;
+            case BattleScreen.Chat:
+                if (!_battle.IsSuspendedForShiny) CompleteAutoBattleSkillSelectionState();
+                break;
+            case BattleScreen.Transition:
+                CompleteAutoBattleSkillSelectionState();
+                break;
         }
 
-        CompleteAutoBattleSkillSelectionState();
-        UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
-            "战斗中",
-            DateTimeOffset.Now));
+        var description = screen switch
+        {
+            _ when screen != BattleScreen.Transition && _battle.IsSuspendedForShiny => "战斗中 - 异色保护",
+            BattleScreen.SkillSelection => "战斗中 - 技能选择",
+            BattleScreen.PetSwitching => "战斗中 - 切换精灵",
+            _ => "战斗中"
+        };
+        UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(description, DateTimeOffset.Now));
         return GameStateScanResult.Battle;
     }
 
@@ -852,7 +731,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var magicPointTemplatePath = GetResolutionTemplatePath(
             state.RecognitionRegionConfig,
             MagicPointTemplateName);
-        if (!TemplateExists(magicPointTemplatePath))
+        if (!_frameRecognizer.TemplateExists(magicPointTemplatePath))
         {
             return false;
         }
@@ -883,7 +762,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var bestMatchScore = matchResult.BestScore;
 
         _recognitionOverlayService.ShowImageMatchResult(magicPointRegion.Id, bestMatchScore);
-        LogDebugOncePerValue(
+        _debugLog.Write(
             CreateDebugLogKey("game-state-magic-point-active", magicPointRegion.Id),
             $"{magicPointCount}/{MagicPointSlotCount}",
             "状态识别目标结果：Target=大世界魔力点 Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
@@ -917,7 +796,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var magicPointTemplatePath = GetResolutionTemplatePath(
             state.RecognitionRegionConfig,
             MagicPointTemplateName);
-        if (!TemplateExists(magicPointTemplatePath))
+        if (!_frameRecognizer.TemplateExists(magicPointTemplatePath))
         {
             UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                 $"未找到 {magicPointTemplatePath}",
@@ -954,7 +833,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
         var bestMatchScore = matchResult.BestScore;
 
         _recognitionOverlayService.ShowImageMatchResult(magicPointRegion.Id, bestMatchScore);
-        LogDebugOncePerValue(
+        _debugLog.Write(
             CreateDebugLogKey("game-state-magic-point-world", magicPointRegion.Id),
             $"{magicPointCount}/{MagicPointSlotCount}",
             "状态识别目标结果：Target=魔力点, Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
@@ -978,262 +857,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService
             magicPointCount,
             MagicPointSlotCount));
         return GameStateScanResult.NonBattle;
-    }
-
-    private async Task<string> RecognizeRegionTextAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        IReadOnlyList<string> regionAliases,
-        CancellationToken cancellationToken,
-        string taskName)
-    {
-        var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
-        var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
-            region,
-            frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("ocr-skip-outside-frame", taskName, region.Id),
-                $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
-                "{TaskName} OCR跳过：识别区域不在截图内。Region={RegionId}, Aliases={RegionAliases}",
-                taskName,
-                region.Id,
-                string.Join("|", regionAliases));
-            return string.Empty;
-        }
-
-        var recognitionMethod = _textRecognitionService
-            .GetMethods()
-            .FirstOrDefault(method => method.Method == state.Options.TextRecognitionMethod && method.IsAvailable);
-        if (recognitionMethod is null)
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("ocr-skip-method-unavailable", taskName, region.Id, state.Options.TextRecognitionMethod),
-                "method-unavailable",
-                "{TaskName} OCR跳过：OCR 方法不可用。Method={TextRecognitionMethod}, Region={RegionId}",
-                taskName,
-                state.Options.TextRecognitionMethod,
-                region.Id);
-            return string.Empty;
-        }
-
-        var result = await _textRecognitionService.RecognizeAsync(
-            frame,
-            frameRegion,
-            recognitionMethod.Method,
-            cancellationToken);
-        _recognitionOverlayService.ShowOcrResult(region.Id, result.Text);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("ocr-result", taskName, region.Id, recognitionMethod.Method),
-            CreateTextDebugFingerprint(result.Text),
-            "{TaskName} OCR结果：Region={RegionId}, Method={TextRecognitionMethod}, FrameRegion={X},{Y},{Width}x{Height}, Text={Text}",
-            taskName,
-            region.Id,
-            recognitionMethod.Method,
-            frameRegion.X,
-            frameRegion.Y,
-            frameRegion.Width,
-            frameRegion.Height,
-            FormatLogText(result.Text));
-        return result.Text;
-    }
-
-    private async Task<bool> MatchRuntimeTemplateAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        IReadOnlyList<string> regionAliases,
-        string templateName,
-        ImageMatchOptions options,
-        string taskName,
-        string targetName,
-        CancellationToken cancellationToken)
-    {
-        var result = await MatchRuntimeTemplateResultAsync(
-            state,
-            frame,
-            regionAliases,
-            templateName,
-            options,
-            taskName,
-            targetName,
-            cancellationToken);
-        return result.IsMatch;
-    }
-
-    private async Task<ImageMatchResult> MatchRuntimeTemplateResultAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        IReadOnlyList<string> regionAliases,
-        string templateName,
-        ImageMatchOptions options,
-        string taskName,
-        string targetName,
-        CancellationToken cancellationToken)
-    {
-        var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
-        var templatePath = GetResolutionTemplatePath(state.RecognitionRegionConfig, templateName);
-        if (!TemplateExists(templatePath))
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("template-skip-missing-template", taskName, targetName, region.Id, templatePath),
-                "missing-template",
-                "{TaskName} 目标识别跳过：未找到模板。Target={Target}, Region={RegionId}, Template={Template}",
-                taskName,
-                targetName,
-                region.Id,
-                templatePath);
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
-
-        var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
-            region,
-            frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
-        {
-            LogDebugOncePerValue(
-                CreateDebugLogKey("template-skip-outside-frame", taskName, targetName, region.Id, templatePath),
-                $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
-                "{TaskName} 目标识别跳过：识别区域不在截图内。Target={Target}, Region={RegionId}, Template={Template}",
-                taskName,
-                targetName,
-                region.Id,
-                templatePath);
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
-
-        var matchOptions = CreateScaledImageMatchOptions(
-            options,
-            frame,
-            state.TargetWindow,
-            state.RecognitionRegionConfig);
-        var result = await _imageMatchingService.MatchAsync(
-            frame,
-            frameRegion,
-            templatePath,
-            matchOptions,
-            cancellationToken);
-        _recognitionOverlayService.ShowImageMatchResult(region.Id, result.Score);
-        LogDebugOncePerValue(
-            CreateDebugLogKey("template-result", taskName, targetName, region.Id, templatePath),
-            CreateBooleanDebugFingerprint(result.IsMatch),
-            "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}",
-            taskName,
-            targetName,
-            region.Id,
-            templatePath,
-            result.Score,
-            matchOptions.MinimumScore,
-            result.IsMatch,
-            frameRegion.X,
-            frameRegion.Y,
-            frameRegion.Width,
-            frameRegion.Height);
-        return result;
-    }
-
-    private static string FormatLogText(string? text, int maximumLength = 120)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return "<empty>";
-        }
-
-        var normalized = string.Join(
-            " ",
-            text
-                .Trim()
-                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return normalized.Length <= maximumLength
-            ? normalized
-            : $"{normalized[..maximumLength]}...";
-    }
-
-    private bool TemplateExists(string templateName)
-    {
-        return File.Exists(Path.Combine(_imageMatchingService.TemplateDirectory, templateName));
-    }
-
-    private static string GetResolutionTemplatePath(
-        RecognitionRegionConfig config,
-        string templateName)
-    {
-        if (config.ResolutionWidth <= 0 || config.ResolutionHeight <= 0)
-        {
-            return templateName;
-        }
-
-        return Path.Combine(
-            $"{config.ResolutionWidth}x{config.ResolutionHeight}",
-            templateName);
-    }
-
-    private static RecognitionRegion FindRegion(
-        RecognitionRegionConfig config,
-        IReadOnlyList<string> aliases)
-    {
-        return config.Regions.FirstOrDefault(region => IsRegionMatch(region, aliases))
-            ?? throw new InvalidOperationException(
-                $"识别区域配置缺少启用区域：{string.Join(", ", aliases)}。配置文件：{config.SourcePath}");
-    }
-
-    private static bool IsRegionMatch(RecognitionRegion region, IReadOnlyList<string> aliases)
-    {
-        if (!region.Enabled || string.IsNullOrWhiteSpace(region.Id))
-        {
-            return false;
-        }
-
-        var id = region.Id.Trim();
-        return aliases.Any(alias => string.Equals(id, alias, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static ImageMatchOptions CreateScaledImageMatchOptions(
-        ImageMatchOptions options,
-        CapturedFrame frame,
-        CaptureTargetWindow targetWindow,
-        RecognitionRegionConfig config)
-    {
-        var configWidth = config.ResolutionWidth > 0
-            ? config.ResolutionWidth
-            : targetWindow.HasClientArea ? targetWindow.ClientWidth : frame.Width;
-        var configHeight = config.ResolutionHeight > 0
-            ? config.ResolutionHeight
-            : targetWindow.HasClientArea ? targetWindow.ClientHeight : frame.Height;
-
-        if (configWidth <= 0 || configHeight <= 0)
-        {
-            return CloneImageMatchOptions(options, 1, 1);
-        }
-
-        _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(
-            frame,
-            targetWindow,
-            out _,
-            out _,
-            out var sourceWidth,
-            out var sourceHeight);
-
-        var scaleX = sourceWidth > 0 ? sourceWidth / (double)configWidth : 1;
-        var scaleY = sourceHeight > 0 ? sourceHeight / (double)configHeight : 1;
-        return CloneImageMatchOptions(options, scaleX, scaleY);
-    }
-
-    private static ImageMatchOptions CloneImageMatchOptions(ImageMatchOptions options, double scaleX, double scaleY)
-    {
-        return new ImageMatchOptions
-        {
-            Algorithm = options.Algorithm,
-            MinimumScore = options.MinimumScore,
-            AlphaThreshold = options.AlphaThreshold,
-            SearchStep = options.SearchStep,
-            TemplateScaleX = options.TemplateScaleX * scaleX,
-            TemplateScaleY = options.TemplateScaleY * scaleY
-        };
     }
 
     public void SetRuntimeRecognitionSettings(RuntimeRecognitionSettings settings)

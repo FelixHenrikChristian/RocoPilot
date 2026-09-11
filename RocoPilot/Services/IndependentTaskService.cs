@@ -14,7 +14,7 @@ namespace RocoPilot.Services;
 /// </summary>
 public sealed class IndependentTaskService : IIndependentTaskService
 {
-    private readonly IRuntimeTaskService _runtimeTaskService;
+    private readonly IRuntimeSessionControl _runtimeTaskService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ILogger<IndependentTaskService> _logger;
 
@@ -35,7 +35,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     public IndependentTaskSettings Settings => _settings.Clone();
 
     public IndependentTaskService(
-        IRuntimeTaskService runtimeTaskService,
+        IRuntimeSessionControl runtimeTaskService,
         ILocalSettingsService localSettingsService,
         ILogger<IndependentTaskService> logger)
     {

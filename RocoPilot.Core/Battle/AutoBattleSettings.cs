@@ -1,8 +1,8 @@
 using Newtonsoft.Json;
 
-using RocoPilot.Models.Input;
+using RocoPilot.Core.Input;
 
-namespace RocoPilot.Models.Runtime;
+namespace RocoPilot.Core.Battle;
 
 public sealed class AutoBattleSettings
 {
@@ -142,8 +142,8 @@ public sealed class AutoBattleSettings
             IsEnabled = IsEnabled,
             RoundOrder = RoundOrder,
             TurnSequence = TurnSequence,
-            ReleaseSequence = (ReleaseSequence ?? []).Select(step => step.Clone()).ToList(),
-            TurnSequencePresets = (TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList(),
+            ReleaseSequence = (ReleaseSequence ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList(),
+            TurnSequencePresets = (TurnSequencePresets ?? []).OfType<AutoBattleTurnSequencePreset>().Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = EncounterRelievedAction,
             KeyboardInputMethod = KeyboardInputMethod,
             SkillSelectionActionDelayMs = SkillSelectionActionDelayMs,

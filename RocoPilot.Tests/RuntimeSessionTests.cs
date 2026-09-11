@@ -73,13 +73,46 @@ public sealed class RuntimeSessionTests
         Assert.AreEqual(1, capture.Releases);
     }
 
+    [TestMethod]
+    public async Task CancellationCallbackFailureStillDrainsWorkersBeforeRelease()
+    {
+        var capture = new CaptureStub();
+        var session = CreateSession(capture);
+        using var pause = new RocoPilot.Tests.TestDoubles.AsyncPause();
+        using var registration = session.Token.Register(() => throw new InvalidOperationException("cancel failed"));
+        session.Track(pause.PauseAsync(string.Empty));
+        await pause.WaitUntilEnteredAsync();
+        var stopping = session.DisposeAsync().AsTask();
+        Assert.IsFalse(stopping.IsCompleted);
+        Assert.AreEqual(0, capture.Releases);
+        pause.Dispose();
+        await Assert.ThrowsExactlyAsync<AggregateException>(() => stopping.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.AreEqual(1, capture.Releases);
+    }
+
+    [TestMethod]
+    public async Task ReleaseFailureStillDisposesCancellationAndIsNotRetried()
+    {
+        var capture = new CaptureStub { FailRelease = true };
+        var session = CreateSession(capture);
+        await Assert.ThrowsExactlyAsync<IOException>(() => session.DisposeAsync().AsTask());
+        await Assert.ThrowsExactlyAsync<IOException>(() => session.DisposeAsync().AsTask());
+        Assert.AreEqual(1, capture.Releases);
+        Assert.ThrowsExactly<ObjectDisposedException>(() => _ = session.Token);
+    }
+
     private static RuntimeSession CreateSession(CaptureStub capture) => new(
         new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1 }, new RecognitionRegionConfig(), new RuntimeTaskStartOptions(), DateTimeOffset.Now), capture);
 
     private sealed class CaptureStub : IScreenCaptureService
     {
         public int Releases;
+        public bool FailRelease;
         public CapturedFrame? Capture(CaptureTargetWindow window, CaptureMethod method) => null;
-        public void Release(CaptureTargetWindow window, CaptureMethod method) => Releases++;
+        public void Release(CaptureTargetWindow window, CaptureMethod method)
+        {
+            Releases++;
+            if (FailRelease) throw new IOException("release failed");
+        }
     }
 }

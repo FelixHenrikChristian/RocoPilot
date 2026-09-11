@@ -4,6 +4,7 @@ using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Services.Statistics.Sync;
 
 using static RocoPilot.Services.Statistics.Sync.StatisticsSyncRules;
 
@@ -21,16 +22,23 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
     private readonly IStatisticsSyncCredentialStore _credentials;
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly SemaphoreSlim _settingsGate = new(1, 1);
-    private readonly object _autoUploadLock = new();
+    private readonly StatisticsAutoUploadScheduler _autoUpload;
+    private readonly CancellationTokenSource _shutdown = new();
+    private readonly object _disposeGate = new();
+    private readonly object _statusGate = new();
+    private Task? _disposeTask;
+    private bool _stopping;
 
     private StatisticsSyncSettings _settings = CreateDefaultSettings();
     private StatisticsSyncStatus _status = new();
-    private CancellationTokenSource? _autoUploadCts;
     private bool _isSettingsLoaded;
 
     public event EventHandler<StatisticsSyncStatusChangedEventArgs>? StatusChanged;
 
-    public StatisticsSyncStatus CurrentStatus => CloneStatus(_status);
+    public StatisticsSyncStatus CurrentStatus
+    {
+        get { lock (_statusGate) return CloneStatus(_status); }
+    }
 
     public StatisticsSyncService(
         ILocalSettingsService localSettingsService,
@@ -38,12 +46,26 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         ILogger<StatisticsSyncService> logger,
         IStatisticsRemoteStore remoteStore,
         IStatisticsSyncCredentialStore credentials)
+        : this(localSettingsService, statisticsService, logger, remoteStore, credentials, Task.Delay)
+    {
+    }
+
+    internal StatisticsSyncService(
+        ILocalSettingsService localSettingsService,
+        IStatisticsService statisticsService,
+        ILogger<StatisticsSyncService> logger,
+        IStatisticsRemoteStore remoteStore,
+        IStatisticsSyncCredentialStore credentials,
+        Func<TimeSpan, CancellationToken, Task> delay)
     {
         _localSettingsService = localSettingsService;
         _statisticsService = statisticsService;
         _logger = logger;
         _remoteStore = remoteStore;
         _credentials = credentials;
+        _autoUpload = new StatisticsAutoUploadScheduler(AutoUploadDelay,
+            token => UploadAsync(automatic: true, token),
+            ex => _logger.LogWarning(ex, "自动上传统计数据失败。"), delay);
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
         ApplyStatusFromSettings(_settings, "未配置云同步");
     }
@@ -55,15 +77,19 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     public async Task<StatisticsSyncSettings> LoadSettingsAsync(CancellationToken cancellationToken = default)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         cancellationToken.ThrowIfCancellationRequested();
-        return CloneSettings(await LoadSettingsCoreAsync());
+        return CloneSettings(await LoadSettingsCoreAsync(cancellationToken));
     }
 
     public async Task<StatisticsSyncStatus> LoadStatusAsync(CancellationToken cancellationToken = default)
     {
-        var settings = await LoadSettingsCoreAsync();
-        ApplyStatusFromSettings(settings, BuildIdleMessage(settings));
-        return CloneStatus(_status);
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
+        var settings = await LoadSettingsCoreAsync(cancellationToken);
+        ApplyStatusFromSettings(settings, BuildIdleMessage(settings), onlyWhenIdle: true);
+        return CurrentStatus;
     }
 
     public async Task<StatisticsSyncStatus> SaveSettingsAsync(
@@ -71,10 +97,12 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         string? password,
         CancellationToken cancellationToken = default)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
-            var currentSettings = await LoadSettingsCoreAsync();
+            var currentSettings = await LoadSettingsCoreAsync(cancellationToken);
             var normalizedSettings = NormalizeSettings(settings);
             if (AreSameRemoteTarget(currentSettings, normalizedSettings))
             {
@@ -92,8 +120,9 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             }
 
             await SaveSettingsCoreAsync(normalizedSettings, cancellationToken);
+            if (!normalizedSettings.IsEnabled) _autoUpload.CancelPending();
             ApplyStatusFromSettings(normalizedSettings, normalizedSettings.IsEnabled ? "云同步设置已保存" : "云同步未启用");
-            return CloneStatus(_status);
+            return CurrentStatus;
         }
         finally
         {
@@ -121,6 +150,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     public async Task<StatisticsSyncRemoteInfo> RefreshRemoteInfoAsync(CancellationToken cancellationToken = default)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
@@ -131,6 +162,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             ApplyStatusFromSettings(settings, info.Exists ? "已更新云端时间" : "云端暂无统计数据");
             return info;
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             SetFailureStatus("读取云端时间失败", ex);
@@ -145,6 +177,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     public async Task<StatisticsSyncResult> TestConnectionAsync(CancellationToken cancellationToken = default)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
@@ -163,6 +197,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             ApplyStatusFromSettings(settings, info.Exists ? "连接成功，已读取云端文件" : "连接成功，云端暂无统计数据");
             return result;
         }
+        catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
             SetFailureStatus("云同步连接失败", ex);
@@ -177,10 +212,12 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     public async Task<bool> DownloadRemoteChangesIfNeededAsync(CancellationToken cancellationToken = default)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
-            var settings = await LoadSettingsCoreAsync();
+            var settings = await LoadSettingsCoreAsync(cancellationToken);
             if (!settings.IsEnabled || !HasRequiredSettings(settings))
             {
                 ApplyStatusFromSettings(settings, BuildIdleMessage(settings));
@@ -234,6 +271,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     public async Task<StatisticsSyncResult> DownloadAsync(CancellationToken cancellationToken = default)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
@@ -308,9 +347,17 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     private async Task<StatisticsSyncResult> UploadAsync(bool automatic, CancellationToken cancellationToken)
     {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
+            if (automatic)
+            {
+                var automaticSettings = await LoadSettingsCoreAsync(cancellationToken);
+                if (!automaticSettings.IsEnabled || !HasRequiredSettings(automaticSettings))
+                    return new StatisticsSyncResult();
+            }
             var (settings, password) = await LoadConfiguredSettingsAsync(cancellationToken);
             var mergedRemoteChanges = false;
             for (var attempt = 1; attempt <= MaxConditionalUploadAttempts; attempt++)
@@ -378,13 +425,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         catch (Exception ex)
         {
             SetFailureStatus(automatic ? "自动上传统计失败" : "上传统计失败", ex);
-            if (!automatic)
-            {
-                throw;
-            }
-
-            _logger.LogWarning(ex, "自动上传统计数据失败。");
-            return new StatisticsSyncResult { CompletedAt = DateTimeOffset.Now };
+            throw;
         }
         finally
         {
@@ -393,56 +434,14 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         }
     }
 
-    private async void StatisticsService_DocumentChanged(object? sender, StatisticsDocumentChangedEventArgs e)
+    private void StatisticsService_DocumentChanged(object? sender, StatisticsDocumentChangedEventArgs e)
     {
-        if (e.Source == StatisticsDocumentChangeSource.CloudSync)
-        {
-            return;
-        }
-
-        try
-        {
-            var settings = await LoadSettingsCoreAsync();
-            if (!settings.IsEnabled || !HasRequiredSettings(settings))
-            {
-                return;
-            }
-
-            QueueAutoUpload();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "准备自动上传统计数据失败。");
-        }
-    }
-
-    private void QueueAutoUpload()
-    {
-        CancellationToken token;
-        lock (_autoUploadLock)
-        {
-            _autoUploadCts?.Cancel();
-            _autoUploadCts?.Dispose();
-            _autoUploadCts = new CancellationTokenSource();
-            token = _autoUploadCts.Token;
-        }
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(AutoUploadDelay, token);
-                await UploadAsync(automatic: true, token);
-            }
-            catch (OperationCanceledException)
-            {
-            }
-        }, token);
+        if (e.Source == StatisticsDocumentChangeSource.Local) _autoUpload.Request();
     }
 
     private async Task<(StatisticsSyncSettings Settings, string Password)> LoadConfiguredSettingsAsync(CancellationToken cancellationToken)
     {
-        var settings = await LoadSettingsCoreAsync();
+        var settings = await LoadSettingsCoreAsync(cancellationToken);
         if (!settings.IsEnabled)
         {
             throw new InvalidOperationException("请先启用云同步。");
@@ -468,14 +467,15 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         return (settings, password);
     }
 
-    private async Task<StatisticsSyncSettings> LoadSettingsCoreAsync()
+    private async Task<StatisticsSyncSettings> LoadSettingsCoreAsync(CancellationToken cancellationToken)
     {
-        await _settingsGate.WaitAsync();
+        await _settingsGate.WaitAsync(cancellationToken);
         try
         {
             if (!_isSettingsLoaded)
             {
                 var savedSettings = await _localSettingsService.ReadSettingAsync<StatisticsSyncSettings>(SettingsKeys.StatisticsSyncSettings);
+                cancellationToken.ThrowIfCancellationRequested();
                 _settings = NormalizeSettings(savedSettings ?? CreateDefaultSettings());
                 _isSettingsLoaded = true;
             }
@@ -514,49 +514,84 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         await SaveSettingsCoreAsync(settings, cancellationToken);
     }
 
-    private void ApplyStatusFromSettings(StatisticsSyncSettings settings, string message)
+    private void ApplyStatusFromSettings(StatisticsSyncSettings settings, string message, bool onlyWhenIdle = false)
     {
-        var provider = ResolveProvider(settings.ProviderId);
-        _status = new StatisticsSyncStatus
+        StatisticsSyncStatus snapshot;
+        lock (_statusGate)
         {
-            IsConfigured = HasRequiredSettings(settings),
-            IsEnabled = settings.IsEnabled,
-            IsBusy = _status.IsBusy,
-            ProviderId = settings.ProviderId,
-            ProviderName = provider.Name,
-            Message = message,
-            RemoteLastModifiedAt = settings.LastRemoteModifiedAt,
-            LastUploadedAt = settings.LastUploadedAt,
-            LastDownloadedAt = settings.LastDownloadedAt,
-            LastRemoteCheckedAt = settings.LastRemoteCheckedAt,
-            RemoteEntityTag = settings.LastRemoteEntityTag
-        };
-        RaiseStatusChanged();
+            if (onlyWhenIdle && _status.IsBusy) return;
+            var provider = ResolveProvider(settings.ProviderId);
+            _status = new StatisticsSyncStatus
+            {
+                IsConfigured = HasRequiredSettings(settings), IsEnabled = settings.IsEnabled,
+                IsBusy = _status.IsBusy, ProviderId = settings.ProviderId, ProviderName = provider.Name,
+                Message = message, RemoteLastModifiedAt = settings.LastRemoteModifiedAt,
+                LastUploadedAt = settings.LastUploadedAt, LastDownloadedAt = settings.LastDownloadedAt,
+                LastRemoteCheckedAt = settings.LastRemoteCheckedAt, RemoteEntityTag = settings.LastRemoteEntityTag
+            };
+            snapshot = CloneStatus(_status);
+        }
+        StatusChanged?.Invoke(this, new StatisticsSyncStatusChangedEventArgs(snapshot));
     }
 
     private void SetBusy(bool isBusy, string? message = null)
     {
-        _status.IsBusy = isBusy;
-        if (!string.IsNullOrWhiteSpace(message))
+        StatisticsSyncStatus snapshot;
+        lock (_statusGate)
         {
-            _status.Message = message;
+            _status.IsBusy = isBusy;
+            if (!string.IsNullOrWhiteSpace(message)) _status.Message = message;
+            snapshot = CloneStatus(_status);
         }
-
-        RaiseStatusChanged();
+        StatusChanged?.Invoke(this, new StatisticsSyncStatusChangedEventArgs(snapshot));
     }
 
     private void SetFailureStatus(string title, Exception exception)
     {
         _logger.LogWarning(exception, "{Title}", title);
-        _status.IsBusy = false;
-        _status.Message = $"{title}：{exception.Message}";
-        RaiseStatusChanged();
+        SetBusy(false, $"{title}：{exception.Message}");
     }
 
-    private void RaiseStatusChanged()
+    private CancellationTokenSource CreateOperationCancellation(CancellationToken cancellationToken)
     {
-        StatusChanged?.Invoke(this, new StatisticsSyncStatusChangedEventArgs(CloneStatus(_status)));
+        lock (_disposeGate)
+        {
+            if (_stopping) throw new OperationCanceledException("云同步服务正在关闭。", cancellationToken);
+            return CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
+        }
     }
 
+    public ValueTask DisposeAsync()
+    {
+        lock (_disposeGate)
+        {
+            _stopping = true;
+            _statisticsService.DocumentChanged -= StatisticsService_DocumentChanged;
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
 
+    private async Task DisposeCoreAsync()
+    {
+        try
+        {
+            try { await _shutdown.CancelAsync(); }
+            finally { await _autoUpload.DisposeAsync(); }
+        }
+        finally
+        {
+            // 已接收的手动操作与配置读写也必须退出，关闭后不再留下写入任务。
+            await _operationGate.WaitAsync();
+            try
+            {
+                await _settingsGate.WaitAsync();
+                _settingsGate.Release();
+            }
+            finally
+            {
+                _operationGate.Release();
+                _shutdown.Dispose();
+            }
+        }
+    }
 }

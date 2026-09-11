@@ -2,7 +2,7 @@ using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Contracts.Services.Statistics;
 
-public interface IStatisticsSyncService
+public interface IStatisticsSyncService : IAsyncDisposable
 {
     event EventHandler<StatisticsSyncStatusChangedEventArgs>? StatusChanged;
 

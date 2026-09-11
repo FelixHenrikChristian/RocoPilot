@@ -1,3 +1,4 @@
+using RocoPilot.Contracts.Services.Statistics;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 
@@ -55,6 +56,15 @@ public sealed partial class MainWindow : WindowEx
         }
         catch
         {
+        }
+
+        try
+        {
+            await App.GetService<IStatisticsSyncService>().DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "关闭云同步任务时发生异常");
         }
 
         try

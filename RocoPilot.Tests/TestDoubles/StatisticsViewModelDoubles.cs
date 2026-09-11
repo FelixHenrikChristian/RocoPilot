@@ -29,6 +29,7 @@ internal sealed class StatisticsUidCoordinatorStub : IStatisticsUidCoordinatorSe
 
 internal sealed class StatisticsSyncStub : IStatisticsSyncService
 {
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     public event EventHandler<StatisticsSyncStatusChangedEventArgs>? StatusChanged;
     public StatisticsSyncStatus CurrentStatus { get; private set; } = new();
     public void SetStatus(StatisticsSyncStatus status)

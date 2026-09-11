@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
@@ -73,23 +74,32 @@ internal sealed class RuntimeSession(RuntimeTaskState state, IScreenCaptureServi
 
     private async Task StopCoreAsync()
     {
+        var failures = new List<Exception>();
+        // 某个取消回调失败也不能跳过等待，否则后台任务可能继续使用已释放的截图后端。
+        await ObserveShutdownAsync(_cancellation.CancelAsync(), failures);
+        await ObserveShutdownAsync(Task.WhenAll(_loops), failures);
+        Task[] jobs;
+        lock (_gate) jobs = _jobs.ToArray();
+        await ObserveShutdownAsync(Task.WhenAll(jobs), failures);
         try
         {
-            _cancellation.Cancel();
-            try { await Task.WhenAll(_loops); }
-            finally
-            {
-                Task[] jobs;
-                lock (_gate) jobs = _jobs.ToArray();
-                await Task.WhenAll(jobs);
-            }
+            try { ClearFrame(); }
+            finally { capture.Release(State.TargetWindow, State.Options.CaptureMethod); }
         }
+        catch (Exception ex) { failures.Add(ex); }
+        finally { _cancellation.Dispose(); }
+
+        if (failures.Count == 1) ExceptionDispatchInfo.Capture(failures[0]).Throw();
+        if (failures.Count > 1) throw new AggregateException(failures);
+    }
+
+    private static async Task ObserveShutdownAsync(Task task, List<Exception> failures)
+    {
+        try { await task; }
         catch (OperationCanceledException) { }
-        finally
+        catch (Exception ex)
         {
-            ClearFrame();
-            capture.Release(State.TargetWindow, State.Options.CaptureMethod);
-            _cancellation.Dispose();
+            failures.Add(ex);
         }
     }
 }

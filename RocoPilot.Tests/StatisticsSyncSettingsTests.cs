@@ -20,7 +20,7 @@ public sealed class StatisticsSyncSettingsTests
             RemotePath = "original.json",
             LastSyncedRemoteEntityTag = "previous-version"
         });
-        var sync = CreateService(store);
+        await using var sync = CreateService(store);
         var settings = await sync.LoadSettingsAsync();
         settings.RemotePath = "changed.json";
         store.BeforeSave = _ => throw new IOException("save failed");
@@ -42,7 +42,7 @@ public sealed class StatisticsSyncSettingsTests
         var store = new ControlledSettingsStore();
         using var pause = new AsyncPause();
         store.BeforeRead = pause.PauseAsync;
-        var sync = CreateService(store);
+        await using var sync = CreateService(store);
         var first = sync.LoadSettingsAsync();
         await pause.WaitUntilEnteredAsync();
         var others = Enumerable.Range(0, 10).Select(_ => sync.LoadSettingsAsync()).ToArray();
@@ -57,7 +57,9 @@ public sealed class StatisticsSyncSettingsTests
     {
         var store = new ControlledSettingsStore();
         var statistics = new StatisticsService(store, NullLogger<StatisticsService>.Instance);
-        var sync = new StatisticsSyncService(store, statistics, NullLogger<StatisticsSyncService>.Instance, new StatisticsRemoteStoreStub(), new StatisticsCredentialsStub());
+        var delay = new ManualAsyncDelay();
+        await using var sync = new StatisticsSyncService(store, statistics, NullLogger<StatisticsSyncService>.Instance,
+            new StatisticsRemoteStoreStub(), new StatisticsCredentialsStub(), delay.DelayAsync);
         var settingsRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         store.BeforeRead = key =>
         {
@@ -67,7 +69,9 @@ public sealed class StatisticsSyncSettingsTests
 
         await statistics.MergeRemoteAsync(new StatisticsDocument(), null, false);
         Assert.IsFalse(settingsRead.Task.IsCompleted);
+        Assert.IsFalse(delay.HasPending);
         await statistics.AddAccountAsync("100");
+        (await delay.NextAsync()).Complete();
         await settingsRead.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.IsFalse((await sync.LoadSettingsAsync()).IsEnabled);
     }

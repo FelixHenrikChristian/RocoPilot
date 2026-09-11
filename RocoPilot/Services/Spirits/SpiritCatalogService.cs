@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using RocoPilot.Contracts.Services.Spirits;
+using RocoPilot.Core.Services;
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
@@ -18,7 +19,7 @@ using Windows.Storage;
 
 namespace RocoPilot.Services.Spirits;
 
-public sealed class SpiritCatalogService : ISpiritCatalogService
+public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
 {
     private const string BiligameSourceId = "biligame";
     private const string BiligameListUrl = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
@@ -43,23 +44,30 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         WriteIndented = true
     };
 
-    private readonly HttpClient _httpClient = CreateHttpClient();
+    private readonly HttpClient _httpClient;
+    private readonly string _bundledDataRoot;
     private readonly ILogger<SpiritCatalogService> _logger;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _localDataRoot;
-    private readonly Dictionary<string, SpiritCatalogDocument> _documents = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, IReadOnlyList<SpiritNameMatchCandidate>> _nameMatchCandidatesBySource =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SpiritCatalogSnapshot> _snapshots = new(StringComparer.OrdinalIgnoreCase);
 
     public SpiritCatalogService(
         IOptions<LocalSettingsOptions> options,
         ILogger<SpiritCatalogService> logger,
         ILocalSettingsService localSettingsService)
+        : this(ResolveLocalDataRoot(options.Value), AppContext.BaseDirectory, logger, localSettingsService, CreateHttpClient())
+    {
+    }
+
+    internal SpiritCatalogService(string localDataRoot, string bundledDataRoot,
+        ILogger<SpiritCatalogService> logger, ILocalSettingsService localSettingsService, HttpClient httpClient)
     {
         _logger = logger;
         _localSettingsService = localSettingsService;
-        _localDataRoot = ResolveLocalDataRoot(options.Value);
+        _localDataRoot = localDataRoot;
+        _bundledDataRoot = bundledDataRoot;
+        _httpClient = httpClient;
     }
 
     public IReadOnlyList<SpiritCatalogSourceOption> GetSources()
@@ -76,11 +84,16 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         string sourceId,
         CancellationToken cancellationToken = default)
     {
+        return (await LoadSnapshotAsync(sourceId, cancellationToken)).CreateDocument();
+    }
+
+    private async Task<SpiritCatalogSnapshot> LoadSnapshotAsync(string sourceId, CancellationToken cancellationToken)
+    {
         await _gate.WaitAsync(cancellationToken);
         try
         {
             var source = ResolveSource(sourceId);
-            if (_documents.TryGetValue(source.Id, out var cachedDocument))
+            if (_snapshots.TryGetValue(source.Id, out var cachedDocument))
             {
                 return cachedDocument;
             }
@@ -96,33 +109,25 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             {
                 var document = await ReadDocumentAsync(localPath, cancellationToken);
                 EnsureDocumentSource(document, source);
-                _documents[source.Id] = document;
-                _nameMatchCandidatesBySource.Remove(source.Id);
-                return document;
+                return CacheDocument(source, document);
             }
 
             if (File.Exists(bundledPath))
             {
                 var document = await ReadDocumentAsync(bundledPath, cancellationToken);
                 EnsureDocumentSource(document, source);
-                _documents[source.Id] = document;
-                _nameMatchCandidatesBySource.Remove(source.Id);
-                return document;
+                return CacheDocument(source, document);
             }
 
             var legacyDocument = await TryLoadLegacyDocumentAsync(source, cancellationToken);
             if (legacyDocument is not null)
             {
                 EnsureDocumentSource(legacyDocument, source);
-                _documents[source.Id] = legacyDocument;
-                _nameMatchCandidatesBySource.Remove(source.Id);
-                return legacyDocument;
+                return CacheDocument(source, legacyDocument);
             }
 
             var emptyDocument = CreateEmptyDocument(source);
-            _documents[source.Id] = emptyDocument;
-            _nameMatchCandidatesBySource.Remove(source.Id);
-            return emptyDocument;
+            return CacheDocument(source, emptyDocument);
         }
         finally
         {
@@ -150,10 +155,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
             await PersistCatalogAsync(source, document, progress, cancellationToken);
 
-            _documents[source.Id] = document;
-            _nameMatchCandidatesBySource.Remove(source.Id);
+            var snapshot = CacheDocument(source, document);
             progress?.Report(new SpiritCatalogSyncProgress(document.Spirits.Count, document.Spirits.Count, "图鉴数据同步完成"));
-            return document;
+            return snapshot.CreateDocument();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -172,83 +176,28 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
     }
 
     public async Task<string> MatchSpiritNameAsync(
-        string recognizedText,
-        double minimumSimilarity,
-        CancellationToken cancellationToken = default)
+        string recognizedText, double minimumSimilarity, CancellationToken cancellationToken = default)
     {
-        var query = TextMatchingHelper.NormalizeSpiritNameForMatching(recognizedText);
-        if (query.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        var threshold = Math.Clamp(minimumSimilarity, 0, 1);
-        var document = await LoadAsync(cancellationToken);
-        var source = ResolveDocumentSource(document) ?? SourceOptions[0];
-        if (!_nameMatchCandidatesBySource.TryGetValue(source.Id, out var candidates))
-        {
-            candidates = BuildNameMatchCandidates(document);
-            _nameMatchCandidatesBySource[source.Id] = candidates;
-        }
-        if (candidates.Count == 0)
-        {
-            return threshold <= 0 ? query : string.Empty;
-        }
-
-        SpiritNameMatchCandidate? bestCandidate = null;
-        var bestSimilarity = -1d;
-        foreach (var candidate in candidates)
-        {
-            foreach (var searchName in candidate.SearchNames)
-            {
-                var similarity = TextMatchingHelper.CalculateSimilarity(query, searchName);
-                if (similarity <= bestSimilarity)
-                {
-                    continue;
-                }
-
-                bestSimilarity = similarity;
-                bestCandidate = candidate;
-                if (similarity >= 1)
-                {
-                    return candidate.Name;
-                }
-            }
-        }
-
-        if (bestCandidate is null)
-        {
-            return threshold <= 0 ? query : string.Empty;
-        }
-
-        return threshold <= 0 || bestSimilarity >= threshold
-            ? bestCandidate.Name
-            : string.Empty;
+        if (TextMatchingHelper.NormalizeSpiritNameForMatching(recognizedText).Length == 0) return string.Empty;
+        var snapshot = await LoadSnapshotAsync(await ResolvePreferredSourceIdAsync(), cancellationToken);
+        return snapshot.Index.Match(recognizedText, minimumSimilarity);
     }
 
-    public async Task<string> ResolveEvolutionRecordNameAsync(
-        string spiritName,
-        CancellationToken cancellationToken = default)
+    public async Task<string> ResolveEvolutionRecordNameAsync(string spiritName, CancellationToken cancellationToken = default)
     {
-        var normalizedName = TextMatchingHelper.NormalizeSpiritNameForMatching(spiritName);
-        if (normalizedName.Length == 0)
-        {
-            return string.Empty;
-        }
-
-        var document = await LoadAsync(cancellationToken);
-        var item = FindCatalogItemByName(document, normalizedName);
-        if (item is null)
-        {
-            return TextMatchingHelper.NormalizeSpiritNameForDisplay(spiritName);
-        }
-
-        var representativeName = ResolveRepresentativeName(document, item, item.BaseId, item.BaseName);
-
-        return string.IsNullOrWhiteSpace(representativeName)
-            ? BuildDisplayName(item)
-            : representativeName;
+        if (TextMatchingHelper.NormalizeSpiritNameForMatching(spiritName).Length == 0) return string.Empty;
+        var snapshot = await LoadSnapshotAsync(await ResolvePreferredSourceIdAsync(), cancellationToken);
+        return snapshot.Index.ResolveEvolutionRecordName(spiritName);
     }
+
+    private SpiritCatalogSnapshot CacheDocument(SpiritCatalogSourceOption source, SpiritCatalogDocument document)
+    {
+        var snapshot = new SpiritCatalogSnapshot(document);
+        _snapshots[source.Id] = snapshot;
+        return snapshot;
+    }
+
+    public void Dispose() => _httpClient.Dispose();
 
     public string? ResolveAvatarPath(string? avatarPath)
     {
@@ -266,57 +215,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         var candidates = new[]
         {
             Path.Combine(_localDataRoot, normalizedPath),
-            Path.Combine(AppContext.BaseDirectory, normalizedPath),
-            Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", normalizedPath)
+            Path.Combine(_bundledDataRoot, normalizedPath),
+            Path.Combine(_bundledDataRoot, "Configuration", "Spirits", normalizedPath)
         };
 
         return candidates.FirstOrDefault(File.Exists);
-    }
-
-    private static SpiritCatalogItem? FindCatalogItemByName(SpiritCatalogDocument document, string normalizedName)
-    {
-        return document.Spirits.FirstOrDefault(item => IsCatalogItemNameMatch(item, normalizedName));
-    }
-
-    private static bool IsCatalogItemNameMatch(SpiritCatalogItem item, string normalizedName)
-    {
-        return IsNameMatch(item.Name, normalizedName)
-            || IsNameMatch(item.WikiName, normalizedName)
-            || IsNameMatch(BuildDisplayName(item), normalizedName)
-            || item.Aliases.Any(alias => IsNameMatch(alias, normalizedName));
-    }
-
-    private static bool IsNameMatch(string? name, string normalizedName)
-    {
-        return string.Equals(
-            TextMatchingHelper.NormalizeSpiritNameForMatching(name),
-            normalizedName,
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string ResolveRepresentativeName(
-        SpiritCatalogDocument document,
-        SpiritCatalogItem item,
-        string representativeId,
-        string fallbackName)
-    {
-        var representative = document.Spirits.FirstOrDefault(candidate =>
-                string.Equals(candidate.ChainId, item.ChainId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(candidate.Id, representativeId, StringComparison.OrdinalIgnoreCase)
-                && TextMatchingHelper.AreSameSpiritName(candidate.Name, fallbackName))
-            ?? document.Spirits.FirstOrDefault(candidate =>
-                string.Equals(candidate.ChainId, item.ChainId, StringComparison.OrdinalIgnoreCase)
-                && TextMatchingHelper.AreSameSpiritName(candidate.Name, fallbackName))
-            ?? document.Spirits.FirstOrDefault(candidate =>
-                string.Equals(candidate.ChainId, item.ChainId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(candidate.Id, representativeId, StringComparison.OrdinalIgnoreCase))
-            ?? document.Spirits.FirstOrDefault(candidate =>
-                string.Equals(candidate.Id, representativeId, StringComparison.OrdinalIgnoreCase));
-
-        var representativeName = representative is null
-            ? fallbackName
-            : BuildDisplayName(representative);
-        return TextMatchingHelper.NormalizeSpiritNameForDisplay(representativeName);
     }
 
     private static SpiritCatalogSourceOption ResolveSource(string? sourceId)
@@ -484,7 +387,11 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
 
         progress?.Report(new SpiritCatalogSyncProgress(0, 0, "正在写入图鉴数据"));
         await WriteDocumentAsync(GetLocalDataPath(source), document, cancellationToken);
-        await UpdateBundledCatalogMarkerAsync(source, cancellationToken);
+        // 文档提交后，标记和旧头像清理失败不应阻止新快照发布。
+        try { await UpdateBundledCatalogMarkerAsync(source, CancellationToken.None); }
+        catch (Exception ex) { _logger.LogWarning(ex, "更新图鉴版本标记失败。"); }
+        try { PruneUnreferencedAvatarFiles(document, avatarDirectory); }
+        catch (Exception ex) { _logger.LogWarning(ex, "清理旧图鉴头像失败。"); }
     }
 
     private async Task UpdateBundledCatalogMarkerAsync(
@@ -500,7 +407,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         var marker = await BuildBundledCatalogMarkerAsync(bundledPath, cancellationToken);
         var markerPath = GetBundledCatalogMarkerPath(source);
         Directory.CreateDirectory(Path.GetDirectoryName(markerPath)!);
-        await File.WriteAllTextAsync(markerPath, marker + Environment.NewLine, cancellationToken);
+        await AtomicFileWriter.WriteAllTextAsync(markerPath, marker + Environment.NewLine, cancellationToken);
     }
 
     private static async Task WriteDocumentAsync(
@@ -509,7 +416,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(
+        await AtomicFileWriter.WriteAllTextAsync(
             path,
             JsonSerializer.Serialize(document, JsonOptions) + Environment.NewLine,
             cancellationToken);
@@ -580,9 +487,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return Path.Combine(GetLocalSourceDirectory(source), BundledCatalogMarkerFileName);
     }
 
-    private static string GetBundledDataPath(SpiritCatalogSourceOption source)
+    private string GetBundledDataPath(SpiritCatalogSourceOption source)
     {
-        return Path.Combine(GetBundledSourceDirectory(AppContext.BaseDirectory, source.Id), DataFileName);
+        return Path.Combine(GetBundledSourceDirectory(_bundledDataRoot, source.Id), DataFileName);
     }
 
     private static string GetBundledSourceDirectory(string root, string sourceId)
@@ -595,9 +502,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return Path.Combine(_localDataRoot, "Spirits", DataFileName);
     }
 
-    private static string GetLegacyBundledDataPath()
+    private string GetLegacyBundledDataPath()
     {
-        return Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", DataFileName);
+        return Path.Combine(_bundledDataRoot, "Configuration", "Spirits", DataFileName);
     }
 
     private async Task ApplyBundledCatalogUpdateAsync(
@@ -619,10 +526,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
-        File.Copy(bundledPath, localPath, overwrite: true);
-        await File.WriteAllTextAsync(markerPath, bundledMarker + Environment.NewLine, cancellationToken);
-        _documents.Remove(source.Id);
-        _nameMatchCandidatesBySource.Remove(source.Id);
+        await AtomicFileWriter.WriteAllBytesAsync(localPath, await File.ReadAllBytesAsync(bundledPath, cancellationToken), cancellationToken);
+        await AtomicFileWriter.WriteAllTextAsync(markerPath, bundledMarker + Environment.NewLine, cancellationToken);
+        _snapshots.Remove(source.Id);
     }
 
     private static async Task<string> BuildBundledCatalogMarkerAsync(
@@ -799,7 +705,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             try
             {
                 var bytes = await _httpClient.GetByteArrayAsync(avatarUrl, cancellationToken);
-                await File.WriteAllBytesAsync(outputPath, bytes, cancellationToken);
+                await AtomicFileWriter.WriteAllBytesAsync(outputPath, bytes, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -840,7 +746,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
                 cancellationToken);
         }
 
-        PruneUnreferencedAvatarFiles(document, avatarDirectory);
     }
 
     private static async Task<string> NormalizeAvatarFileAsync(
@@ -901,57 +806,6 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
             {
                 _logger.LogWarning(ex, "清理未引用精灵头像失败：{AvatarPath}", file);
             }
-        }
-    }
-
-    private static IReadOnlyList<SpiritNameMatchCandidate> BuildNameMatchCandidates(SpiritCatalogDocument document)
-    {
-        var candidates = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var item in document.Spirits)
-        {
-            var displayName = BuildDisplayName(item);
-            if (displayName.Length == 0)
-            {
-                continue;
-            }
-
-            if (!candidates.TryGetValue(displayName, out var searchNames))
-            {
-                searchNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                candidates[displayName] = searchNames;
-            }
-
-            AddSearchName(searchNames, item.Name);
-            AddSearchName(searchNames, item.WikiName);
-            foreach (var alias in item.Aliases)
-            {
-                AddSearchName(searchNames, alias);
-            }
-
-            searchNames.Add(displayName);
-        }
-
-        return candidates
-            .Select(pair => new SpiritNameMatchCandidate(pair.Key, pair.Value.ToList()))
-            .OrderBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private static string BuildDisplayName(SpiritCatalogItem item)
-    {
-        var wikiName = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.WikiName);
-        return wikiName.Length == 0
-            ? TextMatchingHelper.NormalizeSpiritNameForDisplay(item.Name)
-            : wikiName;
-    }
-
-    private static void AddSearchName(HashSet<string> searchNames, string? name)
-    {
-        var normalizedName = TextMatchingHelper.NormalizeSpiritNameForMatching(name);
-        if (normalizedName.Length > 0)
-        {
-            searchNames.Add(normalizedName);
         }
     }
 
@@ -1019,5 +873,4 @@ public sealed class SpiritCatalogService : ISpiritCatalogService
         return path.Replace(Path.DirectorySeparatorChar, '/');
     }
 
-    private sealed record SpiritNameMatchCandidate(string Name, IReadOnlyList<string> SearchNames);
 }

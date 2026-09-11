@@ -215,6 +215,80 @@ public sealed class StatisticsServiceTests
         Assert.AreEqual(0, service.GetSelectedAccountPendingShinyCaptures().Count);
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task QueuedWriteKeepsAccountThatWasSelectedWhenRequested(bool automatic)
+    {
+        var (service, store) = await CreateServiceAsync();
+        await service.AddAccountAsync("200");
+        using var pause = new AsyncPause();
+        store.BeforeSave = pause.PauseAsync;
+        var holdingLock = service.AddAccountAsync("300");
+        await pause.WaitUntilEnteredAsync();
+        var queued = automatic ? service.RecordEncounterAsync(Season, "精灵", Now)
+            : service.UpsertEncounterAsync("S3", "精灵", 1, Now);
+        service.SetSelectedAccountUid("200");
+        service.SetActiveAccountUid("200");
+        pause.Dispose();
+        await Task.WhenAll(holdingLock, queued);
+        Assert.AreEqual(2, Count(service.CurrentDocument));
+        Assert.AreEqual(0, service.CurrentDocument.Accounts.Single(account => account.Uid == "200").Seasons.Count);
+    }
+
+    [TestMethod]
+    public async Task DeletedQueuedManualTargetNeverFallsBackToAnotherAccount()
+    {
+        var (service, store) = await CreateServiceAsync();
+        await service.AddAccountAsync("200");
+        using var pause = new AsyncPause();
+        store.BeforeSave = pause.PauseAsync;
+        var deleting = service.DeleteAccountAsync("100");
+        await pause.WaitUntilEnteredAsync();
+        var editing = service.UpsertEncounterAsync("S3", "精灵", 1, Now);
+        var saves = store.SaveCount;
+        pause.Dispose();
+        await deleting;
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => editing);
+        Assert.AreEqual(saves, store.SaveCount);
+        Assert.AreEqual("200", service.SelectedAccountUid);
+        Assert.AreEqual(0, service.CurrentDocument.Accounts.Single().Seasons.Count);
+    }
+
+    [TestMethod]
+    public async Task DeletedAutomaticTargetIsSkippedWithoutClearingNewActiveAccount()
+    {
+        var (service, store) = await CreateServiceAsync();
+        await service.AddAccountAsync("200");
+        using var pause = new AsyncPause();
+        store.BeforeSave = pause.PauseAsync;
+        var deleting = service.DeleteAccountAsync("100");
+        await pause.WaitUntilEnteredAsync();
+        var recording = service.RecordEncounterAsync(Season, "精灵", Now);
+        service.SetActiveAccountUid("200");
+        pause.Dispose();
+        await Task.WhenAll(deleting, recording);
+        Assert.AreEqual("200", service.ActiveAccountUid);
+        Assert.IsFalse(service.IsActiveAccountSelectionRequired);
+        Assert.AreEqual(0, service.CurrentDocument.Accounts.Single().Seasons.Count);
+    }
+
+    [TestMethod]
+    public async Task RecordRequestedBeforeUidConfirmationIsNotCreditedLater()
+    {
+        var (service, store) = await CreateServiceAsync();
+        service.RequireActiveAccountSelection();
+        using var pause = new AsyncPause();
+        store.BeforeSave = pause.PauseAsync;
+        var holdingLock = service.AddAccountAsync("200");
+        await pause.WaitUntilEnteredAsync();
+        var recording = service.RecordEncounterAsync(Season, "精灵", Now);
+        service.SetActiveAccountUid("100");
+        pause.Dispose();
+        await Task.WhenAll(holdingLock, recording);
+        Assert.AreEqual(1, Count(service.CurrentDocument));
+    }
+
     private static async Task<(StatisticsService, ControlledSettingsStore)> CreateServiceAsync()
     {
         var store = new ControlledSettingsStore();

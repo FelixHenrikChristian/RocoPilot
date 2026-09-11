@@ -427,9 +427,30 @@ public sealed class StatisticsService : IStatisticsService
         Action<AccountStatisticsData> update,
         bool useActiveAccount = false)
     {
+        // 账号属于这次操作的上下文，不能等拿到写锁后再读取用户的新选择。
+        var selectionRequired = useActiveAccount && IsActiveAccountSelectionRequired;
+        var targetUid = (useActiveAccount ? ActiveAccountUid : null)
+            ?? SelectedAccountUid
+            ?? Volatile.Read(ref _document).Accounts.FirstOrDefault()?.Uid;
         return UpdateAsync(document =>
         {
-            var account = useActiveAccount ? ResolveActiveAccount(document) : ResolveTargetAccount(document);
+            if (selectionRequired)
+            {
+                LogMissingActiveAccountOnce("尚未确认本次启动使用的统计账号，本次自动统计已跳过。");
+                return document;
+            }
+
+            // 首次载入前尚无默认账号时，才从载入的数据中选第一个账号。
+            var account = targetUid is null ? document.Accounts.FirstOrDefault() : document.Accounts.FirstOrDefault(item =>
+                string.Equals(item.Uid, targetUid, StringComparison.OrdinalIgnoreCase));
+            if (account is null && !useActiveAccount)
+                throw new InvalidOperationException("操作对应的统计账号已不存在，请重新选择账号后重试。");
+            if (account is null)
+            {
+                if (string.Equals(ActiveAccountUid, targetUid, StringComparison.OrdinalIgnoreCase))
+                    RequireActiveAccountSelection();
+                LogMissingActiveAccountOnce($"统计账号 {targetUid} 已不存在，本次自动统计已跳过。");
+            }
             if (account is not null) update(account);
             return document;
         });
@@ -495,54 +516,6 @@ public sealed class StatisticsService : IStatisticsService
         // 保存期间用户可能切换账号，只修复仍指向被删除账号的选择。
         var nextUid = document.Accounts.FirstOrDefault()?.Uid;
         return Interlocked.CompareExchange(ref _selectedAccountUid, nextUid, selectedUid) == selectedUid;
-    }
-
-    private AccountStatisticsData? ResolveTargetAccount(StatisticsDocument document)
-    {
-        var account = !string.IsNullOrWhiteSpace(_selectedAccountUid)
-            ? document.Accounts.FirstOrDefault(account =>
-                string.Equals(account.Uid, _selectedAccountUid, StringComparison.OrdinalIgnoreCase))
-            : null;
-
-        if (account is not null)
-        {
-            return account;
-        }
-
-        account = document.Accounts.FirstOrDefault();
-        if (account is not null)
-        {
-            return account;
-        }
-
-        _logger.LogWarning("没有可写入的统计账号，本次奇遇记录已跳过。");
-        return null;
-    }
-
-    private AccountStatisticsData? ResolveActiveAccount(StatisticsDocument document)
-    {
-        if (IsActiveAccountSelectionRequired)
-        {
-            LogMissingActiveAccountOnce("尚未确认本次启动使用的统计账号，本次自动统计已跳过。");
-            return null;
-        }
-
-        var activeAccountUid = ActiveAccountUid;
-        if (!string.IsNullOrWhiteSpace(activeAccountUid))
-        {
-            var activeAccount = document.Accounts.FirstOrDefault(account =>
-                string.Equals(account.Uid, activeAccountUid, StringComparison.OrdinalIgnoreCase));
-            if (activeAccount is not null)
-            {
-                return activeAccount;
-            }
-
-            RequireActiveAccountSelection();
-            LogMissingActiveAccountOnce($"本次启动的统计账号 {activeAccountUid} 已不存在，本次自动统计已跳过。");
-            return null;
-        }
-
-        return ResolveTargetAccount(document);
     }
 
     private AccountStatisticsData? ResolveActiveAccountForRead(StatisticsDocument document)

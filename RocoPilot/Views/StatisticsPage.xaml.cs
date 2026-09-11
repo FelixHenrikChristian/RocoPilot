@@ -78,7 +78,7 @@ public sealed partial class StatisticsPage : Page
         }
         else
         {
-            ViewModel.SelectedAccount = account;
+            ViewModel.SelectAccount(account);
         }
 
         AccountSelectorFlyout.Hide();
@@ -536,7 +536,7 @@ public sealed partial class StatisticsPage : Page
         }
 
         await ViewModel.AddShinyAsync(
-            ViewModel.DefaultShinyAddSeasonId,
+            ViewModel.Overview.DefaultShinyAddSeasonId,
             input.Name,
             input.Count,
             input.CapturedAt,
@@ -552,7 +552,7 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var details = ViewModel.GetShinyCaptureDetails(item).ToList();
+        var details = ViewModel.Overview.GetShinyCaptureDetails(item).ToList();
         if (details.Count == 0)
         {
             return;

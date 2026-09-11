@@ -33,50 +33,16 @@ public partial class StatisticsViewModel : ObservableRecipient
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly ILogger<StatisticsViewModel> _logger;
-    private readonly DispatcherQueue? _dispatcherQueue;
+    private readonly Action<Action> _dispatch;
 
-    private StatisticsDocument _document;
+    private Task? _loadTask;
     private bool _isLoaded;
+    private int _statisticsRefreshQueued;
+    private EncounterSeasonConfig _seasonConfig = new();
+
     private IReadOnlyDictionary<string, string> _spiritAvatarPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-    private IReadOnlyList<AccountStatisticsOption> _accounts = [];
-    private AccountStatisticsOption? _selectedAccount;
-    private IReadOnlyList<ShinyScopeOption> _shinyScopes = [new("全部")];
-    private int _selectedSeasonIndex;
-    private int _selectedShinyScopeIndex;
-    private IReadOnlyList<SeasonStatisticsGroup> _seasons = [];
-    private IReadOnlyList<SpiritCountItem> _allShinyCounts = [];
-    private IReadOnlyList<PendingShinyCaptureItem> _pendingShinyCaptures = [];
-    private string? _editingPendingShinyId;
-    private string _pendingShinyEditName = string.Empty;
-    private double _pendingShinyEditEncounterCount;
-
-    public IReadOnlyList<AccountStatisticsOption> Accounts
-    {
-        get => _accounts;
-        private set => SetProperty(ref _accounts, value);
-    }
-
-    public AccountStatisticsOption? SelectedAccount
-    {
-        get => _selectedAccount;
-        set
-        {
-            if (value is not null && _statisticsService.IsActiveAccountSelectionRequired)
-            {
-                _statisticsService.SetSelectedAccountUid(value.Uid);
-            }
-
-            if (SetProperty(ref _selectedAccount, value))
-            {
-                _statisticsService.SetSelectedAccountUid(value?.Uid);
-                OnPropertyChanged(nameof(SelectedAccountDisplayName));
-                RefreshSelectedAccount();
-            }
-        }
-    }
-
-    public string SelectedAccountDisplayName => SelectedAccount?.DisplayName ?? "未选择账号";
+    public StatisticsOverviewViewModel Overview { get; } = new();
 
     public StatisticsUidConfirmationRequest? PendingUidConfirmation =>
         _statisticsUidCoordinatorService.PendingConfirmation;
@@ -88,137 +54,6 @@ public partial class StatisticsViewModel : ObservableRecipient
         PendingUidConfirmation?.Message ?? "统计账号尚未确认";
 
     public event EventHandler? UidConfirmationChanged;
-
-    public IReadOnlyList<ShinyScopeOption> ShinyScopes
-    {
-        get => _shinyScopes;
-        private set => SetProperty(ref _shinyScopes, value);
-    }
-
-    public int SelectedSeasonIndex
-    {
-        get => _selectedSeasonIndex;
-        set
-        {
-            var nextIndex = Seasons.Count == 0
-                ? 0
-                : Math.Clamp(value, 0, Seasons.Count - 1);
-            if (SetProperty(ref _selectedSeasonIndex, nextIndex))
-            {
-                OnPropertyChanged(nameof(SelectedSeason));
-                OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
-            }
-        }
-    }
-
-    public int SelectedShinyScopeIndex
-    {
-        get => _selectedShinyScopeIndex;
-        set
-        {
-            var nextIndex = ShinyScopes.Count == 0
-                ? 0
-                : Math.Clamp(value, 0, ShinyScopes.Count - 1);
-            if (SetProperty(ref _selectedShinyScopeIndex, nextIndex))
-            {
-                OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
-                OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
-                NotifySelectedShinyChanged();
-            }
-        }
-    }
-
-    public IReadOnlyList<SpiritCountItem> AllShinyCounts
-    {
-        get => _allShinyCounts;
-        private set => SetProperty(ref _allShinyCounts, value);
-    }
-
-    public IReadOnlyList<PendingShinyCaptureItem> PendingShinyCaptures
-    {
-        get => _pendingShinyCaptures;
-        private set => SetProperty(ref _pendingShinyCaptures, value);
-    }
-
-    public int PendingShinyCount => PendingShinyCaptures.Count;
-
-    public PendingShinyCaptureItem? LatestPendingShinyCapture => PendingShinyCaptures.FirstOrDefault();
-
-    public Visibility PendingShinyBadgeVisibility => PendingShinyCount > 0
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
-    public Visibility PendingShinyConfirmationVisibility => PendingShinyCount > 0
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
-    public string PendingShinyEditName
-    {
-        get => _pendingShinyEditName;
-        set
-        {
-            if (SetProperty(ref _pendingShinyEditName, value))
-            {
-                UpdatePendingShinyEncounterCountFromName();
-            }
-        }
-    }
-
-    public double PendingShinyEditEncounterCount
-    {
-        get => _pendingShinyEditEncounterCount;
-        set
-        {
-            var nextValue = double.IsNaN(value) ? 0 : Math.Max(0, value);
-            SetProperty(ref _pendingShinyEditEncounterCount, nextValue);
-        }
-    }
-
-    public string PendingShinySeasonDisplay => LatestPendingShinyCapture?.SeasonDisplay ?? "--";
-
-    public string PendingShinyDetectedAtDisplay => LatestPendingShinyCapture?.DetectedAtDisplay ?? "--";
-
-    public BitmapImage? LatestPendingShinyAvatar => LatestPendingShinyCapture?.Avatar;
-
-    public Visibility LatestPendingShinyAvatarVisibility => LatestPendingShinyAvatar is null
-        ? Visibility.Collapsed
-        : Visibility.Visible;
-
-    public Visibility LatestPendingShinyAvatarFallbackVisibility => LatestPendingShinyAvatar is null
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
-    public string PendingShinyQueueDisplay => PendingShinyCount > 1
-        ? $"还有 {PendingShinyCount - 1} 条待确认"
-        : "当前仅此一条";
-
-    public int TotalAllShiny => AllShinyCounts.Sum(item => item.Count);
-
-    public IReadOnlyList<SpiritCountItem> SelectedShinyCounts => SelectedShinyScopeIndex == 0
-        ? AllShinyCounts
-        : Seasons.ElementAtOrDefault(SelectedShinyScopeIndex - 1)?.ShinyCounts ?? [];
-
-    public int TotalSelectedShiny => SelectedShinyCounts.Sum(item => item.Count);
-
-    public string SelectedShinyDateDisplay => SelectedShinyScopeIndex == 0
-        ? StatisticsProjection.BuildAllSeasonDateDisplay(Seasons)
-        : Seasons.ElementAtOrDefault(SelectedShinyScopeIndex - 1)?.SeasonDateDisplay ?? "无记录";
-
-    public IReadOnlyList<SeasonStatisticsGroup> Seasons
-    {
-        get => _seasons;
-        private set => SetProperty(ref _seasons, value);
-    }
-
-    public SeasonStatisticsGroup? SelectedSeason => Seasons.ElementAtOrDefault(SelectedSeasonIndex);
-
-    public string? SelectedShinyScopeSeasonId => SelectedShinyScopeIndex == 0
-        ? null
-        : Seasons.ElementAtOrDefault(SelectedShinyScopeIndex - 1)?.Id;
-
-    public string? DefaultShinyAddSeasonId => SelectedShinyScopeSeasonId
-        ?? SelectedSeason?.Id
-        ?? Seasons.FirstOrDefault()?.Id;
 
     private bool _isNotificationOpen;
     private InfoBarSeverity _notificationSeverity = InfoBarSeverity.Informational;
@@ -275,6 +110,19 @@ public partial class StatisticsViewModel : ObservableRecipient
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         ILogger<StatisticsViewModel> logger)
+        : this(statisticsService, statisticsUidCoordinatorService, statisticsSyncService,
+            encounterSeasonConfigService, spiritCatalogService, logger, CreateDispatcher())
+    {
+    }
+
+    internal StatisticsViewModel(
+        IStatisticsService statisticsService,
+        IStatisticsUidCoordinatorService statisticsUidCoordinatorService,
+        IStatisticsSyncService statisticsSyncService,
+        IEncounterSeasonConfigService encounterSeasonConfigService,
+        ISpiritCatalogService spiritCatalogService,
+        ILogger<StatisticsViewModel> logger,
+        Action<Action> dispatch)
     {
         _statisticsService = statisticsService;
         _statisticsUidCoordinatorService = statisticsUidCoordinatorService;
@@ -282,14 +130,14 @@ public partial class StatisticsViewModel : ObservableRecipient
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _logger = logger;
-        _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
-        _document = _statisticsService.CurrentDocument;
+        _dispatch = dispatch;
+        _seasonConfig = LoadEncounterSeasonConfig();
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
         _statisticsService.SelectedAccountChanged += StatisticsService_SelectedAccountChanged;
         _statisticsUidCoordinatorService.PendingConfirmationChanged +=
             StatisticsUidCoordinatorService_PendingConfirmationChanged;
         _statisticsSyncService.StatusChanged += StatisticsSyncService_StatusChanged;
-        ApplyDocument(_document);
+        RefreshStatistics();
         ApplySyncStatus(_statisticsSyncService.CurrentStatus);
     }
 
@@ -311,33 +159,46 @@ public partial class StatisticsViewModel : ObservableRecipient
         return _statisticsUidCoordinatorService.ConfirmUidAsync(uid, cancellationToken);
     }
 
-    public async Task LoadAsync()
+    public Task LoadAsync()
+    {
+        // 同一页面重复 Loaded 时共用加载任务；读取失败后下次进入仍可重试。
+        return _loadTask is { IsCompleted: false } ? _loadTask : _loadTask = LoadCoreAsync();
+    }
+
+    private async Task LoadCoreAsync()
     {
         if (_isLoaded)
         {
-            await LoadSpiritAvatarPathsAsync();
-            ApplySyncStatus(await _statisticsSyncService.LoadStatusAsync());
-            return;
+            _seasonConfig = LoadEncounterSeasonConfig();
+        }
+        else
+        {
+            try
+            {
+                await _statisticsService.LoadAsync();
+                _isLoaded = true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "读取统计数据失败。");
+                ShowNotification(InfoBarSeverity.Warning, "读取统计失败", "已使用当前内存统计数据。");
+            }
         }
 
-        _isLoaded = true;
-        try
-        {
-            ApplyDocument(await _statisticsService.LoadAsync());
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "读取统计数据失败。");
-            ShowNotification(InfoBarSeverity.Warning, "读取统计失败", "已使用当前内存统计数据。");
-        }
-
+        RefreshStatistics();
         await LoadSpiritAvatarPathsAsync();
-        ApplySyncStatus(await _statisticsSyncService.LoadStatusAsync());
+        await _statisticsSyncService.LoadStatusAsync();
+        ApplySyncStatus(_statisticsSyncService.CurrentStatus);
+    }
+
+    public void SelectAccount(AccountStatisticsOption account)
+    {
+        _statisticsService.SetSelectedAccountUid(account.Uid);
     }
 
     public string ExportToJson()
     {
-        var exportDocument = CloneDocument(_document);
+        var exportDocument = _statisticsService.CurrentDocument;
         exportDocument.Info = new StatisticsDocumentInfo
         {
             Format = StatisticsDocumentFormats.RocoPilotStatistics,
@@ -362,11 +223,11 @@ public partial class StatisticsViewModel : ObservableRecipient
             throw new InvalidOperationException("不是 RocoPilot 统计数据文件。");
         }
 
-        ApplyDocument(await _statisticsService.ReplaceAsync(document));
+        var imported = await _statisticsService.ReplaceAsync(document);
         ShowNotification(
             InfoBarSeverity.Success,
             "导入完成",
-            $"已导入 {Accounts.Count} 个账号，{Seasons.Count} 个赛季。");
+            $"已导入 {imported.Accounts.Count} 个账号的统计记录。");
     }
 
     public async Task<bool> AddAccountAsync(string uid)
@@ -378,35 +239,34 @@ public partial class StatisticsViewModel : ObservableRecipient
             return false;
         }
 
-        if (_document.Accounts.Any(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase)))
+        if (_statisticsService.CurrentDocument.Accounts.Any(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase)))
         {
             ShowNotification(InfoBarSeverity.Warning, "添加失败", $"账号 {uid} 已存在。");
             return false;
         }
 
-        var document = await _statisticsService.AddAccountAsync(uid);
+        await _statisticsService.AddAccountAsync(uid);
         _statisticsService.SetSelectedAccountUid(uid);
-        ApplyDocument(document, uid);
         ShowNotification(InfoBarSeverity.Success, "已添加账号", $"已添加账号 {uid}。");
         return true;
     }
 
     public async Task DeleteAccountAsync(string uid)
     {
-        var exists = _document.Accounts.Any(account =>
+        var exists = _statisticsService.CurrentDocument.Accounts.Any(account =>
             string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase));
         if (!exists)
         {
             return;
         }
 
-        ApplyDocument(await _statisticsService.DeleteAccountAsync(uid));
+        await _statisticsService.DeleteAccountAsync(uid);
         ShowNotification(InfoBarSeverity.Success, "已删除账号", $"已删除账号 {uid} 及其统计记录。");
     }
 
     public async Task ClearAllAsync()
     {
-        ApplyDocument(await _statisticsService.ClearAsync());
+        await _statisticsService.ClearAsync();
         ShowNotification(InfoBarSeverity.Success, "已清空", "已清空所有账号和统计记录。");
     }
 
@@ -418,7 +278,7 @@ public partial class StatisticsViewModel : ObservableRecipient
             return false;
         }
 
-        ApplyDocument(await _statisticsService.UpsertEncounterAsync(seasonId, name, count, DateTimeOffset.Now));
+        await _statisticsService.UpsertEncounterAsync(seasonId, name, count, DateTimeOffset.Now);
         ShowNotification(InfoBarSeverity.Success, "已添加奇遇", $"已添加 {name} x{count}。");
         return true;
     }
@@ -431,19 +291,19 @@ public partial class StatisticsViewModel : ObservableRecipient
             return false;
         }
 
-        ApplyDocument(await _statisticsService.EditEncounterAsync(
+        await _statisticsService.EditEncounterAsync(
             seasonId,
             item.Name,
             nextName,
             nextCount,
-            DateTimeOffset.Now));
+            DateTimeOffset.Now);
         ShowNotification(InfoBarSeverity.Success, "已更新奇遇", $"已更新 {nextName}。");
         return true;
     }
 
     public async Task DeleteEncounterAsync(string seasonId, SpiritCountItem item)
     {
-        ApplyDocument(await _statisticsService.DeleteEncounterAsync(seasonId, item.Name));
+        await _statisticsService.DeleteEncounterAsync(seasonId, item.Name);
         ShowNotification(InfoBarSeverity.Success, "已删除奇遇", $"已删除 {item.Name}。");
     }
 
@@ -455,20 +315,20 @@ public partial class StatisticsViewModel : ObservableRecipient
         bool resetEncounterCount = false,
         int? encounterCountBeforeCapture = null)
     {
-        seasonId = string.IsNullOrWhiteSpace(seasonId) ? DefaultShinyAddSeasonId : seasonId.Trim();
+        seasonId = string.IsNullOrWhiteSpace(seasonId) ? Overview.DefaultShinyAddSeasonId : seasonId.Trim();
         name = CleanSpiritName(name);
         if (!ValidateStatisticInput(seasonId, name, count))
         {
             return false;
         }
 
-        ApplyDocument(await _statisticsService.AddShinyCapturesAsync(
+        await _statisticsService.AddShinyCapturesAsync(
             seasonId!,
             name,
             count,
             capturedAt ?? DateTimeOffset.Now,
             resetEncounterCount,
-            encounterCountBeforeCapture));
+            encounterCountBeforeCapture);
         var message = resetEncounterCount
             ? $"已添加 {name} x{count}，并清空对应奇遇计数。"
             : $"已添加 {name} x{count}。";
@@ -483,7 +343,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         DateTimeOffset capturedAt)
     {
         nextName = CleanSpiritName(nextName);
-        if (SelectedAccount is null)
+        if (Overview.SelectedAccount is null)
         {
             ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先添加或选择账号。");
             return false;
@@ -495,51 +355,42 @@ public partial class StatisticsViewModel : ObservableRecipient
             return false;
         }
 
-        ApplyDocument(await _statisticsService.EditShinyCaptureAsync(
+        await _statisticsService.EditShinyCaptureAsync(
             item.Id,
             nextName,
             Math.Max(0, encounterCountBeforeCapture),
-            capturedAt));
+            capturedAt);
         ShowNotification(InfoBarSeverity.Success, "已更新异色", $"已更新 {nextName}。");
         return true;
     }
 
     public async Task DeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
     {
-        ApplyDocument(await _statisticsService.DeleteShinyCaptureAsync(item.Id));
+        await _statisticsService.DeleteShinyCaptureAsync(item.Id);
         ShowNotification(InfoBarSeverity.Success, "已删除异色", $"已删除 {item.Name}。");
-    }
-
-    public IReadOnlyList<ShinyCaptureDetailItem> GetShinyCaptureDetails(SpiritCountItem item)
-    {
-        return StatisticsProjection.BuildShinyCaptureDetails(
-            FindSelectedAccount(),
-            SelectedShinyScopeSeasonId,
-            item.Name,
-            ResolveSpiritAvatar);
     }
 
     public async Task ConfirmLatestPendingShinyAsync()
     {
-        var pendingCapture = LatestPendingShinyCapture;
+        var pendingCapture = Overview.LatestPendingShinyCapture;
         if (pendingCapture is null)
         {
             return;
         }
 
-        var spiritName = CleanSpiritName(PendingShinyEditName);
+        var spiritName = CleanSpiritName(Overview.PendingEditor.Name);
         if (string.IsNullOrWhiteSpace(spiritName))
         {
             ShowNotification(InfoBarSeverity.Warning, "确认失败", "精灵名不能为空。");
             return;
         }
 
-        var encounterCount = (int)Math.Round(PendingShinyEditEncounterCount);
-        ApplyDocument(await _statisticsService.ConfirmPendingShinyCaptureAsync(
+        var encounterCount = (int)Math.Round(Overview.PendingEditor.EncounterCount);
+        await _statisticsService.ConfirmPendingShinyCaptureAsync(
             pendingCapture.Id,
             spiritName,
             encounterCount,
-            DateTimeOffset.Now));
+            DateTimeOffset.Now);
         ShowNotification(
             InfoBarSeverity.Success,
             "已确认异色",
@@ -548,13 +399,13 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public async Task DiscardLatestPendingShinyAsync()
     {
-        var pendingCapture = LatestPendingShinyCapture;
+        var pendingCapture = Overview.LatestPendingShinyCapture;
         if (pendingCapture is null)
         {
             return;
         }
 
-        ApplyDocument(await _statisticsService.DiscardPendingShinyCaptureAsync(pendingCapture.Id));
+        await _statisticsService.DiscardPendingShinyCaptureAsync(pendingCapture.Id);
         ShowNotification(InfoBarSeverity.Informational, "已忽略待确认异色", pendingCapture.Name);
     }
 
@@ -566,13 +417,14 @@ public partial class StatisticsViewModel : ObservableRecipient
     public async Task<StatisticsSyncSettings> LoadSyncSettingsAsync()
     {
         var settings = await _statisticsSyncService.LoadSettingsAsync();
-        ApplySyncStatus(await _statisticsSyncService.LoadStatusAsync());
+        await _statisticsSyncService.LoadStatusAsync();
+        ApplySyncStatus(_statisticsSyncService.CurrentStatus);
         return settings;
     }
 
     public async Task SaveSyncSettingsAsync(StatisticsSyncSettings settings, string? password)
     {
-        ApplySyncStatus(await _statisticsSyncService.SaveSettingsAsync(settings, password));
+        await _statisticsSyncService.SaveSettingsAsync(settings, password);
         ShowNotification(InfoBarSeverity.Success, "云同步设置已保存", SyncStatusSummary);
     }
 
@@ -611,49 +463,49 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     private void StatisticsSyncService_StatusChanged(object? sender, StatisticsSyncStatusChangedEventArgs e)
     {
-        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
-        {
-            ApplySyncStatus(e.Status);
-            return;
-        }
-
-        _dispatcherQueue.TryEnqueue(() => ApplySyncStatus(e.Status));
+        _dispatch(() => ApplySyncStatus(_statisticsSyncService.CurrentStatus));
     }
 
     private void StatisticsService_DocumentChanged(object? sender, StatisticsDocumentChangedEventArgs e)
     {
-        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
-        {
-            ApplyDocument(e.Document);
-            return;
-        }
-
-        _dispatcherQueue.TryEnqueue(() => ApplyDocument(e.Document));
+        RequestStatisticsRefresh();
     }
 
     private void StatisticsService_SelectedAccountChanged(object? sender, EventArgs e)
     {
-        var selectedUid = _statisticsService.SelectedAccountUid;
-        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
-        {
-            ApplySelectedAccountUid(selectedUid);
-            return;
-        }
-
-        _dispatcherQueue.TryEnqueue(() => ApplySelectedAccountUid(selectedUid));
+        RequestStatisticsRefresh();
     }
 
-    private void StatisticsUidCoordinatorService_PendingConfirmationChanged(
-        object? sender,
-        EventArgs e)
+    private void RequestStatisticsRefresh()
     {
-        if (_dispatcherQueue is null || _dispatcherQueue.HasThreadAccess)
+        if (Interlocked.Exchange(ref _statisticsRefreshQueued, 1) != 0) return;
+        _dispatch(() =>
         {
-            NotifyUidConfirmationChanged();
-            return;
-        }
+            Volatile.Write(ref _statisticsRefreshQueued, 0);
+            RefreshStatistics();
+        });
+    }
 
-        _dispatcherQueue.TryEnqueue(NotifyUidConfirmationChanged);
+    private void RefreshStatistics()
+    {
+        // 事件只表示需要刷新。处理 UI 队列时重新取值，避免旧事件回滚文档或账号选择。
+        Overview.ApplyDocument(_statisticsService.CurrentDocument,
+            _statisticsService.SelectedAccountUid, _seasonConfig, ResolveSpiritAvatar);
+    }
+
+    private void StatisticsUidCoordinatorService_PendingConfirmationChanged(object? sender, EventArgs e)
+    {
+        _dispatch(NotifyUidConfirmationChanged);
+    }
+
+    private static Action<Action> CreateDispatcher()
+    {
+        var queue = DispatcherQueue.GetForCurrentThread();
+        return action =>
+        {
+            if (queue is null || queue.HasThreadAccess) action();
+            else queue.TryEnqueue(() => action());
+        };
     }
 
     private void NotifyUidConfirmationChanged()
@@ -664,42 +516,6 @@ public partial class StatisticsViewModel : ObservableRecipient
         UidConfirmationChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private void ApplySelectedAccountUid(string? uid)
-    {
-        var account = Accounts.FirstOrDefault(item =>
-            string.Equals(item.Uid, uid, StringComparison.OrdinalIgnoreCase));
-        if (account is null
-            || string.Equals(_selectedAccount?.Uid, account.Uid, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        _selectedAccount = account;
-        OnPropertyChanged(nameof(SelectedAccount));
-        OnPropertyChanged(nameof(SelectedAccountDisplayName));
-        RefreshSelectedAccount();
-    }
-
-    private void ApplyDocument(StatisticsDocument document, string? preferredUid = null)
-    {
-        _document = CloneDocument(document);
-
-        var previousUid = preferredUid ?? SelectedAccount?.Uid ?? _statisticsService.ActiveAccountUid;
-        Accounts = StatisticsProjection.BuildAccounts(_document);
-
-        var nextSelectedAccount = Accounts.FirstOrDefault(account => string.Equals(account.Uid, previousUid, StringComparison.OrdinalIgnoreCase))
-            ?? Accounts.FirstOrDefault();
-
-        _selectedAccount = nextSelectedAccount;
-        if (!_statisticsService.IsActiveAccountSelectionRequired)
-        {
-            _statisticsService.SetSelectedAccountUid(nextSelectedAccount?.Uid);
-        }
-        OnPropertyChanged(nameof(SelectedAccount));
-        OnPropertyChanged(nameof(SelectedAccountDisplayName));
-        RefreshSelectedAccount();
-    }
-
     private void ApplySyncStatus(StatisticsSyncStatus status)
     {
         _syncStatus = status;
@@ -708,30 +524,6 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SyncEnabledIconVisibility));
         OnPropertyChanged(nameof(SyncDisabledIconVisibility));
         OnPropertyChanged(nameof(IsSyncBusy));
-    }
-
-    private void RefreshSelectedAccount()
-    {
-        var selectedAccount = FindSelectedAccount();
-        var seasonConfig = LoadEncounterSeasonConfig();
-
-        Seasons = StatisticsProjection.BuildSeasons(selectedAccount, seasonConfig, ResolveSpiritAvatar);
-        ShinyScopes = StatisticsProjection.BuildShinyScopes(Seasons);
-        AllShinyCounts = StatisticsProjection.BuildAllShinyCounts(selectedAccount, ResolveSpiritAvatar);
-        PendingShinyCaptures = StatisticsProjection.BuildPendingShinyCaptures(selectedAccount, ResolveSpiritAvatar);
-        SyncPendingShinyEditor();
-
-        SelectedSeasonIndex = Math.Min(SelectedSeasonIndex, Math.Max(0, Seasons.Count - 1));
-        SelectedShinyScopeIndex = Math.Min(SelectedShinyScopeIndex, Math.Max(0, ShinyScopes.Count - 1));
-
-        OnPropertyChanged(nameof(SelectedSeasonIndex));
-        OnPropertyChanged(nameof(SelectedShinyScopeIndex));
-        OnPropertyChanged(nameof(SelectedSeason));
-        OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
-        OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
-        OnPropertyChanged(nameof(TotalAllShiny));
-        NotifyPendingShinyChanged();
-        NotifySelectedShinyChanged();
     }
 
     private EncounterSeasonConfig LoadEncounterSeasonConfig()
@@ -747,40 +539,12 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
     }
 
-    private AccountStatisticsData? FindSelectedAccount()
-    {
-        return SelectedAccount is null
-            ? null
-            : _document.Accounts.FirstOrDefault(account => string.Equals(account.Uid, SelectedAccount.Uid, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private void NotifySelectedShinyChanged()
-    {
-        OnPropertyChanged(nameof(SelectedShinyCounts));
-        OnPropertyChanged(nameof(TotalSelectedShiny));
-        OnPropertyChanged(nameof(SelectedShinyDateDisplay));
-    }
-
-    private void NotifyPendingShinyChanged()
-    {
-        OnPropertyChanged(nameof(PendingShinyCount));
-        OnPropertyChanged(nameof(LatestPendingShinyCapture));
-        OnPropertyChanged(nameof(PendingShinyBadgeVisibility));
-        OnPropertyChanged(nameof(PendingShinyConfirmationVisibility));
-        OnPropertyChanged(nameof(PendingShinySeasonDisplay));
-        OnPropertyChanged(nameof(PendingShinyDetectedAtDisplay));
-        OnPropertyChanged(nameof(LatestPendingShinyAvatar));
-        OnPropertyChanged(nameof(LatestPendingShinyAvatarVisibility));
-        OnPropertyChanged(nameof(LatestPendingShinyAvatarFallbackVisibility));
-        OnPropertyChanged(nameof(PendingShinyQueueDisplay));
-    }
-
     private async Task LoadSpiritAvatarPathsAsync()
     {
         try
         {
             _spiritAvatarPaths = BuildSpiritAvatarPaths(await _spiritCatalogService.LoadAsync());
-            RefreshSelectedAccount();
+            RefreshStatistics();
         }
         catch (Exception ex)
         {
@@ -832,50 +596,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
     }
 
-    private void SyncPendingShinyEditor()
-    {
-        var pendingCapture = LatestPendingShinyCapture;
-        if (pendingCapture is null)
-        {
-            _editingPendingShinyId = null;
-            PendingShinyEditName = string.Empty;
-            PendingShinyEditEncounterCount = 0;
-            return;
-        }
-
-        if (string.Equals(_editingPendingShinyId, pendingCapture.Id, StringComparison.OrdinalIgnoreCase))
-        {
-            UpdatePendingShinyEncounterCountFromName();
-            return;
-        }
-
-        _editingPendingShinyId = pendingCapture.Id;
-        PendingShinyEditName = pendingCapture.Name;
-        PendingShinyEditEncounterCount = pendingCapture.EncounterCount;
-    }
-
-    private void UpdatePendingShinyEncounterCountFromName()
-    {
-        var pendingCapture = LatestPendingShinyCapture;
-        var selectedAccount = FindSelectedAccount();
-        var spiritName = CleanSpiritName(PendingShinyEditName);
-        if (pendingCapture is null
-            || selectedAccount is null
-            || string.IsNullOrWhiteSpace(spiritName))
-        {
-            PendingShinyEditEncounterCount = 0;
-            return;
-        }
-
-        PendingShinyEditEncounterCount = StatisticsProjection.FindEncounterCount(
-            selectedAccount,
-            pendingCapture.Season,
-            spiritName);
-    }
-
     private bool ValidateStatisticInput(string? seasonId, string name, int count)
     {
-        if (SelectedAccount is null)
+        if (Overview.SelectedAccount is null)
         {
             ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先添加或选择账号。");
             return false;
@@ -941,11 +664,5 @@ public partial class StatisticsViewModel : ObservableRecipient
         return value is null
             ? "未同步"
             : value.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
-    }
-
-    private static StatisticsDocument CloneDocument(StatisticsDocument document)
-    {
-        var json = JsonSerializer.Serialize(document, JsonOptions);
-        return JsonSerializer.Deserialize<StatisticsDocument>(json, JsonOptions) ?? new StatisticsDocument();
     }
 }

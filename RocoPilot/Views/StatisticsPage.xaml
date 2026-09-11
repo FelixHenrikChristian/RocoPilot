@@ -502,7 +502,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock
                             VerticalAlignment="Center"
-                            Text="{x:Bind ViewModel.SelectedAccountDisplayName, Mode=OneWay}"
+                            Text="{x:Bind ViewModel.Overview.SelectedAccountDisplayName, Mode=OneWay}"
                             TextTrimming="CharacterEllipsis"
                             TextWrapping="NoWrap" />
                         <FontIcon
@@ -519,7 +519,7 @@
                                 MaxHeight="260"
                                 IsItemClickEnabled="True"
                                 ItemClick="AccountListView_ItemClick"
-                                ItemsSource="{x:Bind ViewModel.Accounts, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.Overview.Accounts, Mode=OneWay}"
                                 SelectionMode="None">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
@@ -647,8 +647,8 @@
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <InfoBadge
-                                    Value="{x:Bind ViewModel.PendingShinyCount, Mode=OneWay}"
-                                    Visibility="{x:Bind ViewModel.PendingShinyBadgeVisibility, Mode=OneWay}" />
+                                    Value="{x:Bind ViewModel.Overview.PendingShinyCount, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.Overview.PendingShinyBadgeVisibility, Mode=OneWay}" />
                                 <Border
                                     MinWidth="48"
                                     Height="32"
@@ -660,7 +660,7 @@
                                         VerticalAlignment="Center"
                                         FontSize="17"
                                         FontWeight="SemiBold"
-                                        Text="{x:Bind ViewModel.TotalSelectedShiny, Mode=OneWay}" />
+                                        Text="{x:Bind ViewModel.Overview.TotalSelectedShiny, Mode=OneWay}" />
                                 </Border>
                             </StackPanel>
                         </Grid>
@@ -683,7 +683,7 @@
                         <ItemsControl
                             Margin="0,0,10,0"
                             ItemTemplate="{StaticResource ShinyCountRowTemplate}"
-                            ItemsSource="{x:Bind ViewModel.SelectedShinyCounts, Mode=OneWay}" />
+                            ItemsSource="{x:Bind ViewModel.Overview.SelectedShinyCounts, Mode=OneWay}" />
                     </ScrollViewer>
 
                     <ComboBox
@@ -692,8 +692,8 @@
                         Margin="0,4,0,0"
                         HorizontalAlignment="Center"
                         DisplayMemberPath="Name"
-                        ItemsSource="{x:Bind ViewModel.ShinyScopes, Mode=OneWay}"
-                        SelectedIndex="{x:Bind ViewModel.SelectedShinyScopeIndex, Mode=TwoWay}" />
+                        ItemsSource="{x:Bind ViewModel.Overview.ShinyScopes, Mode=OneWay}"
+                        SelectedIndex="{x:Bind ViewModel.Overview.SelectedShinyScopeIndex, Mode=TwoWay}" />
                 </Grid>
             </Border>
 
@@ -704,8 +704,8 @@
             <FlipView
                 Grid.Column="2"
                 Background="Transparent"
-                ItemsSource="{x:Bind ViewModel.Seasons, Mode=OneWay}"
-                SelectedIndex="{x:Bind ViewModel.SelectedSeasonIndex, Mode=TwoWay}">
+                ItemsSource="{x:Bind ViewModel.Overview.Seasons, Mode=OneWay}"
+                SelectedIndex="{x:Bind ViewModel.Overview.SelectedSeasonIndex, Mode=TwoWay}">
                 <FlipView.ItemContainerStyle>
                     <Style TargetType="FlipViewItem">
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -824,7 +824,7 @@
         <Grid
             Canvas.ZIndex="9"
             Background="#B3000000"
-            Visibility="{x:Bind ViewModel.PendingShinyConfirmationVisibility, Mode=OneWay}">
+            Visibility="{x:Bind ViewModel.Overview.PendingShinyConfirmationVisibility, Mode=OneWay}">
             <Border
                 Width="590"
                 MaxWidth="590"
@@ -864,15 +864,15 @@
                                 <Grid>
                                     <Image
                                         Margin="2"
-                                        Source="{x:Bind ViewModel.LatestPendingShinyAvatar, Mode=OneWay}"
+                                        Source="{x:Bind ViewModel.Overview.LatestPendingShinyAvatar, Mode=OneWay}"
                                         Stretch="Uniform"
-                                        Visibility="{x:Bind ViewModel.LatestPendingShinyAvatarVisibility, Mode=OneWay}" />
+                                        Visibility="{x:Bind ViewModel.Overview.LatestPendingShinyAvatarVisibility, Mode=OneWay}" />
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                                         FontSize="24"
                                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                         Glyph="&#xE7BA;"
-                                        Visibility="{x:Bind ViewModel.LatestPendingShinyAvatarFallbackVisibility, Mode=OneWay}" />
+                                        Visibility="{x:Bind ViewModel.Overview.LatestPendingShinyAvatarFallbackVisibility, Mode=OneWay}" />
                                 </Grid>
                             </Border>
 
@@ -905,7 +905,7 @@
                                         FontSize="12"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                         Text="待确认" />
-                                    <InfoBadge Value="{x:Bind ViewModel.PendingShinyCount, Mode=OneWay}" />
+                                    <InfoBadge Value="{x:Bind ViewModel.Overview.PendingShinyCount, Mode=OneWay}" />
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -955,7 +955,7 @@
                                         Header="精灵名"
                                         MaxLength="32"
                                         PlaceholderText="输入精灵名"
-                                        Text="{x:Bind ViewModel.PendingShinyEditName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        Text="{x:Bind ViewModel.Overview.PendingEditor.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
                                     <NumberBox
                                         Grid.Column="1"
@@ -964,7 +964,7 @@
                                         SmallChange="1"
                                         LargeChange="5"
                                         SpinButtonPlacementMode="Compact"
-                                        Value="{x:Bind ViewModel.PendingShinyEditEncounterCount, Mode=TwoWay}" />
+                                        Value="{x:Bind ViewModel.Overview.PendingEditor.EncounterCount, Mode=TwoWay}" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -1005,7 +1005,7 @@
                                             Text="赛季" />
                                         <TextBlock
                                             FontWeight="SemiBold"
-                                            Text="{x:Bind ViewModel.PendingShinySeasonDisplay, Mode=OneWay}"
+                                            Text="{x:Bind ViewModel.Overview.PendingShinySeasonDisplay, Mode=OneWay}"
                                             TextTrimming="CharacterEllipsis"
                                             TextWrapping="NoWrap" />
                                     </StackPanel>
@@ -1043,7 +1043,7 @@
                                             Text="识别时间" />
                                         <TextBlock
                                             FontWeight="SemiBold"
-                                            Text="{x:Bind ViewModel.PendingShinyDetectedAtDisplay, Mode=OneWay}"
+                                            Text="{x:Bind ViewModel.Overview.PendingShinyDetectedAtDisplay, Mode=OneWay}"
                                             TextTrimming="CharacterEllipsis"
                                             TextWrapping="NoWrap" />
                                     </StackPanel>
@@ -1077,7 +1077,7 @@
                                 <TextBlock
                                     VerticalAlignment="Center"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="{x:Bind ViewModel.PendingShinyQueueDisplay, Mode=OneWay}" />
+                                    Text="{x:Bind ViewModel.Overview.PendingShinyQueueDisplay, Mode=OneWay}" />
                             </StackPanel>
 
                             <StackPanel

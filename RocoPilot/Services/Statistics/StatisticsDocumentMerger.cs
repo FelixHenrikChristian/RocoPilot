@@ -8,10 +8,6 @@ using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Services.Statistics;
 
-internal sealed record StatisticsDocumentMergeResult(
-    StatisticsDocument Document,
-    IReadOnlyList<string> ConflictingAccountUids);
-
 internal static class StatisticsDocumentMerger
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)

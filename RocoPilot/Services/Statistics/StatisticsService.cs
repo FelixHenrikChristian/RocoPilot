@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.Logging;
@@ -35,7 +35,7 @@ public sealed class StatisticsService : IStatisticsService
 
     public event EventHandler? SelectedAccountChanged;
 
-    public StatisticsDocument CurrentDocument => CloneDocument(_document);
+    public StatisticsDocument CurrentDocument => CloneDocument(Volatile.Read(ref _document));
 
     public string? SelectedAccountUid => Volatile.Read(ref _selectedAccountUid);
 
@@ -70,72 +70,62 @@ public sealed class StatisticsService : IStatisticsService
         }
     }
 
-    public async Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document)
+    public Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document)
     {
-        var changedDocument = await UpdateAsync(() => StatisticsDocumentNormalizer.Normalize(document));
-        EnsureActiveAccountExists(changedDocument);
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        var replacement = CloneDocument(document);
+        return UpdateAsync(_ => replacement);
     }
 
-    public async Task<StatisticsDocument> AddAccountAsync(string uid)
+    public async Task<StatisticsDocumentMergeResult> MergeRemoteAsync(
+        StatisticsDocument remoteDocument,
+        IReadOnlyDictionary<string, string>? lastSyncedAccountFingerprints,
+        bool preferRemoteAccountsWithoutBaseline,
+        CancellationToken cancellationToken = default)
+    {
+        var remote = CloneDocument(remoteDocument);
+        var baseline = lastSyncedAccountFingerprints?.ToDictionary(pair => pair.Key, pair => pair.Value);
+        IReadOnlyList<string> conflicts = [];
+        var changedDocument = await UpdateAsync(local =>
+        {
+            var result = StatisticsDocumentMerger.Merge(local, remote, baseline, preferRemoteAccountsWithoutBaseline);
+            conflicts = result.ConflictingAccountUids;
+            return result.Document;
+        }, StatisticsDocumentChangeSource.CloudSync, cancellationToken);
+        return new StatisticsDocumentMergeResult(changedDocument, conflicts);
+    }
+
+    public Task<StatisticsDocument> AddAccountAsync(string uid)
     {
         uid = uid.Trim();
-        var changedDocument = await UpdateAsync(() =>
+        return UpdateAsync(document =>
         {
-            if (_document.Accounts.Any(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase)))
+            if (!document.Accounts.Any(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase)))
             {
-                return _document;
+                document.Accounts.Add(new AccountStatisticsData { Uid = uid });
             }
-
-            _document.Accounts.Add(new AccountStatisticsData { Uid = uid });
-            return StatisticsDocumentNormalizer.Normalize(_document);
+            return document;
         });
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
     }
 
-    public async Task<StatisticsDocument> DeleteAccountAsync(string uid)
+    public Task<StatisticsDocument> DeleteAccountAsync(string uid)
     {
-        var changedDocument = await UpdateAsync(() =>
+        return UpdateAsync(document =>
         {
-            var account = _document.Accounts.FirstOrDefault(account =>
-                string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase));
-            if (account is not null)
-            {
-                _document.Accounts.Remove(account);
-            }
-
-            if (string.Equals(_selectedAccountUid, uid, StringComparison.OrdinalIgnoreCase))
-            {
-                _selectedAccountUid = _document.Accounts.FirstOrDefault()?.Uid;
-            }
-
-            if (string.Equals(ActiveAccountUid, uid, StringComparison.OrdinalIgnoreCase))
-            {
-                RequireActiveAccountSelection();
-            }
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
+            document.Accounts.RemoveAll(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase));
+            return document;
         });
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
     }
 
-    public async Task<StatisticsDocument> ClearAsync()
+    public Task<StatisticsDocument> ClearAsync()
     {
-        var changedDocument = await UpdateAsync(() =>
+        return UpdateAsync(document =>
         {
-            _document.Accounts.Clear();
-            _selectedAccountUid = null;
-            RequireActiveAccountSelection();
-            return StatisticsDocumentNormalizer.Normalize(_document);
+            document.Accounts.Clear();
+            return document;
         });
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
     }
 
-    public async Task<StatisticsDocument> RecordEncounterAsync(
+    public Task<StatisticsDocument> RecordEncounterAsync(
         EncounterSeasonDefinition season,
         string spiritName,
         DateTimeOffset capturedAt)
@@ -143,27 +133,14 @@ public sealed class StatisticsService : IStatisticsService
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(spiritName))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveActiveAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.RecordEncounter(account, season, spiritName, capturedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.RecordEncounter(account, season, spiritName, capturedAt), useActiveAccount: true);
     }
 
-    public async Task<StatisticsDocument> UpsertEncounterAsync(
+    public Task<StatisticsDocument> UpsertEncounterAsync(
         string seasonId,
         string spiritName,
         int count,
@@ -176,27 +153,14 @@ public sealed class StatisticsService : IStatisticsService
             || string.IsNullOrWhiteSpace(spiritName)
             || count <= 0)
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.UpsertEncounter(account, seasonId, spiritName, count, countedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.UpsertEncounter(account, seasonId, spiritName, count, countedAt));
     }
 
-    public async Task<StatisticsDocument> EditEncounterAsync(
+    public Task<StatisticsDocument> EditEncounterAsync(
         string seasonId,
         string originalName,
         string nextName,
@@ -212,53 +176,27 @@ public sealed class StatisticsService : IStatisticsService
             || string.IsNullOrWhiteSpace(nextName)
             || nextCount <= 0)
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.EditEncounter(account, seasonId, originalName, nextName, nextCount, editedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.EditEncounter(account, seasonId, originalName, nextName, nextCount, editedAt));
     }
 
-    public async Task<StatisticsDocument> DeleteEncounterAsync(string seasonId, string spiritName)
+    public Task<StatisticsDocument> DeleteEncounterAsync(string seasonId, string spiritName)
     {
         seasonId = seasonId.Trim();
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(seasonId) || string.IsNullOrWhiteSpace(spiritName))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.DeleteEncounter(account, seasonId, spiritName);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.DeleteEncounter(account, seasonId, spiritName));
     }
 
-    public async Task<StatisticsDocument> AddShinyCapturesAsync(
+    public Task<StatisticsDocument> AddShinyCapturesAsync(
         string seasonId,
         string spiritName,
         int count,
@@ -273,17 +211,10 @@ public sealed class StatisticsService : IStatisticsService
             || string.IsNullOrWhiteSpace(spiritName)
             || count <= 0)
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
+        return UpdateAccountAsync(account =>
             StatisticsMutationRules.AddShinyCaptures(
                 account,
                 seasonId,
@@ -291,42 +222,23 @@ public sealed class StatisticsService : IStatisticsService
                 count,
                 capturedAt,
                 resetEncounterCount,
-                encounterCountBeforeCapture);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+                encounterCountBeforeCapture));
     }
 
-    public async Task<StatisticsDocument> DeleteShinyCapturesAsync(string? seasonId, string spiritName)
+    public Task<StatisticsDocument> DeleteShinyCapturesAsync(string? seasonId, string spiritName)
     {
         seasonId = string.IsNullOrWhiteSpace(seasonId) ? null : seasonId.Trim();
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(spiritName))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.DeleteShinyCaptures(account, seasonId, spiritName);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.DeleteShinyCaptures(account, seasonId, spiritName));
     }
 
-    public async Task<StatisticsDocument> EditShinyCaptureAsync(
+    public Task<StatisticsDocument> EditShinyCaptureAsync(
         string captureId,
         string nextName,
         int encounterCountBeforeCapture,
@@ -337,57 +249,31 @@ public sealed class StatisticsService : IStatisticsService
         encounterCountBeforeCapture = Math.Max(0, encounterCountBeforeCapture);
         if (string.IsNullOrWhiteSpace(captureId) || string.IsNullOrWhiteSpace(nextName))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
+        return UpdateAccountAsync(account =>
             StatisticsMutationRules.EditShinyCapture(
                 account,
                 captureId,
                 nextName,
                 encounterCountBeforeCapture,
-                capturedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+                capturedAt));
     }
 
-    public async Task<StatisticsDocument> DeleteShinyCaptureAsync(string captureId)
+    public Task<StatisticsDocument> DeleteShinyCaptureAsync(string captureId)
     {
         captureId = captureId.Trim();
         if (string.IsNullOrWhiteSpace(captureId))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.DeleteShinyCapture(account, captureId);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.DeleteShinyCapture(account, captureId));
     }
 
-    public async Task<StatisticsDocument> AddPendingShinyCaptureAsync(
+    public Task<StatisticsDocument> AddPendingShinyCaptureAsync(
         EncounterSeasonDefinition season,
         string spiritName,
         DateTimeOffset detectedAt)
@@ -395,27 +281,14 @@ public sealed class StatisticsService : IStatisticsService
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(season.Id) || string.IsNullOrWhiteSpace(spiritName))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveActiveAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt), useActiveAccount: true);
     }
 
-    public async Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
+    public Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
         string pendingCaptureId,
         string spiritName,
         int encounterCount,
@@ -427,54 +300,28 @@ public sealed class StatisticsService : IStatisticsService
         if (string.IsNullOrWhiteSpace(pendingCaptureId)
             || string.IsNullOrWhiteSpace(spiritName))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
+        return UpdateAccountAsync(account =>
             StatisticsMutationRules.ConfirmPendingShinyCapture(
                 account,
                 pendingCaptureId,
                 spiritName,
                 encounterCount,
-                confirmedAt);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+                confirmedAt));
     }
 
-    public async Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(string pendingCaptureId)
+    public Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(string pendingCaptureId)
     {
         pendingCaptureId = pendingCaptureId.Trim();
         if (string.IsNullOrWhiteSpace(pendingCaptureId))
         {
-            return await LoadAsync();
+            return LoadAsync();
         }
 
-        var changedDocument = await UpdateAsync(() =>
-        {
-            var account = ResolveTargetAccount(_document);
-            if (account is null)
-            {
-                return _document;
-            }
-
-            StatisticsMutationRules.DiscardPendingShinyCapture(account, pendingCaptureId);
-
-            return StatisticsDocumentNormalizer.Normalize(_document);
-        });
-
-        RaiseDocumentChanged(changedDocument);
-        return changedDocument;
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.DiscardPendingShinyCapture(account, pendingCaptureId));
     }
 
     public void SetSelectedAccountUid(string? uid)
@@ -522,7 +369,7 @@ public sealed class StatisticsService : IStatisticsService
             return [];
         }
 
-        var account = ResolveActiveAccountForRead(_document);
+        var account = ResolveActiveAccountForRead(Volatile.Read(ref _document));
         var season = account?.Seasons.FirstOrDefault(item =>
             string.Equals(item.Id, seasonId.Trim(), StringComparison.OrdinalIgnoreCase));
         if (season is null)
@@ -554,7 +401,7 @@ public sealed class StatisticsService : IStatisticsService
 
     public IReadOnlyList<PendingShinyCaptureRecord> GetSelectedAccountPendingShinyCaptures()
     {
-        var account = ResolveSelectedAccountForRead(_document);
+        var account = ResolveSelectedAccountForRead(Volatile.Read(ref _document));
         if (account is null)
         {
             return [];
@@ -576,24 +423,46 @@ public sealed class StatisticsService : IStatisticsService
             .ToList();
     }
 
-    private async Task<StatisticsDocument> UpdateAsync(Func<StatisticsDocument> update)
+    private Task<StatisticsDocument> UpdateAccountAsync(
+        Action<AccountStatisticsData> update,
+        bool useActiveAccount = false)
     {
-        await _gate.WaitAsync();
+        return UpdateAsync(document =>
+        {
+            var account = useActiveAccount ? ResolveActiveAccount(document) : ResolveTargetAccount(document);
+            if (account is not null) update(account);
+            return document;
+        });
+    }
+
+    private async Task<StatisticsDocument> UpdateAsync(
+        Func<StatisticsDocument, StatisticsDocument> update,
+        StatisticsDocumentChangeSource source = StatisticsDocumentChangeSource.Local,
+        CancellationToken cancellationToken = default)
+    {
+        StatisticsDocument changedDocument;
+        bool selectionChanged;
+        await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (!_isLoaded)
-            {
-                await LoadCoreAsync();
-            }
+            if (!_isLoaded) await LoadCoreAsync();
 
-            _document = update();
-            await PersistAsync();
-            return CloneDocument(_document);
+            // 已发布的文档只读。所有修改在副本上完成，持久化成功后再发布新快照。
+            var nextDocument = StatisticsDocumentNormalizer.Normalize(update(CloneDocument(_document)));
+            cancellationToken.ThrowIfCancellationRequested();
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, nextDocument);
+            Volatile.Write(ref _document, nextDocument);
+            selectionChanged = ReconcileAccountSelection(nextDocument);
+            changedDocument = CloneDocument(nextDocument);
         }
         finally
         {
             _gate.Release();
         }
+
+        DocumentChanged?.Invoke(this, new StatisticsDocumentChangedEventArgs(changedDocument, source));
+        if (selectionChanged) SelectedAccountChanged?.Invoke(this, EventArgs.Empty);
+        return changedDocument;
     }
 
     private async Task LoadCoreAsync()
@@ -601,27 +470,31 @@ public sealed class StatisticsService : IStatisticsService
         try
         {
             var savedDocument = await _localSettingsService.ReadSettingAsync<StatisticsDocument>(SettingsKeys.StatisticsData);
-            _document = savedDocument is null
+            var document = savedDocument is null
                 ? StatisticsDocumentNormalizer.CreateDefault()
-                : StatisticsDocumentNormalizer.Normalize(savedDocument);
+                : StatisticsDocumentNormalizer.Normalize(CloneDocument(savedDocument));
+            Volatile.Write(ref _document, document);
+            _isLoaded = true;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取统计数据失败，已使用空统计数据。");
-            _document = StatisticsDocumentNormalizer.CreateDefault();
+            _logger.LogWarning(ex, "读取统计数据失败，保留当前状态并等待重试。");
+            throw;
         }
-
-        _isLoaded = true;
     }
 
-    private async Task PersistAsync()
+    private bool ReconcileAccountSelection(StatisticsDocument document)
     {
-        await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, _document);
-    }
+        EnsureActiveAccountExists(document);
+        if (document.Accounts.Count == 0) RequireActiveAccountSelection();
 
-    private void RaiseDocumentChanged(StatisticsDocument document)
-    {
-        DocumentChanged?.Invoke(this, new StatisticsDocumentChangedEventArgs(document));
+        var selectedUid = SelectedAccountUid;
+        if (selectedUid is null || document.Accounts.Any(account =>
+                string.Equals(account.Uid, selectedUid, StringComparison.OrdinalIgnoreCase))) return false;
+
+        // 保存期间用户可能切换账号，只修复仍指向被删除账号的选择。
+        var nextUid = document.Accounts.FirstOrDefault()?.Uid;
+        return Interlocked.CompareExchange(ref _selectedAccountUid, nextUid, selectedUid) == selectedUid;
     }
 
     private AccountStatisticsData? ResolveTargetAccount(StatisticsDocument document)
@@ -639,7 +512,6 @@ public sealed class StatisticsService : IStatisticsService
         account = document.Accounts.FirstOrDefault();
         if (account is not null)
         {
-            _selectedAccountUid = account.Uid;
             return account;
         }
 

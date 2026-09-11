@@ -51,13 +51,13 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
     private readonly ILogger<StatisticsSyncService> _logger;
     private readonly HttpClient _httpClient = CreateHttpClient();
     private readonly SemaphoreSlim _operationGate = new(1, 1);
+    private readonly SemaphoreSlim _settingsGate = new(1, 1);
     private readonly object _autoUploadLock = new();
 
     private StatisticsSyncSettings _settings = CreateDefaultSettings();
     private StatisticsSyncStatus _status = new();
     private CancellationTokenSource? _autoUploadCts;
     private bool _isSettingsLoaded;
-    private bool _suspendAutoUpload;
 
     public event EventHandler<StatisticsSyncStatusChangedEventArgs>? StatusChanged;
 
@@ -305,30 +305,19 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             EntityTag = ReadEntityTag(response),
             CheckedAt = DateTimeOffset.Now
         };
-        var localDocument = await _statisticsService.LoadAsync();
-        var mergeResult = StatisticsDocumentMerger.Merge(
-            localDocument,
+        var mergeResult = await _statisticsService.MergeRemoteAsync(
             remoteDocument,
             settings.LastSyncedAccountFingerprints,
             preferRemoteAccountsWithoutBaseline:
                 settings.LastSyncedAccountFingerprints is null
                 && HasRecordedSyncVersion(settings)
-                && HasRemoteChangedSinceLastSync(settings, downloadedRemoteInfo));
+                && HasRemoteChangedSinceLastSync(settings, downloadedRemoteInfo),
+            cancellationToken);
         if (mergeResult.ConflictingAccountUids.Count > 0)
         {
             _logger.LogWarning(
                 "云同步检测到同一账号在本地和云端都发生变化，已采用云端版本：{AccountUids}",
                 string.Join(", ", mergeResult.ConflictingAccountUids));
-        }
-
-        _suspendAutoUpload = true;
-        try
-        {
-            await _statisticsService.ReplaceAsync(mergeResult.Document);
-        }
-        finally
-        {
-            _suspendAutoUpload = false;
         }
 
         var completedAt = DateTimeOffset.Now;
@@ -459,7 +448,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     private async void StatisticsService_DocumentChanged(object? sender, StatisticsDocumentChangedEventArgs e)
     {
-        if (_suspendAutoUpload)
+        if (e.Source == StatisticsDocumentChangeSource.CloudSync)
         {
             return;
         }
@@ -534,23 +523,37 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     private async Task<StatisticsSyncSettings> LoadSettingsCoreAsync()
     {
-        if (_isSettingsLoaded)
+        await _settingsGate.WaitAsync();
+        try
         {
+            if (!_isSettingsLoaded)
+            {
+                var savedSettings = await _localSettingsService.ReadSettingAsync<StatisticsSyncSettings>(SettingsKeys.StatisticsSyncSettings);
+                _settings = NormalizeSettings(savedSettings ?? CreateDefaultSettings());
+                _isSettingsLoaded = true;
+            }
             return CloneSettings(_settings);
         }
-
-        var savedSettings = await _localSettingsService.ReadSettingAsync<StatisticsSyncSettings>(SettingsKeys.StatisticsSyncSettings);
-        _settings = NormalizeSettings(savedSettings ?? CreateDefaultSettings());
-        _isSettingsLoaded = true;
-        return CloneSettings(_settings);
+        finally
+        {
+            _settingsGate.Release();
+        }
     }
 
     private async Task SaveSettingsCoreAsync(StatisticsSyncSettings settings, CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        _settings = NormalizeSettings(settings);
-        _isSettingsLoaded = true;
-        await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsSyncSettings, _settings);
+        await _settingsGate.WaitAsync(cancellationToken);
+        try
+        {
+            var nextSettings = NormalizeSettings(settings);
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsSyncSettings, nextSettings);
+            _settings = nextSettings;
+            _isSettingsLoaded = true;
+        }
+        finally
+        {
+            _settingsGate.Release();
+        }
     }
 
     private async Task SaveRemoteInfoAsync(

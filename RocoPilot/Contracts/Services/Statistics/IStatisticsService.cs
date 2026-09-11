@@ -21,6 +21,13 @@ public interface IStatisticsService
 
     Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document);
 
+    /// <summary>在同一次写入中读取最新本地数据、合并云端文档并持久化。</summary>
+    Task<StatisticsDocumentMergeResult> MergeRemoteAsync(
+        StatisticsDocument remoteDocument,
+        IReadOnlyDictionary<string, string>? lastSyncedAccountFingerprints,
+        bool preferRemoteAccountsWithoutBaseline,
+        CancellationToken cancellationToken = default);
+
     Task<StatisticsDocument> AddAccountAsync(string uid);
 
     Task<StatisticsDocument> DeleteAccountAsync(string uid);
@@ -95,12 +102,23 @@ public interface IStatisticsService
     void RequireActiveAccountSelection();
 }
 
+public enum StatisticsDocumentChangeSource
+{
+    Local,
+    CloudSync
+}
+
 public sealed class StatisticsDocumentChangedEventArgs : EventArgs
 {
-    public StatisticsDocumentChangedEventArgs(StatisticsDocument document)
+    public StatisticsDocumentChangedEventArgs(
+        StatisticsDocument document,
+        StatisticsDocumentChangeSource source = StatisticsDocumentChangeSource.Local)
     {
         Document = document;
+        Source = source;
     }
 
     public StatisticsDocument Document { get; }
+
+    public StatisticsDocumentChangeSource Source { get; }
 }

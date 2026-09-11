@@ -26,6 +26,7 @@ using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.Spirits;
 using RocoPilot.Services.Statistics;
+using RocoPilot.Services.Statistics.Sync;
 using RocoPilot.Services.TextRecognition;
 using RocoPilot.Services.TextRecognition.Backends;
 using RocoPilot.ViewModels;
@@ -121,6 +122,9 @@ public partial class App : Application
             services.AddSingleton<IEncounterSeasonConfigService, EncounterSeasonConfigService>();
             services.AddSingleton<ISpiritCatalogService, SpiritCatalogService>();
             services.AddSingleton<IStatisticsService, StatisticsService>();
+            services.AddSingleton<IStatisticsRemoteStore>(_ => new S3StatisticsRemoteStore(
+                new HttpClient { Timeout = TimeSpan.FromSeconds(30) }));
+            services.AddSingleton<IStatisticsSyncCredentialStore, WindowsStatisticsSyncCredentialStore>();
             services.AddSingleton<IStatisticsSyncService, StatisticsSyncService>();
             services.AddSingleton<IStatisticsUidDetectionService, StatisticsUidDetectionService>();
             services.AddSingleton<IUpdateService, UpdateService>();

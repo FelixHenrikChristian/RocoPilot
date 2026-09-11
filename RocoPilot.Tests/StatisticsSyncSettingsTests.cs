@@ -57,7 +57,7 @@ public sealed class StatisticsSyncSettingsTests
     {
         var store = new ControlledSettingsStore();
         var statistics = new StatisticsService(store, NullLogger<StatisticsService>.Instance);
-        var sync = new StatisticsSyncService(store, statistics, NullLogger<StatisticsSyncService>.Instance);
+        var sync = new StatisticsSyncService(store, statistics, NullLogger<StatisticsSyncService>.Instance, new StatisticsRemoteStoreStub(), new StatisticsCredentialsStub());
         var settingsRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         store.BeforeRead = key =>
         {
@@ -75,5 +75,5 @@ public sealed class StatisticsSyncSettingsTests
     private static StatisticsSyncService CreateService(ControlledSettingsStore store) => new(
         store,
         new StatisticsService(store, NullLogger<StatisticsService>.Instance),
-        NullLogger<StatisticsSyncService>.Instance);
+        NullLogger<StatisticsSyncService>.Instance, new StatisticsRemoteStoreStub(), new StatisticsCredentialsStub());
 }

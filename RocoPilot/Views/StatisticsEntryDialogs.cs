@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
@@ -114,27 +115,56 @@ internal static class StatisticsEntryDialogs
             LargeChange = 5,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
         };
-        var addModeComboBox = new ComboBox
+        var resetEncounterCheckBox = new CheckBox
         {
-            Header = "新增类型",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            Items =
+            Content = "清空该精灵奇遇计数",
+            IsChecked = true,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        const string resetEncounterHelp = "需要清空：软件遗漏识别、手动补录等\n"
+            + "无需清空：通过异色蛋等途径获取的异色，不占用奇遇保底";
+        var helpButton = new Button
+        {
+            Width = 22,
+            Height = 22,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            CornerRadius = new CornerRadius(11),
+            BorderThickness = new Thickness(1),
+            BorderBrush = GetResourceBrush("TextFillColorSecondaryBrush", CreateBrush(0xFF, 0x72, 0x76, 0x83)),
+            Background = CreateBrush(0x00, 0x00, 0x00, 0x00),
+            VerticalAlignment = VerticalAlignment.Center,
+            Content = new TextBlock { Text = "?", FontSize = 13 }
+        };
+        AutomationProperties.SetName(helpButton, "清空奇遇计数说明");
+        AutomationProperties.SetHelpText(helpButton, resetEncounterHelp);
+        var helpToolTip = new ToolTip
+        {
+            Content = new TextBlock
             {
-                "本次漏识别（清空当前奇遇）",
-                "历史补录（保留当前奇遇）"
+                Text = resetEncounterHelp,
+                MaxWidth = 400,
+                TextWrapping = TextWrapping.Wrap
             }
         };
-        addModeComboBox.SelectedIndex = 0;
+        ToolTipService.SetToolTip(helpButton, helpToolTip);
+        var resetEncounterPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { resetEncounterCheckBox, helpButton }
+        };
 
         var capturedDatePicker = new CalendarDatePicker
         {
-            Header = "捕获日期",
+            Header = "获取日期",
             Date = now,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var capturedTimePicker = new TimePicker
         {
-            Header = "捕获时间",
+            Header = "获取时间",
             Time = now.TimeOfDay,
             MinuteIncrement = 1,
             MinWidth = 220,
@@ -144,7 +174,9 @@ internal static class StatisticsEntryDialogs
         {
             Header = "异色前奇遇",
             Minimum = 0,
-            Value = 0,
+            Value = double.NaN,
+            IsEnabled = false,
+            PlaceholderText = "自动使用当前奇遇计数",
             SmallChange = 1,
             LargeChange = 5,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
@@ -155,65 +187,39 @@ internal static class StatisticsEntryDialogs
         };
         basicGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         basicGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        basicGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(countNumberBox, 1);
+        Grid.SetRow(resetEncounterPanel, 2);
         basicGrid.Children.Add(nameTextBox);
         basicGrid.Children.Add(countNumberBox);
+        basicGrid.Children.Add(resetEncounterPanel);
 
-        var modeHintTextBlock = new TextBlock
+        var manualEncounterCount = 0d;
+        resetEncounterCheckBox.Checked += (_, _) =>
         {
-            Text = "适用于软件漏识别但你刚刚抓到异色的情况。确认后会清空当前对应精灵的奇遇计数。",
-            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", CreateBrush(0xFF, 0x72, 0x76, 0x83)),
-            TextWrapping = TextWrapping.Wrap
+            manualEncounterCount = double.IsNaN(encounterCountNumberBox.Value) ? 0 : encounterCountNumberBox.Value;
+            encounterCountNumberBox.Value = double.NaN;
+            encounterCountNumberBox.IsEnabled = false;
         };
-        var modePanel = new StackPanel
+        resetEncounterCheckBox.Unchecked += (_, _) =>
         {
-            Spacing = 10,
-            Children =
-            {
-                addModeComboBox,
-                new Border
-                {
-                    Padding = new Thickness(12),
-                    Background = CreateBrush(0x12, 0x63, 0x66, 0xF1),
-                    BorderBrush = CreateBrush(0x24, 0x63, 0x66, 0xF1),
-                    BorderThickness = new Thickness(1),
-                    CornerRadius = new CornerRadius(8),
-                    Child = modeHintTextBlock
-                }
-            }
+            encounterCountNumberBox.IsEnabled = true;
+            encounterCountNumberBox.Value = manualEncounterCount;
         };
 
-        var historicalGrid = new Grid
+        var captureGrid = new Grid
         {
             RowSpacing = 12
         };
-        historicalGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        historicalGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        historicalGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        historicalGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        captureGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        captureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        captureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        captureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(capturedTimePicker, 1);
         Grid.SetRow(encounterCountNumberBox, 2);
-        historicalGrid.Children.Add(capturedDatePicker);
-        historicalGrid.Children.Add(capturedTimePicker);
-        historicalGrid.Children.Add(encounterCountNumberBox);
-
-        var historicalSection = CreateDialogSection(
-            "\uE787",
-            "历史补录信息",
-            "仅在软件使用前就已获得异色时使用，请在下方补充获得时间和异色前奇遇。",
-            historicalGrid);
-        historicalSection.Visibility = Visibility.Collapsed;
-
-        addModeComboBox.SelectionChanged += (_, _) =>
-        {
-            var isHistorical = addModeComboBox.SelectedIndex == 1;
-            historicalSection.Visibility = isHistorical
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            modeHintTextBlock.Text = isHistorical
-                ? "适用于软件使用前就已经获得的异色。请在下方补充获得时间和异色前奇遇，保存后不会清空当前对应精灵的奇遇计数。"
-                : "适用于软件漏识别但你刚刚抓到异色的情况。确认后会清空当前对应精灵的奇遇计数。";
-        };
+        captureGrid.Children.Add(capturedDatePicker);
+        captureGrid.Children.Add(capturedTimePicker);
+        captureGrid.Children.Add(encounterCountNumberBox);
 
         var content = new StackPanel
         {
@@ -225,7 +231,7 @@ internal static class StatisticsEntryDialogs
                     "\uE734",
                     "新增异色",
                     "异色精灵统计",
-                    "选择新增类型后，软件会按对应规则处理奇遇计数。",
+                    "手动记录获得的异色精灵。",
                     CreateBrush(0xFF, 0x63, 0x66, 0xF1),
                     CreateBrush(0x1F, 0x63, 0x66, 0xF1)),
                 CreateDialogSection(
@@ -234,11 +240,10 @@ internal static class StatisticsEntryDialogs
                     "新增记录会计入异色统计列表。",
                     basicGrid),
                 CreateDialogSection(
-                    "\uE8FD",
-                    "新增类型",
-                    "漏识别会清空对应奇遇，历史补录会保留当前奇遇。",
-                    modePanel),
-                historicalSection
+                    "\uE787",
+                    "获取信息",
+                    "勾选清空时自动记录清空前的奇遇次数；未勾选时可自行填写。",
+                    captureGrid)
             }
         };
         var scrollViewer = new ScrollViewer
@@ -269,10 +274,8 @@ internal static class StatisticsEntryDialogs
         var nextCount = double.IsNaN(countNumberBox.Value)
             ? 0
             : (int)Math.Round(countNumberBox.Value);
-        var resetEncounterCount = addModeComboBox.SelectedIndex != 1;
-        var capturedAt = resetEncounterCount
-            ? DateTimeOffset.Now
-            : ResolveHistoricalCapturedAt(capturedDatePicker, capturedTimePicker, now);
+        var resetEncounterCount = resetEncounterCheckBox.IsChecked == true;
+        var capturedAt = ResolveCapturedAt(capturedDatePicker, capturedTimePicker, now);
         var encounterCountBeforeCapture = double.IsNaN(encounterCountNumberBox.Value)
             ? 0
             : Math.Max(0, (int)Math.Round(encounterCountNumberBox.Value));
@@ -388,7 +391,7 @@ internal static class StatisticsEntryDialogs
         return new ShinyCaptureEditResult(
             nameTextBox.Text,
             encounterCount,
-            ResolveHistoricalCapturedAt(capturedDatePicker, capturedTimePicker, capturedAt));
+            ResolveCapturedAt(capturedDatePicker, capturedTimePicker, capturedAt));
     }
 
     private static Border CreateDialogHeaderCard(
@@ -513,7 +516,7 @@ internal static class StatisticsEntryDialogs
             : fallback;
     }
 
-    private static DateTimeOffset ResolveHistoricalCapturedAt(
+    private static DateTimeOffset ResolveCapturedAt(
         CalendarDatePicker capturedDatePicker,
         TimePicker capturedTimePicker,
         DateTimeOffset fallback)

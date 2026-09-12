@@ -4,6 +4,7 @@ using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.Spirits;
+using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Models.Input;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.Spirits;
@@ -18,6 +19,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
+    private readonly IStatisticsService _statisticsService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly DispatcherQueue? _dispatcherQueue;
 
@@ -228,11 +230,13 @@ public partial class RealtimeViewModel : ObservableRecipient
         IRuntimeTaskService runtimeTaskService,
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
-        ILocalSettingsService localSettingsService)
+        ILocalSettingsService localSettingsService,
+        IStatisticsService statisticsService)
     {
         _runtimeTaskService = runtimeTaskService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
+        _statisticsService = statisticsService;
         _localSettingsService = localSettingsService;
         SpiritCatalogSources = _spiritCatalogService.GetSources();
         _selectedSpiritCatalogSource = SpiritCatalogSources.FirstOrDefault();
@@ -280,6 +284,16 @@ public partial class RealtimeViewModel : ObservableRecipient
             var document = await _spiritCatalogService.SyncAsync(source.Id, progress);
             ApplySpiritCatalogSummary(document);
             SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号 · {document.Source.Name}";
+            try
+            {
+                var count = await _statisticsService.RematchPendingEncountersAsync(
+                    document, _encounterSeasonConfigService.Load().SpiritNameMatchThreshold);
+                if (count > 0) SpiritCatalogSyncStatus += $" · 已补计 {count} 次奇遇";
+            }
+            catch (Exception ex)
+            {
+                SpiritCatalogSyncStatus += $" · 待确认奇遇处理失败，可重新同步后重试：{ex.Message}";
+            }
         }
         catch (Exception ex)
         {

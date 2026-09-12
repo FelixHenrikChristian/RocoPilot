@@ -31,6 +31,12 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
 
     public PendingShinyCaptureEditor PendingEditor { get; } = new();
 
+    public IReadOnlyList<PendingEncounterItem> PendingEncounters { get; private set; } = [];
+
+    public int PendingEncounterCount => PendingEncounters.Count;
+
+    public Visibility PendingEncounterVisibility => PendingEncounterCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public int SelectedSeasonIndex
     {
         get => _selectedSeasonIndex;
@@ -131,6 +137,11 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
             ShinyScopes = scopes;
             AllShinyCounts = shinyCounts;
             PendingShinyCaptures = pendingCaptures;
+            PendingEncounters = account?.PendingEncounters
+                .Where(item => item.HandledAt is null)
+                .OrderBy(item => item.DetectedAt)
+                .Select(item => new PendingEncounterItem(account.Uid, item.Id, item.RawText, item.Season, item.DetectedAt))
+                .ToList() ?? [];
             _selectedSeasonIndex = Math.Max(0, FindSeasonIndex(seasons, seasonId));
             _selectedShinyScopeIndex = FindSeasonIndex(seasons, shinySeasonId) + 1;
             PendingEditor.Update(account, LatestPendingShinyCapture);
@@ -142,6 +153,9 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
             OnPropertyChanged(nameof(ShinyScopes));
             OnPropertyChanged(nameof(AllShinyCounts));
             OnPropertyChanged(nameof(PendingShinyCaptures));
+            OnPropertyChanged(nameof(PendingEncounters));
+            OnPropertyChanged(nameof(PendingEncounterCount));
+            OnPropertyChanged(nameof(PendingEncounterVisibility));
             OnPropertyChanged(nameof(SelectedSeasonIndex));
             OnPropertyChanged(nameof(SelectedShinyScopeIndex));
             OnPropertyChanged(nameof(SelectedSeason));

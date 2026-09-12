@@ -22,7 +22,7 @@ public static class StatisticsDocumentFormats
 {
     public const string RocoPilotStatistics = "RocoPilot.Statistics";
 
-    public const string CurrentVersion = "1.1";
+    public const string CurrentVersion = "1.2";
 }
 
 public sealed class AccountStatisticsData
@@ -32,6 +32,8 @@ public sealed class AccountStatisticsData
     public List<SeasonStatisticsData> Seasons { get; set; } = [];
 
     public List<PendingShinyCaptureRecord> PendingShinyCaptures { get; set; } = [];
+
+    public List<PendingEncounterRecord> PendingEncounters { get; set; } = [];
 }
 
 public sealed class SeasonStatisticsData
@@ -47,6 +49,32 @@ public sealed class SeasonStatisticsData
     public List<EncounterSpiritRecord> Encounters { get; set; } = [];
 
     public List<ShinySpiritCaptureRecord> ShinyCaptures { get; set; } = [];
+
+    public List<EncounterCountResetRecord> EncounterCountResets { get; set; } = [];
+}
+
+public sealed class PendingEncounterRecord
+{
+    public string Id { get; set; } = string.Empty;
+    public string RawText { get; set; } = string.Empty;
+    public string Season { get; set; } = string.Empty;
+    public DateTimeOffset DetectedAt { get; set; }
+
+    // 处理后保留标记，合并旧的云端记录时不会重新进入待确认队列。
+    public DateTimeOffset? HandledAt { get; set; }
+}
+
+public sealed class EncounterCountResetRecord
+{
+    public string Name { get; set; } = string.Empty;
+    public DateTimeOffset ResetAt { get; set; }
+}
+
+public enum PendingEncounterConfirmationResult
+{
+    NotFound,
+    Counted,
+    BeforeReset
 }
 
 public sealed class EncounterSpiritRecord

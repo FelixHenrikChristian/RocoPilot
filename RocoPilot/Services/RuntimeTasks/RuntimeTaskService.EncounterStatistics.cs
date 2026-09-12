@@ -76,6 +76,7 @@ public sealed partial class RuntimeTaskService
         new(StringComparer.OrdinalIgnoreCase);
     private volatile bool _encounterStatisticsEnabled = true;
     private bool _hasActiveEncounterRecord;
+    private string? _encounterRecordId;
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
     private DateTimeOffset _lastRecordedEncounterAt;
@@ -470,11 +471,17 @@ public sealed partial class RuntimeTaskService
     {
         if (!EncounterStatisticsEnabled
             || !_encounterCaptureButtonStateTracker.IsRelieved
-            || HasActiveEncounterRecord())
+            || HasActiveEncounterRecord()
+            || _statisticsService.IsActiveAccountSelectionRequired)
         {
             return;
         }
 
+        // 在异步 OCR 前固定这次奇遇的账号和时间，避免切换账号后记到其他账号。
+        var accountUid = _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
+            ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
+        if (accountUid is null) return;
+        var detectedAt = DateTimeOffset.Now;
         var enemyNameText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
@@ -495,7 +502,7 @@ public sealed partial class RuntimeTaskService
             enemyName,
             !string.IsNullOrWhiteSpace(enemyName),
             spiritNameMatchThreshold);
-        if (battleId != _battle.BattleId || string.IsNullOrWhiteSpace(enemyName))
+        if (battleId != _battle.BattleId)
         {
             return;
         }
@@ -503,7 +510,10 @@ public sealed partial class RuntimeTaskService
         await RecordEncounterAsync(
             season,
             enemyName,
-            DateTimeOffset.Now,
+            enemyNameText,
+            detectedAt,
+            accountUid,
+            battleId,
             cancellationToken);
     }
 
@@ -545,7 +555,10 @@ public sealed partial class RuntimeTaskService
     private async Task RecordEncounterAsync(
         EncounterSeasonDefinition season,
         string enemyName,
+        string rawText,
         DateTimeOffset now,
+        string accountUid,
+        long battleId,
         CancellationToken cancellationToken)
     {
         if (!EncounterStatisticsEnabled)
@@ -553,35 +566,50 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
-        if (string.IsNullOrWhiteSpace(enemyName))
+        if (!string.IsNullOrWhiteSpace(enemyName))
+            enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (battleId != _battle.BattleId || !EncounterStatisticsEnabled) return;
+
+        if (!TryReserveEncounterRecord(season.Id, enemyName, now, out var recordId))
         {
             return;
         }
 
-        if (!TryReserveEncounterRecord(season.Id, enemyName, now))
+        try
         {
-            return;
-        }
+            if (string.IsNullOrWhiteSpace(enemyName))
+            {
+                await _statisticsService.AddPendingEncounterAsync(accountUid, season, recordId, rawText, now);
+                _logger.LogInformation(
+                    "奇遇统计：精灵名未匹配，已保存为待确认奇遇。Uid={Uid}, Season={SeasonId}, EnemyNameRaw={EnemyNameRaw}",
+                    accountUid, season.Id, FormatLogText(rawText));
+                return;
+            }
 
-        var previousCount = GetEncounterCount(season.Id, enemyName);
-        await _statisticsService.RecordEncounterAsync(season, enemyName, now);
-        var currentCount = GetEncounterCount(season.Id, enemyName);
-        if (currentCount > previousCount)
-        {
+            var document = await _statisticsService.RecordEncounterAsync(season, enemyName, now, accountUid);
+            var currentCount = document.Accounts.FirstOrDefault(account => account.Uid == accountUid)?.Seasons
+                .FirstOrDefault(item => item.Id == season.Id)?.Encounters
+                .FirstOrDefault(item => TextMatchingHelper.AreSameSpiritName(item.Name, enemyName))?.Count ?? 0;
+            if (currentCount == 0) return;
             _logger.LogInformation(
                 "奇遇统计：{SpiritName} 奇遇 +1（当前 {Count}）",
                 enemyName,
                 currentCount);
         }
-
-        _logger.LogDebug(
-            "奇遇统计已记录：Season={SeasonId}, Type={EncounterType}, Spirit={SpiritName}, PreviousCount={PreviousCount}, CurrentCount={CurrentCount}, Detection=CaptureButtonTransition",
-            season.Id,
-            season.EncounterTypeName,
-            enemyName,
-            previousCount,
-            currentCount);
+        catch
+        {
+            // 保存失败时允许后续帧重试；不能把尚未落盘的事件当成已经记录。
+            lock (_encounterRecordLock)
+            {
+                if (_lastRecordedEncounterAt == now && _encounterRecordId == recordId)
+                {
+                    _hasActiveEncounterRecord = false;
+                    _lastRecordedEncounterAt = default;
+                }
+            }
+            throw;
+        }
     }
 
     private async Task RecordPendingShinyCaptureAsync(
@@ -612,10 +640,11 @@ public sealed partial class RuntimeTaskService
             enemyName);
     }
 
-    private bool TryReserveEncounterRecord(string seasonId, string spiritName, DateTimeOffset now)
+    private bool TryReserveEncounterRecord(string seasonId, string spiritName, DateTimeOffset now, out string recordId)
     {
         lock (_encounterRecordLock)
         {
+            recordId = string.Empty;
             if (string.Equals(_lastRecordedEncounterSeasonId, seasonId, StringComparison.OrdinalIgnoreCase)
                 && (_hasActiveEncounterRecord || now - _lastRecordedEncounterAt < EncounterDuplicateSuppressWindow))
             {
@@ -637,6 +666,8 @@ public sealed partial class RuntimeTaskService
             }
 
             _lastRecordedEncounterSeasonId = seasonId;
+            _encounterRecordId ??= Guid.NewGuid().ToString("N");
+            recordId = _encounterRecordId;
             _lastRecordedEncounterName = spiritName;
             _lastRecordedEncounterAt = now;
             _hasActiveEncounterRecord = true;
@@ -725,6 +756,7 @@ public sealed partial class RuntimeTaskService
         lock (_encounterRecordLock)
         {
             _hasActiveEncounterRecord = false;
+            _encounterRecordId = null;
         }
 
         lock (_pendingShinyRecordLock)
@@ -744,14 +776,6 @@ public sealed partial class RuntimeTaskService
         }
 
         ClearPendingShinyDetection();
-    }
-
-    private int GetEncounterCount(string seasonId, string spiritName)
-    {
-        var record = _statisticsService
-            .GetActiveAccountSeasonEncounters(seasonId)
-            .FirstOrDefault(record => TextMatchingHelper.AreSameSpiritName(record.Name, spiritName));
-        return record?.Count ?? 0;
     }
 
     private async Task<string> MatchRecognizedSpiritNameAsync(

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
@@ -14,7 +15,21 @@ internal static class StatisticsDocumentMerger
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNameCaseInsensitive = true,
-        WriteIndented = true
+        WriteIndented = true,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver
+        {
+            Modifiers =
+            {
+                typeInfo =>
+                {
+                    // 新增的空集合不改变旧账号的指纹，避免升级后误判为云端冲突。
+                    foreach (var property in typeInfo.Properties.Where(property =>
+                        (typeInfo.Type == typeof(AccountStatisticsData) && property.Name == "pendingEncounters")
+                        || (typeInfo.Type == typeof(SeasonStatisticsData) && property.Name == "encounterCountResets")))
+                        property.ShouldSerialize = (_, value) => value is System.Collections.ICollection { Count: > 0 };
+                }
+            }
+        }
     };
 
     public static StatisticsDocumentMergeResult Merge(
@@ -169,6 +184,8 @@ internal static class StatisticsDocumentMerger
         }
 
         MergePendingShinyCaptures(localAccount, remoteAccount);
+        // Normalize 按事件 ID 合并，并优先保留已处理标记。
+        localAccount.PendingEncounters.AddRange(remoteAccount.PendingEncounters);
     }
 
     private static void MergeSeason(SeasonStatisticsData localSeason, SeasonStatisticsData remoteSeason)
@@ -179,6 +196,7 @@ internal static class StatisticsDocumentMerger
 
         MergeEncounters(localSeason, remoteSeason);
         MergeShinyCaptures(localSeason, remoteSeason);
+        localSeason.EncounterCountResets.AddRange(remoteSeason.EncounterCountResets);
     }
 
     private static void MergeEncounters(SeasonStatisticsData localSeason, SeasonStatisticsData remoteSeason)

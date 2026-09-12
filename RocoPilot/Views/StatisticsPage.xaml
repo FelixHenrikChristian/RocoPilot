@@ -435,25 +435,38 @@
                     Text="统计" />
             </StackPanel>
 
-            <Grid
+            <StackPanel
                 Grid.Column="1"
                 HorizontalAlignment="Right"
-                VerticalAlignment="Center">
-                <FontIcon
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                    FontSize="16"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Glyph="&#xE753;"
-                    ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
-                    Visibility="{x:Bind ViewModel.SyncDisabledIconVisibility, Mode=OneWay}" />
-                <FontIcon
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                    FontSize="16"
-                    Foreground="#FF107C10"
-                    Glyph="&#xE753;"
-                    ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
-                    Visibility="{x:Bind ViewModel.SyncEnabledIconVisibility, Mode=OneWay}" />
-            </Grid>
+                VerticalAlignment="Center"
+                Orientation="Horizontal"
+                Spacing="14">
+                <Button
+                    Click="PendingEncountersButton_Click"
+                    ToolTipService.ToolTip="查看并处理未匹配到精灵名称的奇遇"
+                    Visibility="{x:Bind ViewModel.Overview.PendingEncounterVisibility, Mode=OneWay}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock VerticalAlignment="Center" Text="待确认奇遇" />
+                        <InfoBadge Value="{x:Bind ViewModel.Overview.PendingEncounterCount, Mode=OneWay}" />
+                    </StackPanel>
+                </Button>
+                <Grid VerticalAlignment="Center">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="16"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Glyph="&#xE753;"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SyncDisabledIconVisibility, Mode=OneWay}" />
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="16"
+                        Foreground="#FF107C10"
+                        Glyph="&#xE753;"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SyncEnabledIconVisibility, Mode=OneWay}" />
+                </Grid>
+            </StackPanel>
 
             <Button
                 Grid.Column="2"

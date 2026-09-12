@@ -9,6 +9,8 @@ using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Models.Spirits;
+using RocoPilot.Services.Spirits;
 
 namespace RocoPilot.Services.Statistics;
 
@@ -128,7 +130,8 @@ public sealed class StatisticsService : IStatisticsService
     public Task<StatisticsDocument> RecordEncounterAsync(
         EncounterSeasonDefinition season,
         string spiritName,
-        DateTimeOffset capturedAt)
+        DateTimeOffset capturedAt,
+        string? accountUid = null)
     {
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(spiritName))
@@ -137,7 +140,63 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.RecordEncounter(account, season, spiritName, capturedAt), useActiveAccount: true);
+            StatisticsMutationRules.RecordEncounter(account, season, spiritName, capturedAt),
+            useActiveAccount: true, accountUid: accountUid);
+    }
+
+    public Task<StatisticsDocument> AddPendingEncounterAsync(
+        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
+        ArgumentException.ThrowIfNullOrWhiteSpace(season.Id);
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        return UpdateAccountAsync(account =>
+            StatisticsMutationRules.AddPendingEncounter(account, season, id, rawText, detectedAt),
+            useActiveAccount: true, accountUid: accountUid);
+    }
+
+    public async Task<PendingEncounterConfirmationResult> ConfirmPendingEncounterAsync(
+        string accountUid, string id, string spiritName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
+        ArgumentException.ThrowIfNullOrWhiteSpace(spiritName);
+        var result = PendingEncounterConfirmationResult.NotFound;
+        await UpdateAccountAsync(account =>
+            result = StatisticsMutationRules.ConfirmPendingEncounter(account, id, spiritName.Trim()),
+            accountUid: accountUid);
+        return result;
+    }
+
+    public Task<StatisticsDocument> DiscardPendingEncounterAsync(string accountUid, string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
+        return UpdateAccountAsync(account =>
+        {
+            var pending = account.PendingEncounters.FirstOrDefault(item => item.Id == id);
+            if (pending is { HandledAt: null }) pending.HandledAt = DateTimeOffset.Now;
+        }, accountUid: accountUid);
+    }
+
+    public async Task<int> RematchPendingEncountersAsync(SpiritCatalogDocument catalog, double minimumSimilarity)
+    {
+        var index = new SpiritCatalogIndex(catalog);
+        var matchedCount = 0;
+        await UpdateAsync(document =>
+        {
+            foreach (var account in document.Accounts)
+            {
+                foreach (var pending in account.PendingEncounters.Where(item => item.HandledAt is null))
+                {
+                    var matchedName = index.Match(pending.RawText, minimumSimilarity);
+                    if (string.IsNullOrWhiteSpace(matchedName)) continue;
+                    var recordName = index.ResolveEvolutionRecordName(matchedName);
+                    if (StatisticsMutationRules.ConfirmPendingEncounter(account, pending.Id, recordName)
+                        == PendingEncounterConfirmationResult.Counted) matchedCount++;
+                }
+            }
+            return document;
+        });
+        return matchedCount;
     }
 
     public Task<StatisticsDocument> UpsertEncounterAsync(
@@ -425,11 +484,12 @@ public sealed class StatisticsService : IStatisticsService
 
     private Task<StatisticsDocument> UpdateAccountAsync(
         Action<AccountStatisticsData> update,
-        bool useActiveAccount = false)
+        bool useActiveAccount = false,
+        string? accountUid = null)
     {
         // 账号属于这次操作的上下文，不能等拿到写锁后再读取用户的新选择。
-        var selectionRequired = useActiveAccount && IsActiveAccountSelectionRequired;
-        var targetUid = (useActiveAccount ? ActiveAccountUid : null)
+        var selectionRequired = accountUid is null && useActiveAccount && IsActiveAccountSelectionRequired;
+        var targetUid = accountUid ?? (useActiveAccount ? ActiveAccountUid : null)
             ?? SelectedAccountUid
             ?? Volatile.Read(ref _document).Accounts.FirstOrDefault()?.Uid;
         return UpdateAsync(document =>

@@ -23,6 +23,22 @@ internal static class StatisticsDocumentNormalizer
             {
                 var account = group.First();
                 account.Uid = group.Key;
+                account.PendingEncounters = group
+                    .SelectMany(item => item.PendingEncounters ?? [])
+                    .Where(item => !string.IsNullOrWhiteSpace(item.Id) && !string.IsNullOrWhiteSpace(item.Season))
+                    .Select(item => new PendingEncounterRecord
+                    {
+                        Id = item.Id.Trim(),
+                        Season = item.Season.Trim(),
+                        RawText = item.RawText ?? string.Empty,
+                        DetectedAt = item.DetectedAt,
+                        HandledAt = item.HandledAt
+                    })
+                    .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+                    .Select(items => items.OrderByDescending(item => item.HandledAt).ThenByDescending(item => item.DetectedAt).First())
+                    .OrderByDescending(item => item.DetectedAt)
+                    .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
                 account.Seasons = group
                     .SelectMany(item => item.Seasons ?? [])
                     .GroupBy(season => ResolveSeasonId(season), StringComparer.OrdinalIgnoreCase)
@@ -84,6 +100,14 @@ internal static class StatisticsDocumentNormalizer
             DateRange = first.DateRange?.Trim() ?? string.Empty,
             EncounterTypeName = first.EncounterTypeName?.Trim() ?? string.Empty
         };
+
+        normalized.EncounterCountResets = seasonList
+            .SelectMany(season => season.EncounterCountResets ?? [])
+            .Where(item => !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(items => new EncounterCountResetRecord { Name = items.Key, ResetAt = items.Max(item => item.ResetAt) })
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         normalized.Encounters = seasonList
             .SelectMany(season => season.Encounters ?? [])

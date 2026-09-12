@@ -370,6 +370,46 @@ public partial class StatisticsViewModel : ObservableRecipient
         ShowNotification(InfoBarSeverity.Success, "已删除异色", $"已删除 {item.Name}。");
     }
 
+    public async Task<bool> ConfirmPendingEncounterAsync(PendingEncounterItem item, string name)
+    {
+        name = CleanSpiritName(name);
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            ShowNotification(InfoBarSeverity.Warning, "确认失败", "精灵名不能为空。");
+            return false;
+        }
+
+        // 手动输入允许图鉴尚未收录的名称；已收录时仍归并到进化链最低阶。
+        var recordName = name;
+        try
+        {
+            recordName = await _spiritCatalogService.ResolveEvolutionRecordNameAsync(name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取图鉴失败，待确认奇遇将使用用户填写的名称。Spirit={SpiritName}", name);
+        }
+        if (string.IsNullOrWhiteSpace(recordName)) recordName = name;
+        var result = await _statisticsService.ConfirmPendingEncounterAsync(item.AccountUid, item.Id, recordName);
+        if (result == PendingEncounterConfirmationResult.BeforeReset)
+        {
+            ShowNotification(InfoBarSeverity.Warning, "未补入当前计数",
+                "这次奇遇发生后，对应精灵的奇遇计数已被清空。请在异色记录中核对当时的奇遇次数，再忽略此条记录。");
+            return false;
+        }
+
+        ShowNotification(InfoBarSeverity.Success,
+            result == PendingEncounterConfirmationResult.Counted ? "已确认奇遇" : "记录已处理",
+            result == PendingEncounterConfirmationResult.Counted ? $"已为账号 {item.AccountUid} 的 {item.Season} 补计 {recordName} x1。" : "此条记录已处理，无需重复确认。");
+        return true;
+    }
+
+    public async Task DiscardPendingEncounterAsync(PendingEncounterItem item)
+    {
+        await _statisticsService.DiscardPendingEncounterAsync(item.AccountUid, item.Id);
+        ShowNotification(InfoBarSeverity.Informational, "已忽略待确认奇遇", item.RawTextDisplay);
+    }
+
     public async Task ConfirmLatestPendingShinyAsync()
     {
         var pendingCapture = Overview.LatestPendingShinyCapture;

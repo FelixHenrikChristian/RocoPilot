@@ -909,6 +909,29 @@ public sealed partial class StatisticsPage : Page
             : $"{seasonId}赛季";
     }
 
+    private async void PendingEncountersButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button) return;
+        button.IsEnabled = false;
+        try
+        {
+            var input = await PendingEncounterDialog.ShowAsync(XamlRoot, ViewModel.Overview.PendingEncounters);
+            if (input is null) return;
+            if (input.Discard)
+                await ViewModel.DiscardPendingEncounterAsync(input.Item);
+            else
+                await ViewModel.ConfirmPendingEncounterAsync(input.Item, input.Name);
+        }
+        catch (Exception ex)
+        {
+            ViewModel.ShowOperationFailed("处理待确认奇遇失败", ex);
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
     private async void ConfirmPendingShinyButton_Click(object sender, RoutedEventArgs e)
     {
         await ViewModel.ConfirmLatestPendingShinyAsync();

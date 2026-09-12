@@ -6,32 +6,48 @@ using RocoPilot.Services;
 namespace RocoPilot.Tests;
 
 [TestClass]
-public sealed class S3EncounterBloodlineRecognitionTests
+public sealed class EncounterBloodlineRecognitionTests
 {
+    [TestMethod]
+    [DataRow("奇异", EncounterBloodlineKind.QiYi)]
+    [DataRow("混乱", EncounterBloodlineKind.HunXue)]
+    [DataRow("污染", EncounterBloodlineKind.WuRan)]
+    [DataRow("特性", EncounterBloodlineKind.Normal)]
+    [DataRow("星陨提示：奇异", EncounterBloodlineKind.QiYi)]
+    [DataRow("星星……混乱", EncounterBloodlineKind.HunXue)]
+    [DataRow("任意前缀污染任意后缀", EncounterBloodlineKind.WuRan)]
+    [DataRow("奇 \n异", EncounterBloodlineKind.QiYi)]
+    [DataRow("特性：奇异能力", EncounterBloodlineKind.Normal)]
+    public void ParsesKeywordsWithoutRequiringSeasonContext(string text, EncounterBloodlineKind expected)
+    {
+        Assert.IsTrue(EncounterBloodlineRecognition.TryParse(text, out var kind));
+        Assert.AreEqual(expected, kind);
+    }
+
     [TestMethod]
     public void ParsesQiYiBloodlineTip()
     {
-        Assert.IsTrue(S3EncounterBloodlineRecognition.TryParse(
+        Assert.IsTrue(EncounterBloodlineRecognition.TryParse(
             "小加尔想了想，染上了几笔奇异的颜色！",
             out var kind));
         Assert.AreEqual(EncounterBloodlineKind.QiYi, kind);
-        Assert.AreEqual("奇异", S3EncounterBloodlineRecognition.GetDisplayName(kind));
+        Assert.AreEqual("奇异", EncounterBloodlineRecognition.GetDisplayName(kind));
     }
 
     [TestMethod]
     public void ParsesHunXueBloodlineTipFromHunLuanText()
     {
-        Assert.IsTrue(S3EncounterBloodlineRecognition.TryParse(
+        Assert.IsTrue(EncounterBloodlineRecognition.TryParse(
             "小加尔想了想，染上了几笔混乱的颜色！",
             out var kind));
         Assert.AreEqual(EncounterBloodlineKind.HunXue, kind);
-        Assert.AreEqual("混血", S3EncounterBloodlineRecognition.GetDisplayName(kind));
+        Assert.AreEqual("混血", EncounterBloodlineRecognition.GetDisplayName(kind));
     }
 
     [TestMethod]
     public void ParsesWuRanBloodlineTip()
     {
-        Assert.IsTrue(S3EncounterBloodlineRecognition.TryParse(
+        Assert.IsTrue(EncounterBloodlineRecognition.TryParse(
             "小加尔想了想，染上了几笔污染的颜色！",
             out var kind));
         Assert.AreEqual(EncounterBloodlineKind.WuRan, kind);
@@ -40,19 +56,22 @@ public sealed class S3EncounterBloodlineRecognitionTests
     [TestMethod]
     public void ParsesNormalTraitTip()
     {
-        Assert.IsTrue(S3EncounterBloodlineRecognition.TryParse(
+        Assert.IsTrue(EncounterBloodlineRecognition.TryParse(
             "特性：坚韧不拔",
             out var kind));
         Assert.AreEqual(EncounterBloodlineKind.Normal, kind);
-        Assert.AreEqual("普通", S3EncounterBloodlineRecognition.GetDisplayName(kind));
+        Assert.AreEqual("普通", EncounterBloodlineRecognition.GetDisplayName(kind));
     }
 
     [TestMethod]
-    public void ReturnsUnrecognizedForUnknownTip()
+    [DataRow("战斗提示无关内容一二三")]
+    [DataRow("星陨")]
+    [DataRow("奇")]
+    [DataRow("")]
+    [DataRow(null)]
+    public void ReturnsUnrecognizedForUnknownTip(string? text)
     {
-        Assert.IsFalse(S3EncounterBloodlineRecognition.TryParse(
-            "战斗提示无关内容一二三",
-            out var kind));
+        Assert.IsFalse(EncounterBloodlineRecognition.TryParse(text, out var kind));
         Assert.AreEqual(EncounterBloodlineKind.Unrecognized, kind);
     }
 

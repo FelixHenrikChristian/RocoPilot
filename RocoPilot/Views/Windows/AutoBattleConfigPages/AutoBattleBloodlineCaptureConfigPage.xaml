@@ -149,7 +149,7 @@
                                     Grid.Column="1"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="旧赛季奇遇不会识别血脉，会根据「未识别」选项决定捕捉或释放战技。"
+                                    Text="根据提示中的「奇异、混乱、污染、特性」识别血脉，不区分赛季；无法识别时按「未识别」选项处理。"
                                     TextWrapping="Wrap" />
                             </Grid>
                         </Border>

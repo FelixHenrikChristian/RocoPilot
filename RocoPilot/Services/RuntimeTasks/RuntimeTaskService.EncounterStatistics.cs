@@ -22,7 +22,6 @@ public sealed partial class RuntimeTaskService
     private const string CaptureButtonEnabledTemplateName = "battle-button-capture.png";
     private const string CaptureButtonDisabledTemplateName = "battle-button-capture-disabled.png";
     private const string CaptureButtonDisabledMarkerTemplateName = "battle-button-capture-disabled-marker.png";
-    private const string S3SeasonId = "S3";
     private const int AuxiliaryTipMinimumChineseCharacterCount = 3;
     private const string ShinyTipText = "发现异色精灵";
     private const double ShinyTipMatchThreshold = 0.78;
@@ -32,10 +31,6 @@ public sealed partial class RuntimeTaskService
     [
         RecognitionRegionIds.BattleMessageTip,
         "battle-tip"
-    ];
-    private static readonly string[] BattleS3EncounterTipRegionIds =
-    [
-        RecognitionRegionIds.BattleS3EncounterTip
     ];
     private static readonly string[] BattleShinyTipRegionIds =
     [
@@ -152,9 +147,11 @@ public sealed partial class RuntimeTaskService
         long battleId,
         CancellationToken cancellationToken)
     {
+        var bloodlineTipTask = RecognizeAndApplyBloodlineTipAsync(state, frame, battleId, cancellationToken);
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
+            await bloodlineTipTask;
             return;
         }
 
@@ -169,17 +166,10 @@ public sealed partial class RuntimeTaskService
             frame,
             season,
             cancellationToken);
-        var s3EncounterTipTask = RecognizeAndApplyBloodlineTipAsync(
-            state,
-            frame,
-            season,
-            battleId,
-            cancellationToken);
-
         await Task.WhenAll(
             shinyTipTask,
             battleTipTask,
-            s3EncounterTipTask);
+            bloodlineTipTask);
         if (battleId != _battle.BattleId) return;
         await TryRecordEncounterAfterRelievedAsync(
             state,
@@ -216,12 +206,10 @@ public sealed partial class RuntimeTaskService
     private async Task RecognizeAndApplyBloodlineTipAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
-        EncounterSeasonDefinition season,
         long battleId,
         CancellationToken cancellationToken)
     {
-        // S3 血脉提示：下赛季可删除本方法、S3SeasonId 与 battle-tip-encounter-s3 区域。
-        if (!string.Equals(season.Id, S3SeasonId, StringComparison.OrdinalIgnoreCase))
+        if (!EncounterBloodlineRecognition.IsAvailable(state.RecognitionRegionConfig))
         {
             return;
         }
@@ -229,29 +217,29 @@ public sealed partial class RuntimeTaskService
         var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
-            BattleS3EncounterTipRegionIds,
+            EncounterBloodlineRecognition.RegionIds,
             cancellationToken,
-            "S3 奇遇提示");
-        if (TextMatchingHelper.CountChineseCharacters(tipText) < AuxiliaryTipMinimumChineseCharacterCount)
+            "奇遇血脉提示");
+        if (string.IsNullOrWhiteSpace(tipText))
         {
             return;
         }
 
-        var hasParsedKind = S3EncounterBloodlineRecognition.TryParse(tipText, out var kind);
+        var hasParsedKind = EncounterBloodlineRecognition.TryParse(tipText, out var kind);
         if (hasParsedKind)
         {
             _battle.ObserveBloodline(battleId, kind);
         }
 
-        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleS3EncounterTip, tipText))
+        if (!TryRememberAuxiliaryTip(RecognitionRegionIds.BattleBloodlineTip, tipText))
         {
             return;
         }
 
         _logger.LogDebug(
-            "S3 奇遇血脉提示：{TipText}，Bloodline={Bloodline}",
+            "奇遇血脉提示：{TipText}，Bloodline={Bloodline}",
             FormatLogText(tipText),
-            S3EncounterBloodlineRecognition.GetDisplayName(
+            EncounterBloodlineRecognition.GetDisplayName(
                 hasParsedKind ? kind : EncounterBloodlineKind.Unrecognized));
     }
 

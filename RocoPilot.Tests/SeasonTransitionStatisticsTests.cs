@@ -22,6 +22,47 @@ public sealed class SeasonTransitionStatisticsTests
     private static readonly DateTimeOffset FirstS5Day = new(2026, 11, 5, 0, 0, 0, TimeSpan.FromHours(8));
 
     [TestMethod]
+    public void BundledS4ConfigIncludesNovemberFourthAndExpiresOnFifth()
+    {
+        var service = new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance);
+        var config = service.Load();
+        Assert.AreEqual("S4", service.GetCurrentSeason()?.Id);
+        Assert.AreEqual("星陨", service.GetCurrentSeason()?.EncounterTypeName);
+        Assert.AreEqual("S3", EncounterSeasonTimeline.FindSeason(config, new DateOnly(2026, 9, 9))?.Id);
+        Assert.AreEqual("S4", EncounterSeasonTimeline.FindSeason(config, new DateOnly(2026, 9, 10))?.Id);
+        Assert.AreEqual("S4", EncounterSeasonTimeline.FindSeason(config, new DateOnly(2026, 11, 4))?.Id);
+        Assert.IsFalse(EncounterSeasonTimeline.IsExpired(config, new DateOnly(2026, 11, 4)));
+        Assert.IsTrue(EncounterSeasonTimeline.IsExpired(config, new DateOnly(2026, 11, 5)));
+        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId,
+            EncounterSeasonTimeline.ResolveForRecording(config, FirstS5Day, service.GetCurrentSeason()!).Id);
+    }
+
+    [TestMethod]
+    public async Task BundledS4UpdateCountsKnownNamesAndKeepsMissingNamesUntilCatalogSync()
+    {
+        var (service, store) = await CreateAsync(S3);
+        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
+        await service.AddPendingEncounterAsync("100", S3, "missing", "烈火王", FirstS4Day.AddMinutes(1));
+        var seasonConfig = new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance);
+        var catalog = new StatisticsSpiritCatalogStub { Document = new SpiritCatalogDocument() };
+        var updated = new StatisticsService(store, NullLogger<StatisticsService>.Instance, seasonConfig, catalog);
+
+        await updated.LoadAsync();
+        Assert.AreEqual(1, Count(updated, "S4"));
+        Assert.AreEqual(0, Count(updated, "S3"));
+        var pending = Account(updated).PendingEncounters.Single(item => item.Id == "missing");
+        Assert.AreEqual("S4", pending.Season);
+        Assert.AreEqual("烈火王", pending.RawText);
+        Assert.IsNull(pending.HandledAt);
+
+        Assert.AreEqual(1, await updated.RematchPendingEncountersAsync(Catalog(), seasonConfig.Load().SpiritNameMatchThreshold));
+        Assert.AreEqual(2, Count(updated, "S4"));
+        Assert.AreEqual("小火苗", Account(updated).Seasons.Single(item => item.Id == "S4").Encounters.Single().Name);
+        Assert.AreEqual(0, await updated.RematchPendingEncountersAsync(Catalog(), seasonConfig.Load().SpiritNameMatchThreshold));
+        Assert.AreEqual(2, Count(updated, "S4"));
+    }
+
+    [TestMethod]
     public async Task EndDateRemainsInOldSeasonAndNextDayStoresEveryEncounter()
     {
         var (service, store) = await CreateAsync(S3);

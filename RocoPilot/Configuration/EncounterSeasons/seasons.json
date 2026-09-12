@@ -1,5 +1,5 @@
 {
-  "currentSeasonId": "S3",
+  "currentSeasonId": "S4",
   "spiritNameMatchThreshold": 0.55,
   "seasons": [
     {
@@ -19,6 +19,12 @@
       "name": "S3赛季",
       "dateRange": "2026/7/16-2026/9/9",
       "encounterTypeName": "铅绘"
+    },
+    {
+      "id": "S4",
+      "name": "S4赛季",
+      "dateRange": "2026/9/10-2026/11/4",
+      "encounterTypeName": "星陨"
     }
   ]
 }

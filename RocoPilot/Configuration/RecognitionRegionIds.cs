@@ -10,6 +10,6 @@ internal static class RecognitionRegionIds
     public const string BattleCaptureButton = "battle-button-capture";
     public const string BattleMessageTip = "battle-tip-message";
     public const string BattleShinyTip = "battle-tip-shiny";
-    public const string BattleS3EncounterTip = "battle-tip-encounter-s3";
+    public const string BattleBloodlineTip = "battle-tip-bloodline";
     public const string StatisticsUid = "statistics-uid";
 }

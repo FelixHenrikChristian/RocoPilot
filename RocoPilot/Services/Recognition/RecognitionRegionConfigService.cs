@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 
 using Microsoft.Extensions.Logging;
 
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services.Recognition;
 using RocoPilot.Models.Recognition;
 
@@ -212,6 +213,16 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
 
         config.SourcePath = path;
         config.LoadedFromFile = true;
+
+        // 沿用用户旧版血脉区域的坐标和启用状态；新 ID 已存在时以新配置为准。
+        if (!config.Regions.Any(region => string.Equals(region.Id?.Trim(), RecognitionRegionIds.BattleBloodlineTip, StringComparison.OrdinalIgnoreCase)))
+        {
+            foreach (var region in config.Regions.Where(region =>
+                string.Equals(region.Id?.Trim(), "battle-tip-encounter-s3", StringComparison.OrdinalIgnoreCase)))
+            {
+                region.Id = RecognitionRegionIds.BattleBloodlineTip;
+            }
+        }
 
         if (expectedWidth > 0
             && expectedHeight > 0

@@ -1,19 +1,25 @@
+using RocoPilot.Configuration;
 using RocoPilot.Helpers;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.RuntimeTasks;
 
 namespace RocoPilot.Services;
 
 /// <summary>
-/// S3 铅绘奇遇血脉提示解析（赛季专用实现，下赛季可整体删除本文件及 tip 区域）。
+/// 通用奇遇血脉识别：只检查提示关键词，不限定赛季或完整句式。
 /// </summary>
-internal static class S3EncounterBloodlineRecognition
+internal static class EncounterBloodlineRecognition
 {
-    public const string SeasonId = "S3";
+    public static IReadOnlyList<string> RegionIds { get; } = [RecognitionRegionIds.BattleBloodlineTip];
 
     public const string QiYiKeyword = "奇异";
     public const string HunXueKeyword = "混乱";
     public const string WuRanKeyword = "污染";
     public const string NormalTraitKeyword = "特性";
+
+    public static bool IsAvailable(RecognitionRegionConfig config) => config.Regions.FirstOrDefault(region =>
+        RuntimeFrameRecognizer.IsRegionMatch(region, RegionIds)) is { Width: > 0, Height: > 0 };
 
     public static string GetDisplayName(EncounterBloodlineKind kind)
     {

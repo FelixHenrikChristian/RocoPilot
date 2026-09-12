@@ -74,7 +74,8 @@ public sealed partial class RuntimeTaskService
         {
             var turn = _battle.CurrentTurn;
             if (turn is null || _battle.IsSuspendedForShiny) return;
-            var plan = _battle.PlanSkillSelection(settings, IsCurrentSeasonBloodlineTipAvailable(), now);
+            var plan = _battle.PlanSkillSelection(
+                settings, EncounterBloodlineRecognition.IsAvailable(state.RecognitionRegionConfig), now);
             if (plan.Action == AutoBattleAction.Skill && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
             {
                 LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForUnconfirmedEncounterRelief");
@@ -101,17 +102,6 @@ public sealed partial class RuntimeTaskService
     private bool ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief()
     {
         return _encounterCaptureButtonStateTracker.ShouldHoldAttackForUnconfirmedRelief;
-    }
-
-    private bool IsCurrentSeasonBloodlineTipAvailable()
-    {
-        // 赛季血脉识别实现入口：目前仅 S3；下赛季可替换或删除。
-        var season = _encounterSeasonConfigService.GetCurrentSeason();
-        return season is not null
-            && string.Equals(
-                season.Id,
-                S3EncounterBloodlineRecognition.SeasonId,
-                StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task HandleAutoBattlePetSwitchingAsync(

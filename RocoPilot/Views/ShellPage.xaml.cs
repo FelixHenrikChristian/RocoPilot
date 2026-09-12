@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Media;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
+using RocoPilot.Services.Encounters;
 using RocoPilot.ViewModels;
 
 using Windows.System;
@@ -23,16 +24,19 @@ public sealed partial class ShellPage : Page
     }
 
     private readonly IUpdateService _updateService;
+    private readonly EncounterSeasonReminderService _seasonReminderService;
     private readonly ILogger<ShellPage> _logger;
-    private bool _isStartupUpdateCheckStarted;
+    private bool _areStartupChecksStarted;
 
     public ShellPage(
         ShellViewModel viewModel,
         IUpdateService updateService,
+        EncounterSeasonReminderService seasonReminderService,
         ILogger<ShellPage> logger)
     {
         ViewModel = viewModel;
         _updateService = updateService;
+        _seasonReminderService = seasonReminderService;
         _logger = logger;
         InitializeComponent();
 #if DEBUG
@@ -77,7 +81,7 @@ public sealed partial class ShellPage : Page
             AutomationProperties.SetName(settingsItem, "设置");
         }
 
-        _ = CheckForUpdatesOnStartupAsync();
+        _ = RunStartupChecksAsync();
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
@@ -127,15 +131,49 @@ public sealed partial class ShellPage : Page
         args.Handled = result;
     }
 
-    private async Task CheckForUpdatesOnStartupAsync()
+    private async Task RunStartupChecksAsync()
     {
-        if (_isStartupUpdateCheckStarted)
+        if (_areStartupChecksStarted)
         {
             return;
         }
 
-        _isStartupUpdateCheckStarted = true;
+        _areStartupChecksStarted = true;
 
+        await ShowSeasonReminderOnStartupAsync();
+        await CheckForUpdatesOnStartupAsync();
+    }
+
+    private async Task ShowSeasonReminderOnStartupAsync()
+    {
+        try
+        {
+            var reminder = await _seasonReminderService.GetPendingReminderAsync(
+                DateOnly.FromDateTime(DateTime.Now));
+            if (reminder is null || XamlRoot is null)
+            {
+                return;
+            }
+
+            var dialog = new EncounterSeasonReminderDialog(reminder)
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme
+            };
+
+            if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+            {
+                await _seasonReminderService.DismissAsync(reminder);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "启动时处理赛季到期提醒失败。");
+        }
+    }
+
+    private async Task CheckForUpdatesOnStartupAsync()
+    {
         try
         {
             var result = await _updateService.CheckUpdateAsync(new UpdateOption { Trigger = UpdateTrigger.Auto });

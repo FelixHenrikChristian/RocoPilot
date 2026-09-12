@@ -120,6 +120,7 @@ public partial class App : Application
             services.AddSingleton<IInfoOverlayNotificationService>(provider => provider.GetRequiredService<InfoOverlayService>());
             services.AddSingleton<IRecognitionRegionConfigService, RecognitionRegionConfigService>();
             services.AddSingleton<IEncounterSeasonConfigService, EncounterSeasonConfigService>();
+            services.AddSingleton<EncounterSeasonReminderService>();
             services.AddSingleton<ISpiritCatalogService, SpiritCatalogService>();
             services.AddSingleton<IStatisticsService, StatisticsService>();
             services.AddSingleton<IStatisticsRemoteStore>(_ => new S3StatisticsRemoteStore(

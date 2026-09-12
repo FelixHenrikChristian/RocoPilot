@@ -8,6 +8,8 @@ internal static class SettingsKeys
 
     public const string EncounterStatisticsEnabled = "EncounterStatisticsEnabled";
 
+    public const string DismissedEncounterSeasonReminder = "DismissedEncounterSeasonReminder";
+
     public const string SpiritCatalogSourceId = "SpiritCatalogSourceId";
 
     public const string AutoBattleSettings = "AutoBattleSettings";

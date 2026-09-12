@@ -12,11 +12,28 @@ internal sealed class ScrapedSpiritState
         SourceIndex = sourceIndex;
     }
 
-    public SpiritCatalogItem Item { get; }
+    public SpiritCatalogItem Item
+    {
+        get;
+    }
 
-    public int SourceIndex { get; }
+    public int SourceIndex
+    {
+        get;
+    }
 
-    public bool IsPrimaryForm { get; init; }
+    public bool IsPrimaryForm
+    {
+        get; init;
+    }
 
-    public int StageRank { get; set; }
+    public bool IsChainStart
+    {
+        get; init;
+    }
+
+    public int StageRank
+    {
+        get; set;
+    }
 }

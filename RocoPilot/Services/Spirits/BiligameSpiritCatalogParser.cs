@@ -8,40 +8,40 @@ namespace RocoPilot.Services.Spirits;
 
 internal static class BiligameSpiritCatalogParser
 {
-    private static readonly Regex CardStartRegex = new(
-        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"(?=[^\"]*\\bdivsort\\b)(?=[^\"]*\\bdex-pet-card\\b)[^\"]*\")(?<attrs>[^>]*)>",
+    private static readonly Regex NrcCardStartRegex = new(
+        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-card(?:\\s|\")[^\"]*\")(?<attrs>[^>]*)>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    private static readonly Regex NrcTargetRegex = new(
+        "<a\\b(?<attrs>[^>]*)>(?<text>.*?)</a>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex NrcNameRegex = new(
+        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-name\\b[^\"]*\")[^>]*>(?<text>.*?)</div>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex NrcStageRegex = new(
+        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-stage\\b[^\"]*\")[^>]*>(?<text>.*?)</div>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex NrcFormRegex = new(
+        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-form\\b[^\"]*\")[^>]*>(?<text>.*?)</div>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex NrcNormalImageRegex = new(
+        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-art-normal\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+    private static readonly Regex NrcShinyImageRegex = new(
+        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-art-shiny\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
     private static readonly Regex AttributeRegex = new(
         "(?<name>[a-zA-Z0-9_:-]+)\\s*=\\s*(?<quote>[\"'])(?<value>.*?)\\k<quote>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.Singleline);
 
-    private static readonly Regex KickerRegex = new(
-        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-card-kicker\\b[^\"]*\")[^>]*>\\s*NO\\.\\s*(?<id>\\d+)\\s*(?:<span\\b[^>]*>(?<stage>.*?)</span>)?",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-    private static readonly Regex NameRegex = new(
-        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-card-name\\b[^\"]*\")[^>]*>\\s*<a\\b(?<attrs>[^>]*)>(?<text>.*?)</a>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-    private static readonly Regex SubtitleRegex = new(
-        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-card-subtitle\\b[^\"]*\")[^>]*>(?<text>.*?)</div>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-    private static readonly Regex NormalAvatarImageRegex = new(
-        "<span\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-pet-art-normal\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-    private static readonly Regex ShinyAvatarImageRegex = new(
-        "<span\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-pet-art-shiny\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-    private static readonly Regex FallbackAvatarImageRegex = new(
-        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-pet-art\\b[^\"]*\")[^>]*>.*?<img\\b(?<attrs>[^>]*)>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-    private static readonly Regex ReportedCountRegex = new(
-        "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bdex-count-note\\b[^\"]*\")[^>]*>.*?<strong\\b[^>]*>\\s*(?<count>\\d+)\\s*</strong>",
+    private static readonly Regex NrcReportedCountRegex = new(
+        "<(?:span|div)\\b(?=[^>]*\\bclass\\s*=\\s*\"[^\"]*\\bnpc-total-number\\b[^\"]*\")[^>]*>\\s*(?<count>\\d+)\\s*</(?:span|div)>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
     private static readonly Regex HtmlTagRegex = new(
@@ -57,8 +57,13 @@ internal static class BiligameSpiritCatalogParser
         ArgumentException.ThrowIfNullOrWhiteSpace(markup);
         ArgumentException.ThrowIfNullOrWhiteSpace(listUrl);
 
-        var cardStarts = CardStartRegex.Matches(markup).Cast<Match>().ToList();
-        var cards = new List<ParsedCard>(cardStarts.Count);
+        return ParseNrcListPage(markup, listUrl);
+    }
+
+    private static List<ScrapedSpiritState> ParseNrcListPage(string markup, string listUrl)
+    {
+        var cardStarts = NrcCardStartRegex.Matches(markup).Cast<Match>().ToList();
+        var cards = new List<ScrapedSpiritState>(cardStarts.Count);
         var listUri = new Uri(listUrl);
 
         for (var index = 0; index < cardStarts.Count; index++)
@@ -68,182 +73,132 @@ internal static class BiligameSpiritCatalogParser
                 ? cardStarts[index + 1].Index
                 : markup.Length;
             var block = markup[start..end];
-            cards.Add(ParseCard(block, cardStarts[index], listUri, index));
+            cards.Add(ParseNrcCard(block, cardStarts[index], listUri, index));
         }
 
-        ApplyChainMetadata(cards);
-        return cards.Select(card => card.State).ToList();
+        ApplyNrcChainMetadata(cards);
+        return cards;
     }
 
-    public static int ParseReportedCount(string markup)
-    {
-        var match = ReportedCountRegex.Match(markup);
-        return match.Success
-            && int.TryParse(match.Groups["count"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var count)
-                ? count
-                : 0;
-    }
-
-    private static ParsedCard ParseCard(
+    private static ScrapedSpiritState ParseNrcCard(
         string block,
         Match cardStart,
         Uri listUri,
         int sourceIndex)
     {
         var cardAttributes = ParseAttributes(cardStart.Groups["attrs"].Value);
-        var kickerMatch = KickerRegex.Match(block);
-        var nameMatch = NameRegex.Match(block);
-        var imageMatch = NormalAvatarImageRegex.Match(block);
-        if (!imageMatch.Success)
-        {
-            imageMatch = FallbackAvatarImageRegex.Match(block);
-        }
-
-        var shinyImageMatch = ShinyAvatarImageRegex.Match(block);
-        if (!kickerMatch.Success || !nameMatch.Success || !imageMatch.Success)
+        var targetMatch = NrcTargetRegex.Match(block);
+        var nameMatch = NrcNameRegex.Match(block);
+        var normalImageMatch = NrcNormalImageRegex.Match(block);
+        var shinyImageMatch = NrcShinyImageRegex.Match(block);
+        if (!targetMatch.Success || !nameMatch.Success || !normalImageMatch.Success)
         {
             throw new InvalidOperationException(
-                $"Biligame 图鉴列表第 {sourceIndex + 1} 张卡片缺少序号、名称或头像。");
+                $"Biligame 新版图鉴第 {sourceIndex + 1} 张卡片缺少链接、名称或头像。");
         }
 
-        var nameAttributes = ParseAttributes(nameMatch.Groups["attrs"].Value);
-        var imageAttributes = ParseAttributes(imageMatch.Groups["attrs"].Value);
-        var shinyImageAttributes = shinyImageMatch.Success
-            ? ParseAttributes(shinyImageMatch.Groups["attrs"].Value)
-            : [];
-        var id = NormalizeCatalogId(kickerMatch.Groups["id"].Value);
+        var targetAttributes = ParseAttributes(targetMatch.Groups["attrs"].Value);
+        var id = NormalizeCatalogId(cardAttributes.GetValueOrDefault("data-number", string.Empty));
+        if (id.Length == 0)
+        {
+            id = NormalizeCatalogId(
+                cardAttributes.GetValueOrDefault("data-id", string.Empty).Replace("pet_", string.Empty, StringComparison.OrdinalIgnoreCase));
+        }
+
         var wikiName = NormalizeText(nameMatch.Groups["text"].Value);
-        var fullName = NormalizeText(nameAttributes.GetValueOrDefault("title", wikiName));
-        var href = Decode(nameAttributes.GetValueOrDefault("href", string.Empty)).Trim();
-        var avatarSource = Decode(imageAttributes.GetValueOrDefault("src", string.Empty)).Trim();
-        var shinyAvatarSource = Decode(shinyImageAttributes.GetValueOrDefault("src", string.Empty)).Trim();
+        var fullName = NormalizeText(targetAttributes.GetValueOrDefault("title", wikiName));
+        var href = Decode(targetAttributes.GetValueOrDefault("href", string.Empty)).Trim();
+        var avatarSource = Decode(ParseAttributes(normalImageMatch.Groups["attrs"].Value).GetValueOrDefault("src", string.Empty)).Trim();
+        var shinyAvatarSource = shinyImageMatch.Success
+            ? Decode(ParseAttributes(shinyImageMatch.Groups["attrs"].Value).GetValueOrDefault("src", string.Empty)).Trim()
+            : string.Empty;
         if (id.Length == 0 || wikiName.Length == 0 || href.Length == 0 || avatarSource.Length == 0)
         {
             throw new InvalidOperationException(
-                $"Biligame 图鉴列表第 {sourceIndex + 1} 张卡片包含空的序号、名称、链接或头像。");
+                $"Biligame 新版图鉴第 {sourceIndex + 1} 张卡片包含空的编号、名称、链接或头像。");
         }
 
-        var stage = ParseStage(kickerMatch, cardAttributes);
-        var form = ParseForm(cardAttributes);
-        var subtitle = NormalizeText(SubtitleRegex.Match(block).Groups["text"].Value);
-        var variant = IsGenericSubtitle(subtitle, form) ? string.Empty : subtitle;
-        var primaryAttribute = NormalizeText(cardAttributes.GetValueOrDefault("data-param2", string.Empty));
-        var secondaryAttribute = NormalizeText(cardAttributes.GetValueOrDefault("data-param3", string.Empty));
-        var declaresShiny = string.Equals(
-            NormalizeText(cardAttributes.GetValueOrDefault("data-param6", string.Empty)),
-            "是",
-            StringComparison.Ordinal);
-        var hasShiny = shinyAvatarSource.Length > 0;
-        if (declaresShiny != hasShiny)
+        var stageText = NormalizeText(NrcStageRegex.Match(block).Groups["text"].Value);
+        var stage = SpiritCatalogParsingHelpers.NormalizeStage(stageText.Length > 0
+            ? stageText
+            : cardAttributes.GetValueOrDefault("data-stage", string.Empty));
+        var form = NormalizeText(NrcFormRegex.Match(block).Groups["text"].Value);
+        if (form.Length == 0)
         {
-            throw new InvalidOperationException(
-                $"Biligame 图鉴列表第 {sourceIndex + 1} 张卡片的异色标记与异色头像不一致。");
+            form = cardAttributes.GetValueOrDefault("data-form", string.Empty) switch
+            {
+                "lord" => "首领形态",
+                "main" => "原始形态",
+                _ => "原始形态"
+            };
         }
 
-        var pageUrl = new Uri(listUri, href).ToString();
-        var avatarUrl = new Uri(listUri, avatarSource).ToString();
-        var shinyAvatarUrl = hasShiny
-            ? new Uri(listUri, shinyAvatarSource).ToString()
-            : string.Empty;
-
+        var typeValues = cardAttributes.GetValueOrDefault("data-type", string.Empty)
+            .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var item = new SpiritCatalogItem
         {
             Id = id,
             Name = fullName.Length > 0 ? fullName : wikiName,
             WikiName = wikiName,
-            PageUrl = pageUrl,
-            AvatarUrl = avatarUrl,
-            OriginalImageUrl = ToOriginalImageUrl(avatarUrl),
-            ShinyAvatarUrl = shinyAvatarUrl,
-            ShinyOriginalImageUrl = ToOriginalImageUrl(shinyAvatarUrl),
+            PageUrl = new Uri(listUri, href).ToString(),
+            AvatarUrl = new Uri(listUri, avatarSource).ToString(),
+            OriginalImageUrl = ToOriginalImageUrl(new Uri(listUri, avatarSource).ToString()),
+            ShinyAvatarUrl = shinyAvatarSource.Length > 0 ? new Uri(listUri, shinyAvatarSource).ToString() : string.Empty,
+            ShinyOriginalImageUrl = shinyAvatarSource.Length > 0 ? ToOriginalImageUrl(new Uri(listUri, shinyAvatarSource).ToString()) : string.Empty,
             Stage = stage,
             Form = form,
-            RegionalForm = variant,
-            HasShiny = hasShiny,
-            PrimaryAttribute = primaryAttribute,
-            SecondaryAttribute = secondaryAttribute
+            HasShiny = string.Equals(cardAttributes.GetValueOrDefault("data-shiny", string.Empty), "yes", StringComparison.OrdinalIgnoreCase),
+            PrimaryAttribute = typeValues.ElementAtOrDefault(0) ?? string.Empty,
+            SecondaryAttribute = typeValues.ElementAtOrDefault(1) ?? string.Empty
         };
-        var state = new ScrapedSpiritState(item, sourceIndex)
+        if (item.HasShiny != (shinyAvatarSource.Length > 0))
         {
-            IsPrimaryForm = string.Equals(
-                NormalizeText(cardAttributes.GetValueOrDefault("data-param5", string.Empty)),
-                "主形态",
-                StringComparison.Ordinal)
-        };
+            throw new InvalidOperationException(
+                $"Biligame 新版图鉴第 {sourceIndex + 1} 张卡片的异色标记与异色头像不一致。");
+        }
 
-        return new ParsedCard(state);
+        var isPrimary = string.Equals(cardAttributes.GetValueOrDefault("data-form", string.Empty), "main", StringComparison.OrdinalIgnoreCase);
+        return new ScrapedSpiritState(item, sourceIndex)
+        {
+            IsPrimaryForm = isPrimary,
+            IsChainStart = cardAttributes.GetValueOrDefault("data-position", string.Empty)
+                .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Any(value => string.Equals(value, "initial", StringComparison.OrdinalIgnoreCase))
+        };
     }
 
-    private static void ApplyChainMetadata(IReadOnlyList<ParsedCard> cards)
+    public static int ParseReportedCount(string markup)
     {
-        var metadataByCatalogId = new Dictionary<string, ChainMetadata>(StringComparer.OrdinalIgnoreCase);
-        string currentBaseName = string.Empty;
+        var match = NrcReportedCountRegex.Match(markup);
+        return match.Success
+            && int.TryParse(match.Groups["count"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var count)
+                ? count
+                : 0;
+    }
 
-        foreach (var card in cards.Where(card => card.State.IsPrimaryForm))
+    private static void ApplyNrcChainMetadata(IReadOnlyList<ScrapedSpiritState> cards)
+    {
+        var currentBaseName = string.Empty;
+        foreach (var state in cards)
         {
-            var item = card.State.Item;
+            var item = state.Item;
             var stageRank = SpiritCatalogParsingHelpers.StageRank(item.Stage);
-            if (stageRank <= 1 || currentBaseName.Length == 0)
+            if (state.IsChainStart || (state.IsPrimaryForm && stageRank <= 1) || currentBaseName.Length == 0)
             {
                 currentBaseName = item.WikiName;
             }
 
-            if (!metadataByCatalogId.TryAdd(
-                    item.Id,
-                    new ChainMetadata(currentBaseName, stageRank)))
+            if (currentBaseName.Length == 0)
             {
-                throw new InvalidOperationException(
-                    $"Biligame 图鉴编号 {item.Id} 存在多个主形态卡片。");
-            }
-        }
-
-        foreach (var card in cards)
-        {
-            var state = card.State;
-            var item = state.Item;
-            if (!metadataByCatalogId.TryGetValue(item.Id, out var metadata))
-            {
-                throw new InvalidOperationException(
-                    $"Biligame 图鉴编号 {item.Id} 缺少主形态卡片。");
+                currentBaseName = item.WikiName;
             }
 
-            item.BaseName = metadata.BaseName;
+            item.BaseName = currentBaseName;
             item.Aliases = SpiritCatalogParsingHelpers.BuildAliases(item);
-            state.StageRank = metadata.StageRank;
+            state.StageRank = stageRank;
         }
     }
 
-    private static string ParseStage(
-        Match kickerMatch,
-        IReadOnlyDictionary<string, string> cardAttributes)
-    {
-        var stage = NormalizeText(kickerMatch.Groups["stage"].Value);
-        if (stage.Length == 0)
-        {
-            stage = NormalizeText(cardAttributes.GetValueOrDefault("data-param1", string.Empty));
-        }
-
-        var form = NormalizeText(cardAttributes.GetValueOrDefault("data-param4", string.Empty));
-        if (stage.Length == 0 && form.Contains("首领", StringComparison.Ordinal))
-        {
-            stage = "首领";
-        }
-
-        return SpiritCatalogParsingHelpers.NormalizeStage(stage);
-    }
-
-    private static string ParseForm(IReadOnlyDictionary<string, string> cardAttributes)
-    {
-        var form = NormalizeText(cardAttributes.GetValueOrDefault("data-param4", string.Empty));
-        return form.Length > 0 ? form : "原始形态";
-    }
-
-    private static bool IsGenericSubtitle(string subtitle, string form)
-    {
-        return subtitle.Length == 0
-            || string.Equals(subtitle, form, StringComparison.Ordinal)
-            || subtitle is "原始形态" or "地区形态" or "首领形态" or "异色形态" or "主形态";
-    }
 
     private static Dictionary<string, string> ParseAttributes(string tag)
     {
@@ -289,7 +244,4 @@ internal static class BiligameSpiritCatalogParser
         return WebUtility.HtmlDecode(value);
     }
 
-    private sealed record ParsedCard(ScrapedSpiritState State);
-
-    private sealed record ChainMetadata(string BaseName, int StageRank);
 }

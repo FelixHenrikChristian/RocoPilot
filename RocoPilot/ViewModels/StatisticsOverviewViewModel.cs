@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Services.Encounters;
 
 namespace RocoPilot.ViewModels;
 
@@ -88,11 +89,12 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
 
     public int PendingShinyCount => PendingShinyCaptures.Count;
 
-    public PendingShinyCaptureItem? LatestPendingShinyCapture => PendingShinyCaptures.FirstOrDefault();
+    public PendingShinyCaptureItem? LatestPendingShinyCapture => PendingShinyCaptures
+        .FirstOrDefault(item => item.Season != EncounterSeasonTimeline.PendingSeasonId);
 
     public Visibility PendingShinyBadgeVisibility => PendingShinyCount > 0 ? Visibility.Visible : Visibility.Collapsed;
 
-    public Visibility PendingShinyConfirmationVisibility => PendingShinyBadgeVisibility;
+    public Visibility PendingShinyConfirmationVisibility => LatestPendingShinyCapture is null ? Visibility.Collapsed : Visibility.Visible;
 
     public string PendingShinySeasonDisplay => LatestPendingShinyCapture?.SeasonDisplay ?? "--";
 
@@ -140,7 +142,7 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
             PendingEncounters = account?.PendingEncounters
                 .Where(item => item.HandledAt is null)
                 .OrderBy(item => item.DetectedAt)
-                .Select(item => new PendingEncounterItem(account.Uid, item.Id, item.RawText, item.Season, item.DetectedAt))
+                .Select(item => new PendingEncounterItem(account.Uid, item.Id, item.RawText, item.Season, item.DetectedAt, item.Name))
                 .ToList() ?? [];
             _selectedSeasonIndex = Math.Max(0, FindSeasonIndex(seasons, seasonId));
             _selectedShinyScopeIndex = FindSeasonIndex(seasons, shinySeasonId) + 1;

@@ -5,12 +5,15 @@ using Microsoft.Extensions.Logging;
 
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Encounters;
+using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 using RocoPilot.Models.Spirits;
 using RocoPilot.Services.Spirits;
+using RocoPilot.Services.Encounters;
 
 namespace RocoPilot.Services.Statistics;
 
@@ -24,6 +27,8 @@ public sealed class StatisticsService : IStatisticsService
 
     private readonly ILocalSettingsService _localSettingsService;
     private readonly ILogger<StatisticsService> _logger;
+    private readonly IEncounterSeasonConfigService? _seasonConfigService;
+    private readonly ISpiritCatalogService? _spiritCatalogService;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
     private StatisticsDocument _document = StatisticsDocumentNormalizer.CreateDefault();
@@ -47,10 +52,14 @@ public sealed class StatisticsService : IStatisticsService
 
     public StatisticsService(
         ILocalSettingsService localSettingsService,
-        ILogger<StatisticsService> logger)
+        ILogger<StatisticsService> logger,
+        IEncounterSeasonConfigService? seasonConfigService = null,
+        ISpiritCatalogService? spiritCatalogService = null)
     {
         _localSettingsService = localSettingsService;
         _logger = logger;
+        _seasonConfigService = seasonConfigService;
+        _spiritCatalogService = spiritCatalogService;
     }
 
     public async Task<StatisticsDocument> LoadAsync()
@@ -139,19 +148,27 @@ public sealed class StatisticsService : IStatisticsService
             return LoadAsync();
         }
 
+        season = ResolveRecordingSeason(season, capturedAt);
+        if (season.Id == EncounterSeasonTimeline.PendingSeasonId)
+            return UpdateAccountAsync(account => StatisticsMutationRules.AddPendingEncounter(
+                account, season, Guid.NewGuid().ToString("N"), string.Empty, capturedAt, spiritName),
+                useActiveAccount: true, accountUid: accountUid);
+
         return UpdateAccountAsync(account =>
             StatisticsMutationRules.RecordEncounter(account, season, spiritName, capturedAt),
             useActiveAccount: true, accountUid: accountUid);
     }
 
     public Task<StatisticsDocument> AddPendingEncounterAsync(
-        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt)
+        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt,
+        string? spiritName = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
         ArgumentException.ThrowIfNullOrWhiteSpace(season.Id);
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        season = ResolveRecordingSeason(season, detectedAt);
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.AddPendingEncounter(account, season, id, rawText, detectedAt),
+            StatisticsMutationRules.AddPendingEncounter(account, season, id, rawText, detectedAt, spiritName),
             useActiveAccount: true, accountUid: accountUid);
     }
 
@@ -183,21 +200,34 @@ public sealed class StatisticsService : IStatisticsService
         var matchedCount = 0;
         await UpdateAsync(document =>
         {
-            foreach (var account in document.Accounts)
-            {
-                foreach (var pending in account.PendingEncounters.Where(item => item.HandledAt is null))
-                {
-                    var matchedName = index.Match(pending.RawText, minimumSimilarity);
-                    if (string.IsNullOrWhiteSpace(matchedName)) continue;
-                    var recordName = index.ResolveEvolutionRecordName(matchedName);
-                    if (StatisticsMutationRules.ConfirmPendingEncounter(account, pending.Id, recordName)
-                        == PendingEncounterConfirmationResult.Counted) matchedCount++;
-                }
-            }
+            matchedCount = MatchPendingNames(document, index, minimumSimilarity, out _);
             return document;
         });
         return matchedCount;
     }
+
+    private static int MatchPendingNames(StatisticsDocument document, SpiritCatalogIndex index, double minimumSimilarity, out bool changed)
+    {
+        changed = false;
+        var matchedCount = 0;
+        foreach (var account in document.Accounts)
+        {
+            foreach (var pending in account.PendingEncounters.Where(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name)))
+            {
+                var matchedName = index.Match(pending.RawText, minimumSimilarity);
+                if (string.IsNullOrWhiteSpace(matchedName)) continue;
+                changed = true;
+                var result = StatisticsMutationRules.ConfirmPendingEncounter(account, pending.Id, index.ResolveEvolutionRecordName(matchedName));
+                if (result is PendingEncounterConfirmationResult.Counted or PendingEncounterConfirmationResult.AwaitingSeason)
+                    matchedCount++;
+            }
+        }
+        return matchedCount;
+    }
+
+    private EncounterSeasonDefinition ResolveRecordingSeason(EncounterSeasonDefinition fallback, DateTimeOffset occurredAt) =>
+        _seasonConfigService is null ? fallback
+            : EncounterSeasonTimeline.ResolveForRecording(_seasonConfigService.Load(), occurredAt, fallback);
 
     public Task<StatisticsDocument> UpsertEncounterAsync(
         string seasonId,
@@ -343,6 +373,7 @@ public sealed class StatisticsService : IStatisticsService
             return LoadAsync();
         }
 
+        season = ResolveRecordingSeason(season, detectedAt);
         return UpdateAccountAsync(account =>
             StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt), useActiveAccount: true);
     }
@@ -529,7 +560,11 @@ public sealed class StatisticsService : IStatisticsService
             if (!_isLoaded) await LoadCoreAsync();
 
             // 已发布的文档只读。所有修改在副本上完成，持久化成功后再发布新快照。
-            var nextDocument = StatisticsDocumentNormalizer.Normalize(update(CloneDocument(_document)));
+            var workingDocument = CloneDocument(_document);
+            if (_seasonConfigService is not null) StatisticsSeasonMigration.Apply(workingDocument, _seasonConfigService.Load());
+            var nextDocument = StatisticsDocumentNormalizer.Normalize(update(workingDocument));
+            if (_seasonConfigService is not null && StatisticsSeasonMigration.Apply(nextDocument, _seasonConfigService.Load()))
+                nextDocument = StatisticsDocumentNormalizer.Normalize(nextDocument);
             cancellationToken.ThrowIfCancellationRequested();
             await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, nextDocument);
             Volatile.Write(ref _document, nextDocument);
@@ -554,6 +589,32 @@ public sealed class StatisticsService : IStatisticsService
             var document = savedDocument is null
                 ? StatisticsDocumentNormalizer.CreateDefault()
                 : StatisticsDocumentNormalizer.Normalize(CloneDocument(savedDocument));
+            var changed = false;
+            if (_seasonConfigService is not null)
+            {
+                var config = _seasonConfigService.Load();
+                changed = StatisticsSeasonMigration.Apply(document, config);
+                if (_spiritCatalogService is not null && document.Accounts.Any(account =>
+                    account.PendingEncounters.Any(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name))))
+                {
+                    try
+                    {
+                        // 只读取本地图鉴；软件自带图鉴更新后也能补名称，不在启动时联网同步。
+                        var catalog = await _spiritCatalogService.LoadAsync();
+                        MatchPendingNames(document, new SpiritCatalogIndex(catalog), config.SpiritNameMatchThreshold, out var namesChanged);
+                        changed |= namesChanged;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "暂存奇遇的本地图鉴匹配失败，保留原始记录等待后续同步。");
+                    }
+                }
+            }
+            if (changed)
+            {
+                document = StatisticsDocumentNormalizer.Normalize(document);
+                await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, document);
+            }
             Volatile.Write(ref _document, document);
             _isLoaded = true;
         }

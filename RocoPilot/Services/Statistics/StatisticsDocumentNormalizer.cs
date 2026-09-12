@@ -31,11 +31,14 @@ internal static class StatisticsDocumentNormalizer
                         Id = item.Id.Trim(),
                         Season = item.Season.Trim(),
                         RawText = item.RawText ?? string.Empty,
+                        Name = string.IsNullOrWhiteSpace(item.Name) ? null : item.Name.Trim(),
                         DetectedAt = item.DetectedAt,
                         HandledAt = item.HandledAt
                     })
                     .GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
-                    .Select(items => items.OrderByDescending(item => item.HandledAt).ThenByDescending(item => item.DetectedAt).First())
+                    .Select(items => items.OrderByDescending(item => item.HandledAt)
+                        .ThenByDescending(item => !string.IsNullOrWhiteSpace(item.Name))
+                        .ThenByDescending(item => item.DetectedAt).First())
                     .OrderByDescending(item => item.DetectedAt)
                     .ThenBy(item => item.Id, StringComparer.OrdinalIgnoreCase)
                     .ToList();

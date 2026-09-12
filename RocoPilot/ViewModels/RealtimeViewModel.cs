@@ -288,7 +288,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             {
                 var count = await _statisticsService.RematchPendingEncountersAsync(
                     document, _encounterSeasonConfigService.Load().SpiritNameMatchThreshold);
-                if (count > 0) SpiritCatalogSyncStatus += $" · 已补计 {count} 次奇遇";
+                if (count > 0) SpiritCatalogSyncStatus += $" · 已补全 {count} 条奇遇的精灵名称";
             }
             catch (Exception ex)
             {

@@ -14,7 +14,7 @@ internal static class PendingEncounterDialog
 
         var selector = new ComboBox
         {
-            Header = $"待确认记录（{items.Count} 条）",
+            Header = $"暂存记录（{items.Count} 条）",
             ItemsSource = items,
             DisplayMemberPath = nameof(PendingEncounterItem.DisplayName),
             HorizontalAlignment = HorizontalAlignment.Stretch
@@ -35,7 +35,7 @@ internal static class PendingEncounterDialog
             {
                 new TextBlock
                 {
-                    Text = "这些奇遇已记录，尚未计入精灵统计。可以填写名称确认，也可以同步图鉴后自动重新匹配。",
+                    Text = "这些奇遇已保存。赛季配置更新后会按发生日期自动归档；未识别的名称可通过同步图鉴补齐，也可以手动填写。",
                     TextWrapping = TextWrapping.Wrap,
                     Foreground = GetBrush("TextFillColorSecondaryBrush")
                 },
@@ -52,7 +52,7 @@ internal static class PendingEncounterDialog
                         Spacing = 8,
                         Children =
                         {
-                            new TextBlock { Text = "原始识别文字", FontSize = 12, Foreground = context.Foreground },
+                            new TextBlock { Text = "精灵名 / 原始识别文字", FontSize = 12, Foreground = context.Foreground },
                             rawText,
                             context
                         }
@@ -64,7 +64,7 @@ internal static class PendingEncounterDialog
         var dialog = new ContentDialog
         {
             XamlRoot = xamlRoot,
-            Title = "待确认奇遇",
+            Title = "暂存奇遇",
             Content = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
             PrimaryButtonText = "确认计入",
             SecondaryButtonText = "忽略此条",
@@ -75,9 +75,10 @@ internal static class PendingEncounterDialog
         selector.SelectionChanged += (_, _) =>
         {
             if (selector.SelectedItem is not PendingEncounterItem item) return;
-            rawText.Text = item.RawTextDisplay;
+            rawText.Text = item.NameDisplay;
             context.Text = item.ContextDisplay;
-            name.Text = item.RawText;
+            name.Text = item.Name ?? item.RawText;
+            dialog.PrimaryButtonText = item.IsSeasonPending ? "保存名称" : "确认计入";
         };
         name.TextChanged += (_, _) => dialog.IsPrimaryButtonEnabled = !string.IsNullOrWhiteSpace(name.Text);
         selector.SelectedIndex = 0;

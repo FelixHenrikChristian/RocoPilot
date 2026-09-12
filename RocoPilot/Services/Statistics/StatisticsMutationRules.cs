@@ -1,6 +1,7 @@
 using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Services.Encounters;
 
 namespace RocoPilot.Services.Statistics;
 
@@ -39,15 +40,17 @@ internal static class StatisticsMutationRules
         EncounterSeasonDefinition season,
         string id,
         string rawText,
-        DateTimeOffset detectedAt)
+        DateTimeOffset detectedAt,
+        string? spiritName = null)
     {
         if (account.PendingEncounters.Any(item => item.Id == id)) return;
-        ResolveSeason(account, season);
+        if (season.Id != EncounterSeasonTimeline.PendingSeasonId) ResolveSeason(account, season);
         account.PendingEncounters.Add(new PendingEncounterRecord
         {
             Id = id,
             Season = season.Id,
             RawText = rawText,
+            Name = string.IsNullOrWhiteSpace(spiritName) ? null : spiritName.Trim(),
             DetectedAt = detectedAt
         });
     }
@@ -57,6 +60,9 @@ internal static class StatisticsMutationRules
     {
         var pending = account.PendingEncounters.FirstOrDefault(item => item.Id == id && item.HandledAt is null);
         if (pending is null) return PendingEncounterConfirmationResult.NotFound;
+        pending.Name = spiritName;
+        if (pending.Season == EncounterSeasonTimeline.PendingSeasonId)
+            return PendingEncounterConfirmationResult.AwaitingSeason;
         var season = ResolveSeason(account, pending.Season);
         if (season.EncounterCountResets.Any(reset =>
                 TextMatchingHelper.AreSameSpiritName(reset.Name, spiritName) && reset.ResetAt >= pending.DetectedAt))
@@ -235,7 +241,8 @@ internal static class StatisticsMutationRules
         _ = ResolveSeason(account, season);
 
         var pendingCapture = account.PendingShinyCaptures.FirstOrDefault(item =>
-            string.Equals(item.Season, season.Id, StringComparison.OrdinalIgnoreCase)
+            season.Id != EncounterSeasonTimeline.PendingSeasonId
+            && string.Equals(item.Season, season.Id, StringComparison.OrdinalIgnoreCase)
             && TextMatchingHelper.AreSameSpiritName(item.Name, spiritName));
         if (pendingCapture is null)
         {
@@ -266,6 +273,9 @@ internal static class StatisticsMutationRules
         {
             return;
         }
+
+        if (pendingCapture.Season == EncounterSeasonTimeline.PendingSeasonId)
+            throw new InvalidOperationException("该异色的赛季尚未确定，请等待软件更新赛季配置后确认。");
 
         var originalName = pendingCapture.Name;
         var seasonId = pendingCapture.Season;
@@ -304,7 +314,7 @@ internal static class StatisticsMutationRules
         }
     }
 
-    private static SeasonStatisticsData ResolveSeason(
+    internal static SeasonStatisticsData ResolveSeason(
         AccountStatisticsData account,
         EncounterSeasonDefinition season)
     {

@@ -8,6 +8,7 @@ using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
+using RocoPilot.Services.Encounters;
 using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
 using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
@@ -119,6 +120,9 @@ public sealed partial class RuntimeTaskService
             return [];
         }
 
+        season = EncounterSeasonTimeline.ResolveForRecording(_encounterSeasonConfigService.Load(), DateTimeOffset.Now, season);
+        if (season.Id == EncounterSeasonTimeline.PendingSeasonId) return [];
+
         return _statisticsService.GetActiveAccountSeasonEncounters(season.Id)
             .Select(record => new InfoOverlayCounter(
                 record.Name,
@@ -137,7 +141,8 @@ public sealed partial class RuntimeTaskService
             ? null
             : new InfoOverlayPendingShinyCapture(
                 pendingCapture.Name,
-                pendingCapture.Season,
+                pendingCapture.Season == EncounterSeasonTimeline.PendingSeasonId
+                    ? EncounterSeasonTimeline.PendingSeasonName : pendingCapture.Season,
                 pendingCapture.DetectedAt);
     }
 
@@ -482,6 +487,7 @@ public sealed partial class RuntimeTaskService
             ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
         if (accountUid is null) return;
         var detectedAt = DateTimeOffset.Now;
+        season = EncounterSeasonTimeline.ResolveForRecording(_encounterSeasonConfigService.Load(), detectedAt, season);
         var enemyNameText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
@@ -578,12 +584,13 @@ public sealed partial class RuntimeTaskService
 
         try
         {
-            if (string.IsNullOrWhiteSpace(enemyName))
+            if (season.Id == EncounterSeasonTimeline.PendingSeasonId || string.IsNullOrWhiteSpace(enemyName))
             {
-                await _statisticsService.AddPendingEncounterAsync(accountUid, season, recordId, rawText, now);
+                await _statisticsService.AddPendingEncounterAsync(accountUid, season, recordId,
+                    string.IsNullOrWhiteSpace(enemyName) ? rawText : string.Empty, now, enemyName);
                 _logger.LogInformation(
-                    "奇遇统计：精灵名未匹配，已保存为待确认奇遇。Uid={Uid}, Season={SeasonId}, EnemyNameRaw={EnemyNameRaw}",
-                    accountUid, season.Id, FormatLogText(rawText));
+                    "奇遇统计：本次奇遇已暂存，等待补齐赛季或精灵名称后自动归档。Uid={Uid}, Season={SeasonId}, Spirit={SpiritName}, EnemyNameRaw={EnemyNameRaw}",
+                    accountUid, season.Id, enemyName, FormatLogText(rawText));
                 return;
             }
 

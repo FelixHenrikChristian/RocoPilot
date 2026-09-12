@@ -16,6 +16,7 @@ using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 using RocoPilot.Models.Spirits;
+using RocoPilot.Services.Encounters;
 
 namespace RocoPilot.ViewModels;
 
@@ -391,6 +392,11 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
         if (string.IsNullOrWhiteSpace(recordName)) recordName = name;
         var result = await _statisticsService.ConfirmPendingEncounterAsync(item.AccountUid, item.Id, recordName);
+        if (result == PendingEncounterConfirmationResult.AwaitingSeason)
+        {
+            ShowNotification(InfoBarSeverity.Informational, "已保存名称", $"{recordName} 已保存，赛季配置更新后会自动计入对应赛季。");
+            return true;
+        }
         if (result == PendingEncounterConfirmationResult.BeforeReset)
         {
             ShowNotification(InfoBarSeverity.Warning, "未补入当前计数",
@@ -400,7 +406,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
         ShowNotification(InfoBarSeverity.Success,
             result == PendingEncounterConfirmationResult.Counted ? "已确认奇遇" : "记录已处理",
-            result == PendingEncounterConfirmationResult.Counted ? $"已为账号 {item.AccountUid} 的 {item.Season} 补计 {recordName} x1。" : "此条记录已处理，无需重复确认。");
+            result == PendingEncounterConfirmationResult.Counted ? $"已为账号 {item.AccountUid} 补计 {recordName} x1。" : "此条记录已处理，无需重复确认。");
         return true;
     }
 
@@ -415,6 +421,12 @@ public partial class StatisticsViewModel : ObservableRecipient
         var pendingCapture = Overview.LatestPendingShinyCapture;
         if (pendingCapture is null)
         {
+            return;
+        }
+
+        if (pendingCapture.Season == EncounterSeasonTimeline.PendingSeasonId)
+        {
+            ShowNotification(InfoBarSeverity.Informational, "异色记录已暂存", "该异色的赛季尚未确定，请等待软件更新赛季配置后确认。");
             return;
         }
 

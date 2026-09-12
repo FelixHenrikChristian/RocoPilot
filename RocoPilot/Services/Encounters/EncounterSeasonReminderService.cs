@@ -1,5 +1,3 @@
-using System.Globalization;
-
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Encounters;
@@ -17,7 +15,7 @@ public sealed class EncounterSeasonReminderService(
         foreach (var season in seasonConfigService.Load().Seasons)
         {
             if (string.IsNullOrWhiteSpace(season.Id)
-                || !TryGetEndDate(season.DateRange, out var endDate))
+                || !EncounterSeasonTimeline.TryGetDates(season.DateRange, out _, out var endDate))
             {
                 continue;
             }
@@ -48,15 +46,4 @@ public sealed class EncounterSeasonReminderService(
             reminder.DismissalKey);
     }
 
-    private static bool TryGetEndDate(string? dateRange, out DateOnly endDate)
-    {
-        endDate = default;
-        var dates = dateRange?.Split('-', StringSplitOptions.TrimEntries);
-        return dates is { Length: 2 }
-            && DateOnly.TryParseExact(dates[0], "yyyy/M/d", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out var startDate)
-            && DateOnly.TryParseExact(dates[1], "yyyy/M/d", CultureInfo.InvariantCulture,
-                DateTimeStyles.None, out endDate)
-            && startDate <= endDate;
-    }
 }

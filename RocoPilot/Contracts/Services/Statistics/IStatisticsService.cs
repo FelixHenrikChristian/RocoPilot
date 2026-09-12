@@ -42,7 +42,8 @@ public interface IStatisticsService
         string? accountUid = null);
 
     Task<StatisticsDocument> AddPendingEncounterAsync(
-        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt);
+        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt,
+        string? spiritName = null);
 
     Task<PendingEncounterConfirmationResult> ConfirmPendingEncounterAsync(
         string accountUid, string id, string spiritName);

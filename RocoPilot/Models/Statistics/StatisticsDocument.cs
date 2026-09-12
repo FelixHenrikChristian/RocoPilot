@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace RocoPilot.Models.Statistics;
 
 public sealed class StatisticsDocument
@@ -22,7 +24,7 @@ public static class StatisticsDocumentFormats
 {
     public const string RocoPilotStatistics = "RocoPilot.Statistics";
 
-    public const string CurrentVersion = "1.2";
+    public const string CurrentVersion = "1.3";
 }
 
 public sealed class AccountStatisticsData
@@ -60,6 +62,10 @@ public sealed class PendingEncounterRecord
     public string Season { get; set; } = string.Empty;
     public DateTimeOffset DetectedAt { get; set; }
 
+    // 名称和赛季可以分别补齐；没有名称时才需要使用原始 OCR 重新匹配。
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Name { get; set; }
+
     // 处理后保留标记，合并旧的云端记录时不会重新进入待确认队列。
     public DateTimeOffset? HandledAt { get; set; }
 }
@@ -74,6 +80,7 @@ public enum PendingEncounterConfirmationResult
 {
     NotFound,
     Counted,
+    AwaitingSeason,
     BeforeReset
 }
 

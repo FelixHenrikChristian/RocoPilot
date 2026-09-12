@@ -50,13 +50,14 @@ internal sealed class StatisticsSyncStub : IStatisticsSyncService
 
 internal sealed class StatisticsSpiritCatalogStub : ISpiritCatalogService
 {
+    public SpiritCatalogDocument Document { get; set; } = new();
     public Func<Task>? BeforeLoad { get; set; }
     public int LoadCount { get; private set; }
     public async Task<SpiritCatalogDocument> LoadAsync(CancellationToken cancellationToken = default)
     {
         LoadCount++;
         if (BeforeLoad is { } beforeLoad) await beforeLoad();
-        return new SpiritCatalogDocument();
+        return Document;
     }
     public string? ResolveAvatarPath(string? avatarPath) => null;
     public IReadOnlyList<SpiritCatalogSourceOption> GetSources() => [];

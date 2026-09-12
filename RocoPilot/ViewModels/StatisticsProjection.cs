@@ -1,6 +1,7 @@
 using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Services.Encounters;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -22,6 +23,7 @@ internal static class StatisticsProjection
         Func<string, BitmapImage?>? avatarResolver = null)
     {
         var seasons = MergeConfiguredSeasons(account?.Seasons ?? [], seasonConfig)
+            .Where(season => season.Data.Id != EncounterSeasonTimeline.PendingSeasonId)
             .Select(season => ToSeasonStatisticsGroup(season.Data, avatarResolver))
             .OrderByDescending(season => IsCurrentSeason(season, seasonConfig))
             .ThenByDescending(season => GetConfiguredSeasonOrder(season, seasonConfig))

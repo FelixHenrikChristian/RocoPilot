@@ -443,10 +443,10 @@
                 Spacing="14">
                 <Button
                     Click="PendingEncountersButton_Click"
-                    ToolTipService.ToolTip="查看并处理未匹配到精灵名称的奇遇"
+                    ToolTipService.ToolTip="查看等待赛季或图鉴更新的奇遇"
                     Visibility="{x:Bind ViewModel.Overview.PendingEncounterVisibility, Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock VerticalAlignment="Center" Text="待确认奇遇" />
+                        <TextBlock VerticalAlignment="Center" Text="暂存奇遇" />
                         <InfoBadge Value="{x:Bind ViewModel.Overview.PendingEncounterCount, Mode=OneWay}" />
                     </StackPanel>
                 </Button>

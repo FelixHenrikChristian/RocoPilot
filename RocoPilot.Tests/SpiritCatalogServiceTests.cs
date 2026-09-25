@@ -12,6 +12,97 @@ namespace RocoPilot.Tests;
 public sealed class SpiritCatalogServiceTests
 {
     [TestMethod]
+    public async Task SyncMigratesExistingBiligameCacheToNewWiki()
+    {
+        using var fixture = new Fixture { ListMarkup = BiligameNrcCatalogTests.Markup };
+        Assert.AreEqual("旧精灵", (await fixture.Service.LoadAsync("biligame")).Spirits.Single().Name);
+        var document = await fixture.Service.SyncAsync("biligame");
+        Assert.AreEqual(BiligameNrcCatalogTests.ListUrl, fixture.LastListUri?.AbsoluteUri);
+        Assert.AreEqual("biligame", document.Source.Id);
+        Assert.AreEqual(BiligameNrcCatalogTests.ListUrl, document.Source.ListUrl);
+        Assert.AreEqual(8, document.Count);
+        Assert.AreEqual(10, document.Spirits.Count);
+        var matchedName = await fixture.Service.MatchSpiritNameAsync("银月狼王", 1);
+        Assert.AreEqual("银月狼王", matchedName);
+        Assert.AreEqual("诅咒狼灵", await fixture.Service.ResolveEvolutionRecordNameAsync(matchedName));
+        var saved = JsonSerializer.Deserialize<SpiritCatalogDocument>(await File.ReadAllTextAsync(fixture.DataPath),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.AreEqual(10, saved.Spirits.Count);
+        Assert.AreEqual(BiligameNrcCatalogTests.ListUrl, saved.Source.ListUrl);
+        Assert.IsTrue(saved.Spirits.All(item => File.Exists(fixture.Service.ResolveAvatarPath(item.AvatarPath))));
+        Assert.AreEqual(string.Empty, await fixture.Service.MatchSpiritNameAsync("旧精灵", 1));
+        Assert.IsFalse(File.Exists(fixture.OldAvatarPath));
+        AssertCatalogFilesMatchDocument(fixture, saved);
+    }
+
+    [TestMethod]
+    public async Task RepeatedNewWikiSyncDoesNotAccumulateCatalogOrAvatars()
+    {
+        using var fixture = new Fixture(withBundledCatalog: true) { ListMarkup = BiligameNrcCatalogTests.Markup };
+        await fixture.Service.LoadAsync();
+        var staleAvatar = Path.Combine(Path.GetDirectoryName(fixture.OldAvatarPath)!, "unused.png");
+        await File.WriteAllTextAsync(staleAvatar, "unreferenced avatar");
+
+        var first = await fixture.Service.SyncAsync();
+        AssertCatalogFilesMatchDocument(fixture, first);
+        Assert.IsFalse(File.Exists(staleAvatar));
+        var oldMushroom = first.Spirits.Single(item => item.Name == "小灵菇");
+        var oldNormalPath = fixture.Service.ResolveAvatarPath(oldMushroom.AvatarPath)!;
+        var oldShinyPath = fixture.Service.ResolveAvatarPath(oldMushroom.ShinyAvatarPath)!;
+        fixture.ListMarkup = fixture.ListMarkup
+            .Replace(oldMushroom.AvatarUrl, "https://example.test/new-normal.png")
+            .Replace(oldMushroom.ShinyAvatarUrl, "https://example.test/new-shiny.png");
+
+        var updated = await fixture.Service.SyncAsync();
+        AssertCatalogFilesMatchDocument(fixture, updated);
+        Assert.IsFalse(File.Exists(oldNormalPath));
+        Assert.IsFalse(File.Exists(oldShinyPath));
+        var repeated = await fixture.Service.SyncAsync();
+        Assert.AreEqual(8, repeated.Count);
+        Assert.AreEqual(10, repeated.Spirits.Count);
+        AssertCatalogFilesMatchDocument(fixture, repeated);
+
+        using var restarted = fixture.CreateService();
+        var reloaded = await restarted.LoadAsync();
+        Assert.AreEqual(10, reloaded.Spirits.Count);
+        Assert.AreEqual(BiligameNrcCatalogTests.ListUrl, reloaded.Source.ListUrl);
+        Assert.AreEqual("https://example.test/new-normal.png", reloaded.Spirits.Single(item => item.Name == "小灵菇").AvatarUrl);
+        Assert.AreEqual(string.Empty, await restarted.MatchSpiritNameAsync("旧精灵", 1));
+        AssertCatalogFilesMatchDocument(fixture, reloaded);
+    }
+
+    private static void AssertCatalogFilesMatchDocument(Fixture fixture, SpiritCatalogDocument document)
+    {
+        var sourceDirectory = Path.GetDirectoryName(fixture.DataPath)!;
+        CollectionAssert.AreEquivalent(new[] { sourceDirectory }, Directory.GetDirectories(Path.GetDirectoryName(sourceDirectory)!));
+        CollectionAssert.AreEquivalent(new[] { fixture.DataPath }, Directory.GetFiles(sourceDirectory, "*.json"));
+        var referencedAvatars = document.Spirits
+            .SelectMany(item => new[] { item.AvatarPath, item.ShinyAvatarPath })
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => fixture.Service.ResolveAvatarPath(path)!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        CollectionAssert.AreEquivalent(referencedAvatars, Directory.GetFiles(Path.GetDirectoryName(fixture.OldAvatarPath)!));
+        Assert.AreEqual(document.Spirits.Count, document.Spirits.Select(item => (item.Id, item.Name)).Distinct().Count());
+    }
+
+    [TestMethod]
+    public async Task NewWikiCountMismatchKeepsExistingCache()
+    {
+        using var fixture = new Fixture
+        {
+            ListMarkup = BiligameNrcCatalogTests.Markup.Replace("npc-total-number\">10<", "npc-total-number\">11<")
+        };
+        await fixture.Service.LoadAsync();
+        var exception = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => fixture.Service.SyncAsync());
+        StringAssert.Contains(exception.Message, "声明 11 张卡片，实际解析 10 张");
+        Assert.AreEqual("旧精灵", await fixture.Service.MatchSpiritNameAsync("旧精灵", 1));
+        StringAssert.Contains(await File.ReadAllTextAsync(fixture.DataPath), "旧精灵");
+        Assert.IsTrue(File.Exists(fixture.OldAvatarPath));
+        Assert.AreEqual(1, fixture.HttpRequests);
+    }
+
+    [TestMethod]
     public async Task ConcurrentCallersCannotMutateCachedDocumentOrIndex()
     {
         using var fixture = new Fixture();
@@ -113,6 +204,8 @@ public sealed class SpiritCatalogServiceTests
         public string OldAvatarPath { get; }
         public int HttpRequests;
         public Func<Task>? BeforeList { get; set; }
+        public string ListMarkup { get; set; } = Markup;
+        public Uri? LastListUri { get; private set; }
 
         public Fixture(bool withBundledCatalog = false)
         {
@@ -124,6 +217,7 @@ public sealed class SpiritCatalogServiceTests
             File.WriteAllText(OldAvatarPath, "old avatar");
             var document = new SpiritCatalogDocument
             {
+                Source = new() { Id = "biligame", Name = "Biligame 洛克王国:手游 Wiki 精灵图鉴", ListUrl = "https://wiki.biligame.com/rocom/精灵图鉴" },
                 Spirits = [new() { Id = "1", Name = "旧精灵", WikiName = "旧精灵", AvatarPath = "Spirits/Sources/biligame/Avatars/old.png" }]
             };
             var json = JsonSerializer.Serialize(document, new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
@@ -134,16 +228,20 @@ public sealed class SpiritCatalogServiceTests
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.WriteAllText(path, json);
             }
-            Service = new SpiritCatalogService(local, bundled, NullLogger<SpiritCatalogService>.Instance,
+            Service = CreateService();
+        }
+
+        public SpiritCatalogService CreateService() =>
+            new(Path.Combine(_directory.FullName, "local"), Path.Combine(_directory.FullName, "bundled"), NullLogger<SpiritCatalogService>.Instance,
                 new ControlledSettingsStore(), new HttpClient(new Handler(async request =>
                 {
                     Interlocked.Increment(ref HttpRequests);
-                    if (request.RequestUri!.Host == "example.test")
-                        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent("new avatar"u8.ToArray()) };
+                    if (request.RequestUri!.Host != "wiki.biligame.com")
+                        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(request.RequestUri.AbsoluteUri)) };
+                    LastListUri = request.RequestUri;
                     if (BeforeList is { } beforeList) await beforeList();
-                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Markup) };
+                    return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(ListMarkup) };
                 })));
-        }
 
         public void Dispose()
         {

@@ -54,7 +54,7 @@ description: RocoPilot 功能与配置项说明。
 ::: details 图鉴源
 选择精灵图鉴数据来源。
 
-- `Biligame 洛克王国:手游 Wiki 精灵图鉴`：使用 Biligame Wiki 的精灵图鉴数据。
+- `Biligame 洛克王国世界 Wiki 精灵图鉴`：使用 Biligame 新版 Wiki 的精灵图鉴数据。
 :::
 
 ::: details 精灵图鉴

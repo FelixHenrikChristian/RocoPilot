@@ -22,8 +22,8 @@ namespace RocoPilot.Services.Spirits;
 public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
 {
     private const string BiligameSourceId = "biligame";
-    private const string BiligameListUrl = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
-    private const string BiligameSourceName = "Biligame 洛克王国:手游 Wiki 精灵图鉴";
+    private const string BiligameListUrl = "https://wiki.biligame.com/nrc/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
+    private const string BiligameSourceName = "Biligame 洛克王国世界 Wiki 精灵图鉴";
     private const string DataFileName = "spirits.json";
     private const string SourcesDirectoryName = "Sources";
     private const string BundledCatalogMarkerFileName = "bundled-spirits.marker";

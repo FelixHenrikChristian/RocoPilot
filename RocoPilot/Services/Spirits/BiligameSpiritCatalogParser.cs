@@ -6,7 +6,7 @@ using RocoPilot.Models.Spirits;
 
 namespace RocoPilot.Services.Spirits;
 
-internal static class BiligameSpiritCatalogParser
+internal static partial class BiligameSpiritCatalogParser
 {
     private static readonly Regex CardStartRegex = new(
         "<div\\b(?=[^>]*\\bclass\\s*=\\s*\"(?=[^\"]*\\bdivsort\\b)(?=[^\"]*\\bdex-pet-card\\b)[^\"]*\")(?<attrs>[^>]*)>",
@@ -57,7 +57,8 @@ internal static class BiligameSpiritCatalogParser
         ArgumentException.ThrowIfNullOrWhiteSpace(markup);
         ArgumentException.ThrowIfNullOrWhiteSpace(listUrl);
 
-        var cardStarts = CardStartRegex.Matches(markup).Cast<Match>().ToList();
+        var isNrc = NrcCardStartRegex.IsMatch(markup);
+        var cardStarts = (isNrc ? NrcCardStartRegex : CardStartRegex).Matches(markup).Cast<Match>().ToList();
         var cards = new List<ParsedCard>(cardStarts.Count);
         var listUri = new Uri(listUrl);
 
@@ -68,7 +69,9 @@ internal static class BiligameSpiritCatalogParser
                 ? cardStarts[index + 1].Index
                 : markup.Length;
             var block = markup[start..end];
-            cards.Add(ParseCard(block, cardStarts[index], listUri, index));
+            cards.Add(isNrc
+                ? ParseNrcCard(block, cardStarts[index], listUri, index)
+                : ParseCard(block, cardStarts[index], listUri, index));
         }
 
         ApplyChainMetadata(cards);
@@ -77,7 +80,11 @@ internal static class BiligameSpiritCatalogParser
 
     public static int ParseReportedCount(string markup)
     {
-        var match = ReportedCountRegex.Match(markup);
+        var match = NrcReportedCountRegex.Match(markup);
+        if (!match.Success)
+        {
+            match = ReportedCountRegex.Match(markup);
+        }
         return match.Success
             && int.TryParse(match.Groups["count"].Value, NumberStyles.None, CultureInfo.InvariantCulture, out var count)
                 ? count

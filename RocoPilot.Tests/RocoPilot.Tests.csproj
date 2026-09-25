@@ -15,5 +15,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RocoPilot\RocoPilot.csproj" />
+    <None Update="Fixtures\biligame-nrc-catalog.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

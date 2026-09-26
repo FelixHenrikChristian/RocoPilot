@@ -108,6 +108,13 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
 
     public string PendingShinyQueueDisplay => PendingShinyCount > 1 ? $"还有 {PendingShinyCount - 1} 条待确认" : "当前仅此一条";
 
+    public string PendingShinyNameHint => LatestPendingShinyCapture is { } capture && string.IsNullOrWhiteSpace(capture.Name)
+        ? (string.IsNullOrWhiteSpace(capture.RawText) ? "暂未识别到精灵名。" : $"原始识别：{capture.RawText}。")
+            + "可手动填写名称，或更新图鉴后再确认。"
+        : string.Empty;
+
+    public Visibility PendingShinyNameHintVisibility => PendingShinyNameHint.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+
     public IReadOnlyList<ShinyCaptureDetailItem> GetShinyCaptureDetails(SpiritCountItem item) =>
         StatisticsProjection.BuildShinyCaptureDetails(_account, SelectedShinyScopeSeasonId, item.Name, _avatarResolver);
 
@@ -201,5 +208,7 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
         OnPropertyChanged(nameof(LatestPendingShinyAvatarVisibility));
         OnPropertyChanged(nameof(LatestPendingShinyAvatarFallbackVisibility));
         OnPropertyChanged(nameof(PendingShinyQueueDisplay));
+        OnPropertyChanged(nameof(PendingShinyNameHint));
+        OnPropertyChanged(nameof(PendingShinyNameHintVisibility));
     }
 }

@@ -953,7 +953,7 @@
                                         <TextBlock
                                             FontSize="12"
                                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                            Text="精灵名会实时匹配当前奇遇计数，识别有误时可在这里修正。" />
+                                            Text="确认后将累计奇遇计入本次异色并清空，次数可手动修正。" />
                                     </StackPanel>
                                 </Grid>
 
@@ -979,6 +979,12 @@
                                         SpinButtonPlacementMode="Compact"
                                         Value="{x:Bind ViewModel.Overview.PendingEditor.EncounterCount, Mode=TwoWay}" />
                                 </Grid>
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind ViewModel.Overview.PendingShinyNameHint, Mode=OneWay}"
+                                    TextWrapping="Wrap"
+                                    Visibility="{x:Bind ViewModel.Overview.PendingShinyNameHintVisibility, Mode=OneWay}" />
                             </StackPanel>
                         </Border>
 

@@ -11,6 +11,9 @@ public sealed class PendingShinyCaptureEditor : ObservableObject
     private string _name = string.Empty;
     private double _encounterCount;
     private bool _hasManualCount;
+    private bool _hasManualName;
+
+    public int? EncounterCountOverride => _hasManualCount ? (int)Math.Round(EncounterCount) : null;
 
     public string Name
     {
@@ -19,6 +22,7 @@ public sealed class PendingShinyCaptureEditor : ObservableObject
         {
             if (SetProperty(ref _name, value))
             {
+                _hasManualName = true;
                 _hasManualCount = false;
                 UpdateSuggestedCount();
             }
@@ -49,6 +53,12 @@ public sealed class PendingShinyCaptureEditor : ObservableObject
         if (!sameCapture)
         {
             _hasManualCount = false;
+            _hasManualName = false;
+            SetProperty(ref _name, capture?.Name ?? string.Empty, nameof(Name));
+        }
+        else if (!_hasManualName)
+        {
+            // 图鉴同步为当前待确认事件补齐名称时，更新自动填入的内容，保留用户草稿。
             SetProperty(ref _name, capture?.Name ?? string.Empty, nameof(Name));
         }
 

@@ -296,10 +296,7 @@ public sealed partial class RuntimeTaskService
             return false;
         }
 
-        await ApplyAutoBattleSkillSelectionEnemyNameResultAsync(
-            season,
-            result,
-            cancellationToken);
+        LogAutoBattleSkillSelectionEnemyNameResult(season, result);
         _battle.ConfirmEnemyName(turn.Id);
         return true;
     }
@@ -344,10 +341,9 @@ public sealed partial class RuntimeTaskService
             });
     }
 
-    private async Task ApplyAutoBattleSkillSelectionEnemyNameResultAsync(
+    private void LogAutoBattleSkillSelectionEnemyNameResult(
         EncounterSeasonDefinition season,
-        AutoBattleSkillSelectionEnemyNameResult result,
-        CancellationToken cancellationToken)
+        AutoBattleSkillSelectionEnemyNameResult result)
     {
         var matchedName = result.MatchedName;
         var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
@@ -362,11 +358,6 @@ public sealed partial class RuntimeTaskService
             matchedName,
             spiritNameMatchThreshold);
 
-        if (TryGetPendingShinyDetection(season.Id, out _))
-        {
-            await RecordPendingShinyCaptureAsync(season, matchedName, cancellationToken);
-            ClearPendingShinyDetection();
-        }
     }
 
     private void ResetAutoBattleSkillSelectionEnemyNameTask()

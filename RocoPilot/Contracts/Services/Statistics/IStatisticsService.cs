@@ -93,12 +93,15 @@ public interface IStatisticsService
     Task<StatisticsDocument> AddPendingShinyCaptureAsync(
         EncounterSeasonDefinition season,
         string spiritName,
-        DateTimeOffset detectedAt);
+        DateTimeOffset detectedAt,
+        string? id = null,
+        string? rawText = null,
+        string? accountUid = null);
 
     Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
         string pendingCaptureId,
         string spiritName,
-        int encounterCount,
+        int? encounterCount,
         DateTimeOffset confirmedAt);
 
     Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(

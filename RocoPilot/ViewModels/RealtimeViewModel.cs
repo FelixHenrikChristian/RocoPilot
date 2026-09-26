@@ -292,7 +292,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             }
             catch (Exception ex)
             {
-                SpiritCatalogSyncStatus += $" · 待确认奇遇处理失败，可重新同步后重试：{ex.Message}";
+                SpiritCatalogSyncStatus += $" · 暂存记录处理失败，可重新同步后重试：{ex.Message}";
             }
         }
         catch (Exception ex)

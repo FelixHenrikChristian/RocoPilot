@@ -53,11 +53,13 @@ internal static class StatisticsDocumentNormalizer
                     .SelectMany(item => item.PendingShinyCaptures ?? [])
                     .Select(NormalizePendingShinyCapture)
                     .Where(record => !string.IsNullOrWhiteSpace(record.Id)
-                        && !string.IsNullOrWhiteSpace(record.Name)
                         && !string.IsNullOrWhiteSpace(record.Season))
                     .GroupBy(record => record.Id, StringComparer.OrdinalIgnoreCase)
                     .Select(recordGroup => recordGroup
-                        .OrderByDescending(record => record.DetectedAt)
+                        .OrderByDescending(record => record.HandledAt)
+                        .ThenByDescending(record => !string.IsNullOrWhiteSpace(record.Name))
+                        .ThenByDescending(record => !string.IsNullOrWhiteSpace(record.RawText))
+                        .ThenByDescending(record => record.DetectedAt)
                         .First())
                     .OrderByDescending(record => record.DetectedAt)
                     .ThenBy(record => record.Name, StringComparer.OrdinalIgnoreCase)
@@ -176,6 +178,8 @@ internal static class StatisticsDocumentNormalizer
                 ? Guid.NewGuid().ToString("N")
                 : record.Id.Trim(),
             Name = record.Name?.Trim() ?? string.Empty,
+            RawText = record.RawText?.Trim() ?? string.Empty,
+            HandledAt = record.HandledAt,
             Season = record.Season?.Trim() ?? string.Empty,
             DetectedAt = record.DetectedAt == default
                 ? DateTimeOffset.Now

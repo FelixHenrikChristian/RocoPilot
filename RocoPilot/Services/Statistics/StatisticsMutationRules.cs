@@ -236,36 +236,38 @@ internal static class StatisticsMutationRules
         AccountStatisticsData account,
         EncounterSeasonDefinition season,
         string spiritName,
-        DateTimeOffset detectedAt)
+        DateTimeOffset detectedAt,
+        string id,
+        string rawText)
     {
         _ = ResolveSeason(account, season);
 
         var pendingCapture = account.PendingShinyCaptures.FirstOrDefault(item =>
-            season.Id != EncounterSeasonTimeline.PendingSeasonId
-            && string.Equals(item.Season, season.Id, StringComparison.OrdinalIgnoreCase)
-            && TextMatchingHelper.AreSameSpiritName(item.Name, spiritName));
+            string.Equals(item.Id, id, StringComparison.OrdinalIgnoreCase));
+        if (pendingCapture?.HandledAt is not null) return;
         if (pendingCapture is null)
         {
             account.PendingShinyCaptures.Add(new PendingShinyCaptureRecord
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = id,
                 Name = spiritName,
+                RawText = rawText,
                 Season = season.Id,
                 DetectedAt = detectedAt
             });
             return;
         }
 
-        pendingCapture.Name = spiritName;
-        pendingCapture.Season = season.Id;
-        pendingCapture.DetectedAt = Max(pendingCapture.DetectedAt, detectedAt);
+        // 同一战斗的后续 OCR 只补充名称，保留第一次检测的时间和赛季。
+        if (!string.IsNullOrWhiteSpace(spiritName)) pendingCapture.Name = spiritName;
+        if (!string.IsNullOrWhiteSpace(rawText)) pendingCapture.RawText = rawText;
     }
 
     public static void ConfirmPendingShinyCapture(
         AccountStatisticsData account,
         string pendingCaptureId,
         string spiritName,
-        int encounterCount,
+        int? encounterCount,
         DateTimeOffset confirmedAt)
     {
         var pendingCapture = FindPendingShinyCapture(account, pendingCaptureId);
@@ -279,21 +281,25 @@ internal static class StatisticsMutationRules
 
         var originalName = pendingCapture.Name;
         var seasonId = pendingCapture.Season;
-        account.PendingShinyCaptures.Remove(pendingCapture);
+        pendingCapture.HandledAt = confirmedAt;
 
         var seasonData = ResolveSeason(account, seasonId);
         seasonData.ShinyCaptures.Add(new ShinySpiritCaptureRecord
         {
-            Id = Guid.NewGuid().ToString("N"),
+            Id = pendingCapture.Id,
             Name = spiritName,
             Season = seasonId,
             CapturedAt = pendingCapture.DetectedAt == default
                 ? confirmedAt
                 : pendingCapture.DetectedAt,
-            EncounterCountBeforeCapture = encounterCount
+            // 延迟确认也使用确认时的全部累计次数，不按异色出现时间拆分。
+            EncounterCountBeforeCapture = encounterCount ?? seasonData.Encounters
+                .Where(item => TextMatchingHelper.AreSameSpiritName(item.Name, originalName)
+                    || TextMatchingHelper.AreSameSpiritName(item.Name, spiritName))
+                .Sum(item => item.Count)
         });
 
-        RememberEncounterReset(seasonData, originalName, confirmedAt);
+        if (!string.IsNullOrWhiteSpace(originalName)) RememberEncounterReset(seasonData, originalName, confirmedAt);
         RememberEncounterReset(seasonData, spiritName, confirmedAt);
 
         foreach (var encounter in seasonData.Encounters
@@ -310,7 +316,7 @@ internal static class StatisticsMutationRules
         var pendingCapture = FindPendingShinyCapture(account, pendingCaptureId);
         if (pendingCapture is not null)
         {
-            account.PendingShinyCaptures.Remove(pendingCapture);
+            pendingCapture.HandledAt = DateTimeOffset.Now;
         }
     }
 
@@ -404,7 +410,7 @@ internal static class StatisticsMutationRules
         string pendingCaptureId)
     {
         return account.PendingShinyCaptures.FirstOrDefault(item =>
-            string.Equals(item.Id, pendingCaptureId, StringComparison.OrdinalIgnoreCase));
+            item.HandledAt is null && string.Equals(item.Id, pendingCaptureId, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void RememberEncounterReset(SeasonStatisticsData season, string name, DateTimeOffset resetAt)

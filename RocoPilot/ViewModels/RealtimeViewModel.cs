@@ -547,11 +547,11 @@ public sealed record AutoBattleKeyboardInputMethodOption(
         [
             new(
                 KeyboardInputMethod.PostMessage,
-                "PostMessage",
+                "PostMessage（已失效）",
                 "旧的后台窗口消息方式；不要求游戏前台，但可能被游戏屏蔽。"),
             new(
                 KeyboardInputMethod.SendInput,
-                "SendInput",
+                "SendInput（已失效）",
                 "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。"),
             new(
                 KeyboardInputMethod.Interception,

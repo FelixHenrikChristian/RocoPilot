@@ -221,6 +221,13 @@ public sealed class StatisticsService : IStatisticsService
                 if (result is PendingEncounterConfirmationResult.Counted or PendingEncounterConfirmationResult.AwaitingSeason)
                     matchedCount++;
             }
+            foreach (var pending in account.PendingShinyCaptures.Where(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name)))
+            {
+                var matchedName = index.Match(pending.RawText, minimumSimilarity);
+                if (string.IsNullOrWhiteSpace(matchedName)) continue;
+                pending.Name = index.ResolveEvolutionRecordName(matchedName);
+                changed = true;
+            }
         }
         return matchedCount;
     }
@@ -365,28 +372,33 @@ public sealed class StatisticsService : IStatisticsService
     public Task<StatisticsDocument> AddPendingShinyCaptureAsync(
         EncounterSeasonDefinition season,
         string spiritName,
-        DateTimeOffset detectedAt)
+        DateTimeOffset detectedAt,
+        string? id = null,
+        string? rawText = null,
+        string? accountUid = null)
     {
         spiritName = spiritName.Trim();
-        if (string.IsNullOrWhiteSpace(season.Id) || string.IsNullOrWhiteSpace(spiritName))
+        if (string.IsNullOrWhiteSpace(season.Id))
         {
             return LoadAsync();
         }
 
         season = ResolveRecordingSeason(season, detectedAt);
+        var eventId = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id.Trim();
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt), useActiveAccount: true);
+            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt, eventId, rawText?.Trim() ?? string.Empty),
+            useActiveAccount: true, accountUid: accountUid);
     }
 
     public Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
         string pendingCaptureId,
         string spiritName,
-        int encounterCount,
+        int? encounterCount,
         DateTimeOffset confirmedAt)
     {
         pendingCaptureId = pendingCaptureId.Trim();
         spiritName = spiritName.Trim();
-        encounterCount = Math.Max(0, encounterCount);
+        encounterCount = encounterCount is { } count ? Math.Max(0, count) : null;
         if (string.IsNullOrWhiteSpace(pendingCaptureId)
             || string.IsNullOrWhiteSpace(spiritName))
         {
@@ -498,13 +510,13 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return account.PendingShinyCaptures
-            .Where(record => !string.IsNullOrWhiteSpace(record.Id)
-                && !string.IsNullOrWhiteSpace(record.Name)
+            .Where(record => record.HandledAt is null && !string.IsNullOrWhiteSpace(record.Id)
                 && !string.IsNullOrWhiteSpace(record.Season))
             .Select(record => new PendingShinyCaptureRecord
             {
                 Id = record.Id.Trim(),
                 Name = record.Name.Trim(),
+                RawText = record.RawText,
                 Season = record.Season.Trim(),
                 DetectedAt = record.DetectedAt
             })
@@ -595,7 +607,8 @@ public sealed class StatisticsService : IStatisticsService
                 var config = _seasonConfigService.Load();
                 changed = StatisticsSeasonMigration.Apply(document, config);
                 if (_spiritCatalogService is not null && document.Accounts.Any(account =>
-                    account.PendingEncounters.Any(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name))))
+                    account.PendingEncounters.Any(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name))
+                    || account.PendingShinyCaptures.Any(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name))))
                 {
                     try
                     {
@@ -606,7 +619,7 @@ public sealed class StatisticsService : IStatisticsService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "暂存奇遇的本地图鉴匹配失败，保留原始记录等待后续同步。");
+                        _logger.LogWarning(ex, "暂存记录的本地图鉴匹配失败，保留原始记录等待后续同步。");
                     }
                 }
             }

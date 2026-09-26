@@ -17,7 +17,6 @@ namespace RocoPilot.Services;
 public sealed partial class RuntimeTaskService
 {
     private static readonly TimeSpan EncounterDuplicateSuppressWindow = TimeSpan.FromSeconds(6);
-    private static readonly TimeSpan PendingShinyDuplicateSuppressWindow = TimeSpan.FromSeconds(12);
 
     private const string CaptureButtonEnabledTemplateName = "battle-button-capture.png";
     private const string CaptureButtonDisabledTemplateName = "battle-button-capture-disabled.png";
@@ -76,13 +75,7 @@ public sealed partial class RuntimeTaskService
     private string? _lastRecordedEncounterSeasonId;
     private string? _lastRecordedEncounterName;
     private DateTimeOffset _lastRecordedEncounterAt;
-    private bool _hasActivePendingShinyRecord;
-    private string? _lastPendingShinySeasonId;
-    private string? _lastPendingShinyName;
-    private DateTimeOffset _lastPendingShinyAt;
-    private bool _hasPendingShinyDetection;
-    private string? _pendingShinyDetectionSeasonId;
-    private double _pendingShinyDetectionSimilarity;
+    private RuntimePendingShinyCapture? _pendingShinyCapture;
     private EncounterCaptureButtonObservation? _latestEncounterCaptureButtonObservation;
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
@@ -135,7 +128,7 @@ public sealed partial class RuntimeTaskService
         return pendingCapture is null
             ? null
             : new InfoOverlayPendingShinyCapture(
-                pendingCapture.Name,
+                string.IsNullOrWhiteSpace(pendingCapture.Name) ? "未识别精灵" : pendingCapture.Name,
                 pendingCapture.Season == EncounterSeasonTimeline.PendingSeasonId
                     ? EncounterSeasonTimeline.PendingSeasonName : pendingCapture.Season,
                 pendingCapture.DetectedAt);
@@ -177,6 +170,7 @@ public sealed partial class RuntimeTaskService
             season,
             battleId,
             cancellationToken);
+        await TryCompletePendingShinyNameAsync(state, frame, battleId, cancellationToken);
     }
 
     private async Task TryLogBattleTipAsync(
@@ -518,6 +512,10 @@ public sealed partial class RuntimeTaskService
         long battleId,
         CancellationToken cancellationToken)
     {
+        var accountUid = _statisticsService.IsActiveAccountSelectionRequired ? null
+            : _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
+                ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
+        var detectedAt = DateTimeOffset.Now;
         var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
@@ -541,8 +539,19 @@ public sealed partial class RuntimeTaskService
         }
 
         if (battleId != _battle.BattleId) return false;
-        RememberPendingShinyDetection(season.Id, similarity);
         ApplyAutoBattleShinySuspension(tipText, "异色识别", battleId);
+        if (EncounterStatisticsEnabled && !_statisticsService.IsActiveAccountSelectionRequired && accountUid is not null)
+        {
+            RuntimePendingShinyCapture capture;
+            lock (_pendingShinyRecordLock)
+            {
+                if (_pendingShinyCapture?.BattleId != battleId)
+                    _pendingShinyCapture = new RuntimePendingShinyCapture(battleId, accountUid, season, detectedAt);
+                capture = _pendingShinyCapture!;
+            }
+            // 名称 OCR 或图鉴匹配失败也不能丢掉已确认的异色提示。
+            await capture.SaveAsync(_statisticsService);
+        }
         return true;
     }
 
@@ -607,32 +616,29 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private async Task RecordPendingShinyCaptureAsync(
-        EncounterSeasonDefinition season,
-        string enemyName,
+    private async Task TryCompletePendingShinyNameAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        long battleId,
         CancellationToken cancellationToken)
     {
-        if (!EncounterStatisticsEnabled)
-        {
-            return;
-        }
+        RuntimePendingShinyCapture? capture;
+        lock (_pendingShinyRecordLock) capture = _pendingShinyCapture;
+        if (!EncounterStatisticsEnabled || capture is null || capture.BattleId != battleId
+            || battleId != _battle.BattleId || capture.HasName) return;
 
-        enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
-        if (string.IsNullOrWhiteSpace(enemyName))
-        {
-            return;
-        }
-
-        var now = DateTimeOffset.Now;
-        if (!TryReservePendingShinyRecord(season.Id, enemyName, now))
-        {
-            return;
-        }
-
-        await _statisticsService.AddPendingShinyCaptureAsync(season, enemyName, now);
-        _logger.LogInformation(
-            "异色识别：{SpiritName} 已暂存，等待统计页面确认后计入异色并清空对应赛季奇遇计数。",
-            enemyName);
+        // 即使异色提示已消失，首次保存失败仍可重试；与自动战斗的名称判定解耦。
+        await capture.SaveAsync(_statisticsService);
+        var rawText = await _frameRecognizer.RecognizeRegionTextAsync(
+            state, frame, BattleEnemyNameRegionIds, cancellationToken, "异色精灵名");
+        if (battleId != _battle.BattleId) return;
+        await capture.SaveAsync(_statisticsService, rawText);
+        var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
+        if (string.IsNullOrWhiteSpace(name)) return;
+        name = await ResolveEncounterStatisticsRecordNameAsync(name, cancellationToken);
+        if (battleId != _battle.BattleId) return;
+        await capture.SaveAsync(_statisticsService, rawText, name);
+        _logger.LogInformation("异色识别：{SpiritName} 已暂存，等待统计页面确认。", name);
     }
 
     private bool TryReserveEncounterRecord(string seasonId, string spiritName, DateTimeOffset now, out string recordId)
@@ -678,74 +684,6 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private bool TryReservePendingShinyRecord(string seasonId, string spiritName, DateTimeOffset now)
-    {
-        lock (_pendingShinyRecordLock)
-        {
-            if (string.Equals(_lastPendingShinySeasonId, seasonId, StringComparison.OrdinalIgnoreCase)
-                && (_hasActivePendingShinyRecord || now - _lastPendingShinyAt < PendingShinyDuplicateSuppressWindow))
-            {
-                var remaining = _hasActivePendingShinyRecord
-                    ? PendingShinyDuplicateSuppressWindow
-                    : PendingShinyDuplicateSuppressWindow - (now - _lastPendingShinyAt);
-                _debugLog.Write(
-                    CreateDebugLogKey("shiny-duplicate-suppression", seasonId),
-                    string.Join(
-                        "|",
-                        _lastPendingShinyName,
-                        spiritName,
-                        CreateBooleanDebugFingerprint(_hasActivePendingShinyRecord)),
-                    "异色识别筛选：冷却中，本次识别已忽略。LastSpirit={LastSpiritName}, CurrentSpirit={CurrentSpiritName}, Remaining={RemainingSeconds:F1}s",
-                    _lastPendingShinyName,
-                    spiritName,
-                    Math.Max(0, remaining.TotalSeconds));
-                return false;
-            }
-
-            _lastPendingShinySeasonId = seasonId;
-            _lastPendingShinyName = spiritName;
-            _lastPendingShinyAt = now;
-            _hasActivePendingShinyRecord = true;
-            return true;
-        }
-    }
-
-    private void RememberPendingShinyDetection(string seasonId, double similarity)
-    {
-        lock (_runtimeEncounterSignalLock)
-        {
-            _hasPendingShinyDetection = true;
-            _pendingShinyDetectionSeasonId = seasonId;
-            _pendingShinyDetectionSimilarity = similarity;
-        }
-    }
-
-    private bool TryGetPendingShinyDetection(string seasonId, out double similarity)
-    {
-        lock (_runtimeEncounterSignalLock)
-        {
-            if (!_hasPendingShinyDetection
-                || !string.Equals(_pendingShinyDetectionSeasonId, seasonId, StringComparison.OrdinalIgnoreCase))
-            {
-                similarity = 0;
-                return false;
-            }
-
-            similarity = _pendingShinyDetectionSimilarity;
-            return true;
-        }
-    }
-
-    private void ClearPendingShinyDetection()
-    {
-        lock (_runtimeEncounterSignalLock)
-        {
-            _hasPendingShinyDetection = false;
-            _pendingShinyDetectionSeasonId = null;
-            _pendingShinyDetectionSimilarity = 0;
-        }
-    }
-
     private void ResetEncounterRecordSuppression()
     {
         lock (_encounterRecordLock)
@@ -756,7 +694,7 @@ public sealed partial class RuntimeTaskService
 
         lock (_pendingShinyRecordLock)
         {
-            _hasActivePendingShinyRecord = false;
+            _pendingShinyCapture = null;
         }
 
         _encounterCaptureButtonStateTracker.Reset();
@@ -770,7 +708,6 @@ public sealed partial class RuntimeTaskService
             _lastAuxiliaryTipTexts.Clear();
         }
 
-        ClearPendingShinyDetection();
     }
 
     private async Task<string> MatchRecognizedSpiritNameAsync(

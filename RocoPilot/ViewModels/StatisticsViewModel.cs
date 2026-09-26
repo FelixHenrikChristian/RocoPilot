@@ -437,12 +437,14 @@ public partial class StatisticsViewModel : ObservableRecipient
             return;
         }
 
-        var encounterCount = (int)Math.Round(Overview.PendingEditor.EncounterCount);
-        await _statisticsService.ConfirmPendingShinyCaptureAsync(
+        var document = await _statisticsService.ConfirmPendingShinyCaptureAsync(
             pendingCapture.Id,
             spiritName,
-            encounterCount,
+            Overview.PendingEditor.EncounterCountOverride,
             DateTimeOffset.Now);
+        var encounterCount = document.Accounts.SelectMany(account => account.Seasons)
+            .SelectMany(season => season.ShinyCaptures)
+            .FirstOrDefault(item => item.Id == pendingCapture.Id)?.EncounterCountBeforeCapture ?? 0;
         ShowNotification(
             InfoBarSeverity.Success,
             "已确认异色",

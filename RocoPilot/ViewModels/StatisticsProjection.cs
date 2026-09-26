@@ -60,8 +60,7 @@ internal static class StatisticsProjection
         }
 
         return account.PendingShinyCaptures
-            .Where(record => !string.IsNullOrWhiteSpace(record.Id)
-                && !string.IsNullOrWhiteSpace(record.Name)
+            .Where(record => record.HandledAt is null && !string.IsNullOrWhiteSpace(record.Id)
                 && !string.IsNullOrWhiteSpace(record.Season))
             .Select(record =>
             {
@@ -75,7 +74,8 @@ internal static class StatisticsProjection
                     string.IsNullOrWhiteSpace(season?.Name) ? $"{record.Season.Trim()}赛季" : season.Name,
                     record.DetectedAt,
                     encounterCount,
-                    avatarResolver?.Invoke(record.Name));
+                    avatarResolver?.Invoke(record.Name),
+                    record.RawText);
             })
             .OrderByDescending(item => item.DetectedAt)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
@@ -483,7 +483,8 @@ public sealed class PendingShinyCaptureItem
         string seasonDisplay,
         DateTimeOffset detectedAt,
         int encounterCount,
-        BitmapImage? avatar = null)
+        BitmapImage? avatar = null,
+        string rawText = "")
     {
         Id = id;
         Name = name;
@@ -492,11 +493,14 @@ public sealed class PendingShinyCaptureItem
         DetectedAt = detectedAt;
         EncounterCount = encounterCount;
         Avatar = avatar;
+        RawText = rawText;
     }
 
     public string Id { get; }
 
     public string Name { get; }
+
+    public string RawText { get; }
 
     public string Season { get; }
 

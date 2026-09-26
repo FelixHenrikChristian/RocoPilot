@@ -27,6 +27,9 @@ internal static class StatisticsDocumentMerger
                         (typeInfo.Type == typeof(AccountStatisticsData) && property.Name == "pendingEncounters")
                         || (typeInfo.Type == typeof(SeasonStatisticsData) && property.Name == "encounterCountResets")))
                         property.ShouldSerialize = (_, value) => value is System.Collections.ICollection { Count: > 0 };
+                    if (typeInfo.Type == typeof(PendingShinyCaptureRecord))
+                        foreach (var property in typeInfo.Properties.Where(property => property.Name == "rawText"))
+                            property.ShouldSerialize = (_, value) => value is string { Length: > 0 };
                 }
             }
         }
@@ -259,9 +262,17 @@ internal static class StatisticsDocumentMerger
                 continue;
             }
 
+            if (remoteCapture.HandledAt is { } handledAt
+                && (localCapture.HandledAt is null || handledAt > localCapture.HandledAt))
+                localCapture.HandledAt = handledAt;
+            if (!string.IsNullOrWhiteSpace(remoteCapture.Name)
+                && (string.IsNullOrWhiteSpace(localCapture.Name) || remoteCapture.DetectedAt > localCapture.DetectedAt))
+                localCapture.Name = remoteCapture.Name;
+            if (!string.IsNullOrWhiteSpace(remoteCapture.RawText)
+                && (string.IsNullOrWhiteSpace(localCapture.RawText) || remoteCapture.DetectedAt > localCapture.DetectedAt))
+                localCapture.RawText = remoteCapture.RawText;
             if (remoteCapture.DetectedAt > localCapture.DetectedAt)
             {
-                localCapture.Name = remoteCapture.Name;
                 localCapture.Season = remoteCapture.Season;
                 localCapture.DetectedAt = remoteCapture.DetectedAt;
             }

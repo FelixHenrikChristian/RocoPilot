@@ -114,7 +114,13 @@ public sealed class PendingShinyCaptureRecord
 
     public string Name { get; set; } = string.Empty;
 
+    public string RawText { get; set; } = string.Empty;
+
     public string Season { get; set; } = string.Empty;
 
     public DateTimeOffset DetectedAt { get; set; }
+
+    // 保留处理标记，避免后续 OCR 或旧云端记录把已确认、已忽略的事件重新加入队列。
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? HandledAt { get; set; }
 }

@@ -6,29 +6,67 @@
     xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    Width="680"
-    Height="620"
-    MinWidth="600"
+    Width="780"
+    Height="740"
+    MinWidth="640"
     MinHeight="520"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="ContentRoot" Loaded="ContentRoot_Loaded">
+    <Grid x:Name="ContentRoot" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" Loaded="ContentRoot_Loaded">
         <Grid.Resources>
+            <Style TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
+            </Style>
+            <Style x:Key="SyncCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="14" />
+                <Setter Property="Padding" Value="20" />
+            </Style>
+            <Style TargetType="TextBox">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="Padding" Value="10,6" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+            </Style>
+            <Style TargetType="PasswordBox">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="Padding" Value="10,6" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+            </Style>
+            <Style TargetType="ComboBox">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="Padding" Value="10,6" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+            </Style>
+            <Style x:Key="SyncActionButtonStyle" TargetType="Button">
+                <Setter Property="FontSize" Value="13" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="CornerRadius" Value="8" />
+            </Style>
             <Style x:Key="SyncSettingRowStyle" TargetType="Grid">
-                <Setter Property="MinHeight" Value="64" />
-                <Setter Property="Padding" Value="16,12" />
-                <Setter Property="ColumnSpacing" Value="16" />
+                <Setter Property="MinHeight" Value="34" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="ColumnSpacing" Value="24" />
             </Style>
             <Style x:Key="SyncSettingTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
             <Style x:Key="SyncSettingDescriptionStyle" TargetType="TextBlock">
                 <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontSize" Value="11" />
                 <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Setter Property="TextWrapping" Value="Wrap" />
             </Style>
@@ -41,10 +79,9 @@
 
         <Grid
             Grid.Row="0"
-            Padding="20,16,20,12"
-            RowSpacing="12">
+            Padding="24,16,24,12"
+            RowSpacing="16">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
@@ -57,31 +94,52 @@
                 </Grid.ColumnDefinitions>
 
                 <Border
-                    Width="44"
-                    Height="44"
+                    Width="36"
+                    Height="36"
                     VerticalAlignment="Center"
-                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
+                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                     CornerRadius="10">
                     <FontIcon
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
-                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
+                        FontSize="18"
+                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                         Glyph="&#xE753;" />
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                     <TextBlock
-                        FontSize="20"
+                        FontSize="18"
                         FontWeight="SemiBold"
                         Text="统计云同步" />
-                    <TextBlock
-                        x:Name="StatusSummaryText"
-                        FontSize="13"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        TextTrimming="CharacterEllipsis"
-                        TextWrapping="NoWrap" />
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="StatusSummaryText"
+                            VerticalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextTrimming="CharacterEllipsis"
+                            TextWrapping="NoWrap" />
+                        <Button
+                            x:Name="RefreshRemoteButton"
+                            Grid.Column="1"
+                            MinWidth="0"
+                            MinHeight="24"
+                            Padding="6,2"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            CornerRadius="4"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Content="检查云端时间"
+                            Click="RefreshRemoteButton_Click"
+                            ToolTipService.ToolTip="查询云端统计文件的最新修改时间，不会下载或合并数据。" />
+                    </Grid>
                 </StackPanel>
 
                 <Border
@@ -101,26 +159,19 @@
                 </Border>
             </Grid>
 
-            <InfoBar
-                x:Name="MessageBar"
-                Grid.Row="1"
-                helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-                IsClosable="True"
-                IsOpen="False" />
 
             <ScrollViewer
-                Grid.Row="2"
+                Grid.Row="1"
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
-                <StackPanel Spacing="12" Padding="0,0,0,4">
+                <StackPanel Spacing="16" Padding="0,0,12,4">
 
-                    <Border Padding="0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
+                    <Border Style="{StaticResource SyncCardStyle}">
+                        <StackPanel Spacing="12">
                             <Grid
-                                Padding="16,14"
-                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                Margin="0,0,0,4"
                                 ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -133,28 +184,19 @@
                                     Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                     Glyph="&#xE72E;" />
                                 <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock FontWeight="SemiBold" Text="连接配置" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="填写 Cloudflare R2 凭证后即可同步统计数据。"
-                                        TextWrapping="Wrap" />
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="连接配置" />
                                 </StackPanel>
                             </Grid>
 
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="280" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="同步方式" />
-                                    <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
-                                        Text="Cloudflare R2 · S3 兼容 API" />
-                                </StackPanel>
+                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="同步方式" VerticalAlignment="Center" />
                                 <ComboBox
                                     x:Name="ProviderComboBox"
+                                    AutomationProperties.Name="同步方式"
                                     Grid.Column="1"
                                     HorizontalAlignment="Stretch"
                                     VerticalAlignment="Center"
@@ -162,101 +204,85 @@
                                     SelectionChanged="ProviderComboBox_SelectionChanged" />
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="280" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Account ID" />
-                                    <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
-                                        Text="Cloudflare 账户 ID" />
-                                </StackPanel>
+                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Account ID" VerticalAlignment="Center" />
                                 <TextBox
                                     x:Name="R2AccountIdTextBox"
+                                    AutomationProperties.Name="Account ID"
                                     Grid.Column="1"
                                     VerticalAlignment="Center"
                                     PlaceholderText="Cloudflare Account ID" />
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="280" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Bucket" />
-                                    <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
-                                        Text="用于保存统计文件的 R2 存储桶" />
-                                </StackPanel>
+                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Bucket" VerticalAlignment="Center" />
                                 <TextBox
                                     x:Name="R2BucketNameTextBox"
+                                    AutomationProperties.Name="Bucket"
                                     Grid.Column="1"
                                     VerticalAlignment="Center"
                                     PlaceholderText="roco-pilot" />
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="280" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Access Key ID" />
-                                    <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
-                                        Text="R2 API 令牌的访问密钥 ID" />
-                                </StackPanel>
+                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Access Key ID" VerticalAlignment="Center" />
                                 <TextBox
                                     x:Name="UserNameTextBox"
+                                    AutomationProperties.Name="Access Key ID"
                                     Grid.Column="1"
                                     VerticalAlignment="Center"
                                     PlaceholderText="R2 Access Key ID" />
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="280" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Secret Access Key" />
                                     <TextBlock
                                         Style="{StaticResource SyncSettingDescriptionStyle}"
-                                        Text="私钥仅显示一次；留空则保留已保存的密钥" />
+                                        Text="留空保留已保存的密钥" />
                                 </StackPanel>
                                 <PasswordBox
                                     x:Name="PasswordBox"
+                                    AutomationProperties.Name="Secret Access Key"
                                     Grid.Column="1"
                                     VerticalAlignment="Center"
-                                    PlaceholderText="输入 Secret Access Key" />
+                                    PlaceholderText="Secret Access Key" />
                             </Grid>
+                            <StackPanel Spacing="10" Margin="0,2,0,0">
+                                <Button
+                                    x:Name="TestConnectionButton"
+                                    Click="TestConnectionButton_Click"
+                                    Style="{StaticResource SyncActionButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE71B;" />
+                                        <TextBlock Text="测试连接" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock Style="{StaticResource SyncSettingDescriptionStyle}" Text="修改配置后，请先保存再测试或同步。" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Padding="0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
+                    <Border Style="{StaticResource SyncCardStyle}">
+                        <StackPanel Spacing="12">
                             <Grid
-                                Padding="16,14"
-                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                Margin="0,0,0,4"
                                 ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -269,47 +295,26 @@
                                     Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                     Glyph="&#xE895;" />
                                 <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock FontWeight="SemiBold" Text="同步操作" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="手动同步云端数据，或开启自动上传。"
-                                        TextWrapping="Wrap" />
+                                    <TextBlock FontSize="14" FontWeight="SemiBold" Text="同步与数据" />
                                 </StackPanel>
                             </Grid>
 
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="云端数据" />
-                                    <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
-                                        Text="刷新云端时间，或与其他设备合并统计" />
-                                </StackPanel>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="云端数据" VerticalAlignment="Center" />
                                 <StackPanel
-                                    Grid.Column="1"
+                                    Grid.Row="1"
+                                    Margin="0,14,0,0"
                                     VerticalAlignment="Center"
                                     Orientation="Horizontal"
                                     Spacing="8">
                                     <Button
-                                        x:Name="RefreshRemoteButton"
-                                        MinWidth="0"
-                                        Click="RefreshRemoteButton_Click"
-                                        ToolTipService.ToolTip="刷新云端更新时间">
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <FontIcon
-                                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                                FontSize="14"
-                                                Glyph="&#xE72C;" />
-                                            <TextBlock Text="刷新" />
-                                        </StackPanel>
-                                    </Button>
-                                    <Button
                                         x:Name="UploadButton"
                                         MinWidth="0"
+                                        Style="{StaticResource SyncActionButtonStyle}"
                                         Click="UploadButton_Click"
                                         ToolTipService.ToolTip="立即上传当前本地统计">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -317,12 +322,13 @@
                                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                 FontSize="14"
                                                 Glyph="&#xE898;" />
-                                            <TextBlock Text="上传" />
+                                            <TextBlock Text="上传到云端" />
                                         </StackPanel>
                                     </Button>
                                     <Button
                                         x:Name="DownloadButton"
                                         MinWidth="0"
+                                        Style="{StaticResource SyncActionButtonStyle}"
                                         Click="DownloadButton_Click"
                                         ToolTipService.ToolTip="合并云端数据">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -330,15 +336,11 @@
                                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                 FontSize="14"
                                                 Glyph="&#xE896;" />
-                                            <TextBlock Text="合并" />
+                                            <TextBlock Text="合并云端数据" />
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>
                             </Grid>
-
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
 
                             <Grid Style="{StaticResource SyncSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
@@ -346,13 +348,14 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="启用同步" />
+                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="自动同步" />
                                     <TextBlock
                                         Style="{StaticResource SyncSettingDescriptionStyle}"
                                         Text="开启后，本地统计变化会自动上传到云端" />
                                 </StackPanel>
                                 <ToggleSwitch
                                     x:Name="EnableSyncSwitch"
+                                    AutomationProperties.Name="启用自动同步"
                                     Grid.Column="1"
                                     MinWidth="0"
                                     HorizontalAlignment="Right"
@@ -367,18 +370,17 @@
             </ScrollViewer>
         </Grid>
 
-        <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">
+        <Grid Grid.Row="1" Padding="24,12" ColumnSpacing="12" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <Button
                 x:Name="TutorialButton"
                 Click="TutorialButton_Click"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}"
+                Style="{StaticResource SyncActionButtonStyle}"
                 ToolTipService.ToolTip="查看 Cloudflare R2 配置教程">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon
@@ -389,28 +391,31 @@
                 </StackPanel>
             </Button>
 
-            <TextBlock
-                Grid.Column="1"
-                Margin="8,0,0,0"
-                VerticalAlignment="Center"
-                FontSize="12"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="首次使用建议先保存并测试连接"
-                TextTrimming="CharacterEllipsis"
-                TextWrapping="NoWrap" />
-
-            <Button
-                x:Name="TestConnectionButton"
-                Grid.Column="2"
-                Click="TestConnectionButton_Click"
-                Content="测试连接"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
             <Button
                 x:Name="SaveSettingsButton"
-                Grid.Column="3"
+                Grid.Column="2"
                 Click="SaveSettingsButton_Click"
-                Content="保存"
+                Content="保存配置"
+                CornerRadius="8"
+                MinHeight="34"
+                FontSize="13"
+                Padding="14,6"
                 Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
         </Grid>
+
+        <!-- Overlay the content instead of allocating a row: notifications must not move the form. -->
+        <InfoBar
+            x:Name="MessageBar"
+            Grid.RowSpan="2"
+            MaxWidth="440"
+            Margin="24,16,24,0"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            Canvas.ZIndex="1"
+            CornerRadius="10"
+            FontSize="13"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsClosable="True"
+            IsOpen="False" />
     </Grid>
 </windowex:WindowEx>

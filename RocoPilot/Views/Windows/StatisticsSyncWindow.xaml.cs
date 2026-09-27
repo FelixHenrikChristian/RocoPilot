@@ -11,7 +11,6 @@ using RocoPilot.Models.Statistics;
 using RocoPilot.ViewModels;
 
 using Windows.Graphics;
-using Windows.UI;
 
 namespace RocoPilot.Views.Windows;
 
@@ -39,7 +38,7 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(680, 620));
+        AppWindow.Resize(new SizeInt32(780, 740));
 
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         Closed += StatisticsSyncWindow_Closed;
@@ -122,7 +121,7 @@ public sealed partial class StatisticsSyncWindow : WindowEx
             var password = string.IsNullOrWhiteSpace(PasswordBox.Password) ? null : PasswordBox.Password;
             await _viewModel.SaveSyncSettingsAsync(settings, password);
             PasswordBox.Password = string.Empty;
-            ShowMessage("云同步设置已保存", _viewModel.SyncStatusSummary, InfoBarSeverity.Success);
+            ShowMessage("云同步设置已保存", string.Empty, InfoBarSeverity.Success);
         });
     }
 
@@ -131,16 +130,16 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         await RunOperationAsync("测试云同步连接失败", async () =>
         {
             await _viewModel.TestSyncConnectionAsync();
-            ShowMessage("云同步连接成功", _viewModel.SyncStatusSummary, InfoBarSeverity.Success);
+            ShowMessage("云同步连接成功", string.Empty, InfoBarSeverity.Success);
         });
     }
 
     private async void RefreshRemoteButton_Click(object sender, RoutedEventArgs e)
     {
-        await RunOperationAsync("刷新云端时间失败", async () =>
+        await RunOperationAsync("检查云端时间失败", async () =>
         {
             await _viewModel.RefreshSyncRemoteInfoAsync();
-            ShowMessage("已刷新云端时间", _viewModel.SyncStatusSummary, InfoBarSeverity.Success);
+            ShowMessage("已检查云端时间", _viewModel.SyncStatusSummary, InfoBarSeverity.Success);
         });
     }
 
@@ -149,7 +148,7 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         await RunOperationAsync("上传到云端失败", async () =>
         {
             await _viewModel.UploadStatisticsToCloudAsync();
-            ShowMessage("上传完成", _viewModel.SyncStatusSummary, InfoBarSeverity.Success);
+            ShowMessage("上传完成", string.Empty, InfoBarSeverity.Success);
         });
     }
 
@@ -301,15 +300,15 @@ public sealed partial class StatisticsSyncWindow : WindowEx
     {
         if (_viewModel.IsSyncBusy)
         {
-            StatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x22, 0x00, 0x78, 0xD4));
-            StatusBadgeText.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0x78, 0xD4));
+            StatusBadge.Background = (Brush)Application.Current.Resources["SystemFillColorAttentionBackgroundBrush"];
+            StatusBadgeText.Foreground = (Brush)Application.Current.Resources["SystemFillColorAttentionBrush"];
             return;
         }
 
         if (EnableSyncSwitch.IsOn)
         {
-            StatusBadge.Background = new SolidColorBrush(Color.FromArgb(0x22, 0x10, 0x7C, 0x10));
-            StatusBadgeText.Foreground = new SolidColorBrush(Color.FromArgb(0xFF, 0x10, 0x7C, 0x10));
+            StatusBadge.Background = (Brush)Application.Current.Resources["SystemFillColorSuccessBackgroundBrush"];
+            StatusBadgeText.Foreground = (Brush)Application.Current.Resources["SystemFillColorSuccessBrush"];
             return;
         }
 

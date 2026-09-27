@@ -4,9 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:windowex="using:WinUIEx"
-    Width="680"
+    Width="620"
     Height="580"
-    MinWidth="600"
+    MinWidth="560"
     MinHeight="520">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -35,60 +35,57 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <StackPanel VerticalAlignment="Center" Spacing="2">
-                <TextBlock
-                    FontSize="18"
-                    FontWeight="SemiBold"
-                    Text="自动战斗高级选项" />
-                <TextBlock
-                    FontSize="13"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="会改变识别等待和按键节奏，普通用户建议保留默认值。"
-                    TextWrapping="Wrap" />
-            </StackPanel>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="40" Height="40" CornerRadius="12"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <FontIcon Glyph="&#xE713;" FontSize="20"
+                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="自动战斗高级选项" />
+                    <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="调整识别等待与按键节奏，建议保留默认值。" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
 
             <ScrollViewer
                 Grid.Row="1"
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
+                VerticalContentAlignment="Top"
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
                 <StackPanel Spacing="12" Padding="0,0,0,4">
-                    <Border Style="{StaticResource DialogCardStyle}">
-                        <StackPanel Spacing="16">
-                            <Grid
-                                Margin="0,0,0,4"
-                                ColumnSpacing="12">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="16" CornerRadius="12">
+                        <StackPanel Spacing="14">
+                            <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <FontIcon
-                                    VerticalAlignment="Center"
-                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                    FontSize="18"
-                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                    Glyph="&#xE823;" />
-                                <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock FontWeight="SemiBold" Text="战斗时序" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="识别与动作之间的等待时间"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
+                                <Border Width="32" Height="32" CornerRadius="9"
+                                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                    <FontIcon Glyph="&#xE823;" FontSize="16"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                           Style="{StaticResource DialogSectionTitleStyle}" Text="战斗时序" />
                             </Grid>
 
                             <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="144" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="技能选择基础等待" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="进入技能选择界面后，开始识别并发送本回合按键前的等待。" />
+                                        Text="进入技能界面后，识别与按键前的等待" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"
@@ -97,11 +94,12 @@
                                     Spacing="8">
                                     <NumberBox
                                         x:Name="SkillSelectionActionDelayNumberBox"
-                                        Width="140"
+                                        AutomationProperties.Name="技能选择基础等待（毫秒）"
+                                        Width="116"
                                         Maximum="30000"
                                         Minimum="0"
                                         SmallChange="100"
-                                        SpinButtonPlacementMode="Compact" />
+                                        SpinButtonPlacementMode="Hidden" />
                                     <TextBlock
                                         VerticalAlignment="Center"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -112,13 +110,13 @@
                             <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="144" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="技能操作重试间隔" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="技能选择界面持续未消失时，再次执行同一动作前的等待。" />
+                                        Text="技能界面未消失时，重复动作的等待" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"
@@ -127,11 +125,12 @@
                                     Spacing="8">
                                     <NumberBox
                                         x:Name="SkillSelectionRetryDelayNumberBox"
-                                        Width="140"
+                                        AutomationProperties.Name="技能操作重试间隔（毫秒）"
+                                        Width="116"
                                         Maximum="30000"
                                         Minimum="500"
                                         SmallChange="500"
-                                        SpinButtonPlacementMode="Compact" />
+                                        SpinButtonPlacementMode="Hidden" />
                                     <TextBlock
                                         VerticalAlignment="Center"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -141,41 +140,32 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource DialogCardStyle}">
-                        <StackPanel Spacing="16">
-                            <Grid
-                                Margin="0,0,0,4"
-                                ColumnSpacing="12">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="16" CornerRadius="12">
+                        <StackPanel Spacing="14">
+                            <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <FontIcon
-                                    VerticalAlignment="Center"
-                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                    FontSize="18"
-                                    Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                    Glyph="&#xE765;" />
-                                <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock FontWeight="SemiBold" Text="按键时序" />
-                                    <TextBlock
-                                        FontSize="12"
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="按下时长与连续按键间隔"
-                                        TextWrapping="Wrap" />
-                                </StackPanel>
+                                <Border Width="32" Height="32" CornerRadius="9"
+                                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                    <FontIcon Glyph="&#xE765;" FontSize="16"
+                                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                           Style="{StaticResource DialogSectionTitleStyle}" Text="按键时序" />
                             </Grid>
 
                             <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="144" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="按键按下时长" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="每个按键从按下到松开的持续时间。" />
+                                        Text="单次按键从按下到松开的时间" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"
@@ -184,11 +174,12 @@
                                     Spacing="8">
                                     <NumberBox
                                         x:Name="KeyboardHoldDurationNumberBox"
-                                        Width="140"
+                                        AutomationProperties.Name="按键按下时长（毫秒）"
+                                        Width="116"
                                         Maximum="2000"
                                         Minimum="10"
                                         SmallChange="10"
-                                        SpinButtonPlacementMode="Compact" />
+                                        SpinButtonPlacementMode="Hidden" />
                                     <TextBlock
                                         VerticalAlignment="Center"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -199,13 +190,13 @@
                             <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="144" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="普通按键间隔" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="战技、自定义序列等相邻按键之间的等待。" />
+                                        Text="战技与自定义序列中相邻按键的等待" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"
@@ -214,11 +205,12 @@
                                     Spacing="8">
                                     <NumberBox
                                         x:Name="KeyboardIntervalNumberBox"
-                                        Width="140"
+                                        AutomationProperties.Name="普通按键间隔（毫秒）"
+                                        Width="116"
                                         Maximum="30000"
                                         Minimum="0"
                                         SmallChange="100"
-                                        SpinButtonPlacementMode="Compact" />
+                                        SpinButtonPlacementMode="Hidden" />
                                     <TextBlock
                                         VerticalAlignment="Center"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -229,13 +221,13 @@
                             <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="144" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel VerticalAlignment="Center">
+                                <StackPanel VerticalAlignment="Center" Spacing="4">
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="捕捉序列按键间隔" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="奇遇解除后执行 W、1、Space 捕捉序列时的相邻按键等待。" />
+                                        Text="奇遇解除后，W、1、Space 之间的等待" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"
@@ -244,11 +236,12 @@
                                     Spacing="8">
                                     <NumberBox
                                         x:Name="CaptureKeyboardIntervalNumberBox"
-                                        Width="140"
+                                        AutomationProperties.Name="捕捉序列按键间隔（毫秒）"
+                                        Width="116"
                                         Maximum="30000"
                                         Minimum="0"
                                         SmallChange="100"
-                                        SpinButtonPlacementMode="Compact" />
+                                        SpinButtonPlacementMode="Hidden" />
                                     <TextBlock
                                         VerticalAlignment="Center"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"

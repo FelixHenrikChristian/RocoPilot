@@ -16,18 +16,25 @@
 
     <Grid
         x:Name="ContentRoot"
-        Padding="16"
+        Padding="24,16"
         RowSpacing="12"
-        Loaded="ContentRoot_Loaded">
+        Loaded="ContentRoot_Loaded"
+        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border
-            Grid.Row="0"
-            Style="{StaticResource CardStyle}">
+        <Border Grid.Row="0"
+            >
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -46,7 +53,7 @@
                             Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                             Glyph="&#xE722;" />
                         <TextBlock
-                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Style="{StaticResource DialogSectionTitleStyle}"
                             Text="屏幕实时捕获" />
                     </StackPanel>
                     <TextBlock
@@ -65,7 +72,7 @@
                     CornerRadius="8">
                     <TextBlock
                         x:Name="StatusText"
-                        Style="{StaticResource CaptionTextBlockStyle}"
+                        Style="{StaticResource DialogDescriptionTextStyle}"
                         Text="准备中" />
                 </Border>
             </Grid>
@@ -76,7 +83,7 @@
             Background="{ThemeResource LayerFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="14">
             <Grid>
                 <Image
                     x:Name="PreviewImage"
@@ -99,9 +106,8 @@
             </Grid>
         </Border>
 
-        <Border
-            Grid.Row="2"
-            Style="{StaticResource CardStyle}">
+        <Border Grid.Row="2"
+            >
             <Grid ColumnSpacing="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

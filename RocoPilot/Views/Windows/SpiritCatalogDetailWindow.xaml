@@ -17,47 +17,33 @@
 
     <Grid
         x:Name="ContentRoot"
-        Padding="16"
-        RowSpacing="12">
+        Padding="24,16"
+        RowSpacing="12" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border Style="{StaticResource CardStyle}">
-            <Grid ColumnSpacing="14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border
-                    Width="42"
-                    Height="42"
-                    VerticalAlignment="Center"
-                    Background="{ThemeResource ControlFillColorDefaultBrush}"
-                    CornerRadius="8">
-                    <FontIcon
-                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
-                        Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                        Glyph="&#xE8F0;" />
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
-                    <TextBlock
-                        FontSize="18"
-                        FontWeight="SemiBold"
-                        Text="{x:Bind HeaderTitle, Mode=OneWay}" />
-                    <TextBlock
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="{x:Bind Summary, Mode=OneWay}"
-                        TextTrimming="CharacterEllipsis"
-                        TextWrapping="NoWrap" />
-                </StackPanel>
-
-            </Grid>
+        <Border>
+            <StackPanel VerticalAlignment="Center" Spacing="3">
+                <TextBlock
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    Text="{x:Bind HeaderTitle, Mode=OneWay}" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{x:Bind Summary, Mode=OneWay}"
+                    TextTrimming="CharacterEllipsis"
+                    TextWrapping="NoWrap" />
+            </StackPanel>
         </Border>
 
         <Border
@@ -65,7 +51,7 @@
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="14">
             <ScrollViewer
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
@@ -120,7 +106,7 @@
 
                                     <Button
                                         Width="28"
-                                        Height="28"
+                                        Height="28" MinHeight="28"
                                         Margin="4"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Top"
@@ -141,7 +127,7 @@
 
                                     <Button
                                         Width="28"
-                                        Height="28"
+                                        Height="28" MinHeight="28"
                                         Margin="4"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Bottom"
@@ -172,7 +158,7 @@
                                     HorizontalAlignment="Center"
                                     MinHeight="24"
                                     VerticalAlignment="Center"
-                                    FontSize="15"
+                                    FontSize="13"
                                     FontWeight="SemiBold"
                                     Text="{Binding Name}"
                                     TextTrimming="CharacterEllipsis"

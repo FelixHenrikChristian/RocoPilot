@@ -5,6 +5,13 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
     <Grid Padding="24,20,24,20" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -12,13 +19,13 @@
         </Grid.RowDefinitions>
 
         <StackPanel Spacing="4">
-            <TextBlock Style="{StaticResource ConfigPageTitleStyle}" Text="公共执行序列" />
+            <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="公共执行序列" />
             <TextBlock
-                Style="{StaticResource ConfigPageDescriptionStyle}"
+                Style="{StaticResource DialogDescriptionTextStyle}"
                 Text="集中管理可被不同战斗类型复用的单回合按键组合，只保存一份。" />
         </StackPanel>
 
-        <Border Grid.Row="1" Style="{StaticResource SectionCardStyle}">
+        <Border Grid.Row="1" Style="{StaticResource DialogSectionCardStyle}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -26,7 +33,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                <Grid Style="{StaticResource DialogSectionHeaderStyle}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -39,9 +46,9 @@
                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                         Glyph="&#xE8F1;" />
                     <StackPanel Grid.Column="1" Spacing="2">
-                        <TextBlock Style="{StaticResource SectionTitleStyle}" Text="序列列表" />
+                        <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="序列列表" />
                         <TextBlock
-                            Style="{StaticResource SectionDescriptionStyle}"
+                            Style="{StaticResource DialogDescriptionTextStyle}"
                             Text="用逗号、空格或换行分隔，如 1, Space；组合键用 +，如 Ctrl+1。" />
                     </StackPanel>
                     <Button

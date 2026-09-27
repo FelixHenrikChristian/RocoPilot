@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
+using RocoPilot.Controls;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
@@ -154,7 +155,7 @@ public sealed partial class StatisticsSyncWindow : WindowEx
 
     private async void DownloadButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = ContentRoot.XamlRoot,
             Title = "合并云端数据",

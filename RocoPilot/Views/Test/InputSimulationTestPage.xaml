@@ -304,12 +304,10 @@
         </ScrollViewer>
 
         <InfoBar
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
             x:Name="InputSimulationInfoBar"
-            Margin="0,0,0,8"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Bottom"
             helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-            IsClosable="False"
             IsOpen="False" />
     </Grid>
 </Page>

@@ -5,23 +5,30 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
     <ScrollViewer
         HorizontalContentAlignment="Stretch"
         HorizontalScrollBarVisibility="Disabled"
         HorizontalScrollMode="Disabled"
         VerticalScrollBarVisibility="Auto"
         VerticalScrollMode="Auto">
-        <StackPanel Style="{StaticResource ConfigPageRootStyle}">
+        <StackPanel Style="{StaticResource DialogPageRootStyle}">
             <StackPanel Spacing="4">
-                <TextBlock Style="{StaticResource ConfigPageTitleStyle}" Text="捕捉血脉" />
+                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="捕捉血脉" />
                 <TextBlock
-                    Style="{StaticResource ConfigPageDescriptionStyle}"
+                    Style="{StaticResource DialogDescriptionTextStyle}"
                     Text="仅在「奇遇解除操作」选择捕捉时生效。识别到血脉后，只捕捉勾选的种类，其余释放战技。" />
             </StackPanel>
 
-            <Border Style="{StaticResource SectionCardStyle}">
+            <Border Style="{StaticResource DialogSectionCardStyle}">
                 <StackPanel>
-                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                    <Grid Style="{StaticResource DialogSectionHeaderStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -34,9 +41,9 @@
                             Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                             Glyph="&#xE8D7;" />
                         <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="启用血脉筛选" />
+                            <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="启用血脉筛选" />
                             <TextBlock
-                                Style="{StaticResource SectionDescriptionStyle}"
+                                Style="{StaticResource DialogDescriptionTextStyle}"
                                 Text="{x:Bind Editor.BloodlineCaptureFilterSummary, Mode=OneWay}" />
                         </StackPanel>
                         <ToggleSwitch
@@ -48,7 +55,7 @@
                             OnContent="" />
                     </Grid>
 
-                    <StackPanel Style="{StaticResource SectionCardBodyStyle}">
+                    <StackPanel Style="{StaticResource DialogSectionBodyStyle}">
                         <TextBlock
                             FontSize="12"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"

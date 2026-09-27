@@ -1,0 +1,46 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- These implicit styles are scoped to dialogs and auxiliary windows. -->
+    <Style TargetType="TextBlock" BasedOn="{StaticResource DialogBodyTextStyle}" />
+    <Style TargetType="Button" BasedOn="{StaticResource DialogButtonStyle}" />
+    <Style TargetType="TextBox" BasedOn="{StaticResource DialogTextBoxStyle}" />
+    <Style TargetType="PasswordBox" BasedOn="{StaticResource DialogPasswordBoxStyle}" />
+    <Style TargetType="ComboBox" BasedOn="{StaticResource DialogComboBoxStyle}" />
+    <Style TargetType="NumberBox" BasedOn="{StaticResource DialogNumberBoxStyle}" />
+    <Style TargetType="ToggleSwitch">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="CheckBox">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="RadioButton">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="CalendarDatePicker">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="DatePicker">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="TimePicker">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="HyperlinkButton">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="ListViewItem">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="ComboBoxItem">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style TargetType="NavigationViewItem">
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <x:Double x:Key="ContentDialogMaxWidth">640</x:Double>
+    <x:Double x:Key="ContentDialogMinWidth">320</x:Double>
+    <Thickness x:Key="ContentDialogPadding">24,20,24,20</Thickness>
+    <Thickness x:Key="ContentDialogTitleMargin">0,0,0,16</Thickness>
+</ResourceDictionary>

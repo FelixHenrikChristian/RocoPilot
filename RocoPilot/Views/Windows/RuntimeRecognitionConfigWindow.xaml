@@ -12,23 +12,13 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="ContentRoot">
+    <Grid x:Name="ContentRoot" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <Grid.Resources>
-            <Style x:Key="SettingRowStyle" TargetType="Grid">
-                <Setter Property="MinHeight" Value="72" />
-                <Setter Property="Padding" Value="16,12" />
-                <Setter Property="ColumnSpacing" Value="16" />
-            </Style>
-            <Style x:Key="SettingTitleStyle" TargetType="TextBlock">
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
-            <Style x:Key="SettingDescriptionStyle" TargetType="TextBlock">
-                <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -38,46 +28,24 @@
 
         <Grid
             Grid.Row="0"
-            Padding="20,16,20,12"
+            Padding="24,16,24,12"
             RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid ColumnSpacing="14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border
-                    Width="44"
-                    Height="44"
-                    VerticalAlignment="Center"
-                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
-                    CornerRadius="10">
-                    <FontIcon
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
-                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                        Glyph="&#xE823;" />
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                    <TextBlock
-                        FontSize="20"
-                        FontWeight="SemiBold"
-                        Text="运行频率" />
-                    <TextBlock
-                        FontSize="13"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="控制实时任务的画面采集、状态匹配和 OCR 节奏。"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    Text="运行频率" />
+                <TextBlock
+                    FontSize="13"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="控制实时任务的画面采集、状态匹配和 OCR 节奏。"
+                    TextWrapping="Wrap" />
+            </StackPanel>
 
             <ScrollViewer
                 Grid.Row="1"
@@ -85,17 +53,17 @@
                 HorizontalScrollMode="Disabled"
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
-                <Border Padding="0" Style="{StaticResource CardStyle}">
-                    <StackPanel>
-                        <Grid Style="{StaticResource SettingRowStyle}">
+                <Border Style="{StaticResource DialogCardStyle}">
+                    <StackPanel Spacing="16">
+                        <Grid Style="{StaticResource DialogSettingRowStyle}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="180" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource SettingTitleStyle}" Text="画面捕获间隔" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="画面捕获间隔" />
                                 <TextBlock
-                                    Style="{StaticResource SettingDescriptionStyle}"
+                                    Style="{StaticResource DialogDescriptionTextStyle}"
                                     Text="连续截图之间的目标间隔；越小越及时，资源占用越高。" />
                             </StackPanel>
                             <StackPanel
@@ -117,19 +85,15 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border
-                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0" />
-
-                        <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid Style="{StaticResource DialogSettingRowStyle}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="180" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource SettingTitleStyle}" Text="状态识别间隔" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="状态识别间隔" />
                                 <TextBlock
-                                    Style="{StaticResource SettingDescriptionStyle}"
+                                    Style="{StaticResource DialogDescriptionTextStyle}"
                                     Text="魔力值、技能选择、切换精灵和战斗聊天等图像状态的扫描间隔。" />
                             </StackPanel>
                             <StackPanel
@@ -151,19 +115,15 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border
-                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0" />
-
-                        <Grid Style="{StaticResource SettingRowStyle}">
+                        <Grid Style="{StaticResource DialogSettingRowStyle}">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="180" />
                             </Grid.ColumnDefinitions>
                             <StackPanel VerticalAlignment="Center">
-                                <TextBlock Style="{StaticResource SettingTitleStyle}" Text="OCR 识别间隔" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="OCR 识别间隔" />
                                 <TextBlock
-                                    Style="{StaticResource SettingDescriptionStyle}"
+                                    Style="{StaticResource DialogDescriptionTextStyle}"
                                     Text="奇遇、异色和精灵名称等后台文字识别的扫描间隔。" />
                             </StackPanel>
                             <StackPanel
@@ -200,23 +160,25 @@
             <Button
                 Click="RestoreDefaultsButton_Click"
                 Content="恢复默认值"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
-            <InfoBar
-                x:Name="MessageBar"
-                Grid.Column="1"
-                helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-                IsOpen="False"
-                Style="{StaticResource DialogFooterMessageBarStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
             <Button
                 Grid.Column="2"
                 Click="CancelButton_Click"
                 Content="取消"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
             <Button
                 Grid.Column="3"
                 Click="SaveButton_Click"
                 Content="保存"
-                Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
+                Style="{StaticResource DialogPrimaryButtonStyle}" />
         </Grid>
+
+        <InfoBar
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
+            x:Name="MessageBar"
+            Grid.RowSpan="2"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsOpen="False" />
     </Grid>
 </windowex:WindowEx>

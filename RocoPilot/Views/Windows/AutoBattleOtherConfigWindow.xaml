@@ -12,23 +12,13 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="ContentRoot">
+    <Grid x:Name="ContentRoot" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <Grid.Resources>
-            <Style x:Key="AdvancedSettingRowStyle" TargetType="Grid">
-                <Setter Property="MinHeight" Value="72" />
-                <Setter Property="Padding" Value="16,12" />
-                <Setter Property="ColumnSpacing" Value="16" />
-            </Style>
-            <Style x:Key="AdvancedSettingTitleStyle" TargetType="TextBlock">
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
-            <Style x:Key="AdvancedSettingDescriptionStyle" TargetType="TextBlock">
-                <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -38,46 +28,24 @@
 
         <Grid
             Grid.Row="0"
-            Padding="20,16,20,12"
+            Padding="24,16,24,12"
             RowSpacing="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Grid ColumnSpacing="14">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-
-                <Border
-                    Width="44"
-                    Height="44"
-                    VerticalAlignment="Center"
-                    Background="{ThemeResource AccentFillColorSecondaryBrush}"
-                    CornerRadius="10">
-                    <FontIcon
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
-                        Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                        Glyph="&#xE7BA;" />
-                </Border>
-
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-                    <TextBlock
-                        FontSize="20"
-                        FontWeight="SemiBold"
-                        Text="自动战斗高级选项" />
-                    <TextBlock
-                        FontSize="13"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="会改变识别等待和按键节奏，普通用户建议保留默认值。"
-                        TextWrapping="Wrap" />
-                </StackPanel>
-            </Grid>
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock
+                    FontSize="18"
+                    FontWeight="SemiBold"
+                    Text="自动战斗高级选项" />
+                <TextBlock
+                    FontSize="13"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="会改变识别等待和按键节奏，普通用户建议保留默认值。"
+                    TextWrapping="Wrap" />
+            </StackPanel>
 
             <ScrollViewer
                 Grid.Row="1"
@@ -86,11 +54,10 @@
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
                 <StackPanel Spacing="12" Padding="0,0,0,4">
-                    <Border Padding="0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
+                    <Border Style="{StaticResource DialogCardStyle}">
+                        <StackPanel Spacing="16">
                             <Grid
-                                Padding="16,14"
-                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                Margin="0,0,0,4"
                                 ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -107,20 +74,20 @@
                                     <TextBlock
                                         FontSize="12"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="控制识别开始、执行动作和失败重试的等待时间。"
+                                        Text="识别与动作之间的等待时间"
                                         TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Style="{StaticResource AdvancedSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="技能选择基础等待" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="技能选择基础等待" />
                                     <TextBlock
-                                        Style="{StaticResource AdvancedSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="进入技能选择界面后，开始识别并发送本回合按键前的等待。" />
                                 </StackPanel>
                                 <StackPanel
@@ -142,19 +109,15 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
-                            <Grid Style="{StaticResource AdvancedSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="技能操作重试间隔" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="技能操作重试间隔" />
                                     <TextBlock
-                                        Style="{StaticResource AdvancedSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="技能选择界面持续未消失时，再次执行同一动作前的等待。" />
                                 </StackPanel>
                                 <StackPanel
@@ -178,11 +141,10 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Padding="0" Style="{StaticResource CardStyle}">
-                        <StackPanel>
+                    <Border Style="{StaticResource DialogCardStyle}">
+                        <StackPanel Spacing="16">
                             <Grid
-                                Padding="16,14"
-                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                Margin="0,0,0,4"
                                 ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -199,20 +161,20 @@
                                     <TextBlock
                                         FontSize="12"
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="控制单个按键及连续按键之间的节奏。"
+                                        Text="按下时长与连续按键间隔"
                                         TextWrapping="Wrap" />
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Style="{StaticResource AdvancedSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="按键按下时长" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="按键按下时长" />
                                     <TextBlock
-                                        Style="{StaticResource AdvancedSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="每个按键从按下到松开的持续时间。" />
                                 </StackPanel>
                                 <StackPanel
@@ -234,19 +196,15 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
-                            <Grid Style="{StaticResource AdvancedSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="普通按键间隔" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="普通按键间隔" />
                                     <TextBlock
-                                        Style="{StaticResource AdvancedSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="战技、自定义序列等相邻按键之间的等待。" />
                                 </StackPanel>
                                 <StackPanel
@@ -268,19 +226,15 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Border
-                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                                BorderThickness="0,1,0,0" />
-
-                            <Grid Style="{StaticResource AdvancedSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="180" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource AdvancedSettingTitleStyle}" Text="捕捉序列按键间隔" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="捕捉序列按键间隔" />
                                     <TextBlock
-                                        Style="{StaticResource AdvancedSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="奇遇解除后执行 W、1、Space 捕捉序列时的相邻按键等待。" />
                                 </StackPanel>
                                 <StackPanel
@@ -318,23 +272,25 @@
             <Button
                 Click="RestoreDefaultsButton_Click"
                 Content="恢复默认值"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
-            <InfoBar
-                x:Name="MessageBar"
-                Grid.Column="1"
-                helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-                IsOpen="False"
-                Style="{StaticResource DialogFooterMessageBarStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
             <Button
                 Grid.Column="2"
                 Click="CancelButton_Click"
                 Content="取消"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
             <Button
                 Grid.Column="3"
                 Click="SaveButton_Click"
                 Content="保存"
-                Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
+                Style="{StaticResource DialogPrimaryButtonStyle}" />
         </Grid>
+
+        <InfoBar
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
+            x:Name="MessageBar"
+            Grid.RowSpan="2"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsOpen="False" />
     </Grid>
 </windowex:WindowEx>

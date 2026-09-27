@@ -5,23 +5,30 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
+    <Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Page.Resources>
     <ScrollViewer
         HorizontalContentAlignment="Stretch"
         HorizontalScrollBarVisibility="Disabled"
         HorizontalScrollMode="Disabled"
         VerticalScrollBarVisibility="Auto"
         VerticalScrollMode="Auto">
-        <StackPanel Style="{StaticResource ConfigPageRootStyle}">
+        <StackPanel Style="{StaticResource DialogPageRootStyle}">
             <StackPanel Spacing="4">
-                <TextBlock Style="{StaticResource ConfigPageTitleStyle}" Text="普通战斗" />
+                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="普通战斗" />
                 <TextBlock
-                    Style="{StaticResource ConfigPageDescriptionStyle}"
+                    Style="{StaticResource DialogDescriptionTextStyle}"
                     Text="配置普通战斗中每个可释放技能回合的循环动作。" />
             </StackPanel>
 
-            <Border Style="{StaticResource SectionCardStyle}">
+            <Border Style="{StaticResource DialogSectionCardStyle}">
                 <StackPanel>
-                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                    <Grid Style="{StaticResource DialogSectionHeaderStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -34,9 +41,9 @@
                             Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                             Glyph="&#xE8FD;" />
                         <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="释放顺序" />
+                            <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="释放顺序" />
                             <TextBlock
-                                Style="{StaticResource SectionDescriptionStyle}"
+                                Style="{StaticResource DialogDescriptionTextStyle}"
                                 Text="从左到右循环执行；右键可调整顺序或删除。" />
                         </StackPanel>
                         <StackPanel
@@ -57,7 +64,7 @@
                         </StackPanel>
                     </Grid>
 
-                    <StackPanel Style="{StaticResource SectionCardBodyStyle}">
+                    <StackPanel Style="{StaticResource DialogSectionBodyStyle}">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -177,9 +184,9 @@
                 </StackPanel>
             </Border>
 
-            <Border Style="{StaticResource SectionCardStyle}">
+            <Border Style="{StaticResource DialogSectionCardStyle}">
                 <StackPanel>
-                    <Grid Style="{StaticResource SectionCardHeaderStyle}">
+                    <Grid Style="{StaticResource DialogSectionHeaderStyle}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
@@ -191,9 +198,9 @@
                             Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                             Glyph="&#xE8F1;" />
                         <StackPanel Grid.Column="1" Spacing="2">
-                            <TextBlock Style="{StaticResource SectionTitleStyle}" Text="公共执行序列" />
+                            <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="公共执行序列" />
                             <TextBlock
-                                Style="{StaticResource SectionDescriptionStyle}"
+                                Style="{StaticResource DialogDescriptionTextStyle}"
                                 Text="将公共序列作为一个动作插入上方释放顺序；在“公共执行序列”页修改后会即时同步。" />
                         </StackPanel>
                     </Grid>

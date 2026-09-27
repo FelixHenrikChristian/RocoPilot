@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
+using RocoPilot.Controls;
 using RocoPilot.ViewModels;
 
 using Windows.UI;
@@ -57,12 +58,9 @@ internal static class StatisticsEntryDialogs
             Children =
             {
                 CreateDialogHeaderCard(
-                    isEdit ? "\uE70F" : "\uE710",
                     isEdit ? name : "新增奇遇",
                     "赛季奇遇统计",
-                    isEdit ? $"当前计数：{Math.Max(1, count)} 次" : "手动补充未被自动统计的奇遇记录。",
-                    CreateBrush(0xFF, 0x63, 0x66, 0xF1),
-                    CreateBrush(0x1F, 0x63, 0x66, 0xF1)),
+                    isEdit ? $"当前计数：{Math.Max(1, count)} 次" : "手动补充未被自动统计的奇遇记录。"),
                 CreateDialogSection(
                     "\uE81D",
                     "条目信息",
@@ -71,7 +69,7 @@ internal static class StatisticsEntryDialogs
             }
         };
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = title,
@@ -228,12 +226,9 @@ internal static class StatisticsEntryDialogs
             Children =
             {
                 CreateDialogHeaderCard(
-                    "\uE734",
                     "新增异色",
                     "异色精灵统计",
-                    "手动记录获得的异色精灵。",
-                    CreateBrush(0xFF, 0x63, 0x66, 0xF1),
-                    CreateBrush(0x1F, 0x63, 0x66, 0xF1)),
+                    "手动记录获得的异色精灵。"),
                 CreateDialogSection(
                     "\uE71C",
                     "基础信息",
@@ -256,7 +251,7 @@ internal static class StatisticsEntryDialogs
             Content = content
         };
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "新增异色条目",
@@ -356,12 +351,9 @@ internal static class StatisticsEntryDialogs
             Children =
             {
                 CreateDialogHeaderCard(
-                    "\uE70F",
                     item.Name,
                     $"{item.SeasonDisplay} · {item.PositionDisplay}",
-                    $"当前记录：{item.EncounterCountDisplay}，{item.CapturedDateDisplay} {item.CapturedTimeDisplay}",
-                    CreateBrush(0xFF, 0x63, 0x66, 0xF1),
-                    CreateBrush(0x1F, 0x63, 0x66, 0xF1)),
+                    $"当前记录：{item.EncounterCountDisplay}，{item.CapturedDateDisplay} {item.CapturedTimeDisplay}"),
                 CreateDialogSection(
                     "\uE71C",
                     "记录信息",
@@ -370,7 +362,7 @@ internal static class StatisticsEntryDialogs
             }
         };
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "编辑异色记录",
@@ -394,83 +386,29 @@ internal static class StatisticsEntryDialogs
             ResolveCapturedAt(capturedDatePicker, capturedTimePicker, capturedAt));
     }
 
-    private static Border CreateDialogHeaderCard(
-        string glyph,
-        string title,
-        string subtitle,
-        string description,
-        Brush iconBrush,
-        Brush backgroundBrush)
+    private static Border CreateDialogHeaderCard(string title, string subtitle, string description)
     {
-        var card = new Border
+        return new Border
         {
-            Padding = new Thickness(16, 14, 16, 14),
-            Background = backgroundBrush,
-            BorderBrush = CreateBrush(0x24, 0x63, 0x66, 0xF1),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8)
-        };
-        var grid = new Grid { ColumnSpacing = 12 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var iconBox = new Border
-        {
-            Width = 42,
-            Height = 42,
-            VerticalAlignment = VerticalAlignment.Center,
-            Background = CreateBrush(0x24, 0xFF, 0xFF, 0xFF),
-            CornerRadius = new CornerRadius(8),
-            Child = new FontIcon
+            Style = (Style)Application.Current.Resources["DialogCardStyle"],
+            Child = new StackPanel
             {
-                Glyph = glyph,
-                FontSize = 19,
-                Foreground = iconBrush,
-                FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock { Text = title, Style = (Style)Application.Current.Resources["DialogSectionTitleStyle"] },
+                    new TextBlock { Text = subtitle, Style = (Style)Application.Current.Resources["DialogDescriptionTextStyle"] },
+                    new TextBlock { Text = description, Style = (Style)Application.Current.Resources["DialogDescriptionTextStyle"] }
+                }
             }
         };
-        var textPanel = new StackPanel { Spacing = 3 };
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 20,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        });
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = subtitle,
-            FontSize = 13,
-            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", CreateBrush(0xFF, 0x5F, 0x64, 0x73)),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        });
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = description,
-            FontSize = 12,
-            Foreground = GetResourceBrush("TextFillColorTertiaryBrush", CreateBrush(0xFF, 0x72, 0x76, 0x83)),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        });
-
-        Grid.SetColumn(textPanel, 1);
-        grid.Children.Add(iconBox);
-        grid.Children.Add(textPanel);
-        card.Child = grid;
-        return card;
     }
 
     private static Border CreateDialogSection(string glyph, string title, string subtitle, UIElement body)
     {
         var card = new Border
         {
-            Padding = new Thickness(16),
-            Background = GetResourceBrush("ControlFillColorDefaultBrush", CreateBrush(0x12, 0xFF, 0xFF, 0xFF)),
-            BorderBrush = GetResourceBrush("CardStrokeColorDefaultBrush", CreateBrush(0x18, 0xFF, 0xFF, 0xFF)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8)
+            Style = (Style)Application.Current.Resources["DialogCardStyle"]
         };
         var panel = new StackPanel { Spacing = 12 };
         var header = new Grid { ColumnSpacing = 10 };
@@ -480,7 +418,7 @@ internal static class StatisticsEntryDialogs
         {
             Glyph = glyph,
             FontSize = 16,
-            Foreground = CreateBrush(0xFF, 0x63, 0x66, 0xF1),
+            Foreground = (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"],
             FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
         });
         var textPanel = new StackPanel { Spacing = 2 };

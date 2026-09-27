@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using RocoPilot.Controls;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 
@@ -37,7 +38,7 @@ public static class InterceptionDriverInstallDialog
 
     private static async Task<ContentDialogResult> ShowInstallPromptAsync(XamlRoot xamlRoot, Uri releasePageUri)
     {
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "需要安装 Interception 驱动",
@@ -78,7 +79,7 @@ public static class InterceptionDriverInstallDialog
             Maximum = 100
         };
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "正在安装 Interception 驱动",
@@ -140,7 +141,7 @@ public static class InterceptionDriverInstallDialog
 
     private static async Task ShowAlreadyInstalledDialogAsync(XamlRoot xamlRoot)
     {
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "Interception 已安装",
@@ -154,7 +155,7 @@ public static class InterceptionDriverInstallDialog
 
     private static async Task ShowRestartPromptAsync(XamlRoot xamlRoot)
     {
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "Interception 安装完成",
@@ -175,7 +176,7 @@ public static class InterceptionDriverInstallDialog
         Uri releasePageUri,
         string errorMessage)
     {
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "Interception 安装失败",
@@ -193,7 +194,7 @@ public static class InterceptionDriverInstallDialog
 
     private static async Task ShowRestartFailedDialogAsync(XamlRoot xamlRoot)
     {
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "无法自动重启",

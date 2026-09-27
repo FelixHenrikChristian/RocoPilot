@@ -59,6 +59,7 @@ public static class InfoBarAutoCloseBehavior
         {
             state = new AutoCloseState();
             state.IsOpenCallbackToken = infoBar.RegisterPropertyChangedCallback(InfoBar.IsOpenProperty, OnIsOpenChanged);
+            infoBar.Loaded += InfoBar_Loaded;
             infoBar.Unloaded += InfoBar_Unloaded;
             SetState(infoBar, state);
         }
@@ -68,6 +69,14 @@ public static class InfoBarAutoCloseBehavior
     }
 
     private static void OnIsOpenChanged(DependencyObject sender, DependencyProperty dp)
+    {
+        if (sender is InfoBar infoBar && GetState(infoBar) is { } state)
+        {
+            RestartTimer(infoBar, state);
+        }
+    }
+
+    private static void InfoBar_Loaded(object sender, RoutedEventArgs e)
     {
         if (sender is InfoBar infoBar && GetState(infoBar) is { } state)
         {
@@ -118,6 +127,7 @@ public static class InfoBarAutoCloseBehavior
 
         state.Timer?.Stop();
         infoBar.UnregisterPropertyChangedCallback(InfoBar.IsOpenProperty, state.IsOpenCallbackToken);
+        infoBar.Loaded -= InfoBar_Loaded;
         infoBar.Unloaded -= InfoBar_Unloaded;
         SetState(infoBar, null);
     }

@@ -418,11 +418,9 @@
         </ScrollViewer>
 
         <InfoBar
-            Margin="{StaticResource NavigationViewPageContentPadding}"
-            HorizontalAlignment="Stretch"
-            VerticalAlignment="Bottom"
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
             helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-            IsClosable="False"
             IsOpen="{x:Bind ViewModel.IsLaunchNotificationOpen, Mode=TwoWay}"
             Message="{x:Bind ViewModel.LaunchNotificationMessage, Mode=OneWay}"
             Severity="{x:Bind ViewModel.LaunchNotificationSeverity, Mode=OneWay}"

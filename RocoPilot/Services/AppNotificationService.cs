@@ -1,23 +1,16 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 using System.Runtime.InteropServices;
 using System.Web;
 
 using Microsoft.Windows.AppNotifications;
 
 using RocoPilot.Contracts.Services;
-using RocoPilot.ViewModels;
 
 namespace RocoPilot.Notifications;
 
 public class AppNotificationService : IAppNotificationService
 {
-    private readonly INavigationService _navigationService;
     private bool _isRegistered;
-
-    public AppNotificationService(INavigationService navigationService)
-    {
-        _navigationService = navigationService;
-    }
 
     ~AppNotificationService()
     {
@@ -46,21 +39,8 @@ public class AppNotificationService : IAppNotificationService
 
     public void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
     {
-        // TODO: Handle notification invocations when your app is already running.
-
-        //// // Navigate to a specific page based on the notification arguments.
-        //// if (ParseArguments(args.Argument)["action"] == "Settings")
-        //// {
-        ////    App.MainWindow.DispatcherQueue.TryEnqueue(() =>
-        ////    {
-        ////        _navigationService.NavigateTo(typeof(SettingsViewModel).FullName!);
-        ////    });
-        //// }
-
         App.MainWindow.DispatcherQueue.TryEnqueue(() =>
         {
-            App.MainWindow.ShowMessageDialogAsync("TODO: Handle notification invocations when your app is already running.", "Notification Invoked");
-
             App.MainWindow.BringToFront();
         });
     }

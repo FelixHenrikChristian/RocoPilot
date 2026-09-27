@@ -14,7 +14,14 @@
 
     <Grid
         x:Name="ContentRoot"
-        Padding="16">
+        Padding="24,16" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <ContentPresenter
             x:Name="DetailContentPresenter"
             HorizontalContentAlignment="Center"

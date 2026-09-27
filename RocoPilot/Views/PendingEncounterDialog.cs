@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using RocoPilot.Controls;
 using RocoPilot.ViewModels;
 
 namespace RocoPilot.Views;
@@ -61,7 +62,7 @@ internal static class PendingEncounterDialog
                 name
             }
         };
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "暂存奇遇",

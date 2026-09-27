@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using RocoPilot.Controls;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
@@ -148,7 +149,7 @@ public partial class SettingsViewModel : ObservableRecipient
             return;
         }
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "重置设置",

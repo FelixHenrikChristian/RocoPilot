@@ -50,14 +50,14 @@ internal static class ReleaseNotesHtmlHelper
     private static string WrapHtml(bool isDarkTheme, string bodyInner, string pageTitle, bool centered = false)
     {
         var foreground = isDarkTheme ? "#ffffff" : "#1f1f1f";
-        var background = isDarkTheme ? "#2d2d30" : "#ffffff";
+        var background = isDarkTheme ? "#282828" : "#ffffff";
         var secondary = isDarkTheme ? "#cccccc" : "#605e5c";
         var accent = isDarkTheme ? "#4fc3f7" : "#0078d4";
         var emphasis = isDarkTheme ? "#81c784" : "#107c10";
         var codeBackground = isDarkTheme ? "#3c3c3c" : "#f3f2f1";
         var codeForeground = isDarkTheme ? "#d4d4d4" : "#323130";
         var divider = isDarkTheme ? "#484848" : "#edebe9";
-        var scrollbarTrack = isDarkTheme ? "#2d2d30" : "#f1f1f1";
+        var scrollbarTrack = isDarkTheme ? "#282828" : "#f1f1f1";
         var scrollbarThumb = isDarkTheme ? "#484848" : "#c1c1c1";
         var scrollbarThumbHover = isDarkTheme ? "#5a5a5a" : "#a8a8a8";
         var link = isDarkTheme ? "#58a6ff" : "#0969da";
@@ -80,7 +80,7 @@ internal static class ReleaseNotesHtmlHelper
             margin: 12px;
             padding: 8px;
             background-color: {background};
-            font-size: 14px;
+            font-size: 13px;
             {centeredStyle}
         }}
         a {{ color: {link}; }}
@@ -106,10 +106,10 @@ internal static class ReleaseNotesHtmlHelper
             margin-bottom: 8px;
             font-weight: 600;
         }}
-        h1 {{ font-size: 20px; }}
-        h2 {{ font-size: 18px; }}
-        h3 {{ font-size: 16px; }}
-        h4 {{ font-size: 15px; }}
+        h1 {{ font-size: 18px; }}
+        h2 {{ font-size: 16px; }}
+        h3 {{ font-size: 14px; }}
+        h4 {{ font-size: 13px; }}
         p {{ margin-bottom: 10px; margin-top: 0; }}
         .markdown-body ul, .markdown-body ol {{
             padding-left: 24px;

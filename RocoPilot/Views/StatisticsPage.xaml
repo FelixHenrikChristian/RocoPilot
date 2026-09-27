@@ -175,20 +175,14 @@
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="8">
+                CornerRadius="14">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Border CornerRadius="8,8,0,0">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Offset="0" Color="#246366F1" />
-                                <GradientStop Offset="1" Color="#188B5CF6" />
-                            </LinearGradientBrush>
-                        </Border.Background>
+                    <Border CornerRadius="14,14,0,0">
                         <Grid Padding="18,14" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -203,7 +197,7 @@
                                 Height="42"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                CornerRadius="8">
+                                CornerRadius="14">
                                 <Grid>
                                     <Image
                                         Margin="2"
@@ -212,7 +206,7 @@
                                         Visibility="{Binding AvatarVisibility}" />
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                        FontSize="20"
+                                        FontSize="18"
                                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                         Glyph="&#xE77B;"
                                         Visibility="{Binding AvatarFallbackVisibility}" />
@@ -221,7 +215,7 @@
 
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
                                 <TextBlock
-                                    FontSize="22"
+                                    FontSize="18"
                                     FontWeight="SemiBold"
                                     Text="{Binding Name}"
                                     TextTrimming="CharacterEllipsis"
@@ -243,7 +237,7 @@
                                 CornerRadius="6">
                                 <Button
                                     Width="32"
-                                    Height="28"
+                                    Height="28" MinHeight="28"
                                     Padding="0"
                                     Background="Transparent"
                                     Click="ShinyCaptureEditButton_Click"
@@ -265,7 +259,7 @@
                                 CornerRadius="6">
                                 <Button
                                     Width="32"
-                                    Height="28"
+                                    Height="28" MinHeight="28"
                                     Padding="0"
                                     Background="Transparent"
                                     Click="ShinyCaptureDeleteButton_Click"
@@ -308,7 +302,7 @@
                             Background="{ThemeResource ControlFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="8">
+                            CornerRadius="14">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -322,7 +316,7 @@
                                     CornerRadius="6">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                        FontSize="16"
+                                        FontSize="13"
                                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                         Glyph="&#xE81D;" />
                                 </Border>
@@ -334,7 +328,7 @@
                                         TextTrimming="CharacterEllipsis"
                                         TextWrapping="NoWrap" />
                                     <TextBlock
-                                        FontSize="22"
+                                        FontSize="18"
                                         FontWeight="SemiBold"
                                         Text="{Binding EncounterCountDisplay}"
                                         TextTrimming="CharacterEllipsis"
@@ -349,7 +343,7 @@
                             Background="{ThemeResource ControlFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="8">
+                            CornerRadius="14">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -363,7 +357,7 @@
                                     CornerRadius="6">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                        FontSize="16"
+                                        FontSize="13"
                                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                         Glyph="&#xE787;" />
                                 </Border>
@@ -375,7 +369,7 @@
                                         TextTrimming="CharacterEllipsis"
                                         TextWrapping="NoWrap" />
                                     <TextBlock
-                                        FontSize="16"
+                                        FontSize="13"
                                         FontWeight="SemiBold"
                                         Text="{Binding CapturedDateDisplay}"
                                         TextTrimming="CharacterEllipsis"
@@ -472,7 +466,7 @@
                 Grid.Column="2"
                 x:Name="UidWarningButton"
                 Width="32"
-                Height="32"
+                Height="32" MinHeight="32"
                 Padding="0"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Center"
@@ -824,11 +818,9 @@
         </Grid>
 
         <InfoBar
+            Style="{StaticResource AppToastStyle}"
             Canvas.ZIndex="10"
-            Margin="{StaticResource NavigationViewPageContentPadding}"
-            VerticalAlignment="Bottom"
             helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-            IsClosable="False"
             IsOpen="{x:Bind ViewModel.IsNotificationOpen, Mode=TwoWay}"
             Message="{x:Bind ViewModel.NotificationMessage, Mode=OneWay}"
             Severity="{x:Bind ViewModel.NotificationSeverity, Mode=OneWay}"

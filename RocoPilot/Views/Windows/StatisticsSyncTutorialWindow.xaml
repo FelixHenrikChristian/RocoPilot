@@ -16,30 +16,24 @@
 
     <Grid x:Name="ContentRoot" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
         <Grid.Resources>
-            <Style TargetType="TextBlock">
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
-            <Style x:Key="TutorialCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="14" />
-                <Setter Property="Padding" Value="20" />
-            </Style>
-            <Style x:Key="StepBadgeStyle" TargetType="Border">
-                <Setter Property="Width" Value="26" />
-                <Setter Property="Height" Value="26" />
-                <Setter Property="VerticalAlignment" Value="Top" />
-                <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-                <Setter Property="CornerRadius" Value="8" />
-            </Style>
-            <Style x:Key="TutorialBodyStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="12" />
-                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-                <Setter Property="IsTextSelectionEnabled" Value="True" />
-            </Style>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+                <Style x:Key="StepBadgeStyle" TargetType="Border">
+                    <Setter Property="Width" Value="26" />
+                    <Setter Property="Height" Value="26" />
+                    <Setter Property="VerticalAlignment" Value="Top" />
+                    <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                    <Setter Property="CornerRadius" Value="8" />
+                </Style>
+                <Style x:Key="TutorialBodyStyle" TargetType="TextBlock">
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Setter Property="TextWrapping" Value="Wrap" />
+                    <Setter Property="IsTextSelectionEnabled" Value="True" />
+                </Style>
+            </ResourceDictionary>
         </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
@@ -75,7 +69,7 @@
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
                 <StackPanel Spacing="16" Padding="0,0,12,4">
-                    <Border Style="{StaticResource TutorialCardStyle}">
+                    <Border Style="{StaticResource DialogCardStyle}">
                         <StackPanel Spacing="24">
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
@@ -140,7 +134,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource TutorialCardStyle}">
+                    <Border Style="{StaticResource DialogCardStyle}">
                         <StackPanel Spacing="12">
                             <TextBlock FontSize="14" FontWeight="SemiBold" Text="同步功能说明" />
                             <Grid ColumnSpacing="16">
@@ -186,16 +180,12 @@
             </ScrollViewer>
         </Grid>
 
-        <Grid Grid.Row="1" Padding="24,12" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">
             <Button
                 HorizontalAlignment="Right"
                 Click="CloseButton_Click"
                 Content="返回配置"
-                FontSize="13"
-                MinHeight="34"
-                Padding="14,6"
-                CornerRadius="8"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
         </Grid>
     </Grid>
 </windowex:WindowEx>

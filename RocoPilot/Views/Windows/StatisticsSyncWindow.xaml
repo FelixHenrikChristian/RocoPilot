@@ -17,59 +17,11 @@
 
     <Grid x:Name="ContentRoot" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" Loaded="ContentRoot_Loaded">
         <Grid.Resources>
-            <Style TargetType="TextBlock">
-                <Setter Property="FontSize" Value="13" />
-            </Style>
-            <Style x:Key="SyncCardStyle" TargetType="Border">
-                <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
-                <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="14" />
-                <Setter Property="Padding" Value="20" />
-            </Style>
-            <Style TargetType="TextBox">
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="MinHeight" Value="34" />
-                <Setter Property="Padding" Value="10,6" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
-            </Style>
-            <Style TargetType="PasswordBox">
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="MinHeight" Value="34" />
-                <Setter Property="Padding" Value="10,6" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
-            </Style>
-            <Style TargetType="ComboBox">
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="MinHeight" Value="34" />
-                <Setter Property="Padding" Value="10,6" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
-            </Style>
-            <Style x:Key="SyncActionButtonStyle" TargetType="Button">
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="MinHeight" Value="34" />
-                <Setter Property="Padding" Value="12,6" />
-                <Setter Property="CornerRadius" Value="8" />
-            </Style>
-            <Style x:Key="SyncSettingRowStyle" TargetType="Grid">
-                <Setter Property="MinHeight" Value="34" />
-                <Setter Property="Padding" Value="0" />
-                <Setter Property="ColumnSpacing" Value="24" />
-            </Style>
-            <Style x:Key="SyncSettingTitleStyle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
-            <Style x:Key="SyncSettingDescriptionStyle" TargetType="TextBlock">
-                <Setter Property="Margin" Value="0,2,0,0" />
-                <Setter Property="FontSize" Value="11" />
-                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-            </Style>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -168,7 +120,7 @@
                 VerticalScrollMode="Auto">
                 <StackPanel Spacing="16" Padding="0,0,12,4">
 
-                    <Border Style="{StaticResource SyncCardStyle}">
+                    <Border Style="{StaticResource DialogCardStyle}">
                         <StackPanel Spacing="12">
                             <Grid
                                 Margin="0,0,0,4"
@@ -188,12 +140,12 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="同步方式" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="同步方式" VerticalAlignment="Center" />
                                 <ComboBox
                                     x:Name="ProviderComboBox"
                                     AutomationProperties.Name="同步方式"
@@ -204,12 +156,12 @@
                                     SelectionChanged="ProviderComboBox_SelectionChanged" />
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Account ID" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="Account ID" VerticalAlignment="Center" />
                                 <TextBox
                                     x:Name="R2AccountIdTextBox"
                                     AutomationProperties.Name="Account ID"
@@ -218,12 +170,12 @@
                                     PlaceholderText="Cloudflare Account ID" />
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Bucket" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="Bucket" VerticalAlignment="Center" />
                                 <TextBox
                                     x:Name="R2BucketNameTextBox"
                                     AutomationProperties.Name="Bucket"
@@ -232,12 +184,12 @@
                                     PlaceholderText="roco-pilot" />
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Access Key ID" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="Access Key ID" VerticalAlignment="Center" />
                                 <TextBox
                                     x:Name="UserNameTextBox"
                                     AutomationProperties.Name="Access Key ID"
@@ -246,15 +198,15 @@
                                     PlaceholderText="R2 Access Key ID" />
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="144" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="Secret Access Key" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="Secret Access Key" />
                                     <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="留空保留已保存的密钥" />
                                 </StackPanel>
                                 <PasswordBox
@@ -268,18 +220,18 @@
                                 <Button
                                     x:Name="TestConnectionButton"
                                     Click="TestConnectionButton_Click"
-                                    Style="{StaticResource SyncActionButtonStyle}">
+                                    Style="{StaticResource DialogButtonStyle}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE71B;" />
                                         <TextBlock Text="测试连接" />
                                     </StackPanel>
                                 </Button>
-                                <TextBlock Style="{StaticResource SyncSettingDescriptionStyle}" Text="修改配置后，请先保存再测试或同步。" />
+                                <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="修改配置后，请先保存再测试或同步。" />
                             </StackPanel>
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource SyncCardStyle}">
+                    <Border Style="{StaticResource DialogCardStyle}">
                         <StackPanel Spacing="12">
                             <Grid
                                 Margin="0,0,0,4"
@@ -299,12 +251,12 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
-                                <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="云端数据" VerticalAlignment="Center" />
+                                <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="云端数据" VerticalAlignment="Center" />
                                 <StackPanel
                                     Grid.Row="1"
                                     Margin="0,14,0,0"
@@ -314,7 +266,7 @@
                                     <Button
                                         x:Name="UploadButton"
                                         MinWidth="0"
-                                        Style="{StaticResource SyncActionButtonStyle}"
+                                        Style="{StaticResource DialogButtonStyle}"
                                         Click="UploadButton_Click"
                                         ToolTipService.ToolTip="立即上传当前本地统计">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -328,7 +280,7 @@
                                     <Button
                                         x:Name="DownloadButton"
                                         MinWidth="0"
-                                        Style="{StaticResource SyncActionButtonStyle}"
+                                        Style="{StaticResource DialogButtonStyle}"
                                         Click="DownloadButton_Click"
                                         ToolTipService.ToolTip="合并云端数据">
                                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -342,15 +294,15 @@
                                 </StackPanel>
                             </Grid>
 
-                            <Grid Style="{StaticResource SyncSettingRowStyle}">
+                            <Grid Style="{StaticResource DialogSettingRowStyle}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Style="{StaticResource SyncSettingTitleStyle}" Text="自动同步" />
+                                    <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="自动同步" />
                                     <TextBlock
-                                        Style="{StaticResource SyncSettingDescriptionStyle}"
+                                        Style="{StaticResource DialogDescriptionTextStyle}"
                                         Text="开启后，本地统计变化会自动上传到云端" />
                                 </StackPanel>
                                 <ToggleSwitch
@@ -370,7 +322,7 @@
             </ScrollViewer>
         </Grid>
 
-        <Grid Grid.Row="1" Padding="24,12" ColumnSpacing="12" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -381,7 +333,7 @@
                 x:Name="TutorialButton"
                 Click="TutorialButton_Click"
                 Content="教程"
-                Style="{StaticResource SyncActionButtonStyle}"
+                Style="{StaticResource DialogButtonStyle}"
                 ToolTipService.ToolTip="查看 Cloudflare R2 配置教程" />
 
             <Button
@@ -389,26 +341,16 @@
                 Grid.Column="2"
                 Click="SaveSettingsButton_Click"
                 Content="保存配置"
-                CornerRadius="8"
-                MinHeight="34"
-                FontSize="13"
-                Padding="14,6"
-                Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
+                Style="{StaticResource DialogPrimaryButtonStyle}" />
         </Grid>
 
         <!-- Overlay the content instead of allocating a row: notifications must not move the form. -->
         <InfoBar
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
             x:Name="MessageBar"
             Grid.RowSpan="2"
-            MaxWidth="440"
-            Margin="24,16,24,0"
-            HorizontalAlignment="Center"
-            VerticalAlignment="Top"
-            Canvas.ZIndex="1"
-            CornerRadius="10"
-            FontSize="13"
             helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-            IsClosable="True"
             IsOpen="False" />
     </Grid>
 </windowex:WindowEx>

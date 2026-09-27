@@ -15,7 +15,14 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootHost">
+    <Grid x:Name="RootHost" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -40,7 +47,7 @@
             <TextBlock
                 Grid.Column="1"
                 VerticalAlignment="Center"
-                Style="{StaticResource CaptionTextBlockStyle}"
+                Style="{StaticResource DialogDescriptionTextStyle}"
                 Text="发现新版本" />
         </Grid>
 
@@ -58,7 +65,7 @@
 
             <Border
                 Grid.Row="0"
-                Style="{StaticResource CardStyle}">
+                Style="{StaticResource DialogCardStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -69,7 +76,7 @@
                         Grid.Column="0"
                         VerticalAlignment="Top"
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
+                        FontSize="18"
                         Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                         Glyph="&#xE946;" />
 
@@ -78,7 +85,7 @@
                         Spacing="4">
                         <TextBlock
                             x:Name="VersionTitleText"
-                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Style="{StaticResource DialogSectionTitleStyle}"
                             TextWrapping="Wrap" />
                         <TextBlock
                             x:Name="PublishDateText"
@@ -149,7 +156,7 @@
 
             <Border
                 Grid.Row="2"
-                Style="{StaticResource CardStyle}">
+                Style="{StaticResource DialogCardStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -161,7 +168,7 @@
                         Grid.Column="0"
                         VerticalAlignment="Center"
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
+                        FontSize="18"
                         Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                         Glyph="&#xE896;" />
 
@@ -170,7 +177,7 @@
                         VerticalAlignment="Center"
                         Spacing="4">
                         <TextBlock
-                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Style="{StaticResource DialogSectionTitleStyle}"
                             Text="自动更新" />
                         <TextBlock
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -182,7 +189,7 @@
                         Grid.Column="2"
                         VerticalAlignment="Center"
                         Click="UpdateButton_Click"
-                        Style="{StaticResource AccentButtonStyle}">
+                        Style="{StaticResource DialogPrimaryButtonStyle}">
                         <StackPanel
                             Orientation="Horizontal"
                             Spacing="8">
@@ -198,7 +205,7 @@
 
             <Border
                 Grid.Row="3"
-                Style="{StaticResource CardStyle}">
+                Style="{StaticResource DialogCardStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
@@ -210,7 +217,7 @@
                         Grid.Column="0"
                         VerticalAlignment="Center"
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="20"
+                        FontSize="18"
                         Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
                         Glyph="&#xE8A7;" />
 
@@ -219,7 +226,7 @@
                         VerticalAlignment="Center"
                         Spacing="4">
                         <TextBlock
-                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Style="{StaticResource DialogSectionTitleStyle}"
                             Text="手动下载" />
                         <TextBlock
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -250,7 +257,7 @@
                 HorizontalAlignment="Right"
                 Click="CancelButton_Click"
                 Content="稍后提醒"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
         </Grid>
     </Grid>
 </windowex:WindowEx>

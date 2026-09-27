@@ -16,18 +16,25 @@
 
     <Grid
         x:Name="ContentRoot"
-        Padding="16"
+        Padding="24,16"
         RowSpacing="12"
-        Loaded="ContentRoot_Loaded">
+        Loaded="ContentRoot_Loaded"
+        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border
-            Grid.Row="0"
-            Style="{StaticResource CardStyle}">
+        <Border Grid.Row="0"
+            >
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -47,7 +54,7 @@
                             Glyph="&#xE722;" />
                         <TextBlock
                             x:Name="SelectionTitleText"
-                            Style="{StaticResource BodyStrongTextBlockStyle}"
+                            Style="{StaticResource DialogSectionTitleStyle}"
                             Text="框选检测区域" />
                     </StackPanel>
                     <TextBlock
@@ -70,7 +77,7 @@
                         CornerRadius="8">
                         <TextBlock
                             x:Name="FrameSizeText"
-                            Style="{StaticResource CaptionTextBlockStyle}" />
+                            Style="{StaticResource DialogDescriptionTextStyle}" />
                     </Border>
 
                     <Border
@@ -86,7 +93,7 @@
                             <Button
                                 x:Name="ZoomOutButton"
                                 Width="32"
-                                Height="30"
+                                Height="30" MinHeight="30"
                                 MinWidth="0"
                                 Padding="0"
                                 Click="ZoomOutButton_Click"
@@ -98,20 +105,20 @@
                             </Button>
                             <Button
                                 x:Name="ResetZoomButton"
-                                Height="30"
+                                Height="30" MinHeight="30"
                                 MinWidth="58"
                                 Padding="8,0"
                                 Click="ResetZoomButton_Click"
                                 ToolTipService.ToolTip="恢复适应窗口 (Ctrl+0)">
                                 <TextBlock
                                     x:Name="ZoomPercentText"
-                                    Style="{StaticResource CaptionTextBlockStyle}"
+                                    Style="{StaticResource DialogDescriptionTextStyle}"
                                     Text="100%" />
                             </Button>
                             <Button
                                 x:Name="ZoomInButton"
                                 Width="32"
-                                Height="30"
+                                Height="30" MinHeight="30"
                                 MinWidth="0"
                                 Padding="0"
                                 Click="ZoomInButton_Click"
@@ -132,7 +139,7 @@
             Background="{ThemeResource LayerFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="14">
             <ScrollViewer
                 x:Name="ImageScrollViewer"
                 HorizontalContentAlignment="Center"
@@ -171,9 +178,8 @@
             </ScrollViewer>
         </Border>
 
-        <Border
-            Grid.Row="2"
-            Style="{StaticResource CardStyle}">
+        <Border Grid.Row="2"
+            >
             <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -223,7 +229,7 @@
                     Grid.Column="3"
                     Click="ConfirmButton_Click"
                     IsEnabled="False"
-                    Style="{StaticResource AccentButtonStyle}">
+                    Style="{StaticResource DialogPrimaryButtonStyle}">
                     <StackPanel
                         Orientation="Horizontal"
                         Spacing="6">

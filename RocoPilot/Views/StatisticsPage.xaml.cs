@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 
+using RocoPilot.Controls;
 using RocoPilot.Helpers;
 using RocoPilot.ViewModels;
 using RocoPilot.Views.Windows;
@@ -171,7 +172,7 @@ public sealed partial class StatisticsPage : Page
             PlaceholderText = "请输入 UID"
         };
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "添加账号",
@@ -225,7 +226,7 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "删除账号",
@@ -358,7 +359,6 @@ public sealed partial class StatisticsPage : Page
                     $"{FormatSeasonDisplay(seasonId)} · 奇遇统计",
                     "该操作会删除当前赛季中这个精灵的奇遇计数。",
                     new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
-                    new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C)),
                     item.Avatar),
             }
         };
@@ -397,7 +397,7 @@ public sealed partial class StatisticsPage : Page
             }
         });
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "删除奇遇条目",
@@ -435,11 +435,7 @@ public sealed partial class StatisticsPage : Page
 
         var headerCard = new Border
         {
-            Padding = new Thickness(16, 14, 16, 14),
-            Background = new SolidColorBrush(Color.FromArgb(0x1F, 0x63, 0x66, 0xF1)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x24, 0x63, 0x66, 0xF1)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8)
+            Style = (Style)Application.Current.Resources["DialogCardStyle"]
         };
         var headerGrid = new Grid { ColumnSpacing = 10 };
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -463,7 +459,7 @@ public sealed partial class StatisticsPage : Page
         titlePanel.Children.Add(new TextBlock
         {
             Text = item.Name,
-            FontSize = 20,
+            FontSize = 18,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextWrapping = TextWrapping.NoWrap
@@ -677,7 +673,7 @@ public sealed partial class StatisticsPage : Page
             return false;
         }
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "删除异色记录",
@@ -704,7 +700,6 @@ public sealed partial class StatisticsPage : Page
             $"{item.SeasonDisplay} · {item.PositionDisplay}",
             "该操作只删除当前这一只异色记录。",
             new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
-            new SolidColorBrush(Color.FromArgb(0x1A, 0xC4, 0x2B, 0x1C)),
             item.Avatar));
 
         var detailGrid = new Grid
@@ -751,16 +746,11 @@ public sealed partial class StatisticsPage : Page
         string subtitle,
         string description,
         Brush iconBrush,
-        Brush backgroundBrush,
         BitmapImage? avatar = null)
     {
         var card = new Border
         {
-            Padding = new Thickness(16, 14, 16, 14),
-            Background = backgroundBrush,
-            BorderBrush = iconBrush,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8)
+            Style = (Style)Application.Current.Resources["DialogCardStyle"]
         };
         var grid = new Grid { ColumnSpacing = 12 };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -779,7 +769,7 @@ public sealed partial class StatisticsPage : Page
         textPanel.Children.Add(new TextBlock
         {
             Text = title,
-            FontSize = 20,
+            FontSize = 18,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextWrapping = TextWrapping.NoWrap
@@ -836,11 +826,7 @@ public sealed partial class StatisticsPage : Page
     {
         var tile = new Border
         {
-            Padding = new Thickness(12),
-            Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x10, 0xFF, 0xFF, 0xFF))),
-            BorderBrush = GetResourceBrush("CardStrokeColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF))),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8)
+            Style = (Style)Application.Current.Resources["DialogCardStyle"]
         };
         var grid = new Grid { ColumnSpacing = 10 };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -848,7 +834,7 @@ public sealed partial class StatisticsPage : Page
         grid.Children.Add(new FontIcon
         {
             Glyph = glyph,
-            FontSize = 15,
+            FontSize = 13,
             Foreground = GetResourceBrush("AccentFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x63, 0x66, 0xF1))),
             FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
         });
@@ -864,7 +850,7 @@ public sealed partial class StatisticsPage : Page
         textPanel.Children.Add(new TextBlock
         {
             Text = value,
-            FontSize = 15,
+            FontSize = 13,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextWrapping = TextWrapping.NoWrap
@@ -888,6 +874,7 @@ public sealed partial class StatisticsPage : Page
         {
             Width = 32,
             Height = 32,
+            MinHeight = 32,
             Padding = new Thickness(0),
             Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
             Content = new FontIcon
@@ -1031,7 +1018,7 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "清空记录",

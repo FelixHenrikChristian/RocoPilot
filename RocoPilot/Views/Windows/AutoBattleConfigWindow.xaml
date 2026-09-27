@@ -15,7 +15,14 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="ContentRoot">
+    <Grid x:Name="ContentRoot" Background="{ThemeResource SolidBackgroundFillColorBaseBrush}">
+        <Grid.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/Styles/DialogControls.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Grid.Resources>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
@@ -61,10 +68,10 @@
 
             <Border
                 Margin="0,4,8,8"
-                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="8">
+                CornerRadius="14">
                 <ContentPresenter x:Name="ConfigPageHost" />
             </Border>
         </NavigationView>
@@ -76,23 +83,24 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <InfoBar
-                x:Name="MessageBar"
-                Grid.Column="0"
-                helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
-                IsOpen="False"
-                Style="{StaticResource DialogFooterMessageBarStyle}" />
-
             <Button
                 Grid.Column="1"
                 Click="CancelButton_Click"
                 Content="取消"
-                Style="{StaticResource DialogFooterSecondaryButtonStyle}" />
+                Style="{StaticResource DialogButtonStyle}" />
             <Button
                 Grid.Column="2"
                 Click="SaveButton_Click"
                 Content="保存"
-                Style="{StaticResource DialogFooterPrimaryButtonStyle}" />
+                Style="{StaticResource DialogPrimaryButtonStyle}" />
         </Grid>
+
+        <InfoBar
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
+            x:Name="MessageBar"
+            Grid.RowSpan="2"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsOpen="False" />
     </Grid>
 </windowex:WindowEx>

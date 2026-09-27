@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using RocoPilot.Controls;
 using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Views;
@@ -31,7 +32,7 @@ public static class StatisticsUidConfirmationDialog
             TextWrapping = TextWrapping.Wrap,
             Visibility = Visibility.Collapsed
         };
-        var dialog = new ContentDialog
+        var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "确认统计账号",

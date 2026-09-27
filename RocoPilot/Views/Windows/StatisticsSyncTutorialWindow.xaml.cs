@@ -24,7 +24,7 @@ public sealed partial class StatisticsSyncTutorialWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(680, 620));
+        AppWindow.Resize(new SizeInt32(780, 740));
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

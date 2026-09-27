@@ -380,16 +380,9 @@
             <Button
                 x:Name="TutorialButton"
                 Click="TutorialButton_Click"
+                Content="教程"
                 Style="{StaticResource SyncActionButtonStyle}"
-                ToolTipService.ToolTip="查看 Cloudflare R2 配置教程">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <FontIcon
-                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="14"
-                        Glyph="&#xE897;" />
-                    <TextBlock Text="教程" />
-                </StackPanel>
-            </Button>
+                ToolTipService.ToolTip="查看 Cloudflare R2 配置教程" />
 
             <Button
                 x:Name="SaveSettingsButton"

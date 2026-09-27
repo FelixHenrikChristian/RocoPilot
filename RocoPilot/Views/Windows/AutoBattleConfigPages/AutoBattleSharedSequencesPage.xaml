@@ -18,12 +18,19 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Spacing="4">
-            <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="公共执行序列" />
-            <TextBlock
-                Style="{StaticResource DialogDescriptionTextStyle}"
-                Text="集中管理可被不同战斗类型复用的单回合按键组合，只保存一份。" />
-        </StackPanel>
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Width="40" Height="40" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                <FontIcon Glyph="&#xE8F1;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="公共执行序列" />
+                <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="创建可复用的按键组合，在普通战斗中插入使用。" />
+            </StackPanel>
+        </Grid>
 
         <Border Grid.Row="1" Style="{StaticResource DialogSectionCardStyle}">
             <Grid>
@@ -33,7 +40,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Style="{StaticResource DialogSectionHeaderStyle}">
+                <Grid Style="{StaticResource DialogSectionHeaderStyle}" Visibility="{x:Bind Editor.SharedPresetListVisibility, Mode=OneWay}">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
@@ -49,7 +56,7 @@
                         <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="序列列表" />
                         <TextBlock
                             Style="{StaticResource DialogDescriptionTextStyle}"
-                            Text="用逗号、空格或换行分隔，如 1, Space；组合键用 +，如 Ctrl+1。" />
+                            Text="{x:Bind Editor.SharedPresetSummary, Mode=OneWay}" />
                     </StackPanel>
                     <Button
                         Grid.Column="2"
@@ -69,22 +76,10 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock
-                            VerticalAlignment="Center"
-                            Style="{StaticResource ConfigSummaryTextStyle}"
-                            Text="{x:Bind Editor.SharedPresetSummary, Mode=OneWay}" />
-                        <TextBlock
-                            Grid.Column="1"
-                            VerticalAlignment="Center"
-                            FontSize="12"
-                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                            Text="支持 A-Z、0-9、F1-F24、方向键、Space、Enter 等" />
-                    </Grid>
+                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}"
+                               Visibility="{x:Bind Editor.SharedPresetListVisibility, Mode=OneWay}"
+                               Text="逗号、空格或换行分隔按键；组合键用 +，如 Ctrl+1。"
+                               ToolTipService.ToolTip="支持 A-Z、0-9、F1-F24、方向键、Space、Enter 等。" />
 
                     <Grid Grid.Row="1">
                         <ListView
@@ -103,7 +98,7 @@
                                     <Border Style="{StaticResource PresetRowStyle}">
                                         <Grid ColumnSpacing="12">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="180" />
+                                                <ColumnDefinition Width="140" />
                                                 <ColumnDefinition Width="*" />
                                                 <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
@@ -115,6 +110,7 @@
                                                 Grid.Column="1"
                                                 Header="按键序列"
                                                 PlaceholderText="1, Space"
+                                                ToolTipService.ToolTip="逗号、空格或换行分隔；组合键如 Ctrl+1。"
                                                 Text="{Binding Sequence, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                                             <Button
                                                 Grid.Column="2"
@@ -136,14 +132,15 @@
                                 HorizontalAlignment="Center"
                                 FontSize="28"
                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                Glyph="&#xE8A5;" />
+                                Glyph="&#xE8F1;" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="暂无公共执行序列" />
                             <Button
                                 Margin="0,4,0,0"
                                 Click="AddPresetButton_Click"
-                                Content="创建第一个序列" />
+                                Content="创建序列"
+                                Style="{StaticResource DialogPrimaryButtonStyle}" />
                         </StackPanel>
                     </Grid>
                 </Grid>

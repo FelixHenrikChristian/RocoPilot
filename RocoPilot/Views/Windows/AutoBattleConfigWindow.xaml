@@ -6,8 +6,8 @@
     xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    Width="1040"
-    Height="760"
+    Width="920"
+    Height="680"
     MinWidth="800"
     MinHeight="640"
     mc:Ignorable="d">
@@ -34,7 +34,7 @@
             IsBackButtonVisible="Collapsed"
             IsPaneToggleButtonVisible="False"
             IsSettingsVisible="False"
-            OpenPaneLength="168"
+            OpenPaneLength="156"
             PaneDisplayMode="Left"
             SelectionChanged="BattleNavigationView_SelectionChanged">
             <NavigationView.MenuItems>
@@ -66,14 +66,7 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <Border
-                Margin="0,4,8,8"
-                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
-                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                BorderThickness="1"
-                CornerRadius="14">
-                <ContentPresenter x:Name="ConfigPageHost" />
-            </Border>
+            <ContentPresenter x:Name="ConfigPageHost" Margin="0,4,8,8" />
         </NavigationView>
 
         <Grid Grid.Row="1" Style="{StaticResource DialogFooterStyle}">

@@ -159,6 +159,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     public string NormalReleaseSummary => BuildReleaseSummary(NormalReleaseItems);
 
+    public Visibility SharedPresetListVisibility => SharedPresetItems.Count > 0
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
     public string SharedPresetSummary => SharedPresetItems.Count == 0
         ? "尚未创建公共序列"
         : $"已创建 {SharedPresetItems.Count} 个公共序列";
@@ -180,15 +184,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         if (AutoBattleSettingsRules.NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
         {
             NormalReleaseItems.Add(AutoBattleReleaseEditorItem.CreateSkill(normalizedSkillKey));
-        }
-    }
-
-    public void ResetNormalReleaseSequence()
-    {
-        NormalReleaseItems.Clear();
-        foreach (var step in AutoBattleSettings.CreateDefaultReleaseSequence())
-        {
-            NormalReleaseItems.Add(AutoBattleReleaseEditorItem.CreateSkill(step.SkillKey));
         }
     }
 
@@ -329,6 +324,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         }
 
         RefreshReleaseIndexes(NormalReleaseItems);
+        foreach (var item in NormalReleaseItems)
+        {
+            item.UpdateMoveAvailability(NormalReleaseItems.Count);
+        }
 
         var bloodlineFilter = settings.BloodlineCaptureFilter
             ?? BloodlineCaptureFilterSettings.CreateDefault();
@@ -434,6 +433,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private void NormalReleaseItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         RefreshReleaseIndexes(NormalReleaseItems);
+        foreach (var item in NormalReleaseItems)
+        {
+            item.UpdateMoveAvailability(NormalReleaseItems.Count);
+        }
         OnPropertyChanged(nameof(NormalReleaseEmptyVisibility));
         OnPropertyChanged(nameof(NormalReleaseSummary));
     }
@@ -441,6 +444,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private void SharedPresetItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         OnPropertyChanged(nameof(SharedPresetEmptyVisibility));
+        OnPropertyChanged(nameof(SharedPresetListVisibility));
         OnPropertyChanged(nameof(SharedPresetSummary));
     }
 
@@ -596,6 +600,31 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
             }
         }
     }
+
+    private bool _canMoveEarlier;
+    private bool _canMoveLater;
+
+    public bool CanMoveEarlier
+    {
+        get => _canMoveEarlier;
+        private set => SetProperty(ref _canMoveEarlier, value);
+    }
+
+    public bool CanMoveLater
+    {
+        get => _canMoveLater;
+        private set => SetProperty(ref _canMoveLater, value);
+    }
+
+    public void UpdateMoveAvailability(int count)
+    {
+        CanMoveEarlier = Position > 1;
+        CanMoveLater = Position < count;
+    }
+
+    public string StepTitle => IsCustom ? $"公共序列 · {Name}" : $"技能 {SkillKey}";
+
+    public Visibility SequenceVisibility => IsCustom ? Visibility.Visible : Visibility.Collapsed;
 
     public string PositionText => $"#{Position}";
 

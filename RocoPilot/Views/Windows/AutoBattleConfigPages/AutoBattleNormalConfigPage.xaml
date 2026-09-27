@@ -10,6 +10,14 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Styles/DialogControls.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="StepActionButtonStyle" TargetType="Button" BasedOn="{StaticResource DialogButtonStyle}">
+                <Setter Property="Width" Value="24" />
+                <Setter Property="Height" Value="24" />
+                <Setter Property="MinHeight" Value="24" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
         </ResourceDictionary>
     </Page.Resources>
     <ScrollViewer
@@ -19,12 +27,19 @@
         VerticalScrollBarVisibility="Auto"
         VerticalScrollMode="Auto">
         <StackPanel Style="{StaticResource DialogPageRootStyle}">
-            <StackPanel Spacing="4">
-                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="普通战斗" />
-                <TextBlock
-                    Style="{StaticResource DialogDescriptionTextStyle}"
-                    Text="配置普通战斗中每个可释放技能回合的循环动作。" />
-            </StackPanel>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="40" Height="40" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <FontIcon Glyph="&#xE768;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="普通战斗" />
+                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="按顺序循环执行每个技能回合的动作。" />
+                </StackPanel>
+            </Grid>
 
             <Border Style="{StaticResource DialogSectionCardStyle}">
                 <StackPanel>
@@ -44,7 +59,7 @@
                             <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="释放顺序" />
                             <TextBlock
                                 Style="{StaticResource DialogDescriptionTextStyle}"
-                                Text="从左到右循环执行；右键可调整顺序或删除。" />
+                                Text="从左到右、逐行循环执行；使用左右箭头交换相邻步骤。" />
                         </StackPanel>
                         <StackPanel
                             Grid.Column="2"
@@ -52,12 +67,8 @@
                             Orientation="Horizontal"
                             Spacing="6">
                             <Button
-                                Click="ResetReleaseSequenceButton_Click"
-                                ToolTipService.ToolTip="恢复默认顺序">
-                                <FontIcon FontSize="14" Glyph="&#xE777;" />
-                            </Button>
-                            <Button
                                 Click="ClearReleaseSequenceButton_Click"
+                                AutomationProperties.Name="清空释放顺序"
                                 ToolTipService.ToolTip="清空释放顺序">
                                 <FontIcon FontSize="14" Glyph="&#xE74D;" />
                             </Button>
@@ -82,7 +93,7 @@
                                     VerticalAlignment="Center"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="追加" />
+                                    Text="添加技能" />
                                 <Button
                                     Click="AppendSkillButton_Click"
                                     Content="1"
@@ -111,75 +122,72 @@
                             </StackPanel>
                         </Grid>
 
-                        <Border
-                            MinHeight="200"
-                            Padding="10"
-                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-                            BorderThickness="1"
-                            CornerRadius="8">
-                            <Grid>
-                                <GridView
-                                    IsItemClickEnabled="False"
-                                    IsSwipeEnabled="False"
-                                    ItemsSource="{x:Bind Editor.NormalReleaseItems, Mode=OneWay}"
-                                    SelectionMode="None">
-                                    <GridView.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <ItemsWrapGrid Orientation="Horizontal" />
-                                        </ItemsPanelTemplate>
-                                    </GridView.ItemsPanel>
-                                    <GridView.ItemContainerStyle>
-                                        <Style TargetType="GridViewItem">
-                                            <Setter Property="Margin" Value="0,0,8,8" />
-                                            <Setter Property="Padding" Value="0" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                            <Setter Property="VerticalContentAlignment" Value="Stretch" />
-                                        </Style>
-                                    </GridView.ItemContainerStyle>
-                                    <GridView.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid RightTapped="ReleaseItem_RightTapped">
-                                                <Border Style="{StaticResource ReleaseStepChipStyle}">
-                                                    <Grid>
-                                                        <TextBlock
-                                                            HorizontalAlignment="Right"
-                                                            FontSize="11"
-                                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                                            Text="{Binding PositionText}" />
-                                                        <StackPanel VerticalAlignment="Center" Spacing="2">
-                                                            <TextBlock
-                                                                FontSize="18"
-                                                                FontWeight="SemiBold"
-                                                                Text="{Binding DisplayText}"
-                                                                TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock
-                                                                FontSize="11"
-                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                                Text="{Binding DetailText}"
-                                                                TextTrimming="CharacterEllipsis" />
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </Border>
+                        <Grid MinHeight="64">
+                            <GridView ItemsSource="{x:Bind Editor.NormalReleaseItems, Mode=OneWay}"
+                                      SelectionMode="None" IsSwipeEnabled="False"
+                                      ScrollViewer.HorizontalScrollMode="Disabled"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.VerticalScrollMode="Disabled"
+                                      ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                                <GridView.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <ItemsWrapGrid Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </GridView.ItemsPanel>
+                                <GridView.ItemContainerStyle>
+                                    <Style TargetType="GridViewItem">
+                                        <Setter Property="Padding" Value="0" />
+                                        <Setter Property="Margin" Value="0,0,8,8" />
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="MinHeight" Value="0" />
+                                    </Style>
+                                </GridView.ItemContainerStyle>
+                                <GridView.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="8"
+                                                Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                ToolTipService.ToolTip="{Binding DetailText}">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center" Spacing="4">
+                                                    <TextBlock FontSize="10"
+                                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                               Text="{Binding PositionText}" />
+                                                    <TextBlock FontWeight="SemiBold"
+                                                               Text="{Binding StepTitle}" TextTrimming="CharacterEllipsis"
+                                                               TextWrapping="NoWrap" ToolTipService.ToolTip="{Binding StepTitle}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Button Click="MoveStepEarlier_Click" IsEnabled="{Binding CanMoveEarlier}"
+                                                                Style="{StaticResource StepActionButtonStyle}"
+                                                                AutomationProperties.Name="前移一步" ToolTipService.ToolTip="与前一步交换">
+                                                            <FontIcon FontSize="11" Glyph="&#xE76B;" />
+                                                        </Button>
+                                                        <Button Click="MoveStepLater_Click" IsEnabled="{Binding CanMoveLater}"
+                                                                Style="{StaticResource StepActionButtonStyle}"
+                                                                AutomationProperties.Name="后移一步" ToolTipService.ToolTip="与后一步交换">
+                                                            <FontIcon FontSize="11" Glyph="&#xE76C;" />
+                                                        </Button>
+                                                    </StackPanel>
+                                                    <Button HorizontalAlignment="Center" Click="DeleteStep_Click" Style="{StaticResource StepActionButtonStyle}"
+                                                            AutomationProperties.Name="删除步骤" ToolTipService.ToolTip="删除此步骤">
+                                                        <FontIcon FontSize="11" Glyph="&#xE74D;" />
+                                                    </Button>
+                                                </StackPanel>
                                             </Grid>
-                                        </DataTemplate>
-                                    </GridView.ItemTemplate>
-                                </GridView>
-
-                                <StackPanel
-                                    Style="{StaticResource EmptyStatePanelStyle}"
-                                    Visibility="{x:Bind Editor.NormalReleaseEmptyVisibility, Mode=OneWay}">
-                                    <FontIcon
-                                        HorizontalAlignment="Center"
-                                        FontSize="28"
-                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                        Glyph="&#xE710;" />
-                                    <TextBlock
-                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                        Text="点击上方技能键追加步骤" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
+                                        </Border>
+                                    </DataTemplate>
+                                </GridView.ItemTemplate>
+                            </GridView>
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       Text="添加上方技能，或从下方插入公共序列"
+                                       Visibility="{x:Bind Editor.NormalReleaseEmptyVisibility, Mode=OneWay}" />
+                        </Grid>
                     </StackPanel>
                 </StackPanel>
             </Border>
@@ -201,11 +209,11 @@
                             <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="公共执行序列" />
                             <TextBlock
                                 Style="{StaticResource DialogDescriptionTextStyle}"
-                                Text="将公共序列作为一个动作插入上方释放顺序；在“公共执行序列”页修改后会即时同步。" />
+                                Text="插入后作为一个动作执行，修改公共序列会同步更新。" />
                         </StackPanel>
                     </Grid>
 
-                    <Grid MinHeight="180" Padding="16,14">
+                    <Grid MinHeight="110" Padding="16,14">
                         <ListView
                             ItemsSource="{x:Bind Editor.SharedPresetItems, Mode=OneWay}"
                             SelectionMode="None">
@@ -243,7 +251,7 @@
                                                 Grid.Column="2"
                                                 MinWidth="72"
                                                 Click="InsertPresetButton_Click"
-                                                Content="插入" />
+                                                Content="添加到末尾" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
@@ -257,7 +265,7 @@
                                 HorizontalAlignment="Center"
                                 FontSize="28"
                                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                                Glyph="&#xE8A5;" />
+                                Glyph="&#xE8F1;" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="暂无公共序列，请先到左侧页面创建" />

@@ -10,6 +10,39 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="/Styles/DialogControls.xaml" />
             </ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#F3F3F3" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#1B1B1B" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#1B1B1B" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#1B1B1B" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            <Style x:Key="BloodlineOptionStyle" TargetType="ToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
+                <Setter Property="HorizontalAlignment" Value="Stretch" />
+                <Setter Property="HorizontalContentAlignment" Value="Center" />
+                <Setter Property="MinHeight" Value="36" />
+                <Setter Property="Padding" Value="14,8" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="FontSize" Value="13" />
+            </Style>
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource SystemAccentColor}" Opacity="0.16" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.24" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.3" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="{ThemeResource SystemAccentColor}" />
+
         </ResourceDictionary>
     </Page.Resources>
     <ScrollViewer
@@ -19,12 +52,19 @@
         VerticalScrollBarVisibility="Auto"
         VerticalScrollMode="Auto">
         <StackPanel Style="{StaticResource DialogPageRootStyle}">
-            <StackPanel Spacing="4">
-                <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="捕捉血脉" />
-                <TextBlock
-                    Style="{StaticResource DialogDescriptionTextStyle}"
-                    Text="仅在「奇遇解除操作」选择捕捉时生效。识别到血脉后，只捕捉勾选的种类，其余释放战技。" />
-            </StackPanel>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="40" Height="40" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <FontIcon Glyph="&#xE8D7;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="捕捉血脉" />
+                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="仅在「奇遇解除操作」选择捕捉时生效。" />
+                </StackPanel>
+            </Grid>
 
             <Border Style="{StaticResource DialogSectionCardStyle}">
                 <StackPanel>
@@ -48,7 +88,10 @@
                         </StackPanel>
                         <ToggleSwitch
                             Grid.Column="2"
-                            MinWidth="0"
+                            Width="44"
+                            MinWidth="44"
+                            HorizontalAlignment="Right"
+                            Padding="0"
                             VerticalAlignment="Center"
                             IsOn="{x:Bind Editor.BloodlineCaptureFilterEnabled, Mode=TwoWay}"
                             OffContent=""
@@ -59,87 +102,26 @@
                         <TextBlock
                             FontSize="12"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="勾选后会尝试捕捉该血脉；未勾选则按普通战斗配置释放战技。"
+                            Text="选中的血脉尝试捕捉，其余按普通战斗配置释放战技。"
                             TextWrapping="Wrap" />
 
-                        <Grid ColumnSpacing="10" RowSpacing="10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-
-                            <Border
-                                Grid.Row="0"
-                                Grid.Column="0"
-                                Padding="14,12"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="10">
-                                <CheckBox
-                                    Content="奇异"
-                                    IsChecked="{x:Bind Editor.CaptureBloodlineQiYi, Mode=TwoWay}"
-                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            </Border>
-                            <Border
-                                Grid.Row="0"
-                                Grid.Column="1"
-                                Padding="14,12"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="10">
-                                <CheckBox
-                                    Content="污染"
-                                    IsChecked="{x:Bind Editor.CaptureBloodlineWuRan, Mode=TwoWay}"
-                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            </Border>
-                            <Border
-                                Grid.Row="1"
-                                Grid.Column="0"
-                                Padding="14,12"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="10">
-                                <CheckBox
-                                    Content="混血"
-                                    IsChecked="{x:Bind Editor.CaptureBloodlineHunXue, Mode=TwoWay}"
-                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            </Border>
-                            <Border
-                                Grid.Row="1"
-                                Grid.Column="1"
-                                Padding="14,12"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="10">
-                                <CheckBox
-                                    Content="普通"
-                                    IsChecked="{x:Bind Editor.CaptureBloodlineNormal, Mode=TwoWay}"
-                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            </Border>
-                            <Border
-                                Grid.Row="2"
-                                Grid.Column="0"
-                                Grid.ColumnSpan="2"
-                                Padding="14,12"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
-                                BorderThickness="1"
-                                CornerRadius="10">
-                                <CheckBox
-                                    Content="未识别"
-                                    IsChecked="{x:Bind Editor.CaptureBloodlineUnrecognized, Mode=TwoWay}"
-                                    IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
-                            </Border>
-                        </Grid>
+                        <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="92" ItemHeight="46">
+                            <ToggleButton Margin="0,0,8,8"
+                                          Style="{StaticResource BloodlineOptionStyle}" Content="奇异"
+                                          IsChecked="{x:Bind Editor.CaptureBloodlineQiYi, Mode=TwoWay}" IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <ToggleButton Margin="0,0,8,8"
+                                          Style="{StaticResource BloodlineOptionStyle}" Content="污染"
+                                          IsChecked="{x:Bind Editor.CaptureBloodlineWuRan, Mode=TwoWay}" IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <ToggleButton Margin="0,0,8,8"
+                                          Style="{StaticResource BloodlineOptionStyle}" Content="混血"
+                                          IsChecked="{x:Bind Editor.CaptureBloodlineHunXue, Mode=TwoWay}" IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <ToggleButton Margin="0,0,8,8"
+                                          Style="{StaticResource BloodlineOptionStyle}" Content="普通"
+                                          IsChecked="{x:Bind Editor.CaptureBloodlineNormal, Mode=TwoWay}" IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                            <ToggleButton Margin="0,0,8,8"
+                                          Style="{StaticResource BloodlineOptionStyle}" Content="未识别"
+                                          IsChecked="{x:Bind Editor.CaptureBloodlineUnrecognized, Mode=TwoWay}" IsEnabled="{x:Bind Editor.BloodlineCaptureFilterOptionsEnabled, Mode=OneWay}" />
+                        </VariableSizedWrapGrid>
 
                         <Border Style="{StaticResource ConfigHintBarStyle}">
                             <Grid ColumnSpacing="10">
@@ -156,7 +138,8 @@
                                     Grid.Column="1"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="根据提示中的「奇异、混乱、污染、特性」识别血脉，不区分赛季；无法识别时按「未识别」选项处理。"
+                                    Text="按提示文字识别血脉，不区分赛季。无法识别时使用「未识别」选项。"
+                                    ToolTipService.ToolTip="识别提示中的「奇异、混乱、污染、特性」。"
                                     TextWrapping="Wrap" />
                             </Grid>
                         </Border>

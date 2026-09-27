@@ -6,8 +6,6 @@ using RocoPilot.Contracts.Services;
 using RocoPilot.ViewModels;
 using RocoPilot.Views.Windows.AutoBattleConfigPages;
 
-using Windows.Graphics;
-
 namespace RocoPilot.Views.Windows;
 
 public sealed partial class AutoBattleConfigWindow : WindowEx
@@ -29,7 +27,6 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
-        AppWindow.Resize(new SizeInt32(1040, 760));
 
         _editor = new AutoBattleConfigEditor(
             _viewModel.AutoBattleSettings,

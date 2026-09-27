@@ -4,9 +4,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:windowex="using:WinUIEx"
-    Width="680"
-    Height="480"
-    MinWidth="600"
+    Width="600"
+    Height="460"
+    MinWidth="560"
     MinHeight="420">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -35,117 +35,151 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <StackPanel VerticalAlignment="Center" Spacing="2">
-                <TextBlock
-                    FontSize="18"
-                    FontWeight="SemiBold"
-                    Text="运行频率" />
-                <TextBlock
-                    FontSize="13"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="控制实时任务的画面采集、状态匹配和 OCR 节奏。"
-                    TextWrapping="Wrap" />
-            </StackPanel>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Width="40" Height="40" CornerRadius="12"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <FontIcon Glyph="&#xE823;" FontSize="20"
+                              Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="运行频率" />
+                    <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="调整画面采集与识别的执行间隔" TextWrapping="Wrap" />
+                </StackPanel>
+            </Grid>
 
             <ScrollViewer
                 Grid.Row="1"
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
+                VerticalContentAlignment="Top"
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
-                <Border Style="{StaticResource DialogCardStyle}">
-                    <StackPanel Spacing="16">
-                        <Grid Style="{StaticResource DialogSettingRowStyle}">
+                <StackPanel Spacing="10">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="14" CornerRadius="12">
+                        <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="144" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
+                            <Border Width="32" Height="32" CornerRadius="9" VerticalAlignment="Center"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <FontIcon Glyph="&#xE714;" FontSize="16"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                                 <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="画面捕获间隔" />
                                 <TextBlock
                                     Style="{StaticResource DialogDescriptionTextStyle}"
-                                    Text="连续截图之间的目标间隔；越小越及时，资源占用越高。" />
+                                    Text="连续两次画面采集的间隔" />
                             </StackPanel>
                             <StackPanel
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <NumberBox
                                     x:Name="FrameCaptureIntervalNumberBox"
-                                    Width="140"
+                                    Width="116"
+                                    AutomationProperties.Name="画面捕获间隔（毫秒）"
                                     Maximum="30000"
                                     Minimum="16"
                                     SmallChange="10"
-                                    SpinButtonPlacementMode="Compact" />
+                                    SpinButtonPlacementMode="Hidden" />
                                 <TextBlock
                                     VerticalAlignment="Center"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Text="ms" />
                             </StackPanel>
                         </Grid>
+                    </Border>
 
-                        <Grid Style="{StaticResource DialogSettingRowStyle}">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="14" CornerRadius="12">
+                        <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="144" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
+                            <Border Width="32" Height="32" CornerRadius="9" VerticalAlignment="Center"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="16"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                                 <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="状态识别间隔" />
                                 <TextBlock
                                     Style="{StaticResource DialogDescriptionTextStyle}"
-                                    Text="魔力值、技能选择、切换精灵和战斗聊天等图像状态的扫描间隔。" />
+                                    Text="扫描魔力值、技能及战斗状态"
+                                    ToolTipService.ToolTip="识别魔力值、技能选择、切换精灵和战斗聊天等图像状态。" />
                             </StackPanel>
                             <StackPanel
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <NumberBox
                                     x:Name="GameStateScanIntervalNumberBox"
-                                    Width="140"
+                                    Width="116"
+                                    AutomationProperties.Name="状态识别间隔（毫秒）"
                                     Maximum="30000"
                                     Minimum="100"
                                     SmallChange="100"
-                                    SpinButtonPlacementMode="Compact" />
+                                    SpinButtonPlacementMode="Hidden" />
                                 <TextBlock
                                     VerticalAlignment="Center"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Text="ms" />
                             </StackPanel>
                         </Grid>
+                    </Border>
 
-                        <Grid Style="{StaticResource DialogSettingRowStyle}">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="14" CornerRadius="12">
+                        <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="180" />
+                                <ColumnDefinition Width="144" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel VerticalAlignment="Center">
+                            <Border Width="32" Height="32" CornerRadius="9" VerticalAlignment="Center"
+                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <FontIcon Glyph="&#xE8D2;" FontSize="16"
+                                          Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                                 <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="OCR 识别间隔" />
                                 <TextBlock
                                     Style="{StaticResource DialogDescriptionTextStyle}"
-                                    Text="奇遇、异色和精灵名称等后台文字识别的扫描间隔。" />
+                                    Text="识别奇遇、异色及精灵名称" />
                             </StackPanel>
                             <StackPanel
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <NumberBox
                                     x:Name="OcrScanIntervalNumberBox"
-                                    Width="140"
+                                    Width="116"
+                                    AutomationProperties.Name="OCR 识别间隔（毫秒）"
                                     Maximum="30000"
                                     Minimum="250"
                                     SmallChange="250"
-                                    SpinButtonPlacementMode="Compact" />
+                                    SpinButtonPlacementMode="Hidden" />
                                 <TextBlock
                                     VerticalAlignment="Center"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Text="ms" />
                             </StackPanel>
                         </Grid>
-                    </StackPanel>
-                </Border>
+                    </Border>
+                    <TextBlock Margin="2,2,2,0" Style="{StaticResource DialogDescriptionTextStyle}"
+                               Text="间隔越短，资源占用越高。建议保留默认值。" />
+                </StackPanel>
             </ScrollViewer>
         </Grid>
 

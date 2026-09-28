@@ -44,7 +44,13 @@ public partial class SettingsViewModel : ObservableRecipient
     public partial bool IsCheckingUpdate { get; set; }
 
     [ObservableProperty]
-    public partial string UpdateStatusText { get; set; }
+    public partial string UpdateMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsUpdateMessageOpen { get; set; }
+
+    [ObservableProperty]
+    public partial InfoBarSeverity UpdateMessageSeverity { get; set; }
 
     public bool IsUpdateCheckEnabled => !IsCheckingUpdate;
 
@@ -63,7 +69,6 @@ public partial class SettingsViewModel : ObservableRecipient
         _updateService = updateService;
         _logger = logger;
         AppVersion = GetAppVersionText();
-        UpdateStatusText = "从 GitHub Releases 获取最新版本信息";
     }
 
     public async Task LoadAsync()
@@ -122,17 +127,26 @@ public partial class SettingsViewModel : ObservableRecipient
         }
 
         IsCheckingUpdate = true;
-        UpdateStatusText = "正在连接 GitHub Releases...";
+        IsUpdateMessageOpen = false;
 
         try
         {
             var result = await _updateService.CheckUpdateAsync(new UpdateOption { Trigger = UpdateTrigger.Manual });
-            UpdateStatusText = BuildUpdateStatusText(result);
+            if (result.Status == UpdateCheckStatus.UpToDate)
+            {
+                ShowUpdateMessage("当前已是最新版本。", InfoBarSeverity.Success);
+            }
+            else if (result.Status == UpdateCheckStatus.Failed)
+            {
+                ShowUpdateMessage(
+                    string.IsNullOrWhiteSpace(result.Message) ? "检查更新失败，请稍后重试。" : result.Message,
+                    InfoBarSeverity.Error);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "检查更新失败");
-            UpdateStatusText = "检查更新失败，请检查网络连接后重试。";
+            ShowUpdateMessage("检查更新失败，请检查网络连接后重试。", InfoBarSeverity.Error);
         }
         finally
         {
@@ -183,20 +197,12 @@ public partial class SettingsViewModel : ObservableRecipient
         _ => "System",
     };
 
-    private static string BuildUpdateStatusText(UpdateCheckResult result)
+    private void ShowUpdateMessage(string message, InfoBarSeverity severity)
     {
-        var checkedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-        return result.Status switch
-        {
-            UpdateCheckStatus.UpToDate => $"当前已是最新版本 · 上次检查：{checkedAt}",
-            UpdateCheckStatus.UpdateAvailable when !string.IsNullOrWhiteSpace(result.Message) =>
-                $"{result.Message} · 上次检查：{checkedAt}",
-            UpdateCheckStatus.UpdateAvailable when result.Release != null =>
-                $"发现新版本 {result.Release.TagName} · 上次检查：{checkedAt}",
-            UpdateCheckStatus.Failed when !string.IsNullOrWhiteSpace(result.Message) =>
-                $"{result.Message} · 上次检查：{checkedAt}",
-            _ => $"上次检查：{checkedAt}",
-        };
+        IsUpdateMessageOpen = false;
+        UpdateMessage = message;
+        UpdateMessageSeverity = severity;
+        IsUpdateMessageOpen = true;
     }
 
     private static string GetAppVersionText()

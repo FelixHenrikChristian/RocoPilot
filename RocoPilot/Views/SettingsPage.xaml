@@ -2,11 +2,13 @@
     x:Class="RocoPilot.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:RocoPilot.Helpers"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Loaded="OnLoaded">
 
+    <Grid>
     <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
         <StackPanel x:Name="ContentArea" Padding="{StaticResource NavigationViewPageContentPadding}">
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
@@ -231,12 +233,6 @@
                                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                         Text="稳定版" />
                                 </StackPanel>
-                                <TextBlock
-                                    Margin="0,6,0,0"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="{x:Bind ViewModel.UpdateStatusText, Mode=OneWay}"
-                                    TextWrapping="Wrap" />
                             </StackPanel>
 
                             <Button
@@ -383,4 +379,12 @@
                 Text="© 2024-2026 Felix Christian. 开源许可：GPL-3.0 许可证" />
         </StackPanel>
     </ScrollViewer>
+        <InfoBar
+            Style="{StaticResource AppToastStyle}"
+            Canvas.ZIndex="10"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            IsOpen="{x:Bind ViewModel.IsUpdateMessageOpen, Mode=TwoWay}"
+            Severity="{x:Bind ViewModel.UpdateMessageSeverity, Mode=OneWay}"
+            Message="{x:Bind ViewModel.UpdateMessage, Mode=OneWay}" />
+    </Grid>
 </Page>

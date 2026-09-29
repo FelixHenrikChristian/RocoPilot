@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.UI.Xaml;
 
 using RocoPilot.Models.Hotkeys;
 
@@ -48,10 +49,13 @@ public class HotkeyBindingItemViewModel : ObservableObject
         {
             if (SetProperty(ref _isCapturing, value))
             {
+                OnPropertyChanged(nameof(CaptureIndicatorVisibility));
                 OnPropertyChanged(nameof(DisplayText));
             }
         }
     }
+
+    public Visibility CaptureIndicatorVisibility => IsCapturing ? Visibility.Visible : Visibility.Collapsed;
 
     public string DisplayText => IsCapturing
         ? "按下快捷键..."

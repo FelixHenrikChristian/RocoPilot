@@ -97,6 +97,7 @@
                     Spacing="8"
                     VerticalAlignment="Center">
                     <Button
+                        CornerRadius="8"
                         Command="{x:Bind ViewModel.ClearCommand}"
                         ToolTipService.ToolTip="清空当前显示（文件日志不受影响）">
                         <FontIcon
@@ -105,6 +106,7 @@
                             Glyph="&#xE74D;" />
                     </Button>
                     <Button
+                        CornerRadius="8"
                         Command="{x:Bind ViewModel.OpenLogFileCommand}"
                         ToolTipService.ToolTip="用默认编辑器打开当天的日志文件">
                         <FontIcon

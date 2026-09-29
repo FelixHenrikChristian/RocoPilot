@@ -5,10 +5,10 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    Width="800"
-    Height="800"
-    MinWidth="600"
-    MinHeight="620"
+    Width="680"
+    Height="600"
+    MinWidth="540"
+    MinHeight="420"
     mc:Ignorable="d">
 
     <Window.SystemBackdrop>
@@ -59,8 +59,6 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <Border
@@ -74,7 +72,7 @@
 
                     <FontIcon
                         Grid.Column="0"
-                        VerticalAlignment="Top"
+                        VerticalAlignment="Center"
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                         FontSize="18"
                         Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
@@ -126,8 +124,7 @@
                         <TextBlock
                             Grid.Column="1"
                             VerticalAlignment="Center"
-                            FontSize="16"
-                            FontWeight="SemiBold"
+                            Style="{StaticResource DialogSectionTitleStyle}"
                             Text="更新内容" />
                     </Grid>
 
@@ -154,110 +151,39 @@
                 </Grid>
             </Border>
 
-            <Border
-                Grid.Row="2"
-                Style="{StaticResource DialogCardStyle}">
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <FontIcon
-                        Grid.Column="0"
-                        VerticalAlignment="Center"
-                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="18"
-                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                        Glyph="&#xE896;" />
-
-                    <StackPanel
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Spacing="4">
-                        <TextBlock
-                            Style="{StaticResource DialogSectionTitleStyle}"
-                            Text="自动更新" />
-                        <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="使用内置更新程序自动下载并安装更新"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <Button
-                        Grid.Column="2"
-                        VerticalAlignment="Center"
-                        Click="UpdateButton_Click"
-                        Style="{StaticResource DialogPrimaryButtonStyle}">
-                        <StackPanel
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <FontIcon
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
-                                Glyph="&#xE896;" />
-                            <TextBlock Text="立即更新" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
-
-            <Border
-                Grid.Row="3"
-                Style="{StaticResource DialogCardStyle}">
-                <Grid ColumnSpacing="12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-
-                    <FontIcon
-                        Grid.Column="0"
-                        VerticalAlignment="Center"
-                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                        FontSize="18"
-                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                        Glyph="&#xE8A7;" />
-
-                    <StackPanel
-                        Grid.Column="1"
-                        VerticalAlignment="Center"
-                        Spacing="4">
-                        <TextBlock
-                            Style="{StaticResource DialogSectionTitleStyle}"
-                            Text="手动下载" />
-                        <TextBlock
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="前往 GitHub 下载页面手动下载更新"
-                            TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <Button
-                        Grid.Column="2"
-                        VerticalAlignment="Center"
-                        Click="DownloadButton_Click">
-                        <StackPanel
-                            Orientation="Horizontal"
-                            Spacing="8">
-                            <FontIcon
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                Glyph="&#xE8A7;" />
-                            <TextBlock Text="前往下载" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
-            </Border>
         </Grid>
 
         <Grid Grid.Row="2" Style="{StaticResource DialogFooterStyle}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
             <Button
-                HorizontalAlignment="Right"
+                HorizontalAlignment="Left"
+                Click="DownloadButton_Click"
+                Style="{StaticResource DialogButtonStyle}"
+                ToolTipService.ToolTip="前往 GitHub 手动下载安装包">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE8A7;" />
+                    <TextBlock Text="手动下载" />
+                </StackPanel>
+            </Button>
+            <Button
+                Grid.Column="1"
                 Click="CancelButton_Click"
                 Content="稍后提醒"
                 Style="{StaticResource DialogButtonStyle}" />
+            <Button
+                Grid.Column="2"
+                Click="UpdateButton_Click"
+                Style="{StaticResource DialogPrimaryButtonStyle}"
+                ToolTipService.ToolTip="使用内置更新程序下载并安装">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE896;" />
+                    <TextBlock Text="立即更新" />
+                </StackPanel>
+            </Button>
         </Grid>
     </Grid>
 </windowex:WindowEx>

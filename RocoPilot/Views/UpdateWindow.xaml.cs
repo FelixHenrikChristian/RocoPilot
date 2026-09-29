@@ -9,8 +9,6 @@ using RocoPilot.Models;
 
 using Serilog;
 
-using Windows.Graphics;
-
 namespace RocoPilot.Views;
 
 public sealed partial class UpdateWindow : WindowEx
@@ -42,7 +40,6 @@ public sealed partial class UpdateWindow : WindowEx
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(TitleBarRoot);
-        AppWindow.Resize(new SizeInt32(800, 800));
 
         VersionTitleText.Text = $"发现新版本 {_release.TagName}";
         PublishDateText.Text = $"发布时间：{_release.PublishedAt:yyyy年MM月dd日}";
@@ -59,6 +56,8 @@ public sealed partial class UpdateWindow : WindowEx
         Closed += OnWindowClosed;
 
         WindowPlacementHelper.SetOwner(this, App.MainWindow);
+        WindowPlacementHelper.ResizeToContent(
+            this, App.MainWindow, new global::Windows.Foundation.Size(680, 600), MinWidth, MinHeight);
         WindowPlacementHelper.CenterOnParent(this, App.MainWindow);
         Activate();
         return _completion.Task;

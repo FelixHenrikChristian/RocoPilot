@@ -172,6 +172,7 @@
         <DataTemplate x:Key="ShinyCaptureDetailTemplate">
             <Border
                 Width="440"
+                VerticalAlignment="Top"
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"

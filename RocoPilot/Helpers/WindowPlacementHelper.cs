@@ -51,29 +51,29 @@ internal static class WindowPlacementHelper
     public static void ResizeToContent(
         WindowEx window,
         WindowEx dpiSource,
-        FrameworkElement contentRoot,
+        Windows.Foundation.Size contentSize,
         double minimumWidth,
         double minimumHeight)
     {
-        contentRoot.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
-
         var dpiSourceHwnd = WindowNative.GetWindowHandle(dpiSource);
         var dpi = GetDpiForWindow(dpiSourceHwnd);
         var scale = dpi > 0 ? dpi / 96d : 1d;
-        var framePadding = Math.Ceiling(2 * scale);
+        // ResizeClient takes physical pixels and accounts for the native window frame.
+        var frameWidth = Math.Max(0, window.AppWindow.Size.Width - window.AppWindow.ClientSize.Width);
+        var frameHeight = Math.Max(0, window.AppWindow.Size.Height - window.AppWindow.ClientSize.Height);
         var targetWidth = Math.Max(
-            Math.Ceiling(minimumWidth * scale),
-            Math.Ceiling(contentRoot.DesiredSize.Width * scale) + framePadding);
+            Math.Ceiling(minimumWidth * scale) - frameWidth,
+            Math.Ceiling(contentSize.Width * scale));
         var targetHeight = Math.Max(
-            Math.Ceiling(minimumHeight * scale),
-            Math.Ceiling(contentRoot.DesiredSize.Height * scale) + window.AppWindow.TitleBar.Height + framePadding);
+            Math.Ceiling(minimumHeight * scale) - frameHeight,
+            Math.Ceiling(contentSize.Height * scale));
 
         var workArea = DisplayArea.GetFromWindowId(dpiSource.AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
         var workAreaMargin = Math.Ceiling(32 * scale);
-        targetWidth = Math.Min(targetWidth, Math.Max(1, workArea.Width - (workAreaMargin * 2)));
-        targetHeight = Math.Min(targetHeight, Math.Max(1, workArea.Height - (workAreaMargin * 2)));
+        targetWidth = Math.Min(targetWidth, Math.Max(1, workArea.Width - (workAreaMargin * 2) - frameWidth));
+        targetHeight = Math.Min(targetHeight, Math.Max(1, workArea.Height - (workAreaMargin * 2) - frameHeight));
 
-        window.AppWindow.Resize(new Windows.Graphics.SizeInt32((int)targetWidth, (int)targetHeight));
+        window.AppWindow.ResizeClient(new Windows.Graphics.SizeInt32((int)targetWidth, (int)targetHeight));
     }
 
     public static void CenterOnParent(WindowEx child, WindowEx parent)

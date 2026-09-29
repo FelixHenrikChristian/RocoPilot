@@ -6,7 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
     MinWidth="460"
-    MinHeight="300"
+    MinHeight="200"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -22,9 +22,14 @@
                 </ResourceDictionary.MergedDictionaries>
             </ResourceDictionary>
         </Grid.Resources>
-        <ContentPresenter
-            x:Name="DetailContentPresenter"
-            HorizontalContentAlignment="Center"
-            VerticalContentAlignment="Center" />
+        <ScrollViewer
+            HorizontalScrollBarVisibility="Auto"
+            HorizontalScrollMode="Auto"
+            VerticalScrollBarVisibility="Auto">
+            <ContentPresenter
+                x:Name="DetailContentPresenter"
+                HorizontalContentAlignment="Center"
+                VerticalContentAlignment="Top" />
+        </ScrollViewer>
     </Grid>
 </windowex:WindowEx>

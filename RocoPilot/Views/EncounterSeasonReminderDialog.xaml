@@ -5,49 +5,59 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="赛季资料已到期"
     CloseButtonText="本次关闭"
+    CloseButtonStyle="{StaticResource DialogPrimaryButtonStyle}"
     DefaultButton="Close"
-    PrimaryButtonText="不再提示">
+    PrimaryButtonText="不再提示"
+    PrimaryButtonStyle="{StaticResource DialogButtonStyle}">
 
-    <StackPanel Spacing="16">
-        <Border Style="{StaticResource DialogCardStyle}">
-            <TextBlock
-                FontSize="13"
-                Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-                LineHeight="20"
-                Text="{x:Bind Reminder.SeasonSummary}"
-                TextWrapping="Wrap" />
-        </Border>
-
-        <TextBlock
-            FontSize="13"
-            Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-            LineHeight="20"
-            Text="{x:Bind Reminder.ImpactMessage}"
-            TextWrapping="Wrap" />
-
-        <Grid
-            Padding="0,16,0,0"
-            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-            BorderThickness="0,1,0,0"
-            ColumnSpacing="10">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <FontIcon
-                Margin="0,4,0,0"
-                VerticalAlignment="Top"
-                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                FontSize="16"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Glyph="&#xE82D;" />
-            <TextBlock
-                Grid.Column="1"
-                FontSize="13"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                LineHeight="18"
-                Text="{x:Bind Reminder.CatalogHint}"
-                TextWrapping="Wrap" />
-        </Grid>
-    </StackPanel>
+    <ScrollViewer
+        x:Name="ReminderScrollViewer"
+        HorizontalScrollMode="Disabled"
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="ReminderContent" Spacing="12">
+            <Border Style="{StaticResource DialogCardStyle}" Padding="16">
+                <StackPanel Spacing="14">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="36" Height="36" CornerRadius="8"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}">
+                            <FontIcon Glyph="&#xE783;" FontSize="18"
+                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                      Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind ConfiguredSeasonDisplay}"
+                                       Style="{StaticResource DialogSectionTitleStyle}" />
+                            <TextBlock Text="{x:Bind EndDateDisplay}" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    <TextBlock Text="{x:Bind Reminder.ImpactMessage}" FontSize="13"
+                               LineHeight="20" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource ConfigHintBarStyle}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE82D;" FontSize="16" VerticalAlignment="Center"
+                              FontFamily="{StaticResource SymbolThemeFontFamily}"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="{x:Bind Reminder.CatalogHint}"
+                               FontSize="12" LineHeight="18"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
 </controls:AppContentDialog>

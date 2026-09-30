@@ -27,46 +27,75 @@ internal static class PendingEncounterDialog
             TextWrapping = TextWrapping.Wrap,
             Foreground = GetBrush("TextFillColorSecondaryBrush")
         };
+        var detectedAt = new TextBlock
+        {
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = context.Foreground,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        var metadata = new Grid { ColumnSpacing = 12 };
+        metadata.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        metadata.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(detectedAt, 1);
+        metadata.Children.Add(context);
+        metadata.Children.Add(detectedAt);
+
+        var hint = new TextBlock
+        {
+            Style = (Style)Application.Current.Resources["DialogDescriptionTextStyle"]
+        };
         var name = new TextBox { Header = "精灵名", PlaceholderText = "输入正确的精灵名", MaxLength = 32 };
         var content = new StackPanel
         {
-            Width = 440,
-            Spacing = 16,
+            Width = Math.Min(440, Math.Max(240, xamlRoot.Size.Width - 96)),
+            Spacing = 12,
             Children =
             {
-                new TextBlock
-                {
-                    Text = "这些奇遇已保存。赛季配置更新后会按发生日期自动归档；未识别的名称可通过同步图鉴补齐，也可以手动填写。",
-                    TextWrapping = TextWrapping.Wrap,
-                    Foreground = GetBrush("TextFillColorSecondaryBrush")
-                },
                 selector,
                 new Border
                 {
-                    Padding = new Thickness(14),
-                    CornerRadius = new CornerRadius(8),
-                    Background = GetBrush("CardBackgroundFillColorDefaultBrush"),
-                    BorderBrush = GetBrush("CardStrokeColorDefaultBrush"),
-                    BorderThickness = new Thickness(1),
+                    Style = (Style)Application.Current.Resources["DialogCardStyle"],
                     Child = new StackPanel
                     {
-                        Spacing = 8,
+                        Spacing = 12,
                         Children =
                         {
-                            new TextBlock { Text = "精灵名 / 原始识别文字", FontSize = 12, Foreground = context.Foreground },
-                            rawText,
-                            context
+                            SpiritNamePreview.CreateField(name),
+                            new Border
+                            {
+                                Height = 1,
+                                Background = GetBrush("DividerStrokeColorDefaultBrush")
+                            },
+                            metadata,
+                            new StackPanel
+                            {
+                                Spacing = 4,
+                                Children =
+                                {
+                                    new TextBlock { Text = "原始识别文字", FontSize = 12, Foreground = context.Foreground },
+                                    rawText
+                                }
+                            }
                         }
                     }
                 },
-                name
+                hint
             }
         };
         var dialog = new AppContentDialog
         {
             XamlRoot = xamlRoot,
             Title = "暂存奇遇",
-            Content = new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
+            Content = new ScrollViewer
+            {
+                Content = content,
+                MaxHeight = Math.Min(560, Math.Max(120, xamlRoot.Size.Height - 200)),
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollMode = ScrollMode.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollMode = ScrollMode.Auto
+            },
             PrimaryButtonText = "确认计入",
             SecondaryButtonText = "忽略此条",
             CloseButtonText = "关闭",
@@ -76,9 +105,13 @@ internal static class PendingEncounterDialog
         selector.SelectionChanged += (_, _) =>
         {
             if (selector.SelectedItem is not PendingEncounterItem item) return;
-            rawText.Text = item.NameDisplay;
-            context.Text = item.ContextDisplay;
+            rawText.Text = item.RawTextDisplay;
+            context.Text = $"UID {item.AccountUid} · {item.SeasonDisplay}";
+            detectedAt.Text = $"{item.DetectedAt:yyyy-MM-dd HH:mm:ss}";
             name.Text = item.Name ?? item.RawText;
+            hint.Text = item.IsSeasonPending
+                ? "记录已保存。赛季资料更新后，将按发生日期自动归档。"
+                : "修正精灵名后确认计入，也可通过同步图鉴补齐名称。";
             dialog.PrimaryButtonText = item.IsSeasonPending ? "保存名称" : "确认计入";
         };
         name.TextChanged += (_, _) => dialog.IsPrimaryButtonEnabled = !string.IsNullOrWhiteSpace(name.Text);

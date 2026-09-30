@@ -1,0 +1,71 @@
+<controls:AppContentDialog
+    x:Class="RocoPilot.Views.StatisticsClearDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:controls="using:RocoPilot.Controls"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="清空记录"
+    PrimaryButtonText="清空"
+    PrimaryButtonStyle="{StaticResource DialogButtonStyle}"
+    CloseButtonText="取消"
+    CloseButtonStyle="{StaticResource DialogPrimaryButtonStyle}"
+    DefaultButton="Close">
+
+    <ScrollViewer x:Name="ClearScrollViewer"
+                  HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="ClearContent" Spacing="12">
+            <Border Style="{StaticResource DialogCardStyle}" Padding="16">
+                <StackPanel Spacing="14">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="36" Height="36" CornerRadius="8"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}">
+                            <FontIcon Glyph="&#xE9D2;" FontSize="18"
+                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="清空全部统计数据"
+                                       Style="{StaticResource DialogSectionTitleStyle}" />
+                            <TextBlock Text="作用于所有账号与全部赛季。" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE783;" FontSize="16" VerticalAlignment="Center"
+                                  FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                  Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                        <TextBlock Grid.Column="1"
+                                   Text="将删除所有账号及其奇遇、异色和暂存记录。"
+                                   FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource ConfigHintBarStyle}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE74E;" FontSize="16" VerticalAlignment="Center"
+                              FontFamily="{StaticResource SymbolThemeFontFamily}"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="已导出的备份文件会保留。"
+                               FontSize="12" LineHeight="18" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</controls:AppContentDialog>

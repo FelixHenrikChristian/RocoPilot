@@ -838,14 +838,9 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var dialog = new AppContentDialog
+        var dialog = new StatisticsClearDialog
         {
-            XamlRoot = xamlRoot,
-            Title = "清空记录",
-            Content = "将清空所有账号和统计记录。此操作不会删除导出的备份文件。",
-            PrimaryButtonText = "清空",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close
+            XamlRoot = xamlRoot
         };
 
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)

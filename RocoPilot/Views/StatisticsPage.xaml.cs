@@ -226,14 +226,9 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var dialog = new AppContentDialog
+        var dialog = new StatisticsAccountDeleteDialog(account.Uid)
         {
-            XamlRoot = xamlRoot,
-            Title = "删除账号",
-            Content = $"将删除账号 {account.Uid} 及其所有统计记录。此操作不会删除导出的备份文件。",
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close
+            XamlRoot = xamlRoot
         };
 
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)

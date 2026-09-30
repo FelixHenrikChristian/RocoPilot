@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
-using RocoPilot.Controls;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
@@ -155,14 +154,9 @@ public sealed partial class StatisticsSyncWindow : WindowEx
 
     private async void DownloadButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new AppContentDialog
+        var dialog = new StatisticsSyncMergeDialog
         {
-            XamlRoot = ContentRoot.XamlRoot,
-            Title = "合并云端数据",
-            Content = "将根据上次同步状态合并云端数据：仅本机变化的账号保留本机版本，仅云端变化的账号采用云端版本。若同一账号在两台设备同时修改，将采用云端版本。",
-            PrimaryButtonText = "合并",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close
+            XamlRoot = ContentRoot.XamlRoot
         };
 
         if (await dialog.ShowAsync() != ContentDialogResult.Primary)

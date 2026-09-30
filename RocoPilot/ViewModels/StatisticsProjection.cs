@@ -20,11 +20,12 @@ internal static class StatisticsProjection
     public static IReadOnlyList<SeasonStatisticsGroup> BuildSeasons(
         AccountStatisticsData? account,
         EncounterSeasonConfig? seasonConfig = null,
-        Func<string, BitmapImage?>? avatarResolver = null)
+        Func<string, BitmapImage?>? avatarResolver = null,
+        Func<string, BitmapImage?>? shinyAvatarResolver = null)
     {
         var seasons = MergeConfiguredSeasons(account?.Seasons ?? [], seasonConfig)
             .Where(season => season.Data.Id != EncounterSeasonTimeline.PendingSeasonId)
-            .Select(season => ToSeasonStatisticsGroup(season.Data, avatarResolver))
+            .Select(season => ToSeasonStatisticsGroup(season.Data, avatarResolver, shinyAvatarResolver ?? avatarResolver))
             .OrderByDescending(season => IsCurrentSeason(season, seasonConfig))
             .ThenByDescending(season => GetConfiguredSeasonOrder(season, seasonConfig))
             .ThenByDescending(season => season.LatestCapturedAt)
@@ -142,7 +143,8 @@ internal static class StatisticsProjection
 
     private static SeasonStatisticsGroup ToSeasonStatisticsGroup(
         SeasonStatisticsData season,
-        Func<string, BitmapImage?>? avatarResolver)
+        Func<string, BitmapImage?>? avatarResolver,
+        Func<string, BitmapImage?>? shinyAvatarResolver)
     {
         var pollutionCounts = season.Encounters
             .Where(item => !string.IsNullOrWhiteSpace(item.Name) && item.Count > 0)
@@ -163,7 +165,7 @@ internal static class StatisticsProjection
             .OrderByDescending(item => item.LastCapturedAt)
             .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var shinyCounts = BuildShinyCounts(season.ShinyCaptures, season.Id, avatarResolver);
+        var shinyCounts = BuildShinyCounts(season.ShinyCaptures, season.Id, shinyAvatarResolver);
 
         return new SeasonStatisticsGroup(
             season.Id,

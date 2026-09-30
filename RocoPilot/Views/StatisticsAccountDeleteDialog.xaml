@@ -1,0 +1,69 @@
+<controls:AppContentDialog
+    x:Class="RocoPilot.Views.StatisticsAccountDeleteDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:controls="using:RocoPilot.Controls"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="删除账号"
+    PrimaryButtonText="删除"
+    PrimaryButtonStyle="{StaticResource DialogButtonStyle}"
+    CloseButtonText="取消"
+    CloseButtonStyle="{StaticResource DialogPrimaryButtonStyle}"
+    DefaultButton="Close">
+
+    <ScrollViewer x:Name="DeleteScrollViewer"
+                  HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="DeleteContent" Spacing="12">
+            <Border Style="{StaticResource DialogCardStyle}" Padding="16">
+                <StackPanel Spacing="14">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Width="36" Height="36" CornerRadius="8"
+                                VerticalAlignment="Center"
+                                Background="{ThemeResource ControlFillColorDefaultBrush}">
+                            <FontIcon Glyph="&#xE77B;" FontSize="18"
+                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="账号 UID" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind Uid}" FontSize="16" FontWeight="SemiBold"
+                                       IsTextSelectionEnabled="True" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Grid>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE783;" FontSize="16" VerticalAlignment="Center"
+                                  FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                  Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+                        <TextBlock Grid.Column="1" Text="将删除该账号及其全部统计记录。"
+                                   FontSize="13" LineHeight="20" TextWrapping="Wrap" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource ConfigHintBarStyle}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE74E;" FontSize="16" VerticalAlignment="Center"
+                              FontFamily="{StaticResource SymbolThemeFontFamily}"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="已导出的备份文件会保留。"
+                               FontSize="12" LineHeight="18" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</controls:AppContentDialog>

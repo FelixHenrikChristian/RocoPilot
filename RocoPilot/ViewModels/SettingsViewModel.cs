@@ -9,11 +9,11 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-using RocoPilot.Controls;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 using RocoPilot.Settings;
+using RocoPilot.Views;
 
 using Windows.ApplicationModel;
 
@@ -163,14 +163,9 @@ public partial class SettingsViewModel : ObservableRecipient
             return;
         }
 
-        var dialog = new AppContentDialog
+        var dialog = new SettingsResetDialog
         {
-            XamlRoot = xamlRoot,
-            Title = "重置设置",
-            Content = "将清除所有用户偏好，并立即关闭应用。是否继续？",
-            PrimaryButtonText = "重置并退出",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = xamlRoot
         };
 
         var result = await dialog.ShowAsync();

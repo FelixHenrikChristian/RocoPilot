@@ -165,21 +165,9 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var uidTextBox = new TextBox
+        var dialog = new StatisticsAccountAddDialog
         {
-            Header = "UID",
-            MaxLength = 32,
-            PlaceholderText = "请输入 UID"
-        };
-
-        var dialog = new AppContentDialog
-        {
-            XamlRoot = xamlRoot,
-            Title = "添加账号",
-            Content = uidTextBox,
-            PrimaryButtonText = "添加",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Primary
+            XamlRoot = xamlRoot
         };
 
         if (await dialog.ShowAsync() != ContentDialogResult.Primary)
@@ -187,11 +175,11 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        if (await ViewModel.AddAccountAsync(uidTextBox.Text))
+        if (await ViewModel.AddAccountAsync(dialog.Uid))
         {
             if (ViewModel.PendingUidConfirmation is not null)
             {
-                await ViewModel.ConfirmUidAsync(uidTextBox.Text);
+                await ViewModel.ConfirmUidAsync(dialog.Uid);
             }
 
             AccountSelectorFlyout.Hide();

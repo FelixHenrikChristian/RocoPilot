@@ -1,0 +1,53 @@
+<controls:AppContentDialog
+    x:Class="RocoPilot.Views.StatisticsAccountAddDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:controls="using:RocoPilot.Controls"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="添加账号"
+    PrimaryButtonText="添加"
+    PrimaryButtonStyle="{StaticResource DialogPrimaryButtonStyle}"
+    CloseButtonText="取消"
+    CloseButtonStyle="{StaticResource DialogButtonStyle}"
+    DefaultButton="Primary">
+
+    <ScrollViewer x:Name="AccountScrollViewer"
+                  HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="AccountContent" Spacing="12">
+            <Border Style="{StaticResource DialogCardStyle}" Padding="16">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="36" Height="36" CornerRadius="8"
+                            VerticalAlignment="Center"
+                            Background="{ThemeResource ControlFillColorDefaultBrush}">
+                        <FontIcon Glyph="&#xE77B;" FontSize="18"
+                                  FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                  Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    </Border>
+                    <TextBox x:Name="UidTextBox" Grid.Column="1"
+                             Header="账号 UID" MaxLength="32"
+                             PlaceholderText="请输入游戏内 UID"
+                             Style="{StaticResource DialogTextBoxStyle}" />
+                </Grid>
+            </Border>
+            <Border Style="{StaticResource ConfigHintBarStyle}">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE946;" FontSize="16" VerticalAlignment="Center"
+                              FontFamily="{StaticResource SymbolThemeFontFamily}"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="添加后将切换到该账号的统计记录。"
+                               FontSize="12" LineHeight="18" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </Grid>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</controls:AppContentDialog>

@@ -342,65 +342,8 @@ public sealed partial class StatisticsPage : Page
             return false;
         }
 
-        var content = new StackPanel
-        {
-            Width = 420,
-            Spacing = 14,
-            Children =
-            {
-                CreateDialogHeaderCard(
-                    "\uE74D",
-                    item.Name,
-                    $"{FormatSeasonDisplay(seasonId)} · 奇遇统计",
-                    "该操作会删除当前赛季中这个精灵的奇遇计数。",
-                    new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
-                    item.Avatar),
-            }
-        };
-
-        var detailGrid = new Grid
-        {
-            ColumnSpacing = 10,
-            RowSpacing = 10
-        };
-        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var countTile = CreateDialogInfoTile("\uE81D", "奇遇计数", $"{item.Count} 次");
-        var progressTile = CreateDialogInfoTile("\uE9D2", "保底进度", $"{Math.Clamp(item.Count / Math.Max(1, item.PityThreshold), 0, 1):P0}");
-        var latestTile = CreateDialogInfoTile("\uE787", "最近记录", item.LastCapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
-        Grid.SetColumn(progressTile, 1);
-        Grid.SetRow(latestTile, 1);
-        Grid.SetColumnSpan(latestTile, 2);
-        detailGrid.Children.Add(countTile);
-        detailGrid.Children.Add(progressTile);
-        detailGrid.Children.Add(latestTile);
-        content.Children.Add(detailGrid);
-        content.Children.Add(new Border
-        {
-            Padding = new Thickness(12),
-            Background = new SolidColorBrush(Color.FromArgb(0x12, 0xC4, 0x2B, 0x1C)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x2E, 0xC4, 0x2B, 0x1C)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Child = new TextBlock
-            {
-                Text = "删除奇遇统计不会删除已记录的异色精灵，但会影响后续保底计数判断。",
-                Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
-                TextWrapping = TextWrapping.Wrap
-            }
-        });
-
-        var dialog = new AppContentDialog
-        {
-            XamlRoot = xamlRoot,
-            Title = "删除奇遇条目",
-            Content = content,
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close
-        };
+        var dialog = StatisticsRecordDeleteDialog.ForEncounter(FormatSeasonDisplay(seasonId), item);
+        dialog.XamlRoot = xamlRoot;
 
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
     }
@@ -668,128 +611,10 @@ public sealed partial class StatisticsPage : Page
             return false;
         }
 
-        var dialog = new AppContentDialog
-        {
-            XamlRoot = xamlRoot,
-            Title = "删除异色记录",
-            Content = CreateShinyDeleteDialogContent(item),
-            PrimaryButtonText = "删除",
-            CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close
-        };
+        var dialog = StatisticsRecordDeleteDialog.ForShiny(item);
+        dialog.XamlRoot = xamlRoot;
 
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
-    }
-
-    private static StackPanel CreateShinyDeleteDialogContent(ShinyCaptureDetailItem item)
-    {
-        var content = new StackPanel
-        {
-            Width = 420,
-            Spacing = 14
-        };
-
-        content.Children.Add(CreateDialogHeaderCard(
-            "\uE74D",
-            item.Name,
-            $"{item.SeasonDisplay} · {item.PositionDisplay}",
-            "该操作只删除当前这一只异色记录。",
-            new SolidColorBrush(Color.FromArgb(0xFF, 0xC4, 0x2B, 0x1C)),
-            item.Avatar));
-
-        var detailGrid = new Grid
-        {
-            ColumnSpacing = 10,
-            RowSpacing = 10
-        };
-        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        detailGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        detailGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var encounterTile = CreateDialogInfoTile("\uE81D", "异色前奇遇", item.EncounterCountDisplay);
-        var dateTile = CreateDialogInfoTile("\uE787", "获得日期", item.CapturedDateDisplay);
-        var timeTile = CreateDialogInfoTile("\uE823", "获得时间", item.CapturedTimeDisplay);
-        Grid.SetColumn(dateTile, 1);
-        Grid.SetRow(timeTile, 1);
-        Grid.SetColumnSpan(timeTile, 2);
-        detailGrid.Children.Add(encounterTile);
-        detailGrid.Children.Add(dateTile);
-        detailGrid.Children.Add(timeTile);
-
-        content.Children.Add(detailGrid);
-        content.Children.Add(new Border
-        {
-            Padding = new Thickness(12),
-            Background = new SolidColorBrush(Color.FromArgb(0x12, 0xC4, 0x2B, 0x1C)),
-            BorderBrush = new SolidColorBrush(Color.FromArgb(0x2E, 0xC4, 0x2B, 0x1C)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8),
-            Child = new TextBlock
-            {
-                Text = "删除后不会清空或改动同名精灵的其他异色记录，也不会回滚奇遇计数。",
-                Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
-                TextWrapping = TextWrapping.Wrap
-            }
-        });
-        return content;
-    }
-
-    private static Border CreateDialogHeaderCard(
-        string glyph,
-        string title,
-        string subtitle,
-        string description,
-        Brush iconBrush,
-        BitmapImage? avatar = null)
-    {
-        var card = new Border
-        {
-            Style = (Style)Application.Current.Resources["DialogCardStyle"]
-        };
-        var grid = new Grid { ColumnSpacing = 12 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        var iconBox = new Border
-        {
-            Width = 42,
-            Height = 42,
-            VerticalAlignment = VerticalAlignment.Center,
-            Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
-            CornerRadius = new CornerRadius(8),
-            Child = CreateDialogAvatarContent(avatar, glyph, iconBrush, 19)
-        };
-        var textPanel = new StackPanel { Spacing = 3 };
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = title,
-            FontSize = 18,
-            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        });
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = subtitle,
-            FontSize = 13,
-            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x5F, 0x64, 0x73))),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            TextWrapping = TextWrapping.NoWrap
-        });
-        textPanel.Children.Add(new TextBlock
-        {
-            Text = description,
-            FontSize = 12,
-            Foreground = GetResourceBrush("TextFillColorTertiaryBrush", new SolidColorBrush(Color.FromArgb(0xFF, 0x72, 0x76, 0x83))),
-            TextWrapping = TextWrapping.Wrap
-        });
-
-        Grid.SetColumn(textPanel, 1);
-        grid.Children.Add(iconBox);
-        grid.Children.Add(textPanel);
-        card.Child = grid;
-        return card;
     }
 
     private static UIElement CreateDialogAvatarContent(

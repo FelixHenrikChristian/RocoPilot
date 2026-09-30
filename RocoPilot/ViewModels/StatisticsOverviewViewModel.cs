@@ -11,7 +11,7 @@ namespace RocoPilot.ViewModels;
 public sealed class StatisticsOverviewViewModel : ObservableObject
 {
     private AccountStatisticsData? _account;
-    private Func<string, BitmapImage?>? _avatarResolver;
+    private Func<string, BitmapImage?>? _shinyAvatarResolver;
     private int _selectedSeasonIndex;
     private int _selectedShinyScopeIndex;
     private bool _isRefreshing;
@@ -116,30 +116,32 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
     public Visibility PendingShinyNameHintVisibility => PendingShinyNameHint.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
 
     public IReadOnlyList<ShinyCaptureDetailItem> GetShinyCaptureDetails(SpiritCountItem item) =>
-        StatisticsProjection.BuildShinyCaptureDetails(_account, SelectedShinyScopeSeasonId, item.Name, _avatarResolver);
+        StatisticsProjection.BuildShinyCaptureDetails(_account, SelectedShinyScopeSeasonId, item.Name, _shinyAvatarResolver);
 
     internal void ApplyDocument(
         StatisticsDocument document,
         string? selectedUid,
         EncounterSeasonConfig seasonConfig,
-        Func<string, BitmapImage?>? avatarResolver = null)
+        Func<string, BitmapImage?>? avatarResolver = null,
+        Func<string, BitmapImage?>? shinyAvatarResolver = null)
     {
         var seasonId = SelectedSeason?.Id;
         var shinySeasonId = SelectedShinyScopeSeasonId;
         var accounts = StatisticsProjection.BuildAccounts(document);
         var account = document.Accounts.FirstOrDefault(item =>
             string.Equals(item.Uid, selectedUid, StringComparison.OrdinalIgnoreCase)) ?? document.Accounts.FirstOrDefault();
-        var seasons = StatisticsProjection.BuildSeasons(account, seasonConfig, avatarResolver);
+        shinyAvatarResolver ??= avatarResolver;
+        var seasons = StatisticsProjection.BuildSeasons(account, seasonConfig, avatarResolver, shinyAvatarResolver);
         var scopes = StatisticsProjection.BuildShinyScopes(seasons);
-        var shinyCounts = StatisticsProjection.BuildAllShinyCounts(account, avatarResolver);
-        var pendingCaptures = StatisticsProjection.BuildPendingShinyCaptures(account, avatarResolver);
+        var shinyCounts = StatisticsProjection.BuildAllShinyCounts(account, shinyAvatarResolver);
+        var pendingCaptures = StatisticsProjection.BuildPendingShinyCaptures(account, shinyAvatarResolver);
 
         // 先替换完整状态，再通知绑定；列表重建期间的 TwoWay 回写不能改变用户的筛选。
         _isRefreshing = true;
         try
         {
             _account = account;
-            _avatarResolver = avatarResolver;
+            _shinyAvatarResolver = shinyAvatarResolver;
             Accounts = accounts;
             SelectedAccount = accounts.FirstOrDefault(item => item.Uid == account?.Uid);
             Seasons = seasons;

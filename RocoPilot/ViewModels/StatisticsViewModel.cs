@@ -42,6 +42,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     private EncounterSeasonConfig _seasonConfig = new();
 
     private IReadOnlyDictionary<string, string> _spiritAvatarPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, string> _shinyAvatarPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
     public StatisticsOverviewViewModel Overview { get; } = new();
 
@@ -544,7 +545,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     {
         // 事件只表示需要刷新。处理 UI 队列时重新取值，避免旧事件回滚文档或账号选择。
         Overview.ApplyDocument(_statisticsService.CurrentDocument,
-            _statisticsService.SelectedAccountUid, _seasonConfig, ResolveSpiritAvatar);
+            _statisticsService.SelectedAccountUid, _seasonConfig, ResolveSpiritAvatar, ResolveShinyAvatar);
     }
 
     private void StatisticsUidCoordinatorService_PendingConfirmationChanged(object? sender, EventArgs e)
@@ -597,7 +598,9 @@ public partial class StatisticsViewModel : ObservableRecipient
     {
         try
         {
-            _spiritAvatarPaths = BuildSpiritAvatarPaths(await _spiritCatalogService.LoadAsync());
+            var catalog = await _spiritCatalogService.LoadAsync();
+            _spiritAvatarPaths = BuildSpiritAvatarPaths(catalog);
+            _shinyAvatarPaths = BuildSpiritAvatarPaths(catalog, shiny: true);
             RefreshStatistics();
         }
         catch (Exception ex)
@@ -606,13 +609,14 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
     }
 
-    private IReadOnlyDictionary<string, string> BuildSpiritAvatarPaths(SpiritCatalogDocument document)
+    private IReadOnlyDictionary<string, string> BuildSpiritAvatarPaths(SpiritCatalogDocument document, bool shiny = false)
     {
         var avatarPaths = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var item in document.Spirits)
         {
-            var path = _spiritCatalogService.ResolveAvatarPath(item.AvatarPath);
+            var path = (shiny ? _spiritCatalogService.ResolveAvatarPath(item.ShinyAvatarPath) : null)
+                ?? _spiritCatalogService.ResolveAvatarPath(item.AvatarPath);
             if (string.IsNullOrWhiteSpace(path))
             {
                 continue;
@@ -630,10 +634,14 @@ public partial class StatisticsViewModel : ObservableRecipient
         return avatarPaths;
     }
 
-    private BitmapImage? ResolveSpiritAvatar(string spiritName)
+    private BitmapImage? ResolveSpiritAvatar(string spiritName) => ResolveAvatar(spiritName, _spiritAvatarPaths);
+
+    private BitmapImage? ResolveShinyAvatar(string spiritName) => ResolveAvatar(spiritName, _shinyAvatarPaths);
+
+    private static BitmapImage? ResolveAvatar(string spiritName, IReadOnlyDictionary<string, string> avatarPaths)
     {
         var key = TextMatchingHelper.NormalizeSpiritNameForMatching(spiritName);
-        if (key.Length == 0 || !_spiritAvatarPaths.TryGetValue(key, out var path))
+        if (key.Length == 0 || !avatarPaths.TryGetValue(key, out var path))
         {
             return null;
         }

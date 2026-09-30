@@ -1,0 +1,82 @@
+<UserControl
+    x:Class="RocoPilot.Controls.PendingShinyConfirmationPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="ms-appx:///Styles/DialogControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Border
+        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+        BorderThickness="1"
+        CornerRadius="14">
+        <Grid RowSpacing="16" Padding="24,20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="确认暂存异色" Style="{StaticResource DialogTitleTextStyle}" />
+                <Border Grid.Column="1" Padding="10,4" CornerRadius="12"
+                        Background="{ThemeResource ControlFillColorDefaultBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="待确认" FontSize="12" />
+                        <TextBlock Text="{Binding PendingShinyCount}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+            <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="12">
+                    <Border Style="{StaticResource DialogCardStyle}">
+                        <StackPanel Spacing="12">
+                            <Border x:Name="NamePreviewHost" />
+                            <NumberBox Header="异色前奇遇次数" Minimum="0" SmallChange="1" LargeChange="5"
+                                       SpinButtonPlacementMode="Compact"
+                                       Value="{Binding PendingEditor.EncounterCount, Mode=TwoWay}" />
+                            <TextBlock Text="{Binding PendingShinyNameHint}"
+                                       Visibility="{Binding PendingShinyNameHintVisibility}"
+                                       Style="{StaticResource DialogDescriptionTextStyle}" />
+                            <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding PendingShinySeasonDisplay}" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Column="1" Text="{Binding PendingShinyDetectedAtDisplay}" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="确认后计入异色统计，并清空该精灵的当前赛季奇遇计数。"
+                               Style="{StaticResource DialogDescriptionTextStyle}" />
+                </StackPanel>
+            </ScrollViewer>
+            <Grid Grid.Row="2" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding PendingShinyQueueDisplay}" VerticalAlignment="Center"
+                           Style="{StaticResource DialogDescriptionTextStyle}" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="忽略此条" Click="DiscardButton_Click" />
+                    <Button Content="确认计入" Click="ConfirmButton_Click"
+                            Style="{StaticResource DialogPrimaryButtonStyle}" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

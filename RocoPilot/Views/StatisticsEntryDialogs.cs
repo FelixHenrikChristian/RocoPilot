@@ -4,6 +4,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 
 using RocoPilot.Controls;
+using RocoPilot.Contracts.Services.Spirits;
+using RocoPilot.Helpers;
+using Microsoft.UI.Xaml.Media.Imaging;
 using RocoPilot.ViewModels;
 
 using Windows.UI;
@@ -47,24 +50,19 @@ internal static class StatisticsEntryDialogs
         formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Grid.SetRow(countNumberBox, 1);
-        formGrid.Children.Add(nameTextBox);
+        formGrid.Children.Add(CreateNameWithAvatar(nameTextBox, shiny: false));
         formGrid.Children.Add(countNumberBox);
 
-        var isEdit = !string.IsNullOrWhiteSpace(name);
         var content = new StackPanel
         {
-            Width = 400,
+            Width = Math.Min(400, Math.Max(240, xamlRoot.Size.Width - 96)),
             Spacing = 14,
             Children =
             {
-                CreateDialogHeaderCard(
-                    isEdit ? name : "新增奇遇",
-                    "赛季奇遇统计",
-                    isEdit ? $"当前计数：{Math.Max(1, count)} 次" : "手动补充未被自动统计的奇遇记录。"),
                 CreateDialogSection(
                     "\uE81D",
                     "条目信息",
-                    "精灵名用于和当前赛季的奇遇统计记录匹配。",
+                    "",
                     formGrid)
             }
         };
@@ -73,7 +71,7 @@ internal static class StatisticsEntryDialogs
         {
             XamlRoot = xamlRoot,
             Title = title,
-            Content = content,
+            Content = CreateScrollableForm(content, xamlRoot),
             PrimaryButtonText = primaryButtonText,
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary
@@ -117,7 +115,17 @@ internal static class StatisticsEntryDialogs
         {
             Content = "清空该精灵奇遇计数",
             IsChecked = true,
+            CornerRadius = new CornerRadius(4),
             VerticalAlignment = VerticalAlignment.Center
+        };
+        resetEncounterCheckBox.Loaded += (_, _) =>
+        {
+            var rectangle = FindTemplateChild<Microsoft.UI.Xaml.Shapes.Rectangle>(resetEncounterCheckBox, "NormalRectangle");
+            if (rectangle is not null)
+            {
+                rectangle.RadiusX = 4;
+                rectangle.RadiusY = 4;
+            }
         };
         const string resetEncounterHelp = "需要清空：软件遗漏识别、手动补录等\n"
             + "无需清空：通过异色蛋等途径获取的异色，不占用奇遇保底";
@@ -157,6 +165,7 @@ internal static class StatisticsEntryDialogs
         var capturedDatePicker = new CalendarDatePicker
         {
             Header = "获取日期",
+            MinWidth = 0,
             Date = now,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
@@ -165,12 +174,13 @@ internal static class StatisticsEntryDialogs
             Header = "获取时间",
             Time = now.TimeOfDay,
             MinuteIncrement = 1,
-            MinWidth = 220,
+            MinWidth = 0,
+            ClockIdentifier = "24HourClock",
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var encounterCountNumberBox = new NumberBox
         {
-            Header = "异色前奇遇",
+            Header = "异色前奇遇次数",
             Minimum = 0,
             Value = double.NaN,
             IsEnabled = false,
@@ -179,19 +189,6 @@ internal static class StatisticsEntryDialogs
             LargeChange = 5,
             SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact
         };
-        var basicGrid = new Grid
-        {
-            RowSpacing = 12
-        };
-        basicGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        basicGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        basicGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Grid.SetRow(countNumberBox, 1);
-        Grid.SetRow(resetEncounterPanel, 2);
-        basicGrid.Children.Add(nameTextBox);
-        basicGrid.Children.Add(countNumberBox);
-        basicGrid.Children.Add(resetEncounterPanel);
-
         var manualEncounterCount = 0d;
         resetEncounterCheckBox.Checked += (_, _) =>
         {
@@ -205,51 +202,42 @@ internal static class StatisticsEntryDialogs
             encounterCountNumberBox.Value = manualEncounterCount;
         };
 
-        var captureGrid = new Grid
+        var formGrid = new Grid { ColumnSpacing = 12, RowSpacing = 12 };
+        formGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        formGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        for (var row = 0; row < 4; row++)
         {
-            RowSpacing = 12
-        };
-        captureGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        captureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        captureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        captureGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        Grid.SetRow(capturedTimePicker, 1);
-        Grid.SetRow(encounterCountNumberBox, 2);
-        captureGrid.Children.Add(capturedDatePicker);
-        captureGrid.Children.Add(capturedTimePicker);
-        captureGrid.Children.Add(encounterCountNumberBox);
+            formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+        var nameWithAvatar = CreateNameWithAvatar(nameTextBox, shiny: true);
+        Grid.SetColumnSpan(nameWithAvatar, 2);
+        Grid.SetRow(countNumberBox, 1);
+        Grid.SetRow(encounterCountNumberBox, 1);
+        Grid.SetColumn(encounterCountNumberBox, 1);
+        var capturedDateField = CreateDateTimeField("获取日期", capturedDatePicker);
+        var capturedTimeField = CreateDateTimeField("获取时间", capturedTimePicker);
+        Grid.SetRow(capturedDateField, 2);
+        Grid.SetRow(capturedTimeField, 2);
+        Grid.SetColumn(capturedTimeField, 1);
+        Grid.SetRow(resetEncounterPanel, 3);
+        Grid.SetColumnSpan(resetEncounterPanel, 2);
+        formGrid.Children.Add(nameWithAvatar);
+        formGrid.Children.Add(countNumberBox);
+        formGrid.Children.Add(encounterCountNumberBox);
+        formGrid.Children.Add(capturedDateField);
+        formGrid.Children.Add(capturedTimeField);
+        formGrid.Children.Add(resetEncounterPanel);
+        ToolTipService.SetToolTip(encounterCountNumberBox,
+            "勾选清空时自动记录清空前的奇遇次数；未勾选时可自行填写。");
+        encounterCountNumberBox.PlaceholderText = "使用当前计数";
 
-        var content = new StackPanel
+        var content = new Border
         {
-            Width = 440,
-            Spacing = 14,
-            Children =
-            {
-                CreateDialogHeaderCard(
-                    "新增异色",
-                    "异色精灵统计",
-                    "手动记录获得的异色精灵。"),
-                CreateDialogSection(
-                    "\uE71C",
-                    "基础信息",
-                    "新增记录会计入异色统计列表。",
-                    basicGrid),
-                CreateDialogSection(
-                    "\uE787",
-                    "获取信息",
-                    "勾选清空时自动记录清空前的奇遇次数；未勾选时可自行填写。",
-                    captureGrid)
-            }
+            Width = Math.Min(440, Math.Max(240, xamlRoot.Size.Width - 96)),
+            Style = (Style)Application.Current.Resources["DialogCardStyle"],
+            Child = formGrid
         };
-        var scrollViewer = new ScrollViewer
-        {
-            MaxHeight = 560,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            HorizontalScrollMode = ScrollMode.Disabled,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollMode = ScrollMode.Auto,
-            Content = content
-        };
+        var scrollViewer = CreateScrollableForm(content, xamlRoot);
 
         var dialog = new AppContentDialog
         {
@@ -302,7 +290,7 @@ internal static class StatisticsEntryDialogs
         };
         var encounterCountNumberBox = new NumberBox
         {
-            Header = "异色前奇遇",
+            Header = "异色前奇遇次数",
             Minimum = 0,
             Value = item.EncounterCountBeforeCapture,
             SmallChange = 1,
@@ -312,6 +300,7 @@ internal static class StatisticsEntryDialogs
         var capturedDatePicker = new CalendarDatePicker
         {
             Header = "获取日期",
+            MinWidth = 0,
             Date = capturedAt,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
@@ -320,6 +309,8 @@ internal static class StatisticsEntryDialogs
             Header = "获取时间",
             Time = capturedAt.TimeOfDay,
             MinuteIncrement = 1,
+            MinWidth = 0,
+            ClockIdentifier = "24HourClock",
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
         var formGrid = new Grid
@@ -333,32 +324,36 @@ internal static class StatisticsEntryDialogs
         formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         formGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        Grid.SetColumnSpan(nameTextBox, 2);
+        var nameWithAvatar = CreateNameWithAvatar(nameTextBox, shiny: true);
+        Grid.SetColumnSpan(nameWithAvatar, 2);
         Grid.SetRow(encounterCountNumberBox, 1);
         Grid.SetColumnSpan(encounterCountNumberBox, 2);
-        Grid.SetRow(capturedDatePicker, 2);
-        Grid.SetRow(capturedTimePicker, 2);
-        Grid.SetColumn(capturedTimePicker, 1);
-        formGrid.Children.Add(nameTextBox);
+        var capturedDateField = CreateDateTimeField("获取日期", capturedDatePicker);
+        var capturedTimeField = CreateDateTimeField("获取时间", capturedTimePicker);
+        Grid.SetRow(capturedDateField, 2);
+        Grid.SetRow(capturedTimeField, 2);
+        Grid.SetColumn(capturedTimeField, 1);
+        formGrid.Children.Add(nameWithAvatar);
         formGrid.Children.Add(encounterCountNumberBox);
-        formGrid.Children.Add(capturedDatePicker);
-        formGrid.Children.Add(capturedTimePicker);
+        formGrid.Children.Add(capturedDateField);
+        formGrid.Children.Add(capturedTimeField);
 
         var content = new StackPanel
         {
-            Width = 440,
+            Width = Math.Min(440, Math.Max(240, xamlRoot.Size.Width - 96)),
             Spacing = 14,
             Children =
             {
-                CreateDialogHeaderCard(
-                    item.Name,
-                    $"{item.SeasonDisplay} · {item.PositionDisplay}",
-                    $"当前记录：{item.EncounterCountDisplay}，{item.CapturedDateDisplay} {item.CapturedTimeDisplay}"),
-                CreateDialogSection(
-                    "\uE71C",
-                    "记录信息",
-                    "修改后只影响当前这一只异色记录。",
-                    formGrid)
+                new TextBlock
+                {
+                    Text = $"{item.SeasonDisplay} · {item.PositionDisplay}",
+                    Style = (Style)Application.Current.Resources["DialogDescriptionTextStyle"]
+                },
+                new Border
+                {
+                    Style = (Style)Application.Current.Resources["DialogCardStyle"],
+                    Child = formGrid
+                }
             }
         };
 
@@ -366,7 +361,7 @@ internal static class StatisticsEntryDialogs
         {
             XamlRoot = xamlRoot,
             Title = "编辑异色记录",
-            Content = content,
+            Content = CreateScrollableForm(content, xamlRoot),
             PrimaryButtonText = "保存",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary
@@ -386,21 +381,157 @@ internal static class StatisticsEntryDialogs
             ResolveCapturedAt(capturedDatePicker, capturedTimePicker, capturedAt));
     }
 
-    private static Border CreateDialogHeaderCard(string title, string subtitle, string description)
+    private static StackPanel CreateDateTimeField(string label, Control picker)
     {
-        return new Border
+        const double fieldHeight = 34;
+        picker.Height = fieldHeight;
+        picker.MinWidth = 0;
+        picker.CornerRadius = new CornerRadius(8);
+        picker.VerticalAlignment = VerticalAlignment.Top;
+        AutomationProperties.SetName(picker, label);
+        if (picker is CalendarDatePicker datePicker)
         {
-            Style = (Style)Application.Current.Resources["DialogCardStyle"],
-            Child = new StackPanel
+            datePicker.Header = null;
+        }
+        else if (picker is TimePicker timePicker)
+        {
+            timePicker.Header = null;
+            // The native TimePicker template has a minimum width on its inner
+            // button, independent of the control's own MinWidth.
+            timePicker.Resources["TimePickerThemeMinWidth"] = 0d;
+            timePicker.Loaded += (_, _) =>
             {
-                Spacing = 6,
-                Children =
+                var button = FindTemplateChild<Button>(timePicker, "FlyoutButton");
+                if (button is not null)
                 {
-                    new TextBlock { Text = title, Style = (Style)Application.Current.Resources["DialogSectionTitleStyle"] },
-                    new TextBlock { Text = subtitle, Style = (Style)Application.Current.Resources["DialogDescriptionTextStyle"] },
-                    new TextBlock { Text = description, Style = (Style)Application.Current.Resources["DialogDescriptionTextStyle"] }
+                    button.MinWidth = 0;
+                    button.Height = fieldHeight;
+                    button.CornerRadius = timePicker.CornerRadius;
+                    button.ApplyTemplate();
+                    // Apply the radius to the element that paints the background,
+                    // including templates that do not forward the picker's radius.
+                    var presenter = FindTemplateChild<ContentPresenter>(button, "ContentPresenter");
+                    if (presenter is not null)
+                    {
+                        presenter.CornerRadius = timePicker.CornerRadius;
+                    }
                 }
+            };
+        }
+
+        return new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                new TextBlock { Text = label },
+                picker
             }
+        };
+    }
+
+    private static T? FindTemplateChild<T>(DependencyObject parent, string name) where T : FrameworkElement
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is T element && element.Name == name) return element;
+            if (FindTemplateChild<T>(child, name) is { } match) return match;
+        }
+        return null;
+    }
+
+    private static Grid CreateNameWithAvatar(TextBox nameInput, bool shiny)
+    {
+        var service = App.GetService<ISpiritCatalogService>();
+        var avatars = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        var image = new Image { Width = 44, Height = 44, Stretch = Stretch.Uniform };
+        var placeholder = new FontIcon
+        {
+            Glyph = "\uE77B",
+            FontSize = 22,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            FontFamily = Application.Current.Resources["SymbolThemeFontFamily"] as FontFamily
+        };
+        var preview = new Grid();
+        preview.Children.Add(placeholder);
+        preview.Children.Add(image);
+        var avatar = new Border
+        {
+            Width = 52,
+            Height = 52,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            CornerRadius = new CornerRadius(8),
+            Background = (Brush)Application.Current.Resources["ControlFillColorDefaultBrush"],
+            Child = preview
+        };
+        var row = new Grid { ColumnSpacing = 12 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(nameInput, 1);
+        row.Children.Add(avatar);
+        row.Children.Add(nameInput);
+
+        void UpdatePreview()
+        {
+            image.Source = null;
+            placeholder.Visibility = Visibility.Visible;
+            var key = TextMatchingHelper.NormalizeSpiritNameForMatching(nameInput.Text);
+            if (key.Length == 0 || !avatars.TryGetValue(key, out var path) ||
+                string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                ToolTipService.SetToolTip(avatar, "暂无匹配的精灵图片");
+                return;
+            }
+
+            image.Source = new BitmapImage(new Uri(path, UriKind.Absolute));
+            ToolTipService.SetToolTip(avatar, nameInput.Text.Trim());
+        }
+
+        image.ImageOpened += (_, _) => placeholder.Visibility = Visibility.Collapsed;
+        image.ImageFailed += (_, _) => placeholder.Visibility = Visibility.Visible;
+        nameInput.TextChanged += (_, _) => UpdatePreview();
+        var active = false;
+        row.Unloaded += (_, _) => active = false;
+        row.Loaded += async (_, _) =>
+        {
+            active = true;
+            try
+            {
+                var catalog = await service.LoadAsync();
+                if (!active) return;
+                avatars.Clear();
+                foreach (var item in catalog.Spirits)
+                {
+                    var path = service.ResolveAvatarPath(shiny && !string.IsNullOrWhiteSpace(item.ShinyAvatarPath)
+                        ? item.ShinyAvatarPath : item.AvatarPath);
+                    foreach (var name in new[] { item.Name, item.WikiName }.Concat(item.Aliases))
+                    {
+                        var key = TextMatchingHelper.NormalizeSpiritNameForMatching(name);
+                        if (key.Length > 0) avatars.TryAdd(key, path);
+                    }
+                }
+                UpdatePreview();
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "统计条目头像预览加载失败");
+            }
+        };
+        UpdatePreview();
+        return row;
+    }
+
+    private static ScrollViewer CreateScrollableForm(UIElement content, XamlRoot xamlRoot)
+    {
+        return new ScrollViewer
+        {
+            MaxHeight = Math.Min(560, Math.Max(120, xamlRoot.Size.Height - 200)),
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Disabled,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollMode = ScrollMode.Auto,
+            Content = content
         };
     }
 
@@ -427,13 +558,16 @@ internal static class StatisticsEntryDialogs
             Text = title,
             FontWeight = Microsoft.UI.Text.FontWeights.SemiBold
         });
-        textPanel.Children.Add(new TextBlock
+        if (!string.IsNullOrWhiteSpace(subtitle))
         {
-            Text = subtitle,
-            FontSize = 12,
-            Foreground = GetResourceBrush("TextFillColorSecondaryBrush", CreateBrush(0xFF, 0x72, 0x76, 0x83)),
-            TextWrapping = TextWrapping.Wrap
-        });
+            textPanel.Children.Add(new TextBlock
+            {
+                Text = subtitle,
+                FontSize = 12,
+                Foreground = GetResourceBrush("TextFillColorSecondaryBrush", CreateBrush(0xFF, 0x72, 0x76, 0x83)),
+                TextWrapping = TextWrapping.Wrap
+            });
+        }
         Grid.SetColumn(textPanel, 1);
         header.Children.Add(textPanel);
         panel.Children.Add(header);

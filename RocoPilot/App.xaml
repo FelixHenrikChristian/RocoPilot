@@ -6,12 +6,12 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <ResourceDictionary Source="/Styles/FontSizes.xaml" />
-                <ResourceDictionary Source="/Styles/Thickness.xaml" />
-                <ResourceDictionary Source="/Styles/TextBlock.xaml" />
-                <ResourceDictionary Source="/Styles/Cards.xaml" />
-                <ResourceDictionary Source="/Styles/Dialogs.xaml" />
-                <ResourceDictionary Source="/Styles/InfoBar.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/FontSizes.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Thickness.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/TextBlock.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Cards.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/Dialogs.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/InfoBar.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>

@@ -99,7 +99,7 @@
                     <Button
                         CornerRadius="8"
                         Command="{x:Bind ViewModel.ClearCommand}"
-                        ToolTipService.ToolTip="清空当前显示（文件日志不受影响）">
+                        ToolTipService.ToolTip="清空内存日志（文件日志不受影响）">
                         <FontIcon
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="14"

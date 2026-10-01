@@ -446,21 +446,41 @@
                         <InfoBadge Value="{x:Bind ViewModel.Overview.PendingEncounterCount, Mode=OneWay}" />
                     </StackPanel>
                 </Button>
-                <Grid VerticalAlignment="Center">
+                <Grid Width="28" Height="28" VerticalAlignment="Center" Background="Transparent">
+                    <ToolTipService.ToolTip>
+                        <ToolTip>
+                            <TextBlock MaxWidth="360" TextWrapping="Wrap"
+                                       Text="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}" />
+                        </ToolTip>
+                    </ToolTipService.ToolTip>
                     <FontIcon
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                         FontSize="16"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Glyph="&#xE753;"
-                        ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                        AutomationProperties.Name="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
                         Visibility="{x:Bind ViewModel.SyncDisabledIconVisibility, Mode=OneWay}" />
                     <FontIcon
                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                         FontSize="16"
-                        Foreground="#FF107C10"
+                        Foreground="{ThemeResource SystemFillColorSuccessBrush}"
                         Glyph="&#xE753;"
-                        ToolTipService.ToolTip="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
-                        Visibility="{x:Bind ViewModel.SyncEnabledIconVisibility, Mode=OneWay}" />
+                        AutomationProperties.Name="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SyncNormalIconVisibility, Mode=OneWay}" />
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="16"
+                        Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                        Glyph="&#xE753;"
+                        AutomationProperties.Name="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SyncWarningIconVisibility, Mode=OneWay}" />
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="16"
+                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                        Glyph="&#xE753;"
+                        AutomationProperties.Name="{x:Bind ViewModel.SyncStatusToolTip, Mode=OneWay}"
+                        Visibility="{x:Bind ViewModel.SyncErrorIconVisibility, Mode=OneWay}" />
                 </Grid>
             </StackPanel>
 

@@ -146,6 +146,84 @@ public sealed class StatisticsViewModelTests
     }
 
     [TestMethod]
+    public async Task SyncIconReflectsFailureIncompleteConfigurationAndRecovery()
+    {
+        var (service, _) = await CreateServiceAsync();
+        var sync = new StatisticsSyncStub();
+        var viewModel = CreateViewModel(service, sync: sync);
+        var notified = new List<string?>();
+        viewModel.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+        sync.SetStatus(new StatisticsSyncStatus { IsEnabled = true, IsConfigured = true });
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncNormalIconVisibility);
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncDisabledIconVisibility);
+
+        sync.SetStatus(new StatisticsSyncStatus
+        {
+            IsEnabled = true, IsConfigured = true, HasError = true,
+            ErrorMessage = "自动上传统计失败：网络中断\n请稍后重试"
+        });
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncErrorIconVisibility);
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncNormalIconVisibility);
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncWarningIconVisibility);
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "自动上传统计失败：网络中断\n请稍后重试");
+        CollectionAssert.Contains(notified, nameof(viewModel.SyncErrorIconVisibility));
+
+        sync.SetStatus(new StatisticsSyncStatus { IsEnabled = true, IsConfigured = false });
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncWarningIconVisibility);
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncErrorIconVisibility);
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "配置不完整");
+
+        sync.SetStatus(new StatisticsSyncStatus { IsEnabled = false });
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncDisabledIconVisibility);
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncNormalIconVisibility);
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncWarningIconVisibility);
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "未启用");
+
+        sync.SetStatus(new StatisticsSyncStatus { IsEnabled = true, IsConfigured = true, Message = "已自动上传统计数据" });
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncNormalIconVisibility);
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "已自动上传统计数据");
+        Assert.IsFalse(viewModel.SyncStatusToolTip.Contains("网络中断", StringComparison.Ordinal));
+        StringAssert.StartsWith(viewModel.SyncStatusToolTip, "云同步：已启用\n");
+
+        sync.SetStatus(new StatisticsSyncStatus
+        {
+            IsEnabled = true, IsConfigured = true, ProviderName = "Cloudflare R2",
+            Message = "已自动上传统计数据", RemoteLastModifiedAt = DateTimeOffset.Now
+        });
+        StringAssert.StartsWith(viewModel.SyncStatusToolTip, "云同步：已启用\nCloudflare R2 · 云端 ");
+        Assert.AreEqual(2, viewModel.SyncStatusToolTip.Split('\n').Length);
+
+        sync.SetStatus(new StatisticsSyncStatus
+        {
+            IsEnabled = true, IsConfigured = true, IsBusy = true, ProviderName = "Cloudflare R2",
+            Message = "正在自动上传统计数据", RemoteLastModifiedAt = DateTimeOffset.Now
+        });
+        Assert.AreEqual("云同步：已启用\nCloudflare R2 · 正在自动上传统计数据", viewModel.SyncStatusToolTip);
+    }
+
+    [TestMethod]
+    public async Task QueuedSyncEventsShowLatestFailureAndKeepDetailsWhileRetrying()
+    {
+        var (service, _) = await CreateServiceAsync();
+        var queue = new ConcurrentQueue<Action>();
+        var sync = new StatisticsSyncStub();
+        var viewModel = CreateViewModel(service, dispatch: queue.Enqueue, sync: sync);
+        sync.SetStatus(new StatisticsSyncStatus { IsBusy = true, Message = "正在自动上传" });
+        sync.SetStatus(new StatisticsSyncStatus { HasError = true, ErrorMessage = "自动上传失败" });
+        foreach (var action in queue.ToArray().Reverse()) action();
+        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncErrorIconVisibility);
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "自动上传失败");
+
+        sync.SetStatus(new StatisticsSyncStatus
+        {
+            IsBusy = true, HasError = true, Message = "正在测试连接", ErrorMessage = "自动上传失败"
+        });
+        queue.Last()();
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "正在测试连接");
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "上次失败：自动上传失败");
+    }
+
+    [TestMethod]
     public async Task DelayedSyncEventCannotRestoreOldBusyStatus()
     {
         var (service, _) = await CreateServiceAsync();

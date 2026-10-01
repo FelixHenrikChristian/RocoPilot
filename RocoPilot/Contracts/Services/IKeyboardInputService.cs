@@ -10,6 +10,9 @@ public interface IKeyboardInputService
 
     bool RequiresForeground(KeyboardInputMethod method);
 
+    /// <summary>检查并准备输入方式所需的驱动和设备，不发送按键；不可用时抛出异常。</summary>
+    void EnsureReady(KeyboardInputMethod method);
+
     bool TryParseSequence(
         string sequence,
         out IReadOnlyList<KeyStroke> keyStrokes,

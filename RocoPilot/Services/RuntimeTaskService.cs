@@ -209,6 +209,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 return RuntimeTaskStartResult.Failed(missingWindowMessage);
             }
 
+            if (autoBattleSettings.IsEnabled)
+            {
+                // 初始化驱动和键盘设备可能阻塞；启动前检查不发送任何按键。
+                await Task.Run(() => _keyboardInputService.EnsureReady(autoBattleSettings.KeyboardInputMethod), cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+
             var shouldBringGameWindowToForeground =
                 ShouldBringGameWindowToForegroundOnStart(autoBattleSettings);
             var broughtGameWindowToForeground = false;

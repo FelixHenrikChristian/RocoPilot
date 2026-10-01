@@ -54,6 +54,7 @@ public sealed class AutoBattleInputExecutorTests
         public bool IsWindowAvailable(nint hwnd) => true;
         public bool IsWindowForeground(nint hwnd) => Foreground;
         public bool RequiresForeground(KeyboardInputMethod method) => method != KeyboardInputMethod.PostMessage;
+        public void EnsureReady(KeyboardInputMethod method) { }
         public bool TryParseSequence(string sequence, out IReadOnlyList<KeyStroke> strokes, out string error)
         {
             strokes = sequence == "invalid" ? [] : [new KeyStroke([], new KeyDefinition("1", 49))];

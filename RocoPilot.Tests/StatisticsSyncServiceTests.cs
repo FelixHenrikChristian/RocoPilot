@@ -92,6 +92,84 @@ public sealed class StatisticsSyncServiceTests
     }
 
     [TestMethod]
+    public async Task FailedUploadStatusSurvivesPageReloadAndClearsAfterSuccess()
+    {
+        var (sync, _, remote, _) = await CreateAsync();
+        await using var lifetime = sync;
+        await sync.LoadStatusAsync();
+        remote.OnRead = (_, _) => throw new IOException("网络连接中断");
+
+        await Assert.ThrowsExactlyAsync<IOException>(() => sync.UploadAsync());
+        var failed = await sync.LoadStatusAsync();
+        Assert.IsTrue(failed.HasError);
+        Assert.IsFalse(failed.IsBusy);
+        StringAssert.Contains(failed.ErrorMessage, "上传统计失败：网络连接中断");
+        Assert.AreEqual(failed.ErrorMessage, failed.Message);
+
+        // Returned snapshots cannot clear the service's failure state.
+        failed.HasError = false;
+        failed.ErrorMessage = string.Empty;
+        Assert.IsTrue(sync.CurrentStatus.HasError);
+        StringAssert.Contains(sync.CurrentStatus.ErrorMessage, "网络连接中断");
+
+        remote.OnRead = (_, _) => Task.FromResult(new StatisticsSyncRemoteInfo());
+        remote.OnUpload = (_, _, _) => Task.FromResult(Success("v1"));
+        await sync.UploadAsync();
+        Assert.IsFalse(sync.CurrentStatus.HasError);
+        Assert.AreEqual(string.Empty, sync.CurrentStatus.ErrorMessage);
+    }
+
+    [TestMethod]
+    public async Task RetryingConnectionKeepsFailureDetailsUntilSuccess()
+    {
+        var (sync, _, remote, _) = await CreateAsync();
+        await using var lifetime = sync;
+        remote.OnRead = (_, _) => throw new IOException("连接失败");
+        await Assert.ThrowsExactlyAsync<IOException>(() => sync.TestConnectionAsync());
+        var failure = sync.CurrentStatus.ErrorMessage;
+        using var pause = new AsyncPause();
+        remote.OnRead = async (_, _) =>
+        {
+            await pause.PauseAsync(string.Empty);
+            return new StatisticsSyncRemoteInfo();
+        };
+
+        var retry = sync.TestConnectionAsync();
+        await pause.WaitUntilEnteredAsync();
+        var status = await sync.LoadStatusAsync();
+        Assert.IsTrue(status.IsBusy);
+        Assert.IsTrue(status.HasError);
+        Assert.AreEqual(failure, status.ErrorMessage);
+        pause.Dispose();
+        await retry;
+        Assert.IsFalse(sync.CurrentStatus.HasError);
+    }
+
+    [TestMethod]
+    public async Task AutomaticUploadFailurePublishesPersistentErrorStatus()
+    {
+        var (sync, statistics, remote, _) = await CreateAsync((_, _) => Task.CompletedTask);
+        await using var lifetime = sync;
+        remote.OnRead = (_, _) => throw new IOException("云端不可达");
+        var failure = new TaskCompletionSource<StatisticsSyncStatus>(TaskCreationOptions.RunContinuationsAsynchronously);
+        sync.StatusChanged += (_, e) =>
+        {
+            if (e.Status.HasError) failure.TrySetResult(e.Status);
+        };
+
+        await statistics.UpsertEncounterAsync("S1", "精灵", 1, DateTimeOffset.Now);
+        var status = await failure.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        StringAssert.Contains(status.ErrorMessage, "自动上传统计失败：云端不可达");
+        Assert.IsTrue((await sync.LoadStatusAsync()).HasError);
+
+        var settings = await sync.LoadSettingsAsync();
+        settings.IsEnabled = false;
+        await sync.SaveSettingsAsync(settings, null);
+        Assert.IsFalse(sync.CurrentStatus.HasError);
+        Assert.IsFalse(sync.CurrentStatus.IsEnabled);
+    }
+
+    [TestMethod]
     public async Task ReadingStatusDuringUploadPreservesBusyMessage()
     {
         var (sync, _, remote, _) = await CreateAsync();

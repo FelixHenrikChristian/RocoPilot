@@ -59,6 +59,10 @@ public sealed class StatisticsSyncStatus
 
     public bool IsBusy { get; set; }
 
+    public bool HasError { get; set; }
+
+    public string ErrorMessage { get; set; } = string.Empty;
+
     public string ProviderId { get; set; } = string.Empty;
 
     public string ProviderName { get; set; } = "未配置";

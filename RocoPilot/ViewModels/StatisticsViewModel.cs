@@ -89,17 +89,47 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public string SyncStatusSummary => BuildSyncStatusSummary(_syncStatus);
 
-    public string SyncStatusToolTip => string.IsNullOrWhiteSpace(_syncStatus.Message)
-        ? SyncStatusSummary
-        : $"{SyncStatusSummary}\n{_syncStatus.Message}";
+    public string SyncStatusToolTip
+    {
+        get
+        {
+            if (!_syncStatus.HasError && _syncStatus.IsEnabled && _syncStatus.IsConfigured)
+            {
+                var info = _syncStatus.IsBusy
+                    ? $"{_syncStatus.ProviderName} · {_syncStatus.Message}"
+                    : SyncStatusSummary;
+                return $"云同步：已启用\n{info}";
+            }
 
-    public Visibility SyncEnabledIconVisibility => _syncStatus.IsEnabled
+            var detail = _syncStatus.HasError ? _syncStatus.ErrorMessage : _syncStatus.Message;
+            var summary = SyncStatusSummary;
+            if (_syncStatus.IsBusy && _syncStatus.HasError)
+            {
+                return $"{summary}\n{_syncStatus.Message}\n上次失败：{detail}";
+            }
+            return string.IsNullOrWhiteSpace(detail) || summary.Contains(detail, StringComparison.Ordinal)
+                ? summary
+                : $"{summary}\n{detail}";
+        }
+    }
+
+    public Visibility SyncNormalIconVisibility => !_syncStatus.HasError
+        && _syncStatus.IsEnabled && _syncStatus.IsConfigured
         ? Visibility.Visible
         : Visibility.Collapsed;
 
-    public Visibility SyncDisabledIconVisibility => _syncStatus.IsEnabled
-        ? Visibility.Collapsed
-        : Visibility.Visible;
+    public Visibility SyncDisabledIconVisibility => !_syncStatus.HasError && !_syncStatus.IsEnabled
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public Visibility SyncWarningIconVisibility => !_syncStatus.HasError
+        && _syncStatus.IsEnabled && !_syncStatus.IsConfigured
+        ? Visibility.Visible
+        : Visibility.Collapsed;
+
+    public Visibility SyncErrorIconVisibility => _syncStatus.HasError
+        ? Visibility.Visible
+        : Visibility.Collapsed;
 
     public bool IsSyncBusy => _syncStatus.IsBusy;
 
@@ -576,8 +606,10 @@ public partial class StatisticsViewModel : ObservableRecipient
         _syncStatus = status;
         OnPropertyChanged(nameof(SyncStatusSummary));
         OnPropertyChanged(nameof(SyncStatusToolTip));
-        OnPropertyChanged(nameof(SyncEnabledIconVisibility));
+        OnPropertyChanged(nameof(SyncNormalIconVisibility));
         OnPropertyChanged(nameof(SyncDisabledIconVisibility));
+        OnPropertyChanged(nameof(SyncWarningIconVisibility));
+        OnPropertyChanged(nameof(SyncErrorIconVisibility));
         OnPropertyChanged(nameof(IsSyncBusy));
     }
 
@@ -703,6 +735,11 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     private static string BuildSyncStatusSummary(StatisticsSyncStatus status)
     {
+        if (status.HasError)
+        {
+            return "云同步：发生错误";
+        }
+
         if (!status.IsEnabled)
         {
             return "云同步：未启用";

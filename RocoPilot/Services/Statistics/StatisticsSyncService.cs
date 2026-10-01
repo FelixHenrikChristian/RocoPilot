@@ -519,7 +519,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         StatisticsSyncStatus snapshot;
         lock (_statusGate)
         {
-            if (onlyWhenIdle && _status.IsBusy) return;
+            // Reading status must not dismiss a failure when the page is reopened.
+            if (onlyWhenIdle && (_status.IsBusy || _status.HasError)) return;
             var provider = ResolveProvider(settings.ProviderId);
             _status = new StatisticsSyncStatus
             {
@@ -549,7 +550,16 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
     private void SetFailureStatus(string title, Exception exception)
     {
         _logger.LogWarning(exception, "{Title}", title);
-        SetBusy(false, $"{title}：{exception.Message}");
+        StatisticsSyncStatus snapshot;
+        lock (_statusGate)
+        {
+            _status.IsBusy = false;
+            _status.HasError = true;
+            _status.ErrorMessage = $"{title}：{exception.Message}";
+            _status.Message = _status.ErrorMessage;
+            snapshot = CloneStatus(_status);
+        }
+        StatusChanged?.Invoke(this, new StatisticsSyncStatusChangedEventArgs(snapshot));
     }
 
     private CancellationTokenSource CreateOperationCancellation(CancellationToken cancellationToken)

@@ -331,6 +331,8 @@ internal static class StatisticsSyncRules
             IsConfigured = status.IsConfigured,
             IsEnabled = status.IsEnabled,
             IsBusy = status.IsBusy,
+            HasError = status.HasError,
+            ErrorMessage = status.ErrorMessage,
             ProviderId = status.ProviderId,
             ProviderName = status.ProviderName,
             Message = status.Message,

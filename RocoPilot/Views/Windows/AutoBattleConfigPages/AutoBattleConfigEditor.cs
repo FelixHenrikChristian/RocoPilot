@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -15,6 +16,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private const string SkillPlaceholder = "{skill}";
 
     private readonly IKeyboardInputService _keyboardInputService;
+    private readonly HashSet<AutoBattlePresetEditorItem> _observedPresets = [];
 
     public ObservableCollection<AutoBattleReleaseEditorItem> NormalReleaseItems
     {
@@ -239,7 +241,8 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
         NormalReleaseItems.Add(AutoBattleReleaseEditorItem.CreateCustom(
             preset.Name.Trim(),
-            preset.Sequence.Trim()));
+            preset.Sequence.Trim(),
+            preset.Id));
         return true;
     }
 
@@ -282,6 +285,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
             presets.Add(new AutoBattleTurnSequencePreset
             {
+                Id = preset.Id,
                 Name = name,
                 Sequence = sequence
             });
@@ -318,6 +322,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         {
             SharedPresetItems.Add(new AutoBattlePresetEditorItem
             {
+                Id = preset.Id,
                 Name = preset.Name,
                 Sequence = preset.Sequence
             });
@@ -364,7 +369,9 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
                         item.Name,
                         item.Sequence,
                         item.DisplayText,
-                        section,
+                        SharedPresetItems.Any(preset => preset.Id == item.PresetId)
+                            ? AutoBattleConfigSection.SharedSequences
+                            : section,
                         out error))
                 {
                     return false;
@@ -372,7 +379,8 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
                 releaseSequence.Add(AutoBattleReleaseStep.CreateCustom(
                     item.Name.Trim(),
-                    item.Sequence.Trim()));
+                    item.Sequence.Trim(),
+                    item.PresetId));
                 continue;
             }
 
@@ -443,9 +451,38 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     private void SharedPresetItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
+        foreach (var removed in _observedPresets.Where(preset => !SharedPresetItems.Contains(preset)).ToArray())
+        {
+            removed.PropertyChanged -= SharedPreset_PropertyChanged;
+            _observedPresets.Remove(removed);
+        }
+
+        foreach (var preset in SharedPresetItems)
+        {
+            if (_observedPresets.Add(preset))
+            {
+                preset.PropertyChanged += SharedPreset_PropertyChanged;
+            }
+        }
+
         OnPropertyChanged(nameof(SharedPresetEmptyVisibility));
         OnPropertyChanged(nameof(SharedPresetListVisibility));
         OnPropertyChanged(nameof(SharedPresetSummary));
+    }
+
+    private void SharedPreset_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not AutoBattlePresetEditorItem preset)
+        {
+            return;
+        }
+
+        foreach (var item in NormalReleaseItems.Where(item => item.PresetId == preset.Id))
+        {
+            item.UpdatePresetValues(preset.Name, preset.Sequence);
+        }
+
+        OnPropertyChanged(nameof(NormalReleaseSummary));
     }
 
     private static bool CanMoveItemEarlier(
@@ -516,7 +553,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     {
         if (step.IsCustom)
         {
-            return AutoBattleReleaseEditorItem.CreateCustom(step.Name, step.Sequence);
+            return AutoBattleReleaseEditorItem.CreateCustom(step.Name, step.Sequence, step.PresetId);
         }
 
         var skillKey = AutoBattleSettingsRules.NormalizeSkillKey(step.SkillKey) ?? "1";
@@ -564,6 +601,10 @@ internal readonly record struct AutoBattleConfigValidationError(
 internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 {
     private int _position;
+    private string _name = string.Empty;
+    private string _sequence = string.Empty;
+
+    public string PresetId { get; private set; } = string.Empty;
 
     public bool IsCustom
     {
@@ -579,15 +620,34 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 
     public string Name
     {
-        get;
-        private init;
-    } = string.Empty;
+        get => _name;
+        private set
+        {
+            if (SetProperty(ref _name, value))
+            {
+                OnPropertyChanged(nameof(StepTitle));
+                OnPropertyChanged(nameof(DisplayText));
+            }
+        }
+    }
 
     public string Sequence
     {
-        get;
-        private init;
-    } = string.Empty;
+        get => _sequence;
+        private set
+        {
+            if (SetProperty(ref _sequence, value))
+            {
+                OnPropertyChanged(nameof(DetailText));
+            }
+        }
+    }
+
+    public void UpdatePresetValues(string name, string sequence)
+    {
+        Name = name.Trim();
+        Sequence = sequence.Trim();
+    }
 
     public int Position
     {
@@ -643,11 +703,12 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
         };
     }
 
-    public static AutoBattleReleaseEditorItem CreateCustom(string name, string sequence)
+    public static AutoBattleReleaseEditorItem CreateCustom(string name, string sequence, string presetId = "")
     {
         return new AutoBattleReleaseEditorItem
         {
             IsCustom = true,
+            PresetId = presetId,
             SkillKey = string.Empty,
             Name = string.IsNullOrWhiteSpace(name) ? "自定义" : name.Trim(),
             Sequence = sequence.Trim()
@@ -657,6 +718,8 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 
 internal sealed class AutoBattlePresetEditorItem : ObservableObject
 {
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+
     private string _name = string.Empty;
     private string _sequence = string.Empty;
 

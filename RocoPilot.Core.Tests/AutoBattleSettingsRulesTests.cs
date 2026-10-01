@@ -39,6 +39,84 @@ public sealed class AutoBattleSettingsRulesTests
     }
 
     [TestMethod]
+    public void ResolvesLinkedPresetAfterSerializationAndUsesLatestSequenceAtRuntime()
+    {
+        var preset = new AutoBattleTurnSequencePreset { Name = "连招", Sequence = "1" };
+        var source = new AutoBattleSettings
+        {
+            TurnSequencePresets = [preset],
+            ReleaseSequence = [AutoBattleReleaseStep.CreateCustom(preset.Name, preset.Sequence, preset.Id)]
+        };
+        var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(source))!;
+        reloaded.TurnSequencePresets[0].Name = "新连招";
+        reloaded.TurnSequencePresets[0].Sequence = "4, X";
+        Assert.AreEqual("4, X", AutoBattleSettingsRules.BuildReleaseSequence(reloaded, reloaded.ReleaseSequence[0]));
+        var normalized = AutoBattleSettingsRules.Normalize(reloaded);
+        Assert.AreEqual("新连招", normalized.ReleaseSequence[0].Name);
+        Assert.AreEqual("4, X", normalized.ReleaseSequence[0].Sequence);
+        Assert.AreEqual(preset.Id, normalized.ReleaseSequence[0].PresetId);
+        Assert.AreEqual(JsonConvert.SerializeObject(normalized), JsonConvert.SerializeObject(AutoBattleSettingsRules.Normalize(normalized)));
+        Assert.AreEqual("连招", source.ReleaseSequence[0].Name);
+    }
+
+    [TestMethod]
+    public void MigratesOnlyUnambiguousLegacyCopies()
+    {
+        var source = new AutoBattleSettings
+        {
+            TurnSequencePresets =
+            [
+                new() { Name = "唯一", Sequence = "1" },
+                new() { Name = "重复", Sequence = "2" },
+                new() { Name = "重复", Sequence = "2" }
+            ],
+            ReleaseSequence =
+            [
+                AutoBattleReleaseStep.CreateCustom("唯一", "1"),
+                AutoBattleReleaseStep.CreateCustom("重复", "2"),
+                AutoBattleReleaseStep.CreateCustom("独立", "3")
+            ]
+        };
+        var normalized = AutoBattleSettingsRules.Normalize(source);
+        Assert.AreEqual(normalized.TurnSequencePresets[0].Id, normalized.ReleaseSequence[0].PresetId);
+        Assert.AreEqual(string.Empty, normalized.ReleaseSequence[1].PresetId);
+        Assert.AreEqual(string.Empty, normalized.ReleaseSequence[2].PresetId);
+    }
+
+    [TestMethod]
+    public void MissingPresetFallsBackToSavedSequenceWithoutMatchingAnotherPreset()
+    {
+        var source = new AutoBattleSettings
+        {
+            TurnSequencePresets = [new() { Name = "连招", Sequence = "1" }],
+            ReleaseSequence = [AutoBattleReleaseStep.CreateCustom("连招", "1", "removed")]
+        };
+        Assert.AreEqual("1", AutoBattleSettingsRules.BuildReleaseSequence(source, source.ReleaseSequence[0]));
+        var normalized = AutoBattleSettingsRules.Normalize(source);
+        Assert.AreEqual("1", normalized.ReleaseSequence[0].Sequence);
+        Assert.AreEqual("removed", normalized.ReleaseSequence[0].PresetId);
+        Assert.AreEqual(JsonConvert.SerializeObject(normalized), JsonConvert.SerializeObject(AutoBattleSettingsRules.Normalize(normalized)));
+    }
+
+    [TestMethod]
+    public void RepairsMissingAndDuplicatePresetIds()
+    {
+        var source = new AutoBattleSettings
+        {
+            TurnSequencePresets =
+            [
+                new() { Id = "", Name = "一", Sequence = "1" },
+                new() { Id = "same", Name = "二", Sequence = "2" },
+                new() { Id = "same", Name = "三", Sequence = "3" }
+            ]
+        };
+        var normalized = AutoBattleSettingsRules.Normalize(source);
+        Assert.AreEqual(3, normalized.TurnSequencePresets.Select(preset => preset.Id).Distinct().Count());
+        Assert.IsTrue(normalized.TurnSequencePresets.All(preset => !string.IsNullOrWhiteSpace(preset.Id)));
+        Assert.AreEqual(JsonConvert.SerializeObject(normalized), JsonConvert.SerializeObject(AutoBattleSettingsRules.Normalize(normalized)));
+    }
+
+    [TestMethod]
     public void ExpandsLegacyTurnTemplateAndKeepsCustomSequenceLiteral()
     {
         var settings = new AutoBattleSettings { TurnSequence = "Space, {SKILL}, X" };

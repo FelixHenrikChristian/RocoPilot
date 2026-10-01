@@ -1,4 +1,5 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json;
 
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services;
@@ -102,6 +103,93 @@ public sealed class AutoBattleConfigEditorTests
         Assert.AreEqual("4, 3, 2", result.TurnSequencePresets.Single().Sequence);
         Assert.AreEqual("更新后的序列", result.ReleaseSequence[^1].Name);
         Assert.AreEqual("4, 3, 2", result.ReleaseSequence[^1].Sequence);
+    }
+
+    [TestMethod]
+    public void UpdatesEveryInsertedReferenceAndNotifiesDisplayBindings()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        settings.TurnSequencePresets = [new() { Name = "连招", Sequence = "1, Space" }];
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+        editor.ClearNormalReleaseSequence();
+        var preset = editor.SharedPresetItems.Single();
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(preset, out _));
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(preset, out _));
+        var changes = new List<string?>();
+        editor.NormalReleaseItems[0].PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        preset.Name = "新连招";
+        preset.Sequence = "4, X";
+
+        Assert.IsTrue(editor.NormalReleaseItems.All(item => item.Name == "新连招" && item.Sequence == "4, X"));
+        StringAssert.Contains(editor.NormalReleaseSummary, "新连招");
+        CollectionAssert.Contains(changes, "StepTitle");
+        CollectionAssert.Contains(changes, "DetailText");
+        Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
+        Assert.IsTrue(result.ReleaseSequence.All(step => step.PresetId == result.TurnSequencePresets.Single().Id));
+    }
+
+    [TestMethod]
+    public void KeepsAssociationAfterSavingReopeningAndRenamingSameNamedPresets()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        settings.TurnSequencePresets =
+        [
+            new() { Name = "连招", Sequence = "1" },
+            new() { Name = "连招", Sequence = "2" }
+        ];
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(editor.SharedPresetItems[1], out _));
+        editor.MoveNormalReleaseItemEarlier(editor.NormalReleaseItems[^1]);
+        Assert.IsTrue(editor.TryBuildSettings(settings, out var saved, out _));
+        var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(saved))!;
+        var reopened = new AutoBattleConfigEditor(reloaded, new KeyboardInputService());
+        reopened.SharedPresetItems[0].Sequence = "3";
+        reopened.SharedPresetItems[1].Name = "改名";
+        reopened.SharedPresetItems[1].Sequence = "4, Space";
+
+        var linked = reopened.NormalReleaseItems.Single(item => item.IsCustom);
+        Assert.AreEqual("改名", linked.Name);
+        Assert.AreEqual("4, Space", linked.Sequence);
+        Assert.IsTrue(reopened.TryBuildSettings(reloaded, out var result, out _));
+        Assert.AreEqual("4, Space", AutoBattleSettingsRules.BuildReleaseSequence(result, result.ReleaseSequence.Single(step => step.IsCustom)));
+    }
+
+    [TestMethod]
+    public void RemovingPresetKeepsInsertedContentAndDoesNotRelinkToSameNamedReplacement()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        settings.TurnSequencePresets = [new() { Name = "连招", Sequence = "1, Space" }];
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+        var preset = editor.SharedPresetItems.Single();
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(preset, out _));
+        preset.Sequence = "4, X";
+        editor.RemoveSharedPreset(preset);
+        preset.Sequence = "2";
+        editor.SharedPresetItems.Add(new() { Name = "连招", Sequence = "4, X" });
+
+        Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
+        Assert.AreEqual(1, result.TurnSequencePresets.Count);
+        Assert.AreEqual("4, X", result.ReleaseSequence[^1].Sequence);
+        Assert.AreEqual(preset.Id, result.ReleaseSequence[^1].PresetId);
+        var reopened = new AutoBattleConfigEditor(result, new KeyboardInputService());
+        reopened.SharedPresetItems.Single().Sequence = "3";
+        Assert.AreEqual("4, X", reopened.NormalReleaseItems[^1].Sequence);
+    }
+
+    [TestMethod]
+    public void RejectsInvalidChangesToLinkedSequence()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        settings.TurnSequencePresets = [new() { Name = "连招", Sequence = "1" }];
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+        var preset = editor.SharedPresetItems.Single();
+        Assert.IsTrue(editor.TryInsertSharedPresetIntoNormal(preset, out _));
+        preset.Sequence = "not-a-key";
+
+        Assert.IsFalse(editor.TryBuildSettings(settings, out _, out var error));
+        Assert.AreEqual(AutoBattleConfigSection.SharedSequences, error.Section);
+        Assert.AreEqual("1", settings.TurnSequencePresets.Single().Sequence);
     }
 
     [TestMethod]

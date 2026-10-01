@@ -258,6 +258,8 @@ public enum EncounterBloodlineKind
 
 public sealed class AutoBattleReleaseStep
 {
+    public string PresetId { get; set; } = string.Empty;
+
     public bool IsCustom
     {
         get;
@@ -293,11 +295,12 @@ public sealed class AutoBattleReleaseStep
         };
     }
 
-    public static AutoBattleReleaseStep CreateCustom(string name, string sequence)
+    public static AutoBattleReleaseStep CreateCustom(string name, string sequence, string presetId = "")
     {
         return new AutoBattleReleaseStep
         {
             IsCustom = true,
+            PresetId = presetId,
             SkillKey = string.Empty,
             Name = name,
             Sequence = sequence
@@ -309,6 +312,7 @@ public sealed class AutoBattleReleaseStep
         return new AutoBattleReleaseStep
         {
             IsCustom = IsCustom,
+            PresetId = PresetId,
             SkillKey = SkillKey,
             Name = Name,
             Sequence = Sequence
@@ -318,6 +322,8 @@ public sealed class AutoBattleReleaseStep
 
 public sealed class AutoBattleTurnSequencePreset
 {
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
     public string Name
     {
         get;
@@ -334,6 +340,7 @@ public sealed class AutoBattleTurnSequencePreset
     {
         return new AutoBattleTurnSequencePreset
         {
+            Id = Id,
             Name = Name,
             Sequence = Sequence
         };

@@ -209,7 +209,7 @@
                             <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="公共执行序列" />
                             <TextBlock
                                 Style="{StaticResource DialogDescriptionTextStyle}"
-                                Text="插入后作为一个动作执行，修改公共序列会同步更新。" />
+                                Text="插入后作为一个动作执行；修改公共序列后，已插入的步骤会同步更新。" />
                         </StackPanel>
                     </Grid>
 

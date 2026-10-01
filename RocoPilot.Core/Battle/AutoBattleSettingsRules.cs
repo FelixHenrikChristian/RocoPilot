@@ -42,7 +42,8 @@ public static class AutoBattleSettingsRules
     {
         if (releaseStep.IsCustom)
         {
-            return releaseStep.Sequence.Trim();
+            var preset = FindPreset(settings.TurnSequencePresets, releaseStep.PresetId);
+            return (preset?.Sequence ?? releaseStep.Sequence).Trim();
         }
 
         return BuildTurnSequence(settings.TurnSequence, releaseStep.SkillKey);
@@ -78,10 +79,11 @@ public static class AutoBattleSettingsRules
             normalized.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         }
 
+        normalized.TurnSequencePresets = NormalizePresets(normalized.TurnSequencePresets);
+        ResolvePresetReferences(normalized);
         normalized.ReleaseSequence = ResolveReleaseSequence(normalized)
             .Select(step => step.Clone())
             .ToList();
-        normalized.TurnSequencePresets = NormalizePresets(normalized.TurnSequencePresets);
         if (!Enum.IsDefined(normalized.EncounterRelievedAction))
         {
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
@@ -170,7 +172,7 @@ public static class AutoBattleSettingsRules
             var name = string.IsNullOrWhiteSpace(step.Name)
                 ? "自定义序列"
                 : step.Name.Trim();
-            return AutoBattleReleaseStep.CreateCustom(name, sequence);
+            return AutoBattleReleaseStep.CreateCustom(name, sequence, step.PresetId);
         }
 
         var skillKey = NormalizeSkillKey(step.SkillKey);
@@ -187,15 +189,58 @@ public static class AutoBattleSettingsRules
             return [];
         }
 
+        var ids = new HashSet<string>(StringComparer.Ordinal);
         return presets
             .Where(preset => !string.IsNullOrWhiteSpace(preset.Name)
                 && !string.IsNullOrWhiteSpace(preset.Sequence))
             .Select(preset => new AutoBattleTurnSequencePreset
             {
+                Id = !string.IsNullOrWhiteSpace(preset.Id) && ids.Add(preset.Id.Trim())
+                    ? preset.Id.Trim()
+                    : CreatePresetId(ids),
                 Name = preset.Name.Trim(),
                 Sequence = preset.Sequence.Trim()
             })
             .ToList();
+    }
+
+    private static string CreatePresetId(HashSet<string> ids)
+    {
+        var id = Guid.NewGuid().ToString("N");
+        ids.Add(id);
+        return id;
+    }
+
+    private static AutoBattleTurnSequencePreset? FindPreset(
+        IEnumerable<AutoBattleTurnSequencePreset> presets, string? presetId)
+    {
+        return string.IsNullOrWhiteSpace(presetId)
+            ? null
+            : presets.FirstOrDefault(preset => preset.Id == presetId);
+    }
+
+    private static void ResolvePresetReferences(AutoBattleSettings settings)
+    {
+        foreach (var step in settings.ReleaseSequence.Where(step => step.IsCustom))
+        {
+            var preset = FindPreset(settings.TurnSequencePresets, step.PresetId);
+            if (string.IsNullOrWhiteSpace(step.PresetId))
+            {
+                // 旧配置只保存副本；仅在名称和按键能唯一匹配时建立关联。
+                var matches = settings.TurnSequencePresets.Where(candidate =>
+                    candidate.Name == step.Name?.Trim()
+                    && candidate.Sequence == step.Sequence?.Trim()).Take(2).ToArray();
+                preset = matches.Length == 1 ? matches[0] : null;
+            }
+
+            // 已删除的关联保留标识和最后保存的内容，避免被同名新序列重新关联。
+            if (preset is not null)
+            {
+                step.PresetId = preset.Id;
+                step.Name = preset.Name;
+                step.Sequence = preset.Sequence;
+            }
+        }
     }
 
     public static string? NormalizeSkillKey(string? skillKey)

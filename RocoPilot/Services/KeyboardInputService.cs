@@ -71,6 +71,21 @@ public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
         };
     }
 
+    public void EnsureReady(KeyboardInputMethod method)
+    {
+        switch (method)
+        {
+            case KeyboardInputMethod.PostMessage:
+            case KeyboardInputMethod.SendInput:
+                return;
+            case KeyboardInputMethod.Interception:
+                _ = GetInterceptionKeyboardHook();
+                return;
+            default:
+                throw new InvalidOperationException($"不支持的键盘输入方式：{method}");
+        }
+    }
+
     public void Dispose()
     {
         lock (_interceptionSyncRoot)

@@ -11,6 +11,7 @@ using Microsoft.UI.Dispatching;
 
 using RocoPilot.Helpers;
 using RocoPilot.Models;
+using RocoPilot.Services.Logging;
 
 using Serilog.Events;
 
@@ -21,13 +22,20 @@ public partial class LogViewModel : ObservableRecipient
     private const int MaxDisplayEntries = 2000;
 
     private readonly ILogger<LogViewModel> _logger;
+    private readonly InMemoryLogSink _logBuffer;
 
-    private DispatcherQueue? _dispatcher;
+    private Action<Action>? _enqueue;
     private bool _subscribed;
 
     public LogViewModel(ILogger<LogViewModel> logger)
+        : this(logger, LoggingHelper.LogBuffer)
+    {
+    }
+
+    internal LogViewModel(ILogger<LogViewModel> logger, InMemoryLogSink logBuffer)
     {
         _logger = logger;
+        _logBuffer = logBuffer;
         ShowInformation = true;
         ShowWarning = true;
         ShowError = true;
@@ -52,11 +60,14 @@ public partial class LogViewModel : ObservableRecipient
     public partial string SearchText { get; set; }
 
     public void Attach(DispatcherQueue dispatcher)
+        => Attach(callback => dispatcher.TryEnqueue(() => callback()));
+
+    internal void Attach(Action<Action> enqueue)
     {
-        _dispatcher = dispatcher;
+        _enqueue = enqueue;
 
         Entries.Clear();
-        foreach (var entry in LoggingHelper.LogBuffer.Snapshot())
+        foreach (var entry in _logBuffer.Snapshot())
         {
             if (PassesFilter(entry))
             {
@@ -66,7 +77,7 @@ public partial class LogViewModel : ObservableRecipient
 
         if (!_subscribed)
         {
-            LoggingHelper.LogBuffer.EntryWritten += OnEntryWritten;
+            _logBuffer.EntryWritten += OnEntryWritten;
             _subscribed = true;
         }
     }
@@ -75,24 +86,25 @@ public partial class LogViewModel : ObservableRecipient
     {
         if (_subscribed)
         {
-            LoggingHelper.LogBuffer.EntryWritten -= OnEntryWritten;
+            _logBuffer.EntryWritten -= OnEntryWritten;
             _subscribed = false;
         }
 
-        _dispatcher = null;
+        _enqueue = null;
     }
 
     private void OnEntryWritten(LogEntry entry)
     {
-        var dq = _dispatcher;
-        if (dq == null)
+        var enqueue = _enqueue;
+        if (enqueue == null)
         {
             return;
         }
 
-        dq.TryEnqueue(() =>
+        enqueue(() =>
         {
-            if (!PassesFilter(entry))
+            // 清空前已排队或延迟送达的通知不能重新加入列表。
+            if (!_logBuffer.IsCurrent(entry) || !PassesFilter(entry))
             {
                 return;
             }
@@ -144,16 +156,16 @@ public partial class LogViewModel : ObservableRecipient
 
     private void RebuildFromBuffer()
     {
-        var dq = _dispatcher;
-        if (dq == null)
+        var enqueue = _enqueue;
+        if (enqueue == null)
         {
             return;
         }
 
-        dq.TryEnqueue(() =>
+        enqueue(() =>
         {
             Entries.Clear();
-            foreach (var entry in LoggingHelper.LogBuffer.Snapshot())
+            foreach (var entry in _logBuffer.Snapshot())
             {
                 if (PassesFilter(entry))
                 {
@@ -170,6 +182,7 @@ public partial class LogViewModel : ObservableRecipient
     [RelayCommand]
     private void Clear()
     {
+        _logBuffer.Clear();
         Entries.Clear();
     }
 

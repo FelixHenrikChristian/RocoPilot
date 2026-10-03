@@ -84,11 +84,16 @@ public sealed partial class RuntimeTaskService
             if (plan.Action == AutoBattleAction.None)
             {
                 LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForBloodlineTip");
+                RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"wait:{turn.Id}",
+                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "识别精灵血脉", string.Empty, now, completed: true));
                 return;
             }
             if (plan.ShouldSendKeys
-                && !await _battleInput.ExecuteAsync(state.TargetWindow.Hwnd, settings, plan, cancellationToken)) return;
+                && !await ExecuteBattleInputWithOverlayAsync(state, settings, plan, turn, cancellationToken)) return;
             if (!_battle.RecordAction(turn.Id, plan.Action, DateTimeOffset.Now)) return;
+            if (!plan.ShouldSendKeys)
+                RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"manual:{turn.Id}",
+                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "等待手动操作", string.Empty, now, completed: true));
 
             LogEncounterCaptureButtonDecisionForCurrentTurn(plan.Action.ToString());
             if (plan.ShouldSendKeys || turn.Action != plan.Action)
@@ -145,6 +150,9 @@ public sealed partial class RuntimeTaskService
             }
 
             BeginAutoBattlePetSwitchingTurn(settings);
+            var switchBattleId = _battle.BattleId;
+            var switchTurn = _battle.TurnNumber;
+            _overlayActivities.BeginTurn(switchTurn);
             _battle.ObservePetSwitching(true);
 
             var keyboardInputOptions = AutoBattleInputExecutor.CreateOptions(settings);
@@ -159,6 +167,9 @@ public sealed partial class RuntimeTaskService
                 }
 
                 var slotKey = slot.ToString();
+                RefreshOverlayActivity(state, _overlayActivities.Publish(switchBattleId, switchTurn, $"switch:{switchTurn}:{slot}",
+                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.PetSwitch, "切换精灵",
+                    $"选择第 {slot} 只精灵", DateTimeOffset.Now, completed: true));
                 _logger.LogDebug("自动战斗换精灵：尝试按 {SlotKey}", slotKey);
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,
@@ -218,6 +229,7 @@ public sealed partial class RuntimeTaskService
     {
         ClearAutoBattleTurnWork();
         var turn = _battle.BeginSkillSelection(settings, now);
+        _overlayActivities.BeginTurn(turn.Id);
         _logger.LogDebug(
             "自动战斗：进入第 {TurnNumber} 回合技能选择，等待 {DelayMs}ms 后执行。ReleaseStep={ReleaseStep}, RoundIndex={RoundIndex}",
             turn.Number, settings.SkillSelectionActionDelayMs,
@@ -297,7 +309,8 @@ public sealed partial class RuntimeTaskService
         }
 
         LogAutoBattleSkillSelectionEnemyNameResult(season, result);
-        _battle.ConfirmEnemyName(turn.Id);
+        if (_battle.ConfirmEnemyName(turn.Id))
+            RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(_battle.BattleId, turn.Id, result.MatchedName, DateTimeOffset.Now));
         return true;
     }
 
@@ -466,7 +479,7 @@ public sealed partial class RuntimeTaskService
             var turn = _battle.CurrentTurn;
             if (turn is null || _battle.IsSuspendedForShiny) return false;
             var plan = new AutoBattlePlan(AutoBattleAction.EnergyRecovery, "X", "临时回能", "X");
-            return await _battleInput.ExecuteAsync(state.TargetWindow.Hwnd, _autoBattleSettings, plan, cancellationToken)
+            return await ExecuteBattleInputWithOverlayAsync(state, _autoBattleSettings, plan, turn, cancellationToken)
                 && _battle.RecordAction(turn.Id, AutoBattleAction.EnergyRecovery, DateTimeOffset.Now);
         }
         catch (OperationCanceledException) { return false; }
@@ -523,6 +536,7 @@ public sealed partial class RuntimeTaskService
     private void ResetAutoBattleBattleState()
     {
         _battle.ResetBattle();
+        _overlayActivities.ResetBattle(_battle.BattleId);
         ClearAutoBattleTurnWork();
     }
 

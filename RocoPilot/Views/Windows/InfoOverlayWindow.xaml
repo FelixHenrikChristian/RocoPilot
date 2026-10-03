@@ -2,249 +2,59 @@
     x:Class="RocoPilot.Views.Windows.InfoOverlayWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:windowex="using:WinUIEx"
-    Width="344"
-    Height="316"
-    mc:Ignorable="d">
-
-    <Grid
-        x:Name="OverlayRoot"
-        Background="Transparent"
-        PointerMoved="OverlayRoot_PointerMoved"
-        PointerPressed="OverlayRoot_PointerPressed"
-        PointerReleased="OverlayRoot_PointerReleased">
-        <Border
-            x:Name="InfoPanel"
-            Padding="14"
-            Background="#EB202026"
-            BorderBrush="#28FFFFFF"
-            BorderThickness="1"
-            CornerRadius="14">
-            <Grid>
+    Width="344" Height="220">
+    <Grid x:Name="OverlayRoot" Background="Transparent"
+          PointerMoved="OverlayRoot_PointerMoved" PointerPressed="OverlayRoot_PointerPressed"
+          PointerReleased="OverlayRoot_PointerReleased">
+        <Border x:Name="InfoPanel" Padding="14" Background="#EB202026" BorderBrush="#28FFFFFF"
+                BorderThickness="1" CornerRadius="14">
+            <Grid RowSpacing="10">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-
-                <Border
-                    x:Name="PendingShinyAlert"
-                    Margin="0,0,0,10"
-                    Padding="10,8"
-                    Background="#36F59E0B"
-                    BorderBrush="#9AF59E0B"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Visibility="Collapsed">
-                    <Grid ColumnSpacing="9">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <FontIcon
-                            Width="24"
-                            Height="24"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="14"
-                            Foreground="#FBBF24"
-                            Glyph="&#xE7BA;" />
-
-                        <StackPanel
-                            Grid.Column="1"
-                            Spacing="1" >
-                            <TextBlock
-                                FontSize="11"
-                                FontWeight="SemiBold"
-                                Foreground="#FDE68A"
-                                Text="发现异色精灵" />
-                            <TextBlock
-                                x:Name="PendingShinyAlertText"
-                                FontSize="12"
-                                FontWeight="SemiBold"
-                                Foreground="#FFF7ED"
-                                TextTrimming="CharacterEllipsis"
-                                TextWrapping="NoWrap" />
-                        </StackPanel>
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="最近捕捉" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="奇遇次数" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
+                </Grid>
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
+                              VerticalScrollBarVisibility="Hidden" VerticalScrollMode="Auto">
+                    <StackPanel x:Name="CounterList" Spacing="7" />
+                </ScrollViewer>
+                <TextBlock x:Name="RecentRecordTimeText" Grid.Row="2" HorizontalAlignment="Right"
+                           FontSize="10" Foreground="#878391" Visibility="Collapsed" />
+            </Grid>
+        </Border>
+        <Border x:Name="IslandPanel" Background="#F018181E" BorderBrush="#30FFFFFF" BorderThickness="1"
+                CornerRadius="23" Visibility="Collapsed">
+            <Grid Padding="16,11" RowSpacing="12">
+                <Grid.RowDefinitions><RowDefinition Height="22" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid ColumnSpacing="9">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Border x:Name="IslandStatusDot" Width="6" Height="6" Background="#34D399" CornerRadius="3" VerticalAlignment="Center" />
+                    <TextBlock x:Name="IslandStatusText" Grid.Column="1" Text="状态待识别" FontSize="13" FontWeight="SemiBold"
+                               Foreground="#F5F3F7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
+                    <Grid Grid.Column="2" ColumnSpacing="7" VerticalAlignment="Center" ToolTipService.ToolTip="魔力值">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="14" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                            <Path Width="24" Height="24" Fill="#DEA6EA"
+                                  Data="M12,21 L3.6,12.6 C-1.8,7.2 6.6,-1.2 12,4.2 C17.4,-1.2 25.8,7.2 20.4,12.6 Z" />
+                        </Viewbox>
+                        <TextBlock x:Name="IslandMagicText" Grid.Column="1" Text="-- / 6" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="#DEA6EA" VerticalAlignment="Center" />
                     </Grid>
-                </Border>
-
-                <Grid
-                    Grid.Row="1"
-                    RowSpacing="10" >
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <Grid ColumnSpacing="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel
-                            VerticalAlignment="Center"
-                            Orientation="Horizontal"
-                            Spacing="7" >
-                            <Border
-                                Width="6"
-                                Height="6"
-                                VerticalAlignment="Center"
-                                Background="#34D399"
-                                CornerRadius="3" />
-                            <TextBlock
-                                VerticalAlignment="Center"
-                                FontSize="12"
-                                FontWeight="SemiBold"
-                                Foreground="#ECECF1"
-                                Text="实时信息" />
-                        </StackPanel>
-                        <StackPanel
-                            Grid.Column="1"
-                            Orientation="Horizontal"
-                            Spacing="6" >
-                            <Border
-                                x:Name="PollutionCounterIndicator"
-                                Width="24"
-                                Height="24"
-                                Background="#2034D399"
-                                BorderBrush="#5534D399"
-                                BorderThickness="1"
-                                CornerRadius="7"
-                                ToolTipService.ToolTip="奇遇计数" >
-                                <FontIcon
-                                    x:Name="PollutionCounterIcon"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                    FontSize="13"
-                                    Foreground="#34D399"
-                                    Glyph="&#xE9A3;" />
-                            </Border>
-                            <Border
-                                x:Name="AutoBattleIndicator"
-                                Width="24"
-                                Height="24"
-                                Background="#22FFFFFF"
-                                BorderBrush="#24FFFFFF"
-                                BorderThickness="1"
-                                CornerRadius="7"
-                                Opacity="0.72"
-                                ToolTipService.ToolTip="自动战斗" >
-                                <FontIcon
-                                    x:Name="AutoBattleIcon"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                    FontSize="13"
-                                    Foreground="#8B95A1"
-                                    Glyph="&#xF272;" />
-                            </Border>
-                        </StackPanel>
-                    </Grid>
-
-                    <Grid
-                        Grid.Row="1"
-                        Margin="0,2"
-                        ColumnSpacing="14" >
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Spacing="4">
-                            <TextBlock
-                                FontSize="11"
-                                Foreground="#9B9BAA"
-                                Text="当前状态" />
-                            <TextBlock
-                                x:Name="StatusText"
-                                FontSize="14"
-                                FontWeight="SemiBold"
-                                Foreground="#34D399"
-                                MaxLines="1"
-                                Text="状态待识别"
-                                TextTrimming="CharacterEllipsis"
-                                TextWrapping="NoWrap" />
-                        </StackPanel>
-                        <StackPanel
-                            x:Name="MagicPointPanel"
-                            Grid.Column="1"
-                            HorizontalAlignment="Right"
-                            Spacing="7" >
-                            <TextBlock
-                                HorizontalAlignment="Right"
-                                FontSize="11"
-                                Foreground="#9B9BAA"
-                                Text="魔力值" />
-                            <StackPanel
-                                Orientation="Horizontal"
-                                Spacing="5" >
-                                <StackPanel
-                                    x:Name="MagicPointDots"
-                                    VerticalAlignment="Center"
-                                    Orientation="Horizontal"
-                                    Spacing="5" />
-                                <TextBlock
-                                    x:Name="MagicPointText"
-                                    Margin="5,0,0,0"
-                                    FontSize="11"
-                                    Foreground="#CCC7D2"
-                                    Text="0/6" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
-
-                    <Border
-                        Grid.Row="2"
-                        Height="1"
-                        Background="#18FFFFFF" />
-
-                    <Grid
-                        Grid.Row="3"
-                        RowSpacing="7" >
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <Grid ColumnSpacing="10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock
-                                FontSize="11"
-                                Foreground="#9B9BAA"
-                                Text="最近捕捉" />
-                            <TextBlock
-                                Grid.Column="1"
-                                FontSize="11"
-                                Foreground="#9B9BAA"
-                                Text="奇遇次数" />
-                        </Grid>
-                        <ScrollViewer
-                            Grid.Row="1"
-                            HorizontalScrollBarVisibility="Disabled"
-                            HorizontalScrollMode="Disabled"
-                            VerticalScrollBarVisibility="Hidden"
-                            VerticalScrollMode="Auto" >
-                            <StackPanel
-                                x:Name="CounterList"
-                                Spacing="7" />
-                        </ScrollViewer>
-                    </Grid>
-
-                    <TextBlock
-                        x:Name="RecentRecordTimeText"
-                        Grid.Row="4"
-                        HorizontalAlignment="Right"
-                        FontSize="10"
-                        Foreground="#878391"
-                        Visibility="Collapsed" />
+                </Grid>
+                <Grid x:Name="IslandDetails" Grid.Row="1" ColumnSpacing="12" Visibility="Collapsed" Opacity="0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Border x:Name="IslandAvatar" Width="42" Height="42" CornerRadius="12" Background="#18DEA6EA" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                        <TextBlock x:Name="IslandCategoryText" FontSize="10" Foreground="#9B9BAA" />
+                        <TextBlock x:Name="IslandTitleText" FontSize="15" FontWeight="SemiBold" Foreground="#F5F3F7" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="IslandDescriptionText" FontSize="12" Foreground="#9B9BAA" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
                 </Grid>
             </Grid>
         </Border>

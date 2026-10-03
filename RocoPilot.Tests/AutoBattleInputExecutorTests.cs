@@ -46,11 +46,71 @@ public sealed class AutoBattleInputExecutorTests
 
     private static AutoBattleInputExecutor CreateExecutor(KeyboardStub keyboard) => new(keyboard, NullLogger<AutoBattleInputExecutor>.Instance);
 
+    [TestMethod]
+    public async Task ProgressReportsTheActualFallbackAndOnlyCompletesAfterSending()
+    {
+        var sent = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var keyboard = new KeyboardStub { SendTask = sent.Task };
+        var updates = new List<(string Sequence, bool Completed)>();
+        var execution = CreateExecutor(keyboard).ExecuteAsync(1, new(),
+            new(AutoBattleAction.Skill, "invalid", "", "1", "1"), default,
+            (sequence, completed) => updates.Add((sequence, completed)));
+        CollectionAssert.AreEqual(new[] { ("1", false) }, updates);
+        Assert.IsFalse(execution.IsCompleted);
+        sent.SetResult();
+        Assert.IsTrue(await execution);
+        CollectionAssert.AreEqual(new[] { ("1", false), ("1", true) }, updates);
+    }
+
+    [TestMethod]
+    public async Task DisplayFailureCannotPreventActualKeySending()
+    {
+        var keyboard = new KeyboardStub();
+        Assert.IsTrue(await CreateExecutor(keyboard).ExecuteAsync(1, new(),
+            new(AutoBattleAction.Skill, "1", "", "1"), default,
+            (_, _) => throw new InvalidOperationException("display failed")));
+        Assert.AreEqual(1, keyboard.Sends);
+    }
+
+    [TestMethod]
+    public async Task FailedOrCancelledSendingNeverReportsCompletion()
+    {
+        foreach (var failure in new Exception[] { new InvalidOperationException("send failed"), new OperationCanceledException() })
+        {
+            var keyboard = new KeyboardStub { SendTask = Task.FromException(failure) };
+            var updates = new List<bool>();
+            try
+            {
+                await CreateExecutor(keyboard).ExecuteAsync(1, new(), new(AutoBattleAction.Skill, "1", "", "1"), default,
+                    (_, completed) => updates.Add(completed));
+                Assert.Fail("Expected sending failure");
+            }
+            catch (Exception ex) when (ReferenceEquals(ex, failure)) { }
+            CollectionAssert.AreEqual(new[] { false }, updates);
+        }
+    }
+
+    [TestMethod]
+    public async Task InvalidSequenceOrBackgroundWindowDoesNotPublishExecution()
+    {
+        var keyboard = new KeyboardStub();
+        var updates = 0;
+        var executor = CreateExecutor(keyboard);
+        Assert.IsFalse(await executor.ExecuteAsync(1, new(), new(AutoBattleAction.Skill, "invalid", "", "组合"), default,
+            (_, _) => updates++));
+        keyboard.Foreground = false;
+        Assert.IsFalse(await executor.ExecuteAsync(1, new() { KeyboardInputMethod = KeyboardInputMethod.SendInput },
+            new(AutoBattleAction.Skill, "1", "", "1"), default, (_, _) => updates++));
+        Assert.AreEqual(0, updates);
+        Assert.AreEqual(0, keyboard.Sends);
+    }
+
     private sealed class KeyboardStub : IKeyboardInputService
     {
         public bool Foreground = true;
         public int Sends;
         public KeyboardInputOptions? LastOptions;
+        public Task SendTask = Task.CompletedTask;
         public bool IsWindowAvailable(nint hwnd) => true;
         public bool IsWindowForeground(nint hwnd) => Foreground;
         public bool RequiresForeground(KeyboardInputMethod method) => method != KeyboardInputMethod.PostMessage;
@@ -67,7 +127,7 @@ public sealed class AutoBattleInputExecutorTests
         {
             Sends++;
             LastOptions = options;
-            return Task.CompletedTask;
+            return SendTask;
         }
     }
 }

@@ -495,6 +495,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
+        RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(battleId, null, enemyName, DateTimeOffset.Now));
         await RecordEncounterAsync(
             season,
             enemyName,
@@ -588,6 +589,8 @@ public sealed partial class RuntimeTaskService
                 _logger.LogInformation(
                     "奇遇统计：本次奇遇已暂存，等待补齐赛季或精灵名称后自动归档。Uid={Uid}, Season={SeasonId}, Spirit={SpiritName}, EnemyNameRaw={EnemyNameRaw}",
                     accountUid, season.Id, enemyName, FormatLogText(rawText));
+                if (CurrentState is { } pendingState && !cancellationToken.IsCancellationRequested && !_isSuspended)
+                    RefreshOverlayActivity(pendingState, _overlayActivities.Record(enemyName, null, now, DateTimeOffset.Now));
                 return;
             }
 
@@ -596,6 +599,8 @@ public sealed partial class RuntimeTaskService
                 .FirstOrDefault(item => item.Id == season.Id)?.Encounters
                 .FirstOrDefault(item => TextMatchingHelper.AreSameSpiritName(item.Name, enemyName))?.Count ?? 0;
             if (currentCount == 0) return;
+            if (CurrentState is { } recordedState && !cancellationToken.IsCancellationRequested && !_isSuspended)
+                RefreshOverlayActivity(recordedState, _overlayActivities.Record(enemyName, currentCount, now, DateTimeOffset.Now));
             _logger.LogInformation(
                 "奇遇统计：{SpiritName} 奇遇 +1（当前 {Count}）",
                 enemyName,

@@ -68,6 +68,10 @@ internal static class TransparentOverlayWindowHelper
         return hook;
     }
 
+    // 信息遮罩覆盖游戏画面时，不能进入 BitBlt 等截图后参与 OCR。
+    public static bool TryExcludeFromCapture(IntPtr hwnd)
+        => hwnd != IntPtr.Zero && SetWindowDisplayAffinity(hwnd, 0x00000011); // WDA_EXCLUDEFROMCAPTURE
+
     public static bool TryGetClientScreenBounds(IntPtr hwnd, out RectInt32 bounds)
     {
         bounds = default;
@@ -348,6 +352,10 @@ internal static class TransparentOverlayWindowHelper
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowDisplayAffinity(IntPtr hwnd, uint affinity);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

@@ -315,6 +315,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             _suspendedReason = null;
             _debugLog.Reset();
             ResetAutoBattleBattleState();
+            _overlayActivities.Clear();
+            Volatile.Write(ref _lastInfoOverlayStatus, "状态待识别");
             ResetEncounterRecordSuppression();
             _encounterStatisticsEnabled = options.EncounterStatisticsEnabled;
             _autoBattleSettings = autoBattleSettings;
@@ -403,6 +405,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         {
             _session = null;
             ResetAutoBattleBattleState();
+            _overlayActivities.Clear();
             _logger.LogInformation("实时任务：已停止");
         }
     }
@@ -504,6 +507,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         ResetEncounterRecordSuppression();
         session.ClearFrame();
         _recognitionOverlayService.Hide();
+        _overlayActivities.Clear();
+        _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("已挂起", DateTimeOffset.Now));
         _logger.LogDebug("实时任务：截图循环进入挂起状态。");
     }
 
@@ -515,6 +520,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         }
 
         _logger.LogDebug("实时任务：截图循环退出挂起状态，重新开始识别。");
+        _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("状态待识别", DateTimeOffset.Now));
     }
 
     private async Task RuntimeOcrLoopAsync(RuntimeSession session, CancellationToken cancellationToken)
@@ -664,6 +670,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     {
         await UpdateEncounterCaptureButtonStateAsync(state, frame, cancellationToken);
         var screen = await _battleScreen.RecognizeAsync(state, frame, isBattleChatVisible, cancellationToken);
+        // 先更新当前状态，长按键序列执行期间也能显示正确的状态和动作。
+        Volatile.Write(ref _lastInfoOverlayStatus, screen switch
+        {
+            BattleScreen.SkillSelection => "战斗中 - 技能选择",
+            BattleScreen.PetSwitching => "战斗中 - 切换精灵",
+            _ => "战斗中"
+        });
         if (screen != BattleScreen.PetSwitching) _battle.ObservePetSwitching(false);
 
         switch (screen)
@@ -699,6 +712,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private void UpdateRecognizedInfoOverlaySnapshot(InfoOverlaySnapshot snapshot)
     {
         _unrecognizedStateDetectedAt = null;
+        Volatile.Write(ref _lastInfoOverlayStatus, snapshot.StatusText);
         _infoOverlayService.UpdateSnapshot(snapshot);
     }
 
@@ -726,7 +740,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             updatedAt,
             magicPointCount,
             magicPointMaximum,
-            GetCurrentPendingShinyCapture());
+            GetCurrentPendingShinyCapture(),
+            _overlayActivities.Current,
+            _battle.IsSuspendedForShiny,
+            Interlocked.Increment(ref _infoOverlayRevision),
+            CurrentState?.StartedAt,
+            _isSuspended ? InfoOverlayScene.Suspended
+                : statusText == "大世界" ? InfoOverlayScene.World
+                : statusText.StartsWith("战斗中", StringComparison.Ordinal) ? InfoOverlayScene.Battle : InfoOverlayScene.Unknown,
+            _autoBattleSettings.IsEnabled,
+            _overlayActivities.CreatureName);
     }
 
     private async Task<bool> TryUpdateMagicPointWorldSnapshotAsync(

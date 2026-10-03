@@ -19,6 +19,10 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
     private readonly ISpiritCatalogService _spiritCatalogService;
 
     private InfoOverlayWindow? _overlayWindow;
+    private InfoOverlayWindow? _islandWindow;
+    private RuntimeTaskState? _shownState;
+    private InfoOverlaySnapshot? _lastSnapshot;
+    private long _lastRevision;
     private InfoOverlayNotice? _uidNotice;
 
     public InfoOverlayService(
@@ -53,7 +57,7 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         RunOnDispatcher(() =>
         {
             _overlayWindow?.ResetPosition();
-            _overlayWindow?.RefreshTopNoticeLayout();
+            _islandWindow?.ResetPosition();
         });
     }
 
@@ -62,26 +66,35 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         RunOnDispatcher(() =>
         {
             _overlayWindow?.SetLocked(isLocked);
-            _overlayWindow?.RefreshTopNoticeLayout();
+            _islandWindow?.SetLocked(isLocked);
         });
     }
 
     public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
     {
-        RunOnDispatcher(() => _overlayWindow?.UpdateTaskIndicators(isEncounterStatisticsEnabled, isAutoBattleEnabled));
+        RunOnDispatcher(() =>
+        {
+            if (_lastSnapshot is not null) _lastSnapshot = _lastSnapshot with { IsAutoBattleEnabled = isAutoBattleEnabled };
+            _islandWindow?.UpdateTaskIndicators(isEncounterStatisticsEnabled, isAutoBattleEnabled);
+        });
     }
 
     public void UpdateSnapshot(InfoOverlaySnapshot snapshot)
     {
         RunOnDispatcher(() =>
         {
+            if (snapshot.SessionStartedAt.HasValue && snapshot.SessionStartedAt != _shownState?.StartedAt) return;
+            if (snapshot.Revision != 0 && snapshot.Revision <= _lastRevision) return;
+            _lastRevision = snapshot.Revision;
+            _lastSnapshot = snapshot;
             if (!_statisticsService.IsActiveAccountSelectionRequired && _uidNotice is not null)
             {
                 _uidNotice = null;
-                _overlayWindow?.UpdateUidNotice(null);
+                _islandWindow?.UpdateUidNotice(null);
             }
 
-            _overlayWindow?.UpdateSnapshotWithTopNotices(snapshot);
+            _overlayWindow?.UpdateSnapshot(snapshot);
+            _islandWindow?.UpdateSnapshot(snapshot);
         });
     }
 
@@ -90,7 +103,7 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         RunOnDispatcher(() =>
         {
             _uidNotice = notice;
-            _overlayWindow?.UpdateUidNotice(notice);
+            _islandWindow?.UpdateUidNotice(notice);
         });
     }
 
@@ -99,18 +112,31 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         try
         {
             HideCore();
+            if (!ReferenceEquals(_shownState, state))
+            {
+                _lastSnapshot = InfoOverlaySnapshot.CreateInitial(state.StartedAt);
+                _lastRevision = 0;
+                _shownState = state;
+            }
 
             _overlayWindow = new InfoOverlayWindow(
                 state.TargetWindow,
                 state.Options.InfoOverlayLocked,
                 state.Options.EncounterStatisticsEnabled,
                 state.Options.AutoBattleSettings.IsEnabled);
-            _overlayWindow.Closed += (_, _) => _overlayWindow = null;
-            _overlayWindow.InitializeTopNoticeLayout();
-            _overlayWindow.UpdateUidNotice(_uidNotice);
-            _overlayWindow.UpdateSnapshotWithTopNotices(InfoOverlaySnapshot.CreateInitial(state.StartedAt));
+            var records = _overlayWindow;
+            records.Closed += (_, _) => { if (ReferenceEquals(_overlayWindow, records)) _overlayWindow = null; };
+            _islandWindow = new InfoOverlayWindow(state.TargetWindow, state.Options.InfoOverlayLocked,
+                state.Options.EncounterStatisticsEnabled, state.Options.AutoBattleSettings.IsEnabled, isIsland: true);
+            var island = _islandWindow;
+            island.Closed += (_, _) => { if (ReferenceEquals(_islandWindow, island)) _islandWindow = null; };
+            _overlayWindow.UpdateSnapshot(_lastSnapshot!);
+            _islandWindow.UpdateUidNotice(_uidNotice);
+            _islandWindow.UpdateSnapshot(_lastSnapshot!);
             _overlayWindow.ShowOverlay();
-            _overlayWindow.RefreshTopNoticeLayout();
+            _islandWindow.ShowOverlay();
+            if (!_overlayWindow.IsExcludedFromCapture || !_islandWindow.IsExcludedFromCapture)
+                _logger.LogWarning("信息遮罩未能从系统截图中排除，使用 BitBlt 时请避免把遮罩放在识别区域上方");
 
             _ = LoadAvatarPathsAsync(_overlayWindow);
 
@@ -118,7 +144,7 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         }
         catch (Exception ex)
         {
-            _overlayWindow = null;
+            HideCore();
             _logger.LogWarning(ex, "显示信息遮罩窗口失败");
         }
     }
@@ -146,7 +172,11 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
             });
             RunOnDispatcher(() =>
             {
-                if (ReferenceEquals(_overlayWindow, window)) window.SetAvatarPaths(paths);
+                if (ReferenceEquals(_overlayWindow, window))
+                {
+                    window.SetAvatarPaths(paths);
+                    _islandWindow?.SetAvatarPaths(paths);
+                }
             });
         }
         catch (Exception ex)
@@ -158,16 +188,14 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
     private void HideCore()
     {
         var overlayWindow = _overlayWindow;
+        var islandWindow = _islandWindow;
         _overlayWindow = null;
-
-        if (overlayWindow is null)
-        {
-            return;
-        }
+        _islandWindow = null;
 
         try
         {
-            overlayWindow.Close();
+            try { overlayWindow?.Close(); }
+            finally { islandWindow?.Close(); }
         }
         catch (Exception ex)
         {
@@ -179,10 +207,16 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
     {
         if (_dispatcherQueue.HasThreadAccess)
         {
-            action();
+            ApplyUpdate();
             return;
         }
 
-        _ = _dispatcherQueue.TryEnqueue(() => action());
+        _ = _dispatcherQueue.TryEnqueue(ApplyUpdate);
+
+        void ApplyUpdate()
+        {
+            try { action(); }
+            catch (Exception ex) { _logger.LogWarning(ex, "更新信息遮罩失败"); }
+        }
     }
 }

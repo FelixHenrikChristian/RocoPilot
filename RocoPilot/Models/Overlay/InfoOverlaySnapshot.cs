@@ -43,7 +43,8 @@ public sealed record InfoOverlaySnapshot(
 public sealed record InfoOverlayPendingShinyCapture(
     string CreatureName,
     string Season,
-    DateTimeOffset DetectedAt);
+    DateTimeOffset DetectedAt,
+    int TotalCount = 1);
 
 public sealed record InfoOverlayNotice(
     string Title,

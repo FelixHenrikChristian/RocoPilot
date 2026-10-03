@@ -33,11 +33,15 @@
             <Grid Padding="16,11" RowSpacing="12">
                 <Grid.RowDefinitions><RowDefinition Height="22" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Grid ColumnSpacing="9">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <Border x:Name="IslandStatusDot" Width="6" Height="6" Background="#34D399" CornerRadius="3" VerticalAlignment="Center" />
                     <TextBlock x:Name="IslandStatusText" Grid.Column="1" Text="状态待识别" FontSize="13" FontWeight="SemiBold"
                                Foreground="#F5F3F7" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxLines="1" />
-                    <Grid Grid.Column="2" ColumnSpacing="7" VerticalAlignment="Center" ToolTipService.ToolTip="魔力值">
+                    <Border x:Name="IslandPendingShinyBadge" Grid.Column="2" Padding="7,2" CornerRadius="8"
+                            Background="#20FBBF24" VerticalAlignment="Center" Visibility="Collapsed">
+                        <TextBlock x:Name="IslandPendingShinyText" FontSize="10" FontWeight="SemiBold" Foreground="#FBBF24" />
+                    </Border>
+                    <Grid Grid.Column="3" ColumnSpacing="7" VerticalAlignment="Center" ToolTipService.ToolTip="魔力值">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="14" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <Viewbox Width="14" Height="14" VerticalAlignment="Center">
                             <Path Width="24" Height="24" Fill="#DEA6EA"

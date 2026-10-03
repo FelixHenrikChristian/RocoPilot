@@ -122,16 +122,16 @@ public sealed partial class RuntimeTaskService
 
     private InfoOverlayPendingShinyCapture? GetCurrentPendingShinyCapture()
     {
-        var pendingCapture = _statisticsService
-            .GetSelectedAccountPendingShinyCaptures()
-            .FirstOrDefault();
+        var pendingCaptures = _statisticsService.GetSelectedAccountPendingShinyCaptures();
+        var pendingCapture = pendingCaptures.FirstOrDefault();
         return pendingCapture is null
             ? null
             : new InfoOverlayPendingShinyCapture(
                 string.IsNullOrWhiteSpace(pendingCapture.Name) ? "未识别精灵" : pendingCapture.Name,
                 pendingCapture.Season == EncounterSeasonTimeline.PendingSeasonId
                     ? EncounterSeasonTimeline.PendingSeasonName : pendingCapture.Season,
-                pendingCapture.DetectedAt);
+                pendingCapture.DetectedAt,
+                pendingCaptures.Count);
     }
 
     private async Task UpdateRuntimeEncounterOcrSignalsAsync(

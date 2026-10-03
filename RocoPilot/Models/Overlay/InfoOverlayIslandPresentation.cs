@@ -17,9 +17,7 @@ public sealed record InfoOverlayIslandPresentation(string Category, string Title
         }
         if (uidNotice is not null)
             return new("统计账号", uidNotice.Title, uidNotice.Message, IsWarning: true);
-        if (snapshot.PendingShinyCapture is { } pending)
-            return new("异色提醒", "发现异色精灵", $"{pending.CreatureName} · 请前往统计页面确认",
-                pending.CreatureName, IsWarning: true);
+        // 未确认记录由顶部标记常驻提醒，不占用下一场战斗的操作详情。
         if (snapshot.Activity is not { } activity || activity.ExpiresAt <= now)
         {
             if (snapshot.Scene == InfoOverlayScene.Unknown && snapshot.MainStatusText == "识别异常")

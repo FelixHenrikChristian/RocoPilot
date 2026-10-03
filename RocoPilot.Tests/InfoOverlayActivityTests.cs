@@ -98,16 +98,55 @@ public sealed class InfoOverlayActivityTests
     }
 
     [TestMethod]
-    public void AccountNoticeAndPendingShinyRemainVisibleUntilCleared()
+    public void AccountNoticeStillExpandsButPendingShinyDoesNotKeepDetailsOpen()
     {
         var snapshot = new InfoOverlaySnapshot("战斗中", [], Now,
             PendingShinyCapture: new("栗鼠", "S4", Now));
         var notice = new InfoOverlayNotice("请确认统计账号", "账号尚未识别");
         Assert.AreEqual(notice.Title, InfoOverlayIslandPresentation.Resolve(snapshot, notice, Now.AddHours(1))!.Title);
-        Assert.AreEqual("发现异色精灵", InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddHours(1))!.Title);
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddHours(1)));
         StringAssert.Contains(InfoOverlayIslandPresentation.Resolve(snapshot with { IsShinyProtectionActive = true }, null, Now)!.Description,
             "请在统计页面确认");
         Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot with { PendingShinyCapture = null }, null, Now.AddHours(1)));
+    }
+
+    [TestMethod]
+    public void LeavingProtectedBattleKeepsPendingRecordWhileWorldDetailsCollapse()
+    {
+        var pending = new InfoOverlayPendingShinyCapture("栗鼠", "S4", Now, TotalCount: 2);
+        var snapshot = new InfoOverlaySnapshot("战斗中", [], Now, PendingShinyCapture: pending,
+            IsShinyProtectionActive: true, Scene: InfoOverlayScene.Battle, IsAutoBattleEnabled: true);
+        Assert.IsTrue(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!.IsWarning);
+
+        var world = snapshot with { IsShinyProtectionActive = false, Scene = InfoOverlayScene.World, StatusText = "大世界" };
+        Assert.AreEqual("大世界", world.MainStatusText);
+        Assert.AreSame(pending, world.PendingShinyCapture);
+        Assert.AreEqual(2, world.PendingShinyCapture!.TotalCount);
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(world, null, Now.AddHours(1)));
+    }
+
+    [TestMethod]
+    public void UnconfirmedShinyDoesNotMaskNextCreatureSkillOrError()
+    {
+        var tracker = new InfoOverlayActivityTracker();
+        tracker.ResetBattle(2); tracker.BeginTurn(1);
+        var recognized = tracker.RecognizeSpirit(2, 1, "刺轮砣", Now);
+        var snapshot = new InfoOverlaySnapshot("战斗中 - 技能选择", [], Now,
+            PendingShinyCapture: new("栗鼠", "S4", Now.AddMinutes(-1)), Activity: recognized,
+            Scene: InfoOverlayScene.Battle, IsAutoBattleEnabled: true, BattleCreatureName: "刺轮砣");
+        Assert.AreEqual("刺轮砣", InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!.CreatureName);
+
+        var skill = tracker.Publish(2, 1, "input", InfoOverlayActivityKind.Skill, "使用技能 3", "", Now, false);
+        var running = InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = skill }, null, Now.AddSeconds(30))!;
+        Assert.AreEqual("使用技能 3", running.Title);
+        Assert.AreEqual("精灵：刺轮砣", running.Description);
+        Assert.IsFalse(running.IsWarning);
+        var withoutPending = InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = skill, PendingShinyCapture = null }, null, Now.AddSeconds(30));
+        Assert.AreEqual(running, withoutPending);
+
+        var failed = tracker.Publish(2, 1, "input:error", InfoOverlayActivityKind.Error, "操作未完成", "键盘设备不可用", Now, true);
+        Assert.IsTrue(InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = failed }, null, Now)!.IsError);
+        Assert.IsTrue(InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = skill, IsShinyProtectionActive = true }, null, Now)!.IsWarning);
     }
 
     private static InfoOverlayIslandPresentation? Present(InfoOverlayActivity? activity, DateTimeOffset at)

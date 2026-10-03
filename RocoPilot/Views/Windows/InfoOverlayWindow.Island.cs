@@ -18,6 +18,8 @@ public sealed partial class InfoOverlayWindow
     private double _animationFromWidth, _animationFromHeight, _animationToWidth = CollapsedIslandWidth, _animationToHeight = CollapsedIslandHeight;
     private DateTimeOffset _islandAnimationStartedAt;
     private bool _islandExpanding;
+    private bool _hasPendingShinyBadge;
+    private InfoOverlayPendingShinyCapture? _pendingShinyReminder;
 
     private void InitializeIsland()
     {
@@ -61,8 +63,20 @@ public sealed partial class InfoOverlayWindow
 
     private void RefreshIslandPresentation()
     {
+        var pending = _islandSnapshot.PendingShinyCapture;
+        var hasPendingBadge = pending is not null && !_islandSnapshot.IsShinyProtectionActive;
+        var badgeChanged = hasPendingBadge != _hasPendingShinyBadge;
+        _hasPendingShinyBadge = hasPendingBadge;
+        if (badgeChanged) IslandPendingShinyBadge.Visibility = hasPendingBadge ? Visibility.Visible : Visibility.Collapsed;
+        if (pending != _pendingShinyReminder)
+        {
+            _pendingShinyReminder = pending;
+            IslandPendingShinyText.Text = pending is null ? string.Empty : $"异色 {Math.Max(1, pending.TotalCount)}";
+            ToolTipService.SetToolTip(IslandPendingShinyBadge, pending is null ? null
+                : $"异色待确认：{Math.Max(1, pending.TotalCount)} 条\n最新发现：{pending.CreatureName}\n请前往统计页面确认，可继续其他战斗");
+        }
         var presentation = InfoOverlayIslandPresentation.Resolve(_islandSnapshot, _uidNotice, DateTimeOffset.Now);
-        if (presentation == _islandPresentation) return;
+        if (presentation == _islandPresentation && !badgeChanged) return;
         var wasExpanded = _islandPresentation is not null;
         _islandPresentation = presentation;
         var warning = presentation?.IsWarning == true;
@@ -83,11 +97,11 @@ public sealed partial class InfoOverlayWindow
             IslandDetails.Visibility = Visibility.Visible;
         }
         else ToolTipService.SetToolTip(IslandDetails, null);
-        // 恢复原来的展开尺寸，为精灵名与两行保护提醒保留空间。
-        if (wasExpanded == (presentation is not null)) return;
+        // 待确认标记只增加收起时的宽度，不撑高窗口或挤占操作详情。
+        if (wasExpanded == (presentation is not null) && (wasExpanded || !badgeChanged)) return;
         _islandExpanding = presentation is not null;
         _animationFromWidth = _islandWidth; _animationFromHeight = _islandHeight;
-        _animationToWidth = _islandExpanding ? ExpandedIslandWidth : CollapsedIslandWidth;
+        _animationToWidth = _islandExpanding ? ExpandedIslandWidth : CollapsedIslandWidth + (hasPendingBadge ? 62 : 0);
         _animationToHeight = _islandExpanding ? 132 : CollapsedIslandHeight;
         IslandPanel.CornerRadius = new CornerRadius(_islandExpanding ? 22 : 23);
         _islandAnimationStartedAt = DateTimeOffset.UtcNow;

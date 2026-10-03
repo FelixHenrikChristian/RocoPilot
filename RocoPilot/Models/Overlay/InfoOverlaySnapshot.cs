@@ -8,14 +8,16 @@ public sealed record InfoOverlaySnapshot(
     int MagicPointMaximum = 6,
     InfoOverlayPendingShinyCapture? PendingShinyCapture = null)
 {
+    public DateTimeOffset? LatestRecordUpdatedAt => Counters.Count == 0
+        ? null
+        : Counters.Max(counter => counter.LastCountedAt);
+
     public static InfoOverlaySnapshot CreateInitial(DateTimeOffset startedAt)
     {
         return new InfoOverlaySnapshot(
             "状态待识别",
-            [
-                new InfoOverlayCounter("待识别目标", 0, 0, startedAt)
-            ],
-            DateTimeOffset.Now);
+            [],
+            startedAt);
     }
 }
 

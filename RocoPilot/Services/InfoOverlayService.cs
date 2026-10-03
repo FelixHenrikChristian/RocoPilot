@@ -2,7 +2,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Views.Windows;
@@ -14,15 +16,18 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
     private readonly ILogger<InfoOverlayService> _logger;
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly IStatisticsService _statisticsService;
+    private readonly ISpiritCatalogService _spiritCatalogService;
 
     private InfoOverlayWindow? _overlayWindow;
     private InfoOverlayNotice? _uidNotice;
 
     public InfoOverlayService(
         IStatisticsService statisticsService,
+        ISpiritCatalogService spiritCatalogService,
         ILogger<InfoOverlayService> logger)
     {
         _statisticsService = statisticsService;
+        _spiritCatalogService = spiritCatalogService;
         _logger = logger;
         _dispatcherQueue = App.MainWindow.DispatcherQueue;
     }
@@ -107,12 +112,46 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
             _overlayWindow.ShowOverlay();
             _overlayWindow.RefreshTopNoticeLayout();
 
+            _ = LoadAvatarPathsAsync(_overlayWindow);
+
             _logger.LogDebug("信息遮罩窗口已显示。Locked={Locked}", state.Options.InfoOverlayLocked);
         }
         catch (Exception ex)
         {
             _overlayWindow = null;
             _logger.LogWarning(ex, "显示信息遮罩窗口失败");
+        }
+    }
+
+    private async Task LoadAvatarPathsAsync(InfoOverlayWindow window)
+    {
+        try
+        {
+            var catalog = await _spiritCatalogService.LoadAsync();
+            // 只读取已有图鉴与本地头像，不发起同步或下载。
+            var paths = await Task.Run(() =>
+            {
+                var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var spirit in catalog.Spirits)
+                {
+                    var path = _spiritCatalogService.ResolveAvatarPath(spirit.AvatarPath);
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+                    foreach (var name in new[] { spirit.Name, spirit.WikiName, spirit.BaseName }.Concat(spirit.Aliases))
+                    {
+                        var key = TextMatchingHelper.NormalizeSpiritNameForMatching(name);
+                        if (key.Length > 0) result.TryAdd(key, path);
+                    }
+                }
+                return result;
+            });
+            RunOnDispatcher(() =>
+            {
+                if (ReferenceEquals(_overlayWindow, window)) window.SetAvatarPaths(paths);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "加载信息遮罩精灵头像失败，使用占位图标");
         }
     }
 

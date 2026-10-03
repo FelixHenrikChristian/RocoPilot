@@ -7,12 +7,14 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Overlay;
 
 using Windows.Graphics;
+using Windows.Foundation;
 using Windows.UI;
 
 namespace RocoPilot.Views.Windows;
@@ -20,9 +22,7 @@ namespace RocoPilot.Views.Windows;
 public sealed partial class InfoOverlayWindow : WindowEx
 {
     private const int OverlayWidth = 344;
-    private const int OverlayHeight = 316;
-    private const int MinOverlayWidth = 286;
-    private const int MinOverlayHeight = 252;
+    private const int MinOverlayHeight = 160;
     private const int DefaultMargin = 16;
     private const int MaxVisibleCounters = 5;
 
@@ -32,10 +32,10 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private static readonly Color DisabledIndicatorForeground = Color.FromArgb(0xFF, 0x8B, 0x95, 0xA1);
     private static readonly Color DisabledIndicatorBackground = Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF);
     private static readonly Color DisabledIndicatorBorder = Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF);
-    private static readonly Color CounterPrimaryForeground = Color.FromArgb(0xFF, 0xF8, 0xFA, 0xFC);
-    private static readonly Color CounterSecondaryForeground = Color.FromArgb(0xFF, 0x93, 0x9D, 0xAA);
-    private static readonly Color CounterAccentForeground = Color.FromArgb(0xFF, 0x7D, 0xD3, 0xFC);
-    private static readonly Color CounterRowBorder = Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF);
+    private static readonly Color CounterPrimaryForeground = Color.FromArgb(0xFF, 0xF6, 0xF4, 0xF8);
+    private static readonly Color CounterSecondaryForeground = Color.FromArgb(0xFF, 0x9B, 0x9B, 0xAA);
+    private static readonly Color CounterAccentForeground = Color.FromArgb(0xFF, 0xDE, 0xA6, 0xEA);
+    private static readonly Color InactiveMagicPointForeground = Color.FromArgb(0xFF, 0x44, 0x40, 0x4B);
 
     private readonly CaptureTargetWindow _targetWindow;
     private readonly DispatcherQueueTimer _followTimer;
@@ -50,6 +50,11 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private int _overlayOffsetY;
     private int _lastMagicPointCount;
     private int _lastMagicPointMaximum = 6;
+    private int _renderedMagicPointCount = -1;
+    private int _renderedMagicPointMaximum = -1;
+    private IReadOnlyList<InfoOverlayCounter>? _renderedCounters;
+    private IReadOnlyDictionary<string, string> _avatarPaths = new Dictionary<string, string>();
+    private readonly Dictionary<string, BitmapImage> _avatarImages = new(StringComparer.OrdinalIgnoreCase);
     private bool _hasActivated;
     private bool _hasUserPositioned;
     private bool _isLocked;
@@ -150,21 +155,49 @@ public sealed partial class InfoOverlayWindow : WindowEx
         StatusText.Text = statusText;
         StatusText.Foreground = new SolidColorBrush(ActiveTaskIndicatorForeground);
         MagicPointText.Text = $"{_lastMagicPointCount}/{_lastMagicPointMaximum}";
-        UpdatedAtText.Text = snapshot.UpdatedAt.ToLocalTime().ToString("HH:mm:ss");
+        UpdateMagicPointDots();
+        var recordTime = snapshot.LatestRecordUpdatedAt;
+        RecentRecordTimeText.Visibility = recordTime.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        RecentRecordTimeText.Text = recordTime.HasValue
+            ? $"最新记录更新于 {recordTime.Value.ToLocalTime():HH:mm:ss}"
+            : string.Empty;
+        ToolTipService.SetToolTip(RecentRecordTimeText,
+            recordTime?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"));
 
         var visibleCounters = snapshot.Counters
             .OrderByDescending(counter => counter.LastCountedAt)
             .Take(MaxVisibleCounters)
             .ToList();
 
-        var latestCounter = visibleCounters.FirstOrDefault();
-        if (latestCounter is null)
-        {
-            RenderCounters([]);
-            return;
-        }
-
         RenderCounters(visibleCounters);
+    }
+
+    public void SetAvatarPaths(IReadOnlyDictionary<string, string> avatarPaths)
+    {
+        if (_isClosed) return;
+        _avatarPaths = avatarPaths;
+        _avatarImages.Clear();
+        RenderCounters(_renderedCounters ?? [], force: true);
+    }
+
+    private void UpdateMagicPointDots()
+    {
+        if (_renderedMagicPointCount == _lastMagicPointCount
+            && _renderedMagicPointMaximum == _lastMagicPointMaximum) return;
+        _renderedMagicPointCount = _lastMagicPointCount;
+        _renderedMagicPointMaximum = _lastMagicPointMaximum;
+        MagicPointDots.Children.Clear();
+        for (var index = 0; index < _lastMagicPointMaximum; index++)
+        {
+            MagicPointDots.Children.Add(new Border
+            {
+                Width = 7,
+                Height = 7,
+                CornerRadius = new CornerRadius(3.5),
+                Background = new SolidColorBrush(index < _lastMagicPointCount
+                    ? CounterAccentForeground : InactiveMagicPointForeground)
+            });
+        }
     }
 
     public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
@@ -297,13 +330,13 @@ public sealed partial class InfoOverlayWindow : WindowEx
             rasterizationScale = 1d;
         }
 
-        var width = (int)Math.Ceiling(OverlayWidth * rasterizationScale);
-        var height = (int)Math.Ceiling(OverlayHeight * rasterizationScale);
         var availableWidth = Math.Max(120, clientBounds.Width - DefaultMargin * 2);
         var availableHeight = Math.Max(120, clientBounds.Height - DefaultMargin * 2);
-
-        width = Math.Min(width, Math.Max(Math.Min(MinOverlayWidth, availableWidth), availableWidth));
-        height = Math.Min(height, Math.Max(Math.Min(MinOverlayHeight, availableHeight), availableHeight));
+        var width = Math.Min((int)Math.Ceiling(OverlayWidth * rasterizationScale), availableWidth);
+        // 测量主体的自然高度；顶部提醒由 Notices 单独预留空间。
+        InfoPanel.Measure(new Size(width / rasterizationScale, double.PositiveInfinity));
+        var height = Math.Min(availableHeight, (int)Math.Ceiling(
+            Math.Max(MinOverlayHeight, InfoPanel.DesiredSize.Height) * rasterizationScale));
 
         return new SizeInt32(width, height);
     }
@@ -335,188 +368,113 @@ public sealed partial class InfoOverlayWindow : WindowEx
         _isOverlayVisible = false;
     }
 
-    private void RenderCounters(IReadOnlyList<InfoOverlayCounter> counters)
+    private void RenderCounters(IReadOnlyList<InfoOverlayCounter> counters, bool force = false)
     {
+        if (!force && _renderedCounters is not null && _renderedCounters.SequenceEqual(counters)) return;
+        _renderedCounters = counters.ToArray();
         CounterList.Children.Clear();
-
         if (counters.Count == 0)
         {
             CounterList.Children.Add(new TextBlock
             {
-                Text = "暂无其他记录",
+                Text = "暂无捕捉记录",
                 FontSize = 12,
                 Foreground = new SolidColorBrush(CounterSecondaryForeground)
             });
             return;
         }
-
         for (var index = 0; index < counters.Count; index++)
         {
-            var rank = index + 1;
-            CounterList.Children.Add(rank == 1
-                ? CreateFeaturedCounterRow(counters[index])
-                : CreateCounterRow(counters[index], rank));
+            CounterList.Children.Add(CreateCounterRow(counters[index], index + 1));
         }
     }
 
-    private static Border CreateFeaturedCounterRow(InfoOverlayCounter counter)
+    private Grid CreateCounterRow(InfoOverlayCounter counter, int rank)
     {
-        var rowContent = new Grid
+        var featured = rank == 1;
+        var row = new Grid { ColumnSpacing = 8, Height = featured ? 40 : 26 };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(new TextBlock
         {
-            ColumnSpacing = 10,
-            MinHeight = 58
-        };
-
-        rowContent.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(30)
+            Text = rank.ToString("00"),
+            FontSize = 10,
+            FontWeight = featured ? FontWeights.SemiBold : FontWeights.Normal,
+            Foreground = new SolidColorBrush(featured ? CounterAccentForeground : CounterSecondaryForeground),
+            VerticalAlignment = VerticalAlignment.Center
         });
-        rowContent.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(1, GridUnitType.Star)
-        });
-        rowContent.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = GridLength.Auto
-        });
-
-        var row = new Border
-        {
-            Padding = new Thickness(0, 7, 0, 8),
-            BorderBrush = new SolidColorBrush(CounterRowBorder),
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = rowContent
-        };
-
-        var rankText = new TextBlock
-        {
-            Text = "#1",
-            VerticalAlignment = VerticalAlignment.Center,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(CounterSecondaryForeground)
-        };
-
-        var nameStack = new StackPanel
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Spacing = 2
-        };
-        nameStack.Children.Add(new TextBlock
-        {
-            Text = "最近捕捉精灵",
-            FontSize = 11,
-            Foreground = new SolidColorBrush(CounterSecondaryForeground)
-        });
-        nameStack.Children.Add(new TextBlock
-        {
-            Text = counter.CreatureName,
-            FontSize = 20,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(CounterPrimaryForeground),
-            MaxLines = 1,
-            TextTrimming = TextTrimming.CharacterEllipsis
-        });
-
-        var countText = new TextBlock
-        {
-            Text = counter.PollutionCount.ToString(),
-            MinWidth = 46,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            FontSize = GetFeaturedCounterFontSize(counter.PollutionCount),
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(CounterAccentForeground),
-            TextAlignment = TextAlignment.Right
-        };
-
-        Grid.SetColumn(rankText, 0);
-        Grid.SetColumn(nameStack, 1);
-        Grid.SetColumn(countText, 2);
-        rowContent.Children.Add(rankText);
-        rowContent.Children.Add(nameStack);
-        rowContent.Children.Add(countText);
-        return row;
-    }
-
-    private static Border CreateCounterRow(InfoOverlayCounter counter, int rank)
-    {
-        var rowContent = new Grid
-        {
-            ColumnSpacing = 10,
-            MinHeight = 30
-        };
-
-        rowContent.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(30)
-        });
-        rowContent.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(1, GridUnitType.Star)
-        });
-        rowContent.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = GridLength.Auto
-        });
-
-        var row = new Border
-        {
-            Padding = new Thickness(0, 5, 0, 6),
-            BorderBrush = new SolidColorBrush(CounterRowBorder),
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Child = rowContent
-        };
-
-        var rankText = new TextBlock
-        {
-            Text = $"#{rank}",
-            VerticalAlignment = VerticalAlignment.Center,
-            FontSize = 12,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = new SolidColorBrush(CounterSecondaryForeground)
-        };
-
+        var avatar = CreateCounterAvatar(counter.CreatureName, featured ? 36 : 24);
+        Grid.SetColumn(avatar, 1);
+        row.Children.Add(avatar);
         var name = new TextBlock
         {
             Text = counter.CreatureName,
-            FontSize = 13,
+            FontSize = featured ? 15 : 12,
+            FontWeight = featured ? FontWeights.SemiBold : FontWeights.Normal,
             Foreground = new SolidColorBrush(CounterPrimaryForeground),
             TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxLines = 1,
             VerticalAlignment = VerticalAlignment.Center
         };
-
-        var countText = new TextBlock
+        ToolTipService.SetToolTip(name, counter.CreatureName);
+        Grid.SetColumn(name, 2);
+        row.Children.Add(name);
+        var count = new TextBlock
         {
             Text = counter.PollutionCount.ToString(),
-            MinWidth = 36,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Center,
-            FontSize = 13,
+            FontSize = featured ? GetFeaturedCounterFontSize(counter.PollutionCount) : 14,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(CounterAccentForeground),
+            VerticalAlignment = VerticalAlignment.Center,
             TextAlignment = TextAlignment.Right
         };
-
-        Grid.SetColumn(rankText, 0);
-        Grid.SetColumn(name, 1);
-        Grid.SetColumn(countText, 2);
-        rowContent.Children.Add(rankText);
-        rowContent.Children.Add(name);
-        rowContent.Children.Add(countText);
+        Grid.SetColumn(count, 3);
+        row.Children.Add(count);
         return row;
     }
 
-    private static double GetFeaturedCounterFontSize(int count)
+    private Border CreateCounterAvatar(string creatureName, double size)
     {
-        return count switch
+        var avatar = new Border
         {
-            >= 10000 => 20,
-            >= 1000 => 22,
-            >= 100 => 24,
-            _ => 28
+            Width = size,
+            Height = size,
+            VerticalAlignment = VerticalAlignment.Center,
+            CornerRadius = new CornerRadius(size > 30 ? 10 : 6),
+            Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)),
+            Child = CreateAvatarPlaceholder(size)
         };
+        var key = TextMatchingHelper.NormalizeSpiritNameForMatching(creatureName);
+        if (_avatarPaths.TryGetValue(key, out var path) && Uri.TryCreate(path, UriKind.Absolute, out var uri))
+        {
+            if (!_avatarImages.TryGetValue(path, out var source))
+            {
+                source = new BitmapImage(uri);
+                _avatarImages[path] = source;
+            }
+            var image = new Image { Width = size - 4, Height = size - 4, Stretch = Stretch.Uniform, Source = source };
+            image.ImageFailed += (_, _) => avatar.Child = CreateAvatarPlaceholder(size);
+            avatar.Child = image;
+        }
+        return avatar;
     }
+
+    private static FontIcon CreateAvatarPlaceholder(double size) => new()
+    {
+        Glyph = "\uE77B",
+        FontFamily = new FontFamily("Segoe Fluent Icons"),
+        FontSize = size / 2,
+        Foreground = new SolidColorBrush(CounterSecondaryForeground)
+    };
+
+    private static double GetFeaturedCounterFontSize(int count) => count switch
+    {
+        >= 10000 => 18,
+        >= 1000 => 20,
+        _ => 24
+    };
 
     private void OverlayRoot_PointerPressed(object sender, PointerRoutedEventArgs e)
     {

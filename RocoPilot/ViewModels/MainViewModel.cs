@@ -90,9 +90,6 @@ public partial class MainViewModel : ObservableRecipient
 
     public string KeyboardInputMethodDescription => SelectedKeyboardInputMethod?.Description ?? string.Empty;
 
-    public RuntimeRecognitionSettings RuntimeRecognitionSettings =>
-        _runtimeTaskService.RuntimeRecognitionSettings;
-
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,
         IInfoOverlayService infoOverlayService,
@@ -204,11 +201,6 @@ public partial class MainViewModel : ObservableRecipient
     {
         await _runtimeTaskService.LoadSettingsAsync();
         ApplyRuntimeTaskSettings();
-    }
-
-    public void UpdateRuntimeRecognitionSettings(RuntimeRecognitionSettings settings)
-    {
-        _runtimeTaskService.SetRuntimeRecognitionSettings(settings);
     }
 
     [RelayCommand]

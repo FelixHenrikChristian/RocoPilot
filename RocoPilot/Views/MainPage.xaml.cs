@@ -2,9 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
-using RocoPilot.Helpers;
 using RocoPilot.ViewModels;
-using RocoPilot.Views.Windows;
 
 namespace RocoPilot.Views;
 
@@ -12,7 +10,6 @@ public sealed partial class MainPage : Page
 {
     private const double CoverAspectRatio = 5.0 / 2.0;
     private readonly IInterceptionDriverService _interceptionDriverService;
-    private RuntimeRecognitionConfigWindow? _runtimeRecognitionConfigWindow;
     private KeyboardInputMethodOption? _confirmedKeyboardInputMethod;
     private bool _isKeyboardInputMethodSelectionReady;
     private bool _isRestoringKeyboardInputMethodSelection;
@@ -99,21 +96,5 @@ public sealed partial class MainPage : Page
         {
             CoverContainer.Height = targetHeight;
         }
-    }
-
-    private async void ConfigureRuntimeRecognitionButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_runtimeRecognitionConfigWindow is not null)
-        {
-            _runtimeRecognitionConfigWindow.Activate();
-            return;
-        }
-
-        await ViewModel.LoadRuntimeTaskSettingsAsync();
-        _runtimeRecognitionConfigWindow = new RuntimeRecognitionConfigWindow(ViewModel);
-        _runtimeRecognitionConfigWindow.Closed += (_, _) => _runtimeRecognitionConfigWindow = null;
-        WindowPlacementHelper.SetOwner(_runtimeRecognitionConfigWindow, App.MainWindow);
-        WindowPlacementHelper.CenterOnParent(_runtimeRecognitionConfigWindow, App.MainWindow);
-        _runtimeRecognitionConfigWindow.Activate();
     }
 }

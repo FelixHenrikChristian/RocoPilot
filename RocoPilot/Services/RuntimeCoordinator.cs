@@ -22,7 +22,6 @@ public sealed class RuntimeCoordinator(
     public RuntimeTaskState? CurrentState => runtime.CurrentState;
     public bool EncounterStatisticsEnabled => runtime.EncounterStatisticsEnabled;
     public AutoBattleSettings AutoBattleSettings => runtime.AutoBattleSettings;
-    public RuntimeRecognitionSettings RuntimeRecognitionSettings => runtime.RuntimeRecognitionSettings;
 
     public async Task<RuntimeTaskStartResult> StartAsync(RuntimeTaskStartOptions options, CancellationToken cancellationToken = default)
     {
@@ -74,7 +73,6 @@ public sealed class RuntimeCoordinator(
     public void SetInfoOverlayEnabled(bool isEnabled) => runtime.SetInfoOverlayEnabled(isEnabled);
     public void SetInfoOverlayLocked(bool isLocked) => runtime.SetInfoOverlayLocked(isLocked);
     public void SetAutoBattleSettings(AutoBattleSettings settings) => runtime.SetAutoBattleSettings(settings);
-    public void SetRuntimeRecognitionSettings(RuntimeRecognitionSettings settings) => runtime.SetRuntimeRecognitionSettings(settings);
     public void Suspend(string reason) => runtime.Suspend(reason);
     public void Resume() => runtime.Resume();
 }

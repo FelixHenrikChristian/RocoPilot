@@ -5,7 +5,6 @@ using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.Statistics;
-using RocoPilot.Models.Input;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.Spirits;
 
@@ -37,7 +36,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
     private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
     private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
-    private AutoBattleKeyboardInputMethodOption? _selectedAutoBattleKeyboardInputMethodOption;
     private int _autoBattleSkillSelectionActionDelayMs = AutoBattleSettings.DefaultSkillSelectionActionDelayMs;
     private int _autoBattleSkillSelectionRetryDelayMs = AutoBattleSettings.DefaultSkillSelectionRetryDelayMs;
     private int _autoBattleKeyboardHoldDurationMs = AutoBattleSettings.DefaultKeyboardHoldDurationMs;
@@ -50,11 +48,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         get;
     } = AutoBattleEncounterRelievedActionOption.CreateDefaultOptions();
-
-    public IReadOnlyList<AutoBattleKeyboardInputMethodOption> AutoBattleKeyboardInputMethodOptions
-    {
-        get;
-    } = AutoBattleKeyboardInputMethodOption.CreateDefaultOptions();
 
     public IReadOnlyList<SpiritCatalogSourceOption> SpiritCatalogSources
     {
@@ -201,30 +194,10 @@ public partial class RealtimeViewModel : ObservableRecipient
     public string AutoBattleEncounterRelievedActionDescription =>
         SelectedAutoBattleEncounterRelievedActionOption?.Description ?? string.Empty;
 
-    public AutoBattleKeyboardInputMethodOption? SelectedAutoBattleKeyboardInputMethodOption
-    {
-        get => _selectedAutoBattleKeyboardInputMethodOption;
-        set
-        {
-            if (value is not null
-                && SetProperty(ref _selectedAutoBattleKeyboardInputMethodOption, value))
-            {
-                SaveAutoBattleSettings();
-                OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
-            }
-        }
-    }
-
-    public string AutoBattleKeyboardInputMethodDescription =>
-        SelectedAutoBattleKeyboardInputMethodOption?.Description ?? string.Empty;
-
     public AutoBattleSettings AutoBattleSettings => BuildAutoBattleSettings();
 
     private AutoBattleEncounterRelievedAction SelectedAutoBattleEncounterRelievedAction =>
         SelectedAutoBattleEncounterRelievedActionOption?.Action ?? AutoBattleEncounterRelievedAction.RecoverEnergy;
-
-    private KeyboardInputMethod SelectedAutoBattleKeyboardInputMethod =>
-        SelectedAutoBattleKeyboardInputMethodOption?.Method ?? KeyboardInputMethod.PostMessage;
 
     public RealtimeViewModel(
         IRuntimeTaskService runtimeTaskService,
@@ -436,8 +409,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
         _selectedAutoBattleEncounterRelievedActionOption =
             FindAutoBattleEncounterRelievedActionOption(settings.EncounterRelievedAction);
-        _selectedAutoBattleKeyboardInputMethodOption =
-            FindAutoBattleKeyboardInputMethodOption(settings.KeyboardInputMethod);
         _autoBattleSkillSelectionActionDelayMs = settings.SkillSelectionActionDelayMs;
         _autoBattleSkillSelectionRetryDelayMs = settings.SkillSelectionRetryDelayMs;
         _autoBattleKeyboardHoldDurationMs = settings.KeyboardHoldDurationMs;
@@ -451,8 +422,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         OnPropertyChanged(nameof(AutoBattleTurnSequence));
         OnPropertyChanged(nameof(SelectedAutoBattleEncounterRelievedActionOption));
         OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
-        OnPropertyChanged(nameof(SelectedAutoBattleKeyboardInputMethodOption));
-        OnPropertyChanged(nameof(AutoBattleKeyboardInputMethodDescription));
         OnPropertyChanged(nameof(AutoBattleSettings));
     }
 
@@ -482,7 +451,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
             TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,
-            KeyboardInputMethod = SelectedAutoBattleKeyboardInputMethod,
+            KeyboardInputMethod = _runtimeTaskService.AutoBattleSettings.KeyboardInputMethod,
             SkillSelectionActionDelayMs = _autoBattleSkillSelectionActionDelayMs,
             SkillSelectionRetryDelayMs = _autoBattleSkillSelectionRetryDelayMs,
             KeyboardHoldDurationMs = _autoBattleKeyboardHoldDurationMs,
@@ -497,13 +466,6 @@ public partial class RealtimeViewModel : ObservableRecipient
     {
         return AutoBattleEncounterRelievedActionOptions.FirstOrDefault(option => option.Action == action)
             ?? AutoBattleEncounterRelievedActionOptions.First(option => option.Action == AutoBattleEncounterRelievedAction.RecoverEnergy);
-    }
-
-    private AutoBattleKeyboardInputMethodOption FindAutoBattleKeyboardInputMethodOption(
-        KeyboardInputMethod method)
-    {
-        return AutoBattleKeyboardInputMethodOptions.FirstOrDefault(option => option.Method == method)
-            ?? AutoBattleKeyboardInputMethodOptions.First(option => option.Method == KeyboardInputMethod.PostMessage);
     }
 }
 
@@ -532,31 +494,6 @@ public sealed record AutoBattleEncounterRelievedActionOption(
                 AutoBattleEncounterRelievedAction.Capture,
                 "捕捉",
                 "识别到奇遇解除后进入技能选择界面会依次按 W、1、Space。可在战斗配置「捕捉血脉」中按血脉筛选是否捕捉。")
-        ];
-    }
-}
-
-public sealed record AutoBattleKeyboardInputMethodOption(
-    KeyboardInputMethod Method,
-    string Name,
-    string Description)
-{
-    public static IReadOnlyList<AutoBattleKeyboardInputMethodOption> CreateDefaultOptions()
-    {
-        return
-        [
-            new(
-                KeyboardInputMethod.PostMessage,
-                "PostMessage（已失效）",
-                "旧的后台窗口消息方式；不要求游戏前台，但可能被游戏屏蔽。"),
-            new(
-                KeyboardInputMethod.SendInput,
-                "SendInput（已失效）",
-                "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。"),
-            new(
-                KeyboardInputMethod.Interception,
-                "Interception",
-                "驱动级键盘输入；需要安装 Interception 驱动并重启，游戏窗口需处于前台。")
         ];
     }
 }

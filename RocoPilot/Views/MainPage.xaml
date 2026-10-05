@@ -225,6 +225,50 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE765;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="按键输入方式" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="实时任务和独立任务统一使用此配置。"
+                                TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{x:Bind ViewModel.KeyboardInputMethodDescription, Mode=OneWay}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ComboBox
+                            x:Name="KeyboardInputMethodComboBox"
+                            Grid.Column="2"
+                            HorizontalAlignment="Stretch"
+                            IsEnabled="{x:Bind ViewModel.IsLaunchConfigurationEnabled, Mode=OneWay}"
+                            VerticalAlignment="Center"
+                            DisplayMemberPath="Name"
+                            ItemsSource="{x:Bind ViewModel.KeyboardInputMethods}"
+                            SelectedItem="{x:Bind ViewModel.SelectedKeyboardInputMethod, Mode=TwoWay}"
+                            SelectionChanged="KeyboardInputMethodComboBox_SelectionChanged" />
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <FontIcon

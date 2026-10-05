@@ -32,32 +32,4 @@ public sealed class TextRecognitionTestPageTests
         Assert.AreEqual("识别完成 · ONNX Runtime PP-OCRv5（单行） · 识别语言：Chinese/English · 耗时 12.3 ms", status);
     }
 
-    [TestMethod]
-    public void PlacesSingleLineOnnxMethodBeforeOtherTestMethods()
-    {
-        var paddleOption = new TextRecognitionMethodOption(
-            TextRecognitionMethod.PaddleOcrV5,
-            "PaddleOCR",
-            "test",
-            true);
-        var onnxOption = new TextRecognitionMethodOption(
-            TextRecognitionMethod.OnnxOcrV5,
-            "ONNX OCR v5（单行加速）",
-            "test",
-            true);
-        var orderingMethod = typeof(TextRecognitionTestPage).GetMethod(
-            "BuildRecognitionMethods",
-            BindingFlags.NonPublic | BindingFlags.Static,
-            binder: null,
-            types: [typeof(IReadOnlyList<TextRecognitionMethodOption>)],
-            modifiers: null);
-
-        Assert.IsNotNull(orderingMethod, "测试页应优先展示 ONNX 单行 OCR。");
-        var methods = (IReadOnlyList<TextRecognitionMethodOption>)orderingMethod.Invoke(
-            null,
-            new object?[] { new[] { paddleOption, onnxOption } })!;
-
-        Assert.AreEqual(TextRecognitionMethod.OnnxOcrV5, methods[0].Method);
-        Assert.AreEqual(TextRecognitionMethod.PaddleOcrV5, methods[1].Method);
-    }
 }

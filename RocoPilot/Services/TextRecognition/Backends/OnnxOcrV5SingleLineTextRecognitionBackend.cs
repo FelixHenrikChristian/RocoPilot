@@ -45,7 +45,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
                 }
                 catch (Exception)
                 {
-                    // Keep PaddleOCR available if the optional ONNX warmup cannot complete.
+                    // 任务启动时会检查 OCR 可用性。
                 }
             },
             cancellationToken);

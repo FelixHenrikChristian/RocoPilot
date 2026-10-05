@@ -39,21 +39,12 @@ public sealed partial class TextRecognitionTestPage : Page
 
     private void LoadRecognitionMethods()
     {
-        _recognitionMethods = BuildRecognitionMethods(
-            _textRecognitionService.GetMethods());
+        _recognitionMethods = _textRecognitionService.GetMethods();
         RecognitionMethodComboBox.ItemsSource = _recognitionMethods;
         RecognitionMethodComboBox.SelectedItem = _recognitionMethods.FirstOrDefault(method => method.IsAvailable)
             ?? _recognitionMethods.FirstOrDefault();
 
         UpdateRecognitionMethodStatus();
-    }
-
-    private static IReadOnlyList<TextRecognitionMethodOption> BuildRecognitionMethods(
-        IReadOnlyList<TextRecognitionMethodOption> methods)
-    {
-        return methods
-            .OrderBy(method => method.Method == TextRecognitionMethod.OnnxOcrV5 ? 0 : 1)
-            .ToList();
     }
 
     private async void ImportImageButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)

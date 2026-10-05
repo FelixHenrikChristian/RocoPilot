@@ -1,3 +1,4 @@
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
@@ -9,14 +10,6 @@ namespace RocoPilot.Services.TextRecognition;
 
 public sealed class TextRecognitionService : ITextRecognitionService
 {
-    private static readonly IReadOnlyDictionary<TextRecognitionMethod, int> MethodPriority = new Dictionary<TextRecognitionMethod, int>
-    {
-        [TextRecognitionMethod.OnnxOcrV5] = 0,
-        [TextRecognitionMethod.PaddleOcrV5] = 1,
-        [TextRecognitionMethod.TesseractOcr] = 2,
-        [TextRecognitionMethod.WindowsOcr] = 3
-    };
-
     private readonly IReadOnlyDictionary<TextRecognitionMethod, ITextRecognitionBackend> _backends;
 
     public TextRecognitionService(IEnumerable<ITextRecognitionBackend> backends)
@@ -28,15 +21,15 @@ public sealed class TextRecognitionService : ITextRecognitionService
     {
         return _backends.Values
             .Select(backend => backend.GetOption())
-            .OrderBy(option => GetMethodPriority(option.Method))
+            .OrderBy(option => option.Method == TextRecognitionDefaults.Method ? 0 : 1)
             .ToList();
     }
 
     public TextRecognitionMethodOption? GetDefaultMethod()
     {
-        var methods = GetMethods();
-        return methods.FirstOrDefault(method => method.IsAvailable)
-            ?? methods.FirstOrDefault();
+        return _backends.TryGetValue(TextRecognitionDefaults.Method, out var backend)
+            ? backend.GetOption()
+            : null;
     }
 
     public Task<TextRecognitionResult> RecognizeAsync(
@@ -82,12 +75,5 @@ public sealed class TextRecognitionService : ITextRecognitionService
             region,
             cancellationToken);
         return await backend.RecognizeAsync(imageBytes, cancellationToken);
-    }
-
-    private static int GetMethodPriority(TextRecognitionMethod method)
-    {
-        return MethodPriority.TryGetValue(method, out var priority)
-            ? priority
-            : int.MaxValue;
     }
 }

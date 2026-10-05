@@ -159,43 +159,6 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE8D4;" />
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="OCR 识别方法" TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,2,0,0"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="选择所有 OCR 任务使用的文字识别后端。"
-                                TextWrapping="Wrap" />
-                        </StackPanel>
-                        <ComboBox
-                            Grid.Column="2"
-                            HorizontalAlignment="Stretch"
-                            IsEnabled="{x:Bind ViewModel.IsLaunchConfigurationEnabled, Mode=OneWay}"
-                            VerticalAlignment="Center"
-                            DisplayMemberPath="Name"
-                            ItemsSource="{x:Bind ViewModel.TextRecognitionMethods}"
-                            SelectedItem="{x:Bind ViewModel.SelectedTextRecognitionMethod, Mode=TwoWay}"
-                            ToolTipService.ToolTip="ONNX OCR 速度优先；PaddleOCR 适合需要完整文字检测的场景。" />
-                    </Grid>
-
-                    <Border
-                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0" />
-
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="220" />
-                        </Grid.ColumnDefinitions>
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="18"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE765;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="按键输入方式" TextWrapping="Wrap" />
@@ -203,14 +166,9 @@
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="实时任务和独立任务统一使用此配置。"
-                                TextWrapping="Wrap" />
-                            <TextBlock
-                                Margin="0,2,0,0"
-                                FontSize="12"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Text="{x:Bind ViewModel.KeyboardInputMethodDescription, Mode=OneWay}"
-                                TextWrapping="Wrap" />
+                                TextTrimming="CharacterEllipsis"
+                                TextWrapping="NoWrap" />
                         </StackPanel>
                         <ComboBox
                             x:Name="KeyboardInputMethodComboBox"

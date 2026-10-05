@@ -9,7 +9,6 @@ using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
-using RocoPilot.Models.TextRecognition;
 using RocoPilot.Settings;
 
 namespace RocoPilot.ViewModels;
@@ -33,29 +32,21 @@ public partial class MainViewModel : ObservableRecipient
         new(CaptureMethod.PrintWindow, "PrintWindow", "窗口后台截图尝试")
     ];
 
-    public IReadOnlyList<TextRecognitionMethodOption> TextRecognitionMethods
-    {
-        get;
-    }
-
     public IReadOnlyList<KeyboardInputMethodOption> KeyboardInputMethods { get; } =
     [
         new(KeyboardInputMethod.PostMessage,
             "PostMessage（已失效）",
-            "旧的后台窗口消息方式；不要求游戏前台，但可能被游戏屏蔽。"),
+            "后台窗口消息，可能被游戏屏蔽。"),
         new(KeyboardInputMethod.SendInput,
             "SendInput（已失效）",
-            "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。"),
+            "前台输入，程序权限不能低于游戏。"),
         new(KeyboardInputMethod.Interception,
             "Interception",
-            "驱动级键盘输入；需要安装 Interception 驱动并重启，游戏窗口需处于前台。")
+            "需安装驱动并重启，游戏需保持前台。")
     ];
 
     [ObservableProperty]
     public partial CaptureMethodOption? SelectedCaptureMethod { get; set; }
-
-    [ObservableProperty]
-    public partial TextRecognitionMethodOption? SelectedTextRecognitionMethod { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyboardInputMethodDescription))]
@@ -114,7 +105,6 @@ public partial class MainViewModel : ObservableRecipient
         _logger = logger;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _runtimeTaskService.SettingsChanged += RuntimeTaskService_SettingsChanged;
-        TextRecognitionMethods = _textRecognitionService.GetMethods();
         _isApplyingRuntimeTaskSettings = true;
         IsInfoOverlayEnabled = true;
         IsInfoOverlayLocked = true;
@@ -122,7 +112,6 @@ public partial class MainViewModel : ObservableRecipient
         LaunchNotificationTitle = string.Empty;
         LaunchNotificationMessage = string.Empty;
         SelectedCaptureMethod = CaptureMethods[0];
-        SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
         SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
@@ -158,21 +147,13 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
-        if (SelectedTextRecognitionMethod is null)
+        var recognitionMethod = _textRecognitionService.GetDefaultMethod();
+        if (recognitionMethod is not { IsAvailable: true })
         {
             ShowLaunchNotification(
-                InfoBarSeverity.Warning,
-                "缺少配置",
-                "请先选择 OCR 识别方法。");
-            return;
-        }
-
-        if (!SelectedTextRecognitionMethod.IsAvailable)
-        {
-            ShowLaunchNotification(
-                InfoBarSeverity.Warning,
+                InfoBarSeverity.Error,
                 "OCR 不可用",
-                SelectedTextRecognitionMethod.UnavailableReason ?? "当前 OCR 识别方法不可用。");
+                recognitionMethod?.UnavailableReason ?? "默认 OCR 引擎未能加载，请检查应用文件是否完整。");
             return;
         }
 
@@ -181,7 +162,6 @@ public partial class MainViewModel : ObservableRecipient
         var result = await _runtimeTaskService.StartAsync(new RuntimeTaskStartOptions
         {
             CaptureMethod = SelectedCaptureMethod.Method,
-            TextRecognitionMethod = SelectedTextRecognitionMethod.Method,
             RecognitionOverlayEnabled = IsMaskOverlayEnabled,
             InfoOverlayEnabled = IsInfoOverlayEnabled,
             InfoOverlayLocked = IsInfoOverlayLocked,
@@ -311,22 +291,6 @@ public partial class MainViewModel : ObservableRecipient
         LaunchNotificationMessage = message;
         IsLaunchNotificationOpen = false;
         IsLaunchNotificationOpen = true;
-    }
-
-    private TextRecognitionMethodOption? GetInitialTextRecognitionMethod()
-    {
-        if (_runtimeTaskService.CurrentState is not null)
-        {
-            var runningMethod = TextRecognitionMethods.FirstOrDefault(
-                method => method.Method == _runtimeTaskService.CurrentState.Options.TextRecognitionMethod);
-            if (runningMethod is not null)
-            {
-                return runningMethod;
-            }
-        }
-
-        return TextRecognitionMethods.FirstOrDefault(method => method.IsAvailable)
-            ?? TextRecognitionMethods.FirstOrDefault();
     }
 
     private KeyboardInputMethodOption FindKeyboardInputMethod(KeyboardInputMethod method)

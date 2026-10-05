@@ -43,10 +43,8 @@ public sealed class RuntimeFrameRecognizer(
             return string.Empty;
         }
 
-        var recognitionMethod = textRecognition
-            .GetMethods()
-            .FirstOrDefault(method => method.Method == state.Options.TextRecognitionMethod && method.IsAvailable);
-        if (recognitionMethod is null)
+        var recognitionMethod = textRecognition.GetDefaultMethod();
+        if (recognitionMethod is not { IsAvailable: true })
         {
             debugLog.Write(
                 CreateDebugLogKey("ocr-skip-method-unavailable", taskName, region.Id, state.Options.TextRecognitionMethod),

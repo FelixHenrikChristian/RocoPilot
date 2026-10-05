@@ -27,7 +27,7 @@ public sealed class OnnxOcrV5TextRecognitionBackend : ITextRecognitionBackend, I
                 "ONNX OCR v5",
                 Description,
                 false,
-                "ONNX OCR 模型或运行时不可用。");
+                "ONNX OCR 模型或运行时不可用，请检查应用文件是否完整，或重新安装 RocoPilot。");
     }
 
     public Task<TextRecognitionResult> RecognizeAsync(

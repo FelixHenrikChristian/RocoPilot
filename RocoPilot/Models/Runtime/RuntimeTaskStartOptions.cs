@@ -1,3 +1,4 @@
+using RocoPilot.Configuration;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.TextRecognition;
 
@@ -11,11 +12,7 @@ public sealed class RuntimeTaskStartOptions
         init;
     }
 
-    public TextRecognitionMethod TextRecognitionMethod
-    {
-        get;
-        init;
-    } = TextRecognitionMethod.OnnxOcrV5;
+    public TextRecognitionMethod TextRecognitionMethod => TextRecognitionDefaults.Method;
 
     public bool RecognitionOverlayEnabled
     {

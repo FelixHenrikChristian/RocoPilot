@@ -5,7 +5,7 @@ using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Services.RuntimeTasks;
 
-public enum BattleScreen { SkillSelection, PetSwitching, Chat, Transition }
+public enum BattleScreen { SkillSelection, PetSwitching, Chat, Unknown }
 
 public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
 {
@@ -27,7 +27,7 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
     ];
     private static readonly ImageMatchOptions BattleChatMatchOptions = new()
     {
-        MinimumScore = 0.88,
+        MinimumScore = 0.96,
         AlphaThreshold = 16,
         SearchStep = 1
     };
@@ -105,10 +105,10 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
             cancellationToken);
     }
 
-    public async Task<BattleScreen> RecognizeAsync(RuntimeTaskState state, CapturedFrame frame, bool? chatVisible, CancellationToken token)
+    public async Task<BattleScreen> RecognizeAsync(RuntimeTaskState state, CapturedFrame frame, CancellationToken token)
     {
         if (await IsBattleSkillSelectionVisibleAsync(state, frame, token)) return BattleScreen.SkillSelection;
         if (await IsBattlePetSwitchingAsync(state, frame, token)) return BattleScreen.PetSwitching;
-        return (chatVisible ?? await IsBattleChatVisibleAsync(state, frame, token)) ? BattleScreen.Chat : BattleScreen.Transition;
+        return await IsBattleChatVisibleAsync(state, frame, token) ? BattleScreen.Chat : BattleScreen.Unknown;
     }
 }

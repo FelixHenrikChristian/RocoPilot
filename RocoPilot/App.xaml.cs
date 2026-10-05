@@ -102,6 +102,7 @@ public partial class App : Application
             services.AddSingleton<RuntimeTaskService>();
             services.AddSingleton<RuntimeDebugLogger>();
             services.AddSingleton<RuntimeFrameRecognizer>();
+            services.AddSingleton<GameSceneRecognizer>();
             services.AddSingleton<BattleScreenRecognizer>();
             services.AddSingleton<AutoBattleInputExecutor>();
             services.AddSingleton<StatisticsUidCoordinatorService>();

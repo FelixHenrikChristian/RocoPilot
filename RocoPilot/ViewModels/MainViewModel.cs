@@ -168,7 +168,7 @@ public partial class MainViewModel : ObservableRecipient
             IsRealtimeCaptureRunning = false;
             TargetGameWindow = null;
             _logger.LogDebug("实时任务停止命令已完成");
-            ShowLaunchNotification(InfoBarSeverity.Success, "任务已停止", "实时任务已停止。");
+            ShowLaunchNotification(InfoBarSeverity.Success, "任务已停止", "场景识别和实时任务已停止。");
             return;
         }
 

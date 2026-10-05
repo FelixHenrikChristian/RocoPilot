@@ -87,7 +87,7 @@
                             <TextBlock
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="展开后配置任务启动前需要确认的基础项。"
+                                Text="启动后持续识别游戏场景，并执行已开启的实时任务。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 
@@ -130,7 +130,7 @@
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="选择实时截图任务使用的捕获后端。"
+                                Text="选择场景识别和实时任务使用的截图后端。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox

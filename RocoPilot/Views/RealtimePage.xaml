@@ -212,7 +212,7 @@
                             <TextBlock
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="进入战斗技能选择时，按配置自动释放技能。"
+                                Text="仅在战斗中按配置执行操作；场景识别由启动任务统一进行。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 

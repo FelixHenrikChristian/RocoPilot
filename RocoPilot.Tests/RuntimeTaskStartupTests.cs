@@ -411,8 +411,6 @@ public sealed class RuntimeTaskStartupTests
                 File.WriteAllBytes(Path.Combine(resolutionDirectory, template), []);
         }
         public IReadOnlyList<string> ListTemplatePaths() => [];
-        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SetDefaultAlgorithmAsync(ImageMatchAlgorithm algorithm, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
         {

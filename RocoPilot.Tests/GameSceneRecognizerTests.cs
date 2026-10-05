@@ -9,7 +9,6 @@ using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.ImageMatching;
-using RocoPilot.Tests.TestDoubles;
 
 namespace RocoPilot.Tests;
 
@@ -17,16 +16,12 @@ namespace RocoPilot.Tests;
 public sealed class GameSceneRecognizerTests
 {
     [TestMethod]
-    [DataRow("battle-chat-handbook.png", ImageMatchAlgorithm.WeightedRgbError, false)]
-    [DataRow("battle-chat-handbook.png", ImageMatchAlgorithm.OpenCvSqDiffNormalized, false)]
-    [DataRow("battle-chat-visible.png", ImageMatchAlgorithm.WeightedRgbError, true)]
-    [DataRow("battle-chat-visible.png", ImageMatchAlgorithm.OpenCvSqDiffNormalized, true)]
+    [DataRow("battle-chat-handbook.png", false)]
+    [DataRow("battle-chat-visible.png", true)]
     public async Task RealChatImagesDistinguishHandbookFromBattle(
-        string sample, ImageMatchAlgorithm algorithm, bool expected)
+        string sample, bool expected)
     {
-        var settings = new ControlledSettingsStore();
-        settings.Seed("ImageMatchAlgorithm", algorithm);
-        var matching = new ImageMatchingService(settings, NullLogger<ImageMatchingService>.Instance);
+        var matching = new ImageMatchingService();
         var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
         var recognizer = new BattleScreenRecognizer(new RuntimeFrameRecognizer(matching, null!, new OverlayStub(), debug));
         var samplePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", sample);
@@ -209,8 +204,6 @@ public sealed class GameSceneRecognizerTests
         public List<(string Template, string Region)> SingleMatches { get; } = [];
 
         public IReadOnlyList<string> ListTemplatePaths() => [];
-        public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-        public Task SetDefaultAlgorithmAsync(ImageMatchAlgorithm algorithm, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)

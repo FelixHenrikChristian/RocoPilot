@@ -6,10 +6,8 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
-using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
-using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Settings;
@@ -20,12 +18,10 @@ public partial class MainViewModel : ObservableRecipient
 {
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IInfoOverlayService _infoOverlayService;
-    private readonly IImageMatchingService _imageMatchingService;
     private readonly ITextRecognitionService _textRecognitionService;
     private readonly ILogger<MainViewModel> _logger;
     private readonly DispatcherQueue? _dispatcherQueue;
     private bool _isApplyingRuntimeTaskSettings;
-    private bool _isApplyingImageMatchAlgorithm;
 
     public IReadOnlyList<CaptureMethodOption> CaptureMethods
     {
@@ -55,31 +51,11 @@ public partial class MainViewModel : ObservableRecipient
             "驱动级键盘输入；需要安装 Interception 驱动并重启，游戏窗口需处于前台。")
     ];
 
-    public IReadOnlyList<ImageMatchAlgorithmOption> ImageMatchAlgorithms
-    {
-        get;
-    } =
-    [
-        new()
-        {
-            Algorithm = ImageMatchAlgorithm.OpenCvSqDiffNormalized,
-            Name = "OpenCV SQDIFF_NORMED"
-        },
-        new()
-        {
-            Algorithm = ImageMatchAlgorithm.WeightedRgbError,
-            Name = "原始 RGB 误差"
-        }
-    ];
-
     [ObservableProperty]
     public partial CaptureMethodOption? SelectedCaptureMethod { get; set; }
 
     [ObservableProperty]
     public partial TextRecognitionMethodOption? SelectedTextRecognitionMethod { get; set; }
-
-    [ObservableProperty]
-    public partial ImageMatchAlgorithmOption? SelectedImageMatchAlgorithm { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyboardInputMethodDescription))]
@@ -129,20 +105,17 @@ public partial class MainViewModel : ObservableRecipient
     public MainViewModel(
         IRuntimeTaskService runtimeTaskService,
         IInfoOverlayService infoOverlayService,
-        IImageMatchingService imageMatchingService,
         ITextRecognitionService textRecognitionService,
         ILogger<MainViewModel> logger)
     {
         _runtimeTaskService = runtimeTaskService;
         _infoOverlayService = infoOverlayService;
-        _imageMatchingService = imageMatchingService;
         _textRecognitionService = textRecognitionService;
         _logger = logger;
         _dispatcherQueue = DispatcherQueue.GetForCurrentThread();
         _runtimeTaskService.SettingsChanged += RuntimeTaskService_SettingsChanged;
         TextRecognitionMethods = _textRecognitionService.GetMethods();
         _isApplyingRuntimeTaskSettings = true;
-        _isApplyingImageMatchAlgorithm = true;
         IsInfoOverlayEnabled = true;
         IsInfoOverlayLocked = true;
         LaunchNotificationSeverity = InfoBarSeverity.Informational;
@@ -150,7 +123,6 @@ public partial class MainViewModel : ObservableRecipient
         LaunchNotificationMessage = string.Empty;
         SelectedCaptureMethod = CaptureMethods[0];
         SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
-        SelectedImageMatchAlgorithm = FindImageMatchAlgorithm(_imageMatchingService.DefaultAlgorithm);
         SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
@@ -162,21 +134,6 @@ public partial class MainViewModel : ObservableRecipient
         }
 
         _isApplyingRuntimeTaskSettings = false;
-        _isApplyingImageMatchAlgorithm = false;
-    }
-
-    public async Task LoadImageMatchAlgorithmAsync()
-    {
-        await _imageMatchingService.InitializeAsync();
-        _isApplyingImageMatchAlgorithm = true;
-        try
-        {
-            SelectedImageMatchAlgorithm = FindImageMatchAlgorithm(_imageMatchingService.DefaultAlgorithm);
-        }
-        finally
-        {
-            _isApplyingImageMatchAlgorithm = false;
-        }
     }
 
     [RelayCommand]
@@ -210,16 +167,6 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
-        var selectedImageMatchAlgorithm = SelectedImageMatchAlgorithm;
-        if (selectedImageMatchAlgorithm is null)
-        {
-            ShowLaunchNotification(
-                InfoBarSeverity.Warning,
-                "缺少配置",
-                "请先选择模板匹配算法。");
-            return;
-        }
-
         if (!SelectedTextRecognitionMethod.IsAvailable)
         {
             ShowLaunchNotification(
@@ -229,7 +176,6 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
-        await _imageMatchingService.SetDefaultAlgorithmAsync(selectedImageMatchAlgorithm.Algorithm);
         await _runtimeTaskService.LoadSettingsAsync();
 
         var result = await _runtimeTaskService.StartAsync(new RuntimeTaskStartOptions
@@ -316,16 +262,6 @@ public partial class MainViewModel : ObservableRecipient
         }
     }
 
-    partial void OnSelectedImageMatchAlgorithmChanged(ImageMatchAlgorithmOption? value)
-    {
-        if (_isApplyingImageMatchAlgorithm || value is null)
-        {
-            return;
-        }
-
-        _ = ApplyImageMatchAlgorithmAsync(value);
-    }
-
     partial void OnSelectedKeyboardInputMethodChanged(KeyboardInputMethodOption? value)
     {
         if (_isApplyingRuntimeTaskSettings || value is null)
@@ -336,32 +272,6 @@ public partial class MainViewModel : ObservableRecipient
         var settings = _runtimeTaskService.AutoBattleSettings;
         settings.KeyboardInputMethod = value.Method;
         _runtimeTaskService.SetAutoBattleSettings(settings);
-    }
-
-    private async Task ApplyImageMatchAlgorithmAsync(ImageMatchAlgorithmOption option)
-    {
-        try
-        {
-            await _imageMatchingService.SetDefaultAlgorithmAsync(option.Algorithm);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "切换模板匹配算法失败：Algorithm={Algorithm}", option.Algorithm);
-            _isApplyingImageMatchAlgorithm = true;
-            try
-            {
-                SelectedImageMatchAlgorithm = FindImageMatchAlgorithm(_imageMatchingService.DefaultAlgorithm);
-            }
-            finally
-            {
-                _isApplyingImageMatchAlgorithm = false;
-            }
-
-            ShowLaunchNotification(
-                InfoBarSeverity.Error,
-                "配置保存失败",
-                "模板匹配算法未能切换，请查看日志。");
-        }
     }
 
     private void RuntimeTaskService_SettingsChanged(object? sender, EventArgs e)
@@ -417,11 +327,6 @@ public partial class MainViewModel : ObservableRecipient
 
         return TextRecognitionMethods.FirstOrDefault(method => method.IsAvailable)
             ?? TextRecognitionMethods.FirstOrDefault();
-    }
-
-    private ImageMatchAlgorithmOption FindImageMatchAlgorithm(ImageMatchAlgorithm algorithm)
-    {
-        return ImageMatchAlgorithms.First(option => option.Algorithm == algorithm);
     }
 
     private KeyboardInputMethodOption FindKeyboardInputMethod(KeyboardInputMethod method)

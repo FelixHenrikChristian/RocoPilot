@@ -157,7 +157,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             var savedRuntimeRecognitionSettings =
                 await _localSettingsService.ReadSettingAsync<RuntimeRecognitionSettings>(SettingsKeys.RuntimeRecognitionSettings);
             _runtimeRecognitionSettings = NormalizeRuntimeRecognitionSettings(savedRuntimeRecognitionSettings);
-            await _imageMatchingService.InitializeAsync(cancellationToken);
             await _hotkeyService.LoadSettingsAsync(cancellationToken);
             _settingsLoaded = true;
         }

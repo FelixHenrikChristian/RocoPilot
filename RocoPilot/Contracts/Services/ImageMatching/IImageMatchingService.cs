@@ -18,12 +18,6 @@ public interface IImageMatchingService
 
     IReadOnlyList<string> ListTemplatePaths();
 
-    Task InitializeAsync(CancellationToken cancellationToken = default);
-
-    Task SetDefaultAlgorithmAsync(
-        ImageMatchAlgorithm algorithm,
-        CancellationToken cancellationToken = default);
-
     Task<ImageMatchResult> MatchAsync(
         CapturedFrame frame,
         RecognitionRegion region,

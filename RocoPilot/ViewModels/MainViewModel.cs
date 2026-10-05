@@ -42,6 +42,19 @@ public partial class MainViewModel : ObservableRecipient
         get;
     }
 
+    public IReadOnlyList<KeyboardInputMethodOption> KeyboardInputMethods { get; } =
+    [
+        new(KeyboardInputMethod.PostMessage,
+            "PostMessage（已失效）",
+            "旧的后台窗口消息方式；不要求游戏前台，但可能被游戏屏蔽。"),
+        new(KeyboardInputMethod.SendInput,
+            "SendInput（已失效）",
+            "扫描码输入，类似 pydirectinput；需要游戏窗口前台，权限不能低于游戏。"),
+        new(KeyboardInputMethod.Interception,
+            "Interception",
+            "驱动级键盘输入；需要安装 Interception 驱动并重启，游戏窗口需处于前台。")
+    ];
+
     public IReadOnlyList<ImageMatchAlgorithmOption> ImageMatchAlgorithms
     {
         get;
@@ -67,6 +80,10 @@ public partial class MainViewModel : ObservableRecipient
 
     [ObservableProperty]
     public partial ImageMatchAlgorithmOption? SelectedImageMatchAlgorithm { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(KeyboardInputMethodDescription))]
+    public partial KeyboardInputMethodOption? SelectedKeyboardInputMethod { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StartStopButtonText))]
@@ -104,6 +121,8 @@ public partial class MainViewModel : ObservableRecipient
 
     public bool IsLaunchConfigurationEnabled => !IsRealtimeCaptureRunning;
 
+    public string KeyboardInputMethodDescription => SelectedKeyboardInputMethod?.Description ?? string.Empty;
+
     public RuntimeRecognitionSettings RuntimeRecognitionSettings =>
         _runtimeTaskService.RuntimeRecognitionSettings;
 
@@ -132,6 +151,7 @@ public partial class MainViewModel : ObservableRecipient
         SelectedCaptureMethod = CaptureMethods[0];
         SelectedTextRecognitionMethod = GetInitialTextRecognitionMethod();
         SelectedImageMatchAlgorithm = FindImageMatchAlgorithm(_imageMatchingService.DefaultAlgorithm);
+        SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
         if (_runtimeTaskService.CurrentState is { } currentState)
@@ -254,9 +274,10 @@ public partial class MainViewModel : ObservableRecipient
             result.Message);
     }
 
-    public async Task LoadRuntimeRecognitionSettingsAsync()
+    public async Task LoadRuntimeTaskSettingsAsync()
     {
         await _runtimeTaskService.LoadSettingsAsync();
+        ApplyRuntimeTaskSettings();
     }
 
     public void UpdateRuntimeRecognitionSettings(RuntimeRecognitionSettings settings)
@@ -305,6 +326,18 @@ public partial class MainViewModel : ObservableRecipient
         _ = ApplyImageMatchAlgorithmAsync(value);
     }
 
+    partial void OnSelectedKeyboardInputMethodChanged(KeyboardInputMethodOption? value)
+    {
+        if (_isApplyingRuntimeTaskSettings || value is null)
+        {
+            return;
+        }
+
+        var settings = _runtimeTaskService.AutoBattleSettings;
+        settings.KeyboardInputMethod = value.Method;
+        _runtimeTaskService.SetAutoBattleSettings(settings);
+    }
+
     private async Task ApplyImageMatchAlgorithmAsync(ImageMatchAlgorithmOption option)
     {
         try
@@ -344,18 +377,16 @@ public partial class MainViewModel : ObservableRecipient
 
     private void ApplyRuntimeTaskSettings()
     {
-        var state = _runtimeTaskService.CurrentState;
-        if (state is null)
-        {
-            return;
-        }
-
         _isApplyingRuntimeTaskSettings = true;
         try
         {
-            IsMaskOverlayEnabled = state.Options.RecognitionOverlayEnabled;
-            IsInfoOverlayEnabled = state.Options.InfoOverlayEnabled;
-            IsInfoOverlayLocked = state.Options.InfoOverlayLocked;
+            SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
+            if (_runtimeTaskService.CurrentState is { } state)
+            {
+                IsMaskOverlayEnabled = state.Options.RecognitionOverlayEnabled;
+                IsInfoOverlayEnabled = state.Options.InfoOverlayEnabled;
+                IsInfoOverlayLocked = state.Options.InfoOverlayLocked;
+            }
         }
         finally
         {
@@ -393,4 +424,11 @@ public partial class MainViewModel : ObservableRecipient
         return ImageMatchAlgorithms.First(option => option.Algorithm == algorithm);
     }
 
+    private KeyboardInputMethodOption FindKeyboardInputMethod(KeyboardInputMethod method)
+    {
+        return KeyboardInputMethods.First(option => option.Method == method);
+    }
+
 }
+
+public sealed record KeyboardInputMethodOption(KeyboardInputMethod Method, string Name, string Description);

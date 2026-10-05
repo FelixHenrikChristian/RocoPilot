@@ -238,12 +238,6 @@ public sealed class RuntimeTaskStartupTests
         using var fixture = new StartupFixture(sceneRecognition: true);
         try
         {
-            fixture.Runtime.SetRuntimeRecognitionSettings(new()
-            {
-                FrameCaptureIntervalMs = 16,
-                GameStateScanIntervalMs = 100,
-                OcrScanIntervalMs = 30000
-            });
             Assert.IsTrue((await fixture.Runtime.StartAsync(Options(enabled: false))).Success);
             fixture.Matching.MatchedTemplate = "battle-chat.png";
             Assert.IsTrue(await fixture.WaitForCapturedSceneAsync(InfoOverlayScene.Battle),
@@ -281,7 +275,7 @@ public sealed class RuntimeTaskStartupTests
             var settings = new ControlledSettingsStore();
             Matching = new(sceneRecognition);
             var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
-            // No frames are published by the workers, so these tests never run OCR.
+            // 仅配置场景识别区域，测试不执行文字识别。
             var recognizer = new RuntimeFrameRecognizer(Matching, null!, Overlay, debug);
             var battleScreen = new BattleScreenRecognizer(recognizer);
             Runtime = new(Window, Keyboard, Capture, new RegionConfigStub(), Matching, recognizer,

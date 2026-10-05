@@ -31,11 +31,6 @@ public interface IRuntimeTaskService
         get;
     }
 
-    RuntimeRecognitionSettings RuntimeRecognitionSettings
-    {
-        get;
-    }
-
     Task<RuntimeTaskStartResult> StartAsync(
         RuntimeTaskStartOptions options,
         CancellationToken cancellationToken = default);
@@ -51,8 +46,6 @@ public interface IRuntimeTaskService
     void SetInfoOverlayLocked(bool isLocked);
 
     void SetAutoBattleSettings(AutoBattleSettings settings);
-
-    void SetRuntimeRecognitionSettings(RuntimeRecognitionSettings settings);
 
     Task StopAsync();
 

@@ -33,7 +33,6 @@ public sealed partial class MainPage : Page
     {
         Loaded -= OnLoaded;
         await ViewModel.LoadRuntimeTaskSettingsAsync();
-        await ViewModel.LoadImageMatchAlgorithmAsync();
         _confirmedKeyboardInputMethod = ViewModel.SelectedKeyboardInputMethod;
         _isKeyboardInputMethodSelectionReady = true;
     }

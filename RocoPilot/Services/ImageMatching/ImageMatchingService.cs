@@ -2,12 +2,8 @@ using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 
-using Microsoft.Extensions.Logging;
-
 using OpenCvSharp;
 
-using RocoPilot.Configuration;
-using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
@@ -32,29 +28,14 @@ public sealed class ImageMatchingService : IImageMatchingService
     ];
 
     private readonly ConcurrentDictionary<TemplateCacheKey, Lazy<Task<ImageTemplate>>> _templateCache = new();
-    private readonly ILocalSettingsService _localSettingsService;
-    private readonly ILogger<ImageMatchingService> _logger;
-    private readonly SemaphoreSlim _initializationLock = new(1, 1);
 
-    private int _defaultAlgorithm = (int)ImageMatchAlgorithm.OpenCvSqDiffNormalized;
-    private bool _isInitialized;
-
-    public ImageMatchingService(
-        ILocalSettingsService localSettingsService,
-        ILogger<ImageMatchingService> logger)
-    {
-        _localSettingsService = localSettingsService;
-        _logger = logger;
-        TemplateDirectory = Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionAssets", "ImageMatching");
-    }
-
-    public ImageMatchAlgorithm DefaultAlgorithm =>
-        (ImageMatchAlgorithm)Volatile.Read(ref _defaultAlgorithm);
+    // 全局模板匹配算法统一在此调整。
+    public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
 
     public string TemplateDirectory
     {
         get;
-    }
+    } = Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionAssets", "ImageMatching");
 
     public IReadOnlyList<string> ListTemplatePaths()
     {
@@ -70,73 +51,6 @@ public sealed class ImageMatchingService : IImageMatchingService
             .ToArray();
     }
 
-    public async Task InitializeAsync(CancellationToken cancellationToken = default)
-    {
-        if (Volatile.Read(ref _isInitialized))
-        {
-            return;
-        }
-
-        await _initializationLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (_isInitialized)
-            {
-                return;
-            }
-
-            var savedAlgorithm =
-                await _localSettingsService.ReadSettingAsync<ImageMatchAlgorithm?>(SettingsKeys.ImageMatchAlgorithm);
-            var algorithm = IsConcreteAlgorithm(savedAlgorithm)
-                ? savedAlgorithm!.Value
-                : ImageMatchAlgorithm.OpenCvSqDiffNormalized;
-            Volatile.Write(ref _defaultAlgorithm, (int)algorithm);
-            Volatile.Write(ref _isInitialized, true);
-            _logger.LogDebug("模板匹配算法已加载：Algorithm={Algorithm}", algorithm);
-        }
-        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            Volatile.Write(ref _defaultAlgorithm, (int)ImageMatchAlgorithm.OpenCvSqDiffNormalized);
-            Volatile.Write(ref _isInitialized, true);
-            _logger.LogWarning(
-                ex,
-                "读取模板匹配算法失败，已使用默认算法：Algorithm={Algorithm}",
-                ImageMatchAlgorithm.OpenCvSqDiffNormalized);
-        }
-        finally
-        {
-            _initializationLock.Release();
-        }
-    }
-
-    public async Task SetDefaultAlgorithmAsync(
-        ImageMatchAlgorithm algorithm,
-        CancellationToken cancellationToken = default)
-    {
-        if (!IsConcreteAlgorithm(algorithm))
-        {
-            throw new ArgumentOutOfRangeException(nameof(algorithm), "A concrete image matching algorithm is required.");
-        }
-
-        await InitializeAsync(cancellationToken);
-        await _initializationLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (DefaultAlgorithm == algorithm)
-            {
-                return;
-            }
-
-            await _localSettingsService.SaveSettingAsync(SettingsKeys.ImageMatchAlgorithm, algorithm);
-            Volatile.Write(ref _defaultAlgorithm, (int)algorithm);
-            _logger.LogInformation("模板匹配算法已切换：Algorithm={Algorithm}", algorithm);
-        }
-        finally
-        {
-            _initializationLock.Release();
-        }
-    }
-
     public async Task<ImageMatchResult> MatchAsync(
         CapturedFrame frame,
         RecognitionRegion region,
@@ -146,7 +60,6 @@ public sealed class ImageMatchingService : IImageMatchingService
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(region);
-        await InitializeAsync(cancellationToken);
 
         if (string.IsNullOrWhiteSpace(templatePath))
         {
@@ -186,7 +99,6 @@ public sealed class ImageMatchingService : IImageMatchingService
     {
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(region);
-        await InitializeAsync(cancellationToken);
 
         if (string.IsNullOrWhiteSpace(templatePath))
         {
@@ -279,7 +191,7 @@ public sealed class ImageMatchingService : IImageMatchingService
         return normalized;
     }
 
-    private static bool IsConcreteAlgorithm(ImageMatchAlgorithm? algorithm)
+    private static bool IsConcreteAlgorithm(ImageMatchAlgorithm algorithm)
     {
         return algorithm is ImageMatchAlgorithm.WeightedRgbError
             or ImageMatchAlgorithm.OpenCvSqDiffNormalized;

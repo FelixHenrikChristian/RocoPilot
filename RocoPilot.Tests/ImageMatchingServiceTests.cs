@@ -1,9 +1,7 @@
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using OpenCvSharp;
 
-using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
@@ -15,33 +13,16 @@ namespace RocoPilot.Tests;
 public sealed class ImageMatchingServiceTests
 {
     [TestMethod]
-    public async Task GlobalAlgorithmCanBeLoadedAndChanged()
-    {
-        var settings = new MemoryLocalSettingsService(ImageMatchAlgorithm.WeightedRgbError);
-        var service = CreateService(settings);
-
-        await service.InitializeAsync();
-
-        Assert.AreEqual(ImageMatchAlgorithm.WeightedRgbError, service.DefaultAlgorithm);
-
-        await service.SetDefaultAlgorithmAsync(ImageMatchAlgorithm.OpenCvSqDiffNormalized);
-
-        Assert.AreEqual(ImageMatchAlgorithm.OpenCvSqDiffNormalized, service.DefaultAlgorithm);
-        Assert.AreEqual(
-            ImageMatchAlgorithm.OpenCvSqDiffNormalized,
-            await settings.ReadSettingAsync<ImageMatchAlgorithm?>("ImageMatchAlgorithm"));
-    }
-
-    [TestMethod]
-    public async Task BothAlgorithmsLocateTheSameTemplateAndRespectAlphaMask()
+    public async Task DefaultAndExplicitAlgorithmsLocateTheSameTemplateAndRespectAlphaMask()
     {
         var fixture = CreateFixture([(3, 2)]);
         try
         {
-            var service = CreateService(new MemoryLocalSettingsService());
+            var service = new ImageMatchingService();
 
             foreach (var algorithm in new[]
                      {
+                         ImageMatchAlgorithm.UseGlobalDefault,
                          ImageMatchAlgorithm.WeightedRgbError,
                          ImageMatchAlgorithm.OpenCvSqDiffNormalized
                      })
@@ -69,12 +50,12 @@ public sealed class ImageMatchingServiceTests
     }
 
     [TestMethod]
-    public async Task OpenCvAlgorithmFindsMultipleNonOverlappingMatches()
+    public async Task GlobalAlgorithmFindsMultipleNonOverlappingMatches()
     {
         var fixture = CreateFixture([(2, 3), (9, 3)]);
         try
         {
-            var service = CreateService(new MemoryLocalSettingsService());
+            var service = new ImageMatchingService();
             var result = await service.FindMatchesAsync(
                 fixture.Frame,
                 fixture.Region,
@@ -82,7 +63,6 @@ public sealed class ImageMatchingServiceTests
                 maximumMatches: 2,
                 new ImageMatchOptions
                 {
-                    Algorithm = ImageMatchAlgorithm.OpenCvSqDiffNormalized,
                     MinimumScore = 0.99
                 });
 
@@ -95,11 +75,6 @@ public sealed class ImageMatchingServiceTests
         {
             fixture.Dispose();
         }
-    }
-
-    private static ImageMatchingService CreateService(ILocalSettingsService settings)
-    {
-        return new ImageMatchingService(settings, NullLogger<ImageMatchingService>.Instance);
     }
 
     private static ImageMatchingFixture CreateFixture(IReadOnlyList<(int X, int Y)> origins)
@@ -190,39 +165,6 @@ public sealed class ImageMatchingServiceTests
             {
                 Directory.Delete(DirectoryPath, recursive: true);
             }
-        }
-    }
-
-    private sealed class MemoryLocalSettingsService : ILocalSettingsService
-    {
-        private readonly Dictionary<string, object?> _values = new();
-
-        public MemoryLocalSettingsService(ImageMatchAlgorithm? algorithm = null)
-        {
-            if (algorithm.HasValue)
-            {
-                _values["ImageMatchAlgorithm"] = algorithm.Value;
-            }
-        }
-
-        public Task<T?> ReadSettingAsync<T>(string key)
-        {
-            return Task.FromResult(
-                _values.TryGetValue(key, out var value)
-                    ? (T?)value
-                    : default);
-        }
-
-        public Task SaveSettingAsync<T>(string key, T value)
-        {
-            _values[key] = value;
-            return Task.CompletedTask;
-        }
-
-        public Task ResetAllAsync()
-        {
-            _values.Clear();
-            return Task.CompletedTask;
         }
     }
 }

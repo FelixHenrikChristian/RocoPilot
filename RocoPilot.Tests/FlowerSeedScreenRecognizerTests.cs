@@ -42,7 +42,6 @@ public sealed class FlowerSeedScreenRecognizerTests
         var cancel = await images.MatchAsync(frame,
             new RecognitionRegion { X = 614, Y = 852, Width = 451, Height = 230 },
             "2048x1152/flower-seed/confirmation-cancel.png", options);
-        Console.WriteLine($"确认页旧标题={oldHeader.Score:F4}，公共标题={sharedHeader.Score:F4}，挑战={challenge.Score:F4}，取消={cancel.Score:F4}");
 
         Assert.IsFalse(oldHeader.IsMatch, $"命定花种全标题得分：{oldHeader.Score:F4}");
         Assert.IsTrue(sharedHeader.IsMatch, $"花种公共标题得分：{sharedHeader.Score:F4}");
@@ -57,7 +56,6 @@ public sealed class FlowerSeedScreenRecognizerTests
         Assert.IsTrue(clickX is >= 1068 and <= 1305 && clickY is >= 966 and <= 1032,
             $"点击位置未落在挑战按钮内：({clickX}, {clickY})");
         Assert.HasCount(0, ocr.Calls);
-        Console.WriteLine($"确认页挑战点击=({clickX}, {clickY})");
     }
 
     [TestMethod]
@@ -77,7 +75,6 @@ public sealed class FlowerSeedScreenRecognizerTests
 
         Assert.IsTrue(match.IsMatch, $"命定花种公共标题得分：{match.Score:F4}");
         Assert.AreEqual((1327, 404), (match.X, match.Y));
-        Console.WriteLine($"命定确认页公共标题={match.Score:F4}");
     }
 
     [TestMethod]
@@ -111,7 +108,6 @@ public sealed class FlowerSeedScreenRecognizerTests
             $"点击位置未落在地图传送按钮内：({clickX}, {clickY})");
         Assert.HasCount(1, ocr.Calls);
         Assert.AreEqual("地图花种名称", ocr.Calls[0].Region.Id);
-        Console.WriteLine($"旧标题={oldHeader.Score:F4}，公共标题={sharedHeader.Score:F4}，传送={screen.Button.Score:F4}，点击=({clickX}, {clickY})");
     }
 
     [TestMethod]

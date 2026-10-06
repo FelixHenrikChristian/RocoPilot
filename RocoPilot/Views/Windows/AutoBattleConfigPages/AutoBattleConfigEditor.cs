@@ -199,12 +199,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         NormalReleaseItems.Remove(item);
     }
 
-    public bool CanMoveNormalReleaseItemEarlier(AutoBattleReleaseEditorItem item)
-        => CanMoveItemEarlier(NormalReleaseItems, item);
-
-    public bool CanMoveNormalReleaseItemLater(AutoBattleReleaseEditorItem item)
-        => CanMoveItemLater(NormalReleaseItems, item);
-
     public void MoveNormalReleaseItemEarlier(AutoBattleReleaseEditorItem item)
         => MoveItemEarlier(NormalReleaseItems, item);
 
@@ -483,21 +477,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         }
 
         OnPropertyChanged(nameof(NormalReleaseSummary));
-    }
-
-    private static bool CanMoveItemEarlier(
-        ObservableCollection<AutoBattleReleaseEditorItem> items,
-        AutoBattleReleaseEditorItem item)
-    {
-        return items.IndexOf(item) > 0;
-    }
-
-    private static bool CanMoveItemLater(
-        ObservableCollection<AutoBattleReleaseEditorItem> items,
-        AutoBattleReleaseEditorItem item)
-    {
-        var index = items.IndexOf(item);
-        return index >= 0 && index < items.Count - 1;
     }
 
     private static void MoveItemEarlier(

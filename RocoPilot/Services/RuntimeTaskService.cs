@@ -61,7 +61,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
 
     public bool IsSuspended => _isSuspended;
 
-    public void Suspend(string reason)
+    private void Suspend(string reason)
     {
         if (_isSuspended)
         {
@@ -505,7 +505,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     {
         _scene = GameScene.Unknown;
         _unrecognizedStateDetectedAt = null;
-        CompleteAutoBattleSkillSelectionState();
         ResetAutoBattleBattleState();
         ResetEncounterRecordSuppression();
         session.ClearFrame();
@@ -637,7 +636,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         switch (match.Scene)
         {
             case GameScene.World:
-                CompleteAutoBattleSkillSelectionState();
                 ResetAutoBattleBattleState();
                 UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                     "大世界", DateTimeOffset.Now, match.MagicPointCount));

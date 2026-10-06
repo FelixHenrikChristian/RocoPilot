@@ -111,7 +111,6 @@ public sealed class RuntimeCoordinatorTests
     {
         public event EventHandler? SettingsChanged { add { } remove { } }
         public bool IsRunning => CurrentState is not null;
-        public bool IsSuspended => false;
         public RuntimeTaskState? CurrentState { get; private set; }
         public bool EncounterStatisticsEnabled => true;
         public AutoBattleSettings AutoBattleSettings => AutoBattleSettings.CreateDefault();
@@ -131,7 +130,5 @@ public sealed class RuntimeCoordinatorTests
         public void SetInfoOverlayEnabled(bool isEnabled) { }
         public void SetInfoOverlayLocked(bool isLocked) { }
         public void SetAutoBattleSettings(AutoBattleSettings settings) { }
-        public void Suspend(string reason) { }
-        public void Resume() { }
     }
 }

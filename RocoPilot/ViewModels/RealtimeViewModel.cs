@@ -147,30 +147,6 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
     }
 
-    public string AutoBattleRoundOrder
-    {
-        get => _autoBattleRoundOrder;
-        set
-        {
-            if (SetProperty(ref _autoBattleRoundOrder, value))
-            {
-                SaveAutoBattleSettings();
-            }
-        }
-    }
-
-    public string AutoBattleTurnSequence
-    {
-        get => _autoBattleTurnSequence;
-        set
-        {
-            if (SetProperty(ref _autoBattleTurnSequence, value))
-            {
-                SaveAutoBattleSettings();
-            }
-        }
-    }
-
     public string AutoBattleConfigurationSummary =>
         "配置普通战斗的释放顺序，以及可复用的公共执行序列。";
 
@@ -418,8 +394,6 @@ public partial class RealtimeViewModel : ObservableRecipient
             ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone();
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
-        OnPropertyChanged(nameof(AutoBattleRoundOrder));
-        OnPropertyChanged(nameof(AutoBattleTurnSequence));
         OnPropertyChanged(nameof(SelectedAutoBattleEncounterRelievedActionOption));
         OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
         OnPropertyChanged(nameof(AutoBattleSettings));
@@ -446,8 +420,8 @@ public partial class RealtimeViewModel : ObservableRecipient
         return new AutoBattleSettings
         {
             IsEnabled = IsAutoBattleEnabled,
-            RoundOrder = AutoBattleRoundOrder,
-            TurnSequence = AutoBattleTurnSequence,
+            RoundOrder = _autoBattleRoundOrder,
+            TurnSequence = _autoBattleTurnSequence,
             ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
             TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,

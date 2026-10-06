@@ -243,11 +243,10 @@ public sealed class RuntimeFrameRecognizer(
         return CloneImageMatchOptions(options, scaleX, scaleY);
     }
 
-    public static ImageMatchOptions CloneImageMatchOptions(ImageMatchOptions options, double scaleX, double scaleY)
+    private static ImageMatchOptions CloneImageMatchOptions(ImageMatchOptions options, double scaleX, double scaleY)
     {
         return new ImageMatchOptions
         {
-            Algorithm = options.Algorithm,
             MinimumScore = options.MinimumScore,
             AlphaThreshold = options.AlphaThreshold,
             SearchStep = options.SearchStep,

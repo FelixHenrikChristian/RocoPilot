@@ -125,7 +125,6 @@ public partial class TasksViewModel : ObservableRecipient
     public async Task LoadAsync()
     {
         await _independentTaskService.LoadSettingsAsync();
-        ApplySettings(_independentTaskService.Settings);
         _hasLoadedSettings = true;
         SyncRunningState();
     }

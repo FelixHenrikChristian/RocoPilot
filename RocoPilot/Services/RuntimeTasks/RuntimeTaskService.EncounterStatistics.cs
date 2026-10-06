@@ -306,23 +306,12 @@ public sealed partial class RuntimeTaskService
                 matchAlgorithm);
         }
 
-        var enabledMatchOptions = CloneImageMatchOptions(
-            CaptureButtonEnabledMatchOptions,
-            1,
-            1);
-        enabledMatchOptions.Algorithm = matchAlgorithm;
-        var disabledMatchOptions = CloneImageMatchOptions(
-            CaptureButtonDisabledMatchOptions,
-            1,
-            1);
-        disabledMatchOptions.Algorithm = matchAlgorithm;
-
         var enabledMatchTask = _frameRecognizer.MatchRuntimeTemplateResultAsync(
             state,
             frame,
             BattleCaptureButtonRegionIds,
             CaptureButtonEnabledTemplateName,
-            enabledMatchOptions,
+            CaptureButtonEnabledMatchOptions,
             "奇遇识别",
             "可捕捉按钮",
             cancellationToken);
@@ -331,7 +320,7 @@ public sealed partial class RuntimeTaskService
             frame,
             BattleCaptureButtonRegionIds,
             CaptureButtonDisabledTemplateName,
-            disabledMatchOptions,
+            CaptureButtonDisabledMatchOptions,
             "奇遇识别",
             "禁用捕捉按钮",
             cancellationToken);
@@ -352,13 +341,8 @@ public sealed partial class RuntimeTaskService
             Height = anchorMatch.Height,
             Enabled = true
         };
-        var disabledMarkerBaseOptions = CloneImageMatchOptions(
-            CaptureButtonDisabledMarkerMatchOptions,
-            1,
-            1);
-        disabledMarkerBaseOptions.Algorithm = matchAlgorithm;
         var disabledMarkerMatchOptions = CreateScaledImageMatchOptions(
-            disabledMarkerBaseOptions,
+            CaptureButtonDisabledMarkerMatchOptions,
             frame,
             state.TargetWindow,
             state.RecognitionRegionConfig);

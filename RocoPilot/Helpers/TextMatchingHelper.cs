@@ -59,11 +59,6 @@ public static class TextMatchingHelper
         return count;
     }
 
-    public static string CleanSpiritName(string? text)
-    {
-        return NormalizeSpiritNameInput(text);
-    }
-
     public static string NormalizeSpiritNameInput(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -105,16 +100,6 @@ public static class TextMatchingHelper
         return normalizedLeft.Length > 0
             && normalizedRight.Length > 0
             && string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
-    }
-
-    public static bool IsSimilar(
-        string? actual,
-        string? expected,
-        double threshold,
-        out double similarity)
-    {
-        similarity = CalculateSimilarity(actual, expected);
-        return similarity >= Math.Clamp(threshold, 0, 1);
     }
 
     public static double CalculateSimilarity(string? actual, string? expected)

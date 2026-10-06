@@ -30,6 +30,11 @@ public sealed partial class RuntimeTaskService
     {
         var previousIsEnabled = _autoBattleSettings.IsEnabled;
         _autoBattleSettings = AutoBattleSettingsRules.Normalize(settings);
+        if (CurrentState is { } state)
+        {
+            state.Options.AutoBattleSettings.KeyboardInputMethod = _autoBattleSettings.KeyboardInputMethod;
+            state.Options.AutoBattleSettings.KeyboardHoldDurationMs = _autoBattleSettings.KeyboardHoldDurationMs;
+        }
         if (!AutoBattleSettingsRules.RequiresReliefDetection(_autoBattleSettings.EncounterRelievedAction))
         {
             ResetAutoBattleEncounterRelievedActionState();
@@ -58,6 +63,7 @@ public sealed partial class RuntimeTaskService
     private async Task HandleAutoBattleSkillSelectionAsync(
         RuntimeTaskState state, CapturedFrame frame, CancellationToken cancellationToken)
     {
+        if (_isSuspended) return;
         var now = DateTimeOffset.Now;
         var settings = _autoBattleSettings;
         if (_battle.Phase != AutoBattlePhase.SkillSelection)
@@ -73,7 +79,7 @@ public sealed partial class RuntimeTaskService
         try
         {
             var turn = _battle.CurrentTurn;
-            if (turn is null || _battle.IsSuspendedForShiny) return;
+            if (turn is null || _isSuspended || _battle.IsSuspendedForShiny) return;
             var plan = _battle.PlanSkillSelection(
                 settings, EncounterBloodlineRecognition.IsAvailable(state.RecognitionRegionConfig), now);
             if (plan.Action == AutoBattleAction.Skill && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
@@ -113,6 +119,7 @@ public sealed partial class RuntimeTaskService
         RuntimeTaskState state,
         CancellationToken cancellationToken)
     {
+        if (_isSuspended) return;
         var settings = _autoBattleSettings;
         if (!settings.IsEnabled)
         {
@@ -193,6 +200,7 @@ public sealed partial class RuntimeTaskService
 
                 await Task.Delay(AutoBattlePetSwitchStateCheckDelay, cancellationToken);
 
+                if (ShouldSkipAutoBattleKeyboardInput(state, settings)) return;
                 using var frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
                 if (frame is null)
                 {
@@ -243,6 +251,7 @@ public sealed partial class RuntimeTaskService
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (_isSuspended) return false;
         var turn = _battle.CurrentTurn;
         if (turn is null) return false;
         if (turn.EnemyNameResolved) return true;
@@ -389,6 +398,7 @@ public sealed partial class RuntimeTaskService
     private async Task<bool> TryHandleAutoBattleSkillReleaseFailureAsync(
         RuntimeTaskState state, CapturedFrame frame, CancellationToken cancellationToken)
     {
+        if (_isSuspended) return false;
         if (!_battle.ShouldRecoverAfterSkillFailure(_autoBattleSettings, DateTimeOffset.Now)) return false;
         QueueAutoBattleSkillFailureTipRecognition(state, frame, _battle.TurnNumber, cancellationToken);
         if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken)) return false;
@@ -402,6 +412,7 @@ public sealed partial class RuntimeTaskService
         int turnNumber,
         CancellationToken cancellationToken)
     {
+        if (_isSuspended) return;
         if (_hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction)
         {
             _logger.LogDebug("自动战斗技能失败提示 OCR 本次技能动作已触发过，本次跳过。");
@@ -467,17 +478,17 @@ public sealed partial class RuntimeTaskService
 
     private bool ShouldSkipAutoBattleKeyboardInput(RuntimeTaskState state, AutoBattleSettings settings)
     {
-        return _battle.IsSuspendedForShiny || !_autoBattleSettings.IsEnabled
+        return _isSuspended || _battle.IsSuspendedForShiny || !_autoBattleSettings.IsEnabled
             || !_battleInput.CanSend(state.TargetWindow.Hwnd, settings);
     }
 
     private async Task<bool> TrySendAutoBattleEnergyRecoveryAsync(RuntimeTaskState state, CancellationToken cancellationToken)
     {
-        if (_battle.IsSuspendedForShiny || !await _autoBattleActionLock.WaitAsync(0, cancellationToken)) return false;
+        if (_isSuspended || _battle.IsSuspendedForShiny || !await _autoBattleActionLock.WaitAsync(0, cancellationToken)) return false;
         try
         {
             var turn = _battle.CurrentTurn;
-            if (turn is null || _battle.IsSuspendedForShiny) return false;
+            if (turn is null || _isSuspended || _battle.IsSuspendedForShiny) return false;
             var plan = new AutoBattlePlan(AutoBattleAction.EnergyRecovery, "X", "临时回能", "X");
             return await ExecuteBattleInputWithOverlayAsync(state, _autoBattleSettings, plan, turn, cancellationToken)
                 && _battle.RecordAction(turn.Id, AutoBattleAction.EnergyRecovery, DateTimeOffset.Now);

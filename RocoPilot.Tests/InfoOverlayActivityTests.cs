@@ -1,5 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using RocoPilot.Models.Overlay;
+using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Tests;
 
@@ -7,6 +8,32 @@ namespace RocoPilot.Tests;
 public sealed class InfoOverlayActivityTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 4, 12, 0, 0, TimeSpan.FromHours(8));
+
+    [TestMethod]
+    public void IndependentTaskDisplaysItsStepOperationAndRecognitionWhileRealtimeIsSuspended()
+    {
+        var progress = new IndependentTaskProgress("稀兽花种列表", "向下滚动，扫描下一页", "小皮球、星云旅者、琳琅");
+        var snapshot = new InfoOverlaySnapshot("已挂起", [], Now, Scene: InfoOverlayScene.Suspended,
+            IndependentTaskName: "扫描花种", IndependentTaskProgress: progress);
+
+        Assert.AreEqual("扫描花种", snapshot.MainStatusText);
+        var presentation = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddHours(1))!;
+        Assert.AreEqual(progress.Stage, presentation.Category);
+        Assert.AreEqual(progress.Operation, presentation.Title);
+        Assert.AreEqual(progress.Recognition, presentation.Description);
+    }
+
+    [TestMethod]
+    public void ClearingIndependentTaskRestoresTheRealtimeSceneAndDetails()
+    {
+        var snapshot = new InfoOverlaySnapshot("大世界", [], Now, Scene: InfoOverlayScene.World,
+            IndependentTaskName: "稀兽花种挑战", IndependentTaskProgress: new("挑战准备", "点击开始"));
+        Assert.IsNotNull(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now));
+
+        var resumed = snapshot with { IndependentTaskName = "", IndependentTaskProgress = null };
+        Assert.AreEqual("大世界", resumed.MainStatusText);
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(resumed, null, Now));
+    }
 
     [TestMethod]
     public void LateOcrAndInputCannotOverwriteANewBattleOrTurn()
@@ -68,6 +95,26 @@ public sealed class InfoOverlayActivityTests
         StringAssert.Contains(record.Description, Now.ToLocalTime().ToString("HH:mm:ss"));
         tracker.Clear();
         Assert.IsNull(tracker.Current);
+    }
+
+    [TestMethod]
+    public void CompletedTaskResultSurvivesResumeAndBattleResetsUntilItsFourSecondExpiry()
+    {
+        var tracker = new InfoOverlayActivityTracker();
+        var completed = tracker.CompleteTask("扫描完成，共识别 12 个花种", "当前花种选项已更新", Now);
+        tracker.ResetBattle(10);
+        tracker.BeginTurn(1);
+        tracker.ResetBattle(11);
+        Assert.AreSame(completed, tracker.Current);
+        Assert.IsFalse(completed.IsBattleBound);
+
+        var resumed = new InfoOverlaySnapshot("大世界", [], Now, Activity: tracker.Current, Scene: InfoOverlayScene.World);
+        var presentation = InfoOverlayIslandPresentation.Resolve(resumed, null, Now.AddSeconds(3))!;
+        Assert.AreEqual("大世界", resumed.MainStatusText);
+        Assert.AreEqual("任务完成", presentation.Category);
+        Assert.AreEqual(completed.Title, presentation.Title);
+        Assert.AreEqual(completed.Description, presentation.Description);
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(resumed, null, Now.AddSeconds(4)));
     }
 
     [TestMethod]

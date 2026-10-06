@@ -1,3 +1,5 @@
+using RocoPilot.Models.Runtime;
+
 namespace RocoPilot.Models.Overlay;
 
 public enum InfoOverlayScene { Unknown, World, Battle, Suspended }
@@ -15,9 +17,12 @@ public sealed record InfoOverlaySnapshot(
     DateTimeOffset? SessionStartedAt = null,
     InfoOverlayScene Scene = InfoOverlayScene.Unknown,
     bool IsAutoBattleEnabled = false,
-    string BattleCreatureName = "")
+    string BattleCreatureName = "",
+    string IndependentTaskName = "",
+    IndependentTaskProgress? IndependentTaskProgress = null)
 {
-    public string MainStatusText => IsShinyProtectionActive ? "异色保护" : Scene switch
+    public string MainStatusText => !string.IsNullOrWhiteSpace(IndependentTaskName) ? IndependentTaskName
+        : IsShinyProtectionActive ? "异色保护" : Scene switch
     {
         InfoOverlayScene.World => "大世界",
         InfoOverlayScene.Battle => IsAutoBattleEnabled ? "自动战斗中" : "战斗中",

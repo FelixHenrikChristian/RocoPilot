@@ -10,21 +10,21 @@ namespace RocoPilot.Services;
 /// 独立任务调度：首领战斗、传说精灵挑战等限次任务按需启动，跑完即止。
 /// 独立任务基于启动页建立的运行会话工作：启动前需实时任务处于运行状态，
 /// 运行期间自动挂起实时识别循环并复用其捕获会话，结束后自动恢复。
-/// 当前版本只维护启动/停止状态与配置持久化，具体挑战执行逻辑后续接入 <see cref="RunTaskAsync"/>。
 /// </summary>
 public sealed class IndependentTaskService : IIndependentTaskService
 {
     private readonly IRuntimeSessionControl _runtimeTaskService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly IFlowerSeedChallengeRunner _flowerSeedRunner;
     private readonly ILogger<IndependentTaskService> _logger;
 
     private readonly SemaphoreSlim _stateLock = new(1, 1);
+    private readonly SemaphoreSlim _settingsSaveLock = new(1, 1);
     private IndependentTaskSettings _settings = IndependentTaskSettings.CreateDefault();
     private bool _hasLoadedSettings;
     private IndependentTaskKind? _runningTaskKind;
     private CancellationTokenSource? _taskCts;
     private Task? _taskLoop;
-    private bool _hasSuspendedRuntimeTask;
 
     public event EventHandler? StateChanged;
 
@@ -37,10 +37,12 @@ public sealed class IndependentTaskService : IIndependentTaskService
     public IndependentTaskService(
         IRuntimeSessionControl runtimeTaskService,
         ILocalSettingsService localSettingsService,
+        IFlowerSeedChallengeRunner flowerSeedRunner,
         ILogger<IndependentTaskService> logger)
     {
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
+        _flowerSeedRunner = flowerSeedRunner;
         _logger = logger;
     }
 
@@ -71,7 +73,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     public void SetSettings(IndependentTaskSettings settings)
     {
         _settings = (settings ?? IndependentTaskSettings.CreateDefault()).Normalize();
-        _ = SaveSettingsAsync(_settings);
+        _ = SaveSettingsAsync(_settings.Clone());
     }
 
     public async Task<IndependentTaskStartResult> StartAsync(
@@ -79,7 +81,6 @@ public sealed class IndependentTaskService : IIndependentTaskService
         CancellationToken cancellationToken = default)
     {
         await _stateLock.WaitAsync(cancellationToken);
-        var suspendedRuntimeTask = false;
         try
         {
             if (_runningTaskKind is { } runningKind)
@@ -91,24 +92,32 @@ public sealed class IndependentTaskService : IIndependentTaskService
             }
 
             // 独立任务复用启动页建立的运行会话（窗口、截图方式、识别配置）。
-            if (!_runtimeTaskService.IsRunning)
+            if (!_runtimeTaskService.IsRunning || _runtimeTaskService.CurrentState is null)
             {
                 return IndependentTaskStartResult.Failed(
                     "请先在启动页启动任务，再运行独立任务。");
             }
 
-            // 实时任务无需手动停止：独立任务运行期间自动挂起，结束后自动恢复。
-            if (!_runtimeTaskService.IsSuspended)
+            if (kind == IndependentTaskKind.FlowerSeedChallenge
+                && !_settings.FlowerSeedOptions.Any(option => option.Number == _settings.FlowerSeedTargetNumber))
             {
-                _runtimeTaskService.Suspend($"{GetTaskDisplayName(kind)}任务运行中");
-                _hasSuspendedRuntimeTask = true;
-                suspendedRuntimeTask = true;
+                return IndependentTaskStartResult.Failed("请先扫描并选择目标花种。");
             }
 
+            if (kind == IndependentTaskKind.FlowerSeedScan)
+            {
+                _settings.FlowerSeedOptions.Clear();
+                _settings.FlowerSeedTargetNumber = 0;
+                await SaveSettingsAsync(_settings.Clone());
+                NotifyStateChanged();
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
             var taskCts = new CancellationTokenSource();
             _taskCts = taskCts;
             _runningTaskKind = kind;
-            _taskLoop = Task.Run(() => RunTaskAsync(kind, taskCts), CancellationToken.None);
+            var settings = _settings.Clone();
+            _taskLoop = Task.Run(() => RunTaskAsync(kind, settings, taskCts), CancellationToken.None);
             _logger.LogInformation("独立任务已启动：{TaskName}", GetTaskDisplayName(kind));
         }
         finally
@@ -117,10 +126,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
 
         NotifyStateChanged();
-        return IndependentTaskStartResult.Started(
-            suspendedRuntimeTask
-                ? $"{GetTaskDisplayName(kind)}任务已启动，实时任务已自动暂停，任务结束后恢复。"
-                : $"{GetTaskDisplayName(kind)}任务已启动。");
+        return IndependentTaskStartResult.Started($"{GetTaskDisplayName(kind)}任务已启动，实时任务自动暂停，结束后恢复。");
     }
 
     public async Task StopAsync()
@@ -164,35 +170,78 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
     }
 
-    private async Task RunTaskAsync(IndependentTaskKind kind, CancellationTokenSource taskCts)
+    private async Task RunTaskAsync(
+        IndependentTaskKind kind,
+        IndependentTaskSettings settings,
+        CancellationTokenSource taskCts)
     {
+        var ownsSuspension = !_runtimeTaskService.IsSuspended;
+        var taskName = GetTaskDisplayName(kind);
         try
         {
-            // 挑战执行逻辑（识别、按键、次数控制）后续接入；当前仅保持运行状态直到手动停止。
-            await Task.Delay(Timeout.InfiniteTimeSpan, taskCts.Token);
+            UpdateProgress(new("准备任务", "等待实时任务暂停"));
+            await _runtimeTaskService.SuspendAsync($"{taskName}任务运行中", taskCts.Token);
+            var state = _runtimeTaskService.CurrentState
+                ?? throw new InvalidOperationException("运行会话已结束，请先在启动页启动任务。");
+
+            switch (kind)
+            {
+                case IndependentTaskKind.FlowerSeedChallenge:
+                    await _flowerSeedRunner.RunAsync(state,
+                        settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
+                        UpdateProgress, taskCts.Token);
+                    break;
+                case IndependentTaskKind.FlowerSeedScan:
+                    var options = await _flowerSeedRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
+                    taskCts.Token.ThrowIfCancellationRequested();
+                    await _stateLock.WaitAsync(taskCts.Token);
+                    try
+                    {
+                        _settings.FlowerSeedOptions = options.ToList();
+                        _settings.FlowerSeedTargetNumber = 0;
+                        await SaveSettingsAsync(_settings.Clone());
+                    }
+                    finally
+                    {
+                        _stateLock.Release();
+                    }
+
+                    _logger.LogInformation("花种扫描完成：{Count} 个花种", _settings.FlowerSeedOptions.Count);
+                    NotifyStateChanged();
+                    _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {_settings.FlowerSeedOptions.Count} 个花种", "花种选项已更新");
+                    break;
+                default:
+                    // 首领和传说任务尚未接入执行逻辑，保持现有手动停止行为。
+                    await Task.Delay(Timeout.InfiniteTimeSpan, taskCts.Token);
+                    break;
+            }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "独立任务异常终止：{TaskName}", GetTaskDisplayName(kind));
+            UpdateProgress(new("任务失败", ex.Message));
         }
         finally
         {
             var stateCleared = false;
-            var shouldResumeRuntimeTask = false;
             await _stateLock.WaitAsync();
             try
             {
                 if (ReferenceEquals(_taskCts, taskCts))
                 {
+                    _runtimeTaskService.UpdateIndependentTaskStatus(null);
+                    if (ownsSuspension)
+                    {
+                        _runtimeTaskService.Resume();
+                    }
+
                     _taskCts = null;
                     _taskLoop = null;
                     _runningTaskKind = null;
                     stateCleared = true;
-                    shouldResumeRuntimeTask = _hasSuspendedRuntimeTask;
-                    _hasSuspendedRuntimeTask = false;
                 }
             }
             finally
@@ -203,19 +252,18 @@ public sealed class IndependentTaskService : IIndependentTaskService
             taskCts.Dispose();
             if (stateCleared)
             {
-                if (shouldResumeRuntimeTask)
-                {
-                    _runtimeTaskService.Resume();
-                }
-
                 _logger.LogInformation("独立任务已停止：{TaskName}", GetTaskDisplayName(kind));
                 NotifyStateChanged();
             }
         }
+
+        void UpdateProgress(IndependentTaskProgress progress)
+            => _runtimeTaskService.UpdateIndependentTaskStatus(taskName, progress);
     }
 
     private async Task SaveSettingsAsync(IndependentTaskSettings settings)
     {
+        await _settingsSaveLock.WaitAsync();
         try
         {
             await _localSettingsService.SaveSettingAsync(SettingsKeys.IndependentTaskSettings, settings);
@@ -223,6 +271,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "保存独立任务设置失败。");
+        }
+        finally
+        {
+            _settingsSaveLock.Release();
         }
     }
 
@@ -237,6 +289,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
         {
             IndependentTaskKind.BossBattle => "首领战斗",
             IndependentTaskKind.LegendaryChallenge => "传说精灵挑战",
+            IndependentTaskKind.FlowerSeedChallenge => "稀兽花种挑战",
+            IndependentTaskKind.FlowerSeedScan => "扫描稀兽花种",
             _ => "独立"
         };
     }

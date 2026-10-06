@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -39,6 +41,29 @@ public partial class TasksViewModel : ObservableRecipient
     public partial bool IsLegendaryChallengeRunning { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FlowerSeedChallengeButtonText))]
+    [NotifyPropertyChangedFor(nameof(FlowerSeedChallengeButtonGlyph))]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
+    public partial bool IsFlowerSeedChallengeRunning { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(FlowerSeedScanButtonText))]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedScanButtonEnabled))]
+    public partial bool IsFlowerSeedScanning { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedConfigurationEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedScanButtonEnabled))]
+    public partial bool IsIndependentTaskRunning { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
+    public partial FlowerSeedOption? SelectedFlowerSeed { get; set; }
+
+    public ObservableCollection<FlowerSeedOption> FlowerSeedOptions { get; } = [];
+
+    [ObservableProperty]
     public partial double BossBattleRunCount { get; set; }
 
     [ObservableProperty]
@@ -67,6 +92,19 @@ public partial class TasksViewModel : ObservableRecipient
     public string LegendaryChallengeButtonGlyph => IsLegendaryChallengeRunning ? StopButtonGlyph : StartButtonGlyph;
 
     public bool IsLegendaryChallengeConfigurationEnabled => !IsLegendaryChallengeRunning;
+
+    public string FlowerSeedChallengeButtonText => IsFlowerSeedChallengeRunning ? StopButtonText : StartButtonText;
+
+    public string FlowerSeedChallengeButtonGlyph => IsFlowerSeedChallengeRunning ? StopButtonGlyph : StartButtonGlyph;
+
+    public string FlowerSeedScanButtonText => IsFlowerSeedScanning ? StopButtonText : "扫描";
+
+    public bool IsFlowerSeedConfigurationEnabled => !IsIndependentTaskRunning;
+
+    public bool IsFlowerSeedChallengeButtonEnabled => IsFlowerSeedChallengeRunning
+        || (!IsIndependentTaskRunning && SelectedFlowerSeed is not null);
+
+    public bool IsFlowerSeedScanButtonEnabled => IsFlowerSeedScanning || !IsIndependentTaskRunning;
 
     public TasksViewModel(
         IIndependentTaskService independentTaskService,
@@ -102,6 +140,18 @@ public partial class TasksViewModel : ObservableRecipient
     private Task ToggleLegendaryChallengeAsync()
     {
         return ToggleTaskAsync(IndependentTaskKind.LegendaryChallenge);
+    }
+
+    [RelayCommand]
+    private Task ToggleFlowerSeedChallengeAsync()
+    {
+        return ToggleTaskAsync(IndependentTaskKind.FlowerSeedChallenge);
+    }
+
+    [RelayCommand]
+    private Task ToggleFlowerSeedScanAsync()
+    {
+        return ToggleTaskAsync(IndependentTaskKind.FlowerSeedScan);
     }
 
     private async Task ToggleTaskAsync(IndependentTaskKind kind)
@@ -141,6 +191,11 @@ public partial class TasksViewModel : ObservableRecipient
         SaveSettingsIfLoaded();
     }
 
+    partial void OnSelectedFlowerSeedChanged(FlowerSeedOption? value)
+    {
+        SaveSettingsIfLoaded();
+    }
+
     private void SaveSettingsIfLoaded()
     {
         if (_hasLoadedSettings && !_isApplyingSettings)
@@ -163,7 +218,9 @@ public partial class TasksViewModel : ObservableRecipient
                 IndependentTaskSettings.DefaultBossBattleRunCount),
             LegendaryChallengeRunCount = ToRunCount(
                 LegendaryChallengeRunCount,
-                IndependentTaskSettings.DefaultLegendaryChallengeRunCount)
+                IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
+            FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
+            FlowerSeedOptions = [.. FlowerSeedOptions]
         }.Normalize();
     }
 
@@ -174,6 +231,17 @@ public partial class TasksViewModel : ObservableRecipient
         {
             BossBattleRunCount = settings.BossBattleRunCount;
             LegendaryChallengeRunCount = settings.LegendaryChallengeRunCount;
+            if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))
+            {
+                FlowerSeedOptions.Clear();
+                foreach (var option in settings.FlowerSeedOptions)
+                {
+                    FlowerSeedOptions.Add(option);
+                }
+            }
+
+            SelectedFlowerSeed = FlowerSeedOptions.FirstOrDefault(
+                option => option.Number == settings.FlowerSeedTargetNumber);
         }
         finally
         {
@@ -197,6 +265,10 @@ public partial class TasksViewModel : ObservableRecipient
         var runningTaskKind = _independentTaskService.RunningTaskKind;
         IsBossBattleRunning = runningTaskKind == IndependentTaskKind.BossBattle;
         IsLegendaryChallengeRunning = runningTaskKind == IndependentTaskKind.LegendaryChallenge;
+        IsFlowerSeedChallengeRunning = runningTaskKind == IndependentTaskKind.FlowerSeedChallenge;
+        IsFlowerSeedScanning = runningTaskKind == IndependentTaskKind.FlowerSeedScan;
+        IsIndependentTaskRunning = _independentTaskService.IsRunning;
+        ApplySettings(_independentTaskService.Settings);
     }
 
     private void ShowTaskNotification(InfoBarSeverity severity, string title, string message)

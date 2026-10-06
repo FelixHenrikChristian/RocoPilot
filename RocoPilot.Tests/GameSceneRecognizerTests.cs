@@ -231,7 +231,7 @@ public sealed class GameSceneRecognizerTests
     private sealed class OverlayStub : IRecognitionOverlayService
     {
         public List<(string Region, double Score)> Results { get; } = [];
-        public void Show(RuntimeTaskState state) { }
+        public void Show(RuntimeTaskState state, RecognitionRegionConfig? regionConfig = null) { }
         public void Hide() { }
         public void ShowOcrResult(string regionId, string text) => throw new AssertFailedException("场景识别不应调用 OCR。");
         public void ShowImageMatchResult(string regionId, double score) => Results.Add((regionId, score));

@@ -22,6 +22,7 @@ using RocoPilot.Services.Capture;
 using RocoPilot.Services.Capture.Backends;
 using RocoPilot.Services.Encounters;
 using RocoPilot.Services.ImageMatching;
+using RocoPilot.Services.IndependentTasks;
 using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.Spirits;
@@ -98,6 +99,9 @@ public partial class App : Application
             services.AddSingleton<INavigationService, NavigationService>();
             services.AddSingleton<IGameWindowService, GameWindowService>();
             services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
+            services.AddSingleton<IMouseInputService, MouseInputService>();
+            services.AddSingleton<FlowerSeedScreenRecognizer>();
+            services.AddSingleton<IFlowerSeedChallengeRunner, FlowerSeedChallengeRunner>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();
             services.AddSingleton<RuntimeDebugLogger>();

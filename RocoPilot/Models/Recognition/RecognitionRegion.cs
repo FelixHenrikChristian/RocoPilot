@@ -1,7 +1,12 @@
+using System.Text.Json.Serialization;
+
 namespace RocoPilot.Models.Recognition;
 
 public sealed class RecognitionRegion
 {
+    [JsonIgnore]
+    public bool IsMatched { get; set; }
+
     public string Id
     {
         get;

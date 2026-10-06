@@ -55,9 +55,9 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <Border x:Name="IslandAvatar" Width="42" Height="42" CornerRadius="12" Background="#18DEA6EA" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                        <TextBlock x:Name="IslandCategoryText" FontSize="10" Foreground="#9B9BAA" />
-                        <TextBlock x:Name="IslandTitleText" FontSize="15" FontWeight="SemiBold" Foreground="#F5F3F7" MaxLines="1" TextTrimming="CharacterEllipsis" />
-                        <TextBlock x:Name="IslandDescriptionText" FontSize="12" Foreground="#9B9BAA" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="IslandCategoryText" FontSize="10" Foreground="#9B9BAA" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="IslandTitleText" FontSize="15" FontWeight="SemiBold" Foreground="#F5F3F7" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="IslandDescriptionText" FontSize="12" Foreground="#9B9BAA" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                 </Grid>
             </Grid>

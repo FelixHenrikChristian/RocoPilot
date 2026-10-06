@@ -437,6 +437,7 @@ public sealed class RuntimeTaskStartupTests
         public int Shows;
         public volatile InfoOverlaySnapshot? Snapshot;
         public void Show(RuntimeTaskState state) => Shows++;
+        public void Show(RuntimeTaskState state, RecognitionRegionConfig? regionConfig = null) => Shows++;
         public void Hide() { }
         public void ResetPosition() { }
         public void SetLocked(bool isLocked) { }

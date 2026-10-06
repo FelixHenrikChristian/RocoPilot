@@ -1,7 +1,7 @@
 namespace RocoPilot.Models.Runtime;
 
 /// <summary>
-/// 独立任务配置。首领战斗与传说精灵挑战体力限次，执行次数用于控制单次启动的挑战场数。
+/// 独立任务配置与本次扫描获得的花种选项。
 /// </summary>
 public sealed class IndependentTaskSettings
 {
@@ -22,6 +22,10 @@ public sealed class IndependentTaskSettings
         set;
     } = DefaultLegendaryChallengeRunCount;
 
+    public int FlowerSeedTargetNumber { get; set; }
+
+    public List<FlowerSeedOption> FlowerSeedOptions { get; set; } = [];
+
     public static IndependentTaskSettings CreateDefault()
     {
         return new IndependentTaskSettings();
@@ -32,7 +36,9 @@ public sealed class IndependentTaskSettings
         return new IndependentTaskSettings
         {
             BossBattleRunCount = BossBattleRunCount,
-            LegendaryChallengeRunCount = LegendaryChallengeRunCount
+            LegendaryChallengeRunCount = LegendaryChallengeRunCount,
+            FlowerSeedTargetNumber = FlowerSeedTargetNumber,
+            FlowerSeedOptions = [.. FlowerSeedOptions]
         };
     }
 
@@ -41,7 +47,9 @@ public sealed class IndependentTaskSettings
         return new IndependentTaskSettings
         {
             BossBattleRunCount = Math.Clamp(BossBattleRunCount, MinimumRunCount, MaximumRunCount),
-            LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount)
+            LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount),
+            FlowerSeedTargetNumber = FlowerSeedTargetNumber,
+            FlowerSeedOptions = [.. FlowerSeedOptions ?? []]
         };
     }
 }

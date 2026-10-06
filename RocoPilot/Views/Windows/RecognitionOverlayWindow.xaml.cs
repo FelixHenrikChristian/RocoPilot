@@ -24,7 +24,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private static readonly TimeSpan ResultTextDuration = TimeSpan.FromSeconds(4);
 
     private readonly CaptureTargetWindow _targetWindow;
-    private readonly RecognitionRegionConfig _regionConfig;
+    private RecognitionRegionConfig _regionConfig;
     private readonly DispatcherQueueTimer _followTimer;
     private readonly DispatcherQueueTimer _visualStateTimer;
     private readonly Dictionary<string, RegionVisualState> _regionVisualStates = new(StringComparer.OrdinalIgnoreCase);
@@ -36,6 +36,8 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private bool _isLoaded;
     private bool _isClosed;
     private bool _isOverlayVisible;
+
+    public IntPtr TargetWindowHandle => _targetWindow.Hwnd;
 
     public RecognitionOverlayWindow(CaptureTargetWindow targetWindow, RecognitionRegionConfig regionConfig)
     {
@@ -52,6 +54,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         _messageHook = TransparentOverlayWindowHelper.InstallMessageHook(_hwnd);
         TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true, show: false);
+        _ = TransparentOverlayWindowHelper.TryExcludeFromCapture(_hwnd);
 
         _followTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _followTimer.Interval = FollowInterval;
@@ -64,6 +67,19 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         OverlayRoot.Loaded += OverlayRoot_Loaded;
         OverlayRoot.SizeChanged += OverlayRoot_SizeChanged;
         Closed += RecognitionOverlayWindow_Closed;
+    }
+
+    public void UpdateRegions(RecognitionRegionConfig regionConfig)
+    {
+        if (_isClosed)
+        {
+            return;
+        }
+
+        _regionConfig = regionConfig;
+        _regionVisualStates.Clear();
+        _visualStateTimer.Stop();
+        DrawRegions();
     }
 
     public void ShowOverlay()
@@ -260,7 +276,9 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         }
 
         var isFlashing = visualState?.IsFlashing(now) == true;
-        var color = isFlashing
+        var color = region.IsMatched
+            ? Color.FromArgb(0xFF, 0x4C, 0xD9, 0x64)
+            : isFlashing
             ? Color.FromArgb(0xFF, 0xFF, 0xD7, 0x2F)
             : Color.FromArgb(0xFF, 0x2F, 0xD7, 0xFF);
         var strokeBrush = new SolidColorBrush(color);

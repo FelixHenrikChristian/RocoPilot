@@ -6,5 +6,7 @@ namespace RocoPilot.Models.Runtime;
 public enum IndependentTaskKind
 {
     BossBattle,
-    LegendaryChallenge
+    LegendaryChallenge,
+    FlowerSeedChallenge,
+    FlowerSeedScan
 }

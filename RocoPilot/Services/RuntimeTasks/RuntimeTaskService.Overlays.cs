@@ -1,9 +1,24 @@
-
+using Microsoft.Extensions.Logging;
 
 namespace RocoPilot.Services;
 
 public sealed partial class RuntimeTaskService
 {
+    public void ShowIndependentTaskResult(string title, string description)
+    {
+        if (!IsRunning) return;
+        var now = DateTimeOffset.Now;
+        _overlayActivities.CompleteTask(title, description, now);
+        try
+        {
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(Volatile.Read(ref _lastInfoOverlayStatus), now));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "更新独立任务完成信息失败，不影响任务执行");
+        }
+    }
+
     public void SetRecognitionOverlayEnabled(bool isEnabled)
     {
         var state = CurrentState;
@@ -20,7 +35,7 @@ public sealed partial class RuntimeTaskService
         state.Options.RecognitionOverlayEnabled = isEnabled;
         if (isEnabled)
         {
-            _recognitionOverlayService.Show(state);
+            if (!_isSuspended) _recognitionOverlayService.Show(state);
             NotifySettingsChanged();
             return;
         }

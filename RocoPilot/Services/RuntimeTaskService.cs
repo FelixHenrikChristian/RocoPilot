@@ -51,6 +51,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private DateTimeOffset? _unrecognizedStateDetectedAt;
     private volatile bool _isSuspended;
     private string? _suspendedReason;
+    private readonly SemaphoreSlim _runtimeIteration = new(1, 1);
 
     public event EventHandler? SettingsChanged;
 
@@ -69,10 +70,23 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
 
         _suspendedReason = reason;
         _isSuspended = true;
+        _recognitionOverlayService.Hide();
         if (IsRunning)
         {
             _logger.LogInformation("实时任务：已挂起（{Reason}），截图与识别暂停。", reason);
         }
+    }
+
+    public async Task SuspendAsync(string reason, CancellationToken cancellationToken = default)
+    {
+        Suspend(reason);
+        await _runtimeIteration.WaitAsync(cancellationToken);
+        try
+        {
+            if (_session is { } session) await session.DrainBackgroundAsync(cancellationToken);
+            _recognitionOverlayService.Hide();
+        }
+        finally { _runtimeIteration.Release(); }
     }
 
     public void Resume()
@@ -412,63 +426,68 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                     continue;
                 }
 
-                if (wasSuspended)
-                {
-                    wasSuspended = false;
-                    ExitCaptureLoopSuspension(state);
-                }
-
                 var frameStart = Stopwatch.GetTimestamp();
                 CapturedFrame? frame = null;
 
+                await _runtimeIteration.WaitAsync(cancellationToken);
                 try
                 {
-                    frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _logger.LogWarning(ex, "捕获画面失败");
-                    await DelayAsync(500, cancellationToken);
-                }
-
-                try
-                {
-                    if (frame is not null)
+                    if (_isSuspended) continue;
+                    if (wasSuspended)
                     {
-                        var now = DateTimeOffset.Now;
-                        if (now >= nextGameStateScanAt)
+                        wasSuspended = false;
+                        ExitCaptureLoopSuspension(state);
+                    }
+                    try
+                    {
+                        frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogWarning(ex, "捕获画面失败");
+                        await DelayAsync(500, cancellationToken);
+                    }
+
+                    try
+                    {
+                        if (frame is not null)
                         {
-                            nextGameStateScanAt = now + TimeSpan.FromMilliseconds(RuntimeRecognitionDefaults.GameStateScanIntervalMs);
-
-                            try
+                            var now = DateTimeOffset.Now;
+                            if (now >= nextGameStateScanAt)
                             {
-                                await ProcessFrameAsync(state, frame, cancellationToken);
-                            }
-                            catch (Exception ex) when (ex is not OperationCanceledException)
-                            {
-                                _scene = GameScene.Unknown;
-                                CompleteAutoBattleSkillSelectionState();
-                                TryUpdateUnrecognizedInfoOverlaySnapshot(now);
-                                _logger.LogWarning(ex, "状态图像匹配失败");
-                            }
+                                nextGameStateScanAt = now + TimeSpan.FromMilliseconds(RuntimeRecognitionDefaults.GameStateScanIntervalMs);
 
-                            if (_scene == GameScene.World)
-                            {
-                                ResetEncounterRecordSuppression();
-                            }
+                                try
+                                {
+                                    await ProcessFrameAsync(state, frame, cancellationToken);
+                                }
+                                catch (Exception ex) when (ex is not OperationCanceledException)
+                                {
+                                    _scene = GameScene.Unknown;
+                                    CompleteAutoBattleSkillSelectionState();
+                                    TryUpdateUnrecognizedInfoOverlaySnapshot(now);
+                                    _logger.LogWarning(ex, "状态图像匹配失败");
+                                }
 
-                            // 后台战斗 OCR 只接收本轮已确认的战斗画面。
-                            if (_scene == GameScene.Battle)
-                                session.PublishFrame(frame, _battle.BattleId);
-                            else
-                                session.ClearFrame();
+                                if (_scene == GameScene.World)
+                                {
+                                    ResetEncounterRecordSuppression();
+                                }
+
+                                // 后台战斗 OCR 只接收本轮已确认的战斗画面。
+                                if (_scene == GameScene.Battle)
+                                    session.PublishFrame(frame, _battle.BattleId);
+                                else
+                                    session.ClearFrame();
+                            }
                         }
                     }
+                    finally
+                    {
+                        frame?.Dispose();
+                    }
                 }
-                finally
-                {
-                    frame?.Dispose();
-                }
+                finally { _runtimeIteration.Release(); }
 
                 var elapsedMilliseconds = Stopwatch.GetElapsedTime(frameStart).TotalMilliseconds;
                 var delay = Math.Max(1, RuntimeRecognitionDefaults.FrameCaptureIntervalMs - (int)elapsedMilliseconds);
@@ -490,7 +509,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         ResetAutoBattleBattleState();
         ResetEncounterRecordSuppression();
         session.ClearFrame();
-        _recognitionOverlayService.Hide();
         _overlayActivities.Clear();
         _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("已挂起", DateTimeOffset.Now));
         _logger.LogDebug("实时任务：截图循环进入挂起状态。");
@@ -550,14 +568,17 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                     continue;
                 }
 
-                var battleId = _battle.BattleId;
-                var frame = session.RentFrame(battleId);
-                if (frame is null)
+                await _runtimeIteration.WaitAsync(cancellationToken);
+                try
                 {
-                    continue;
+                    if (_isSuspended) continue;
+                    var battleId = _battle.BattleId;
+                    var frame = session.RentFrame(battleId);
+                    if (frame is null) continue;
+                    activeScanTask = RunRuntimeOcrScanAsync(state, frame, battleId, cancellationToken);
+                    session.Track(activeScanTask);
                 }
-
-                activeScanTask = RunRuntimeOcrScanAsync(state, frame, battleId, cancellationToken);
+                finally { _runtimeIteration.Release(); }
             }
         }
         catch (OperationCanceledException)
@@ -707,6 +728,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         int? magicPointCount = null,
         int magicPointMaximum = GameSceneRecognizer.MagicPointSlotCount)
     {
+        var independentTask = Volatile.Read(ref _independentTaskOverlay);
         return new InfoOverlaySnapshot(
             statusText,
             GetCurrentSeasonEncounterCounters(),
@@ -725,7 +747,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 _ => InfoOverlayScene.Unknown
             },
             _autoBattleSettings.IsEnabled,
-            _overlayActivities.CreatureName);
+            _overlayActivities.CreatureName,
+            independentTask?.Name ?? string.Empty,
+            independentTask?.Progress);
     }
 
     private Task<CapturedFrame?> CaptureFrameAsync(

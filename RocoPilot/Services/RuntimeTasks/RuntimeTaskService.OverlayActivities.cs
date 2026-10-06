@@ -9,6 +9,23 @@ public sealed partial class RuntimeTaskService
     private readonly InfoOverlayActivityTracker _overlayActivities = new();
     private string _lastInfoOverlayStatus = "状态待识别";
     private long _infoOverlayRevision;
+    private sealed record IndependentTaskOverlay(string Name, IndependentTaskProgress Progress);
+    private IndependentTaskOverlay? _independentTaskOverlay;
+
+    public void UpdateIndependentTaskStatus(string? taskName, IndependentTaskProgress? progress = null)
+    {
+        Volatile.Write(ref _independentTaskOverlay,
+            string.IsNullOrWhiteSpace(taskName) ? null : new IndependentTaskOverlay(taskName, progress ?? new("准备启动")));
+        if (!IsRunning) return;
+        try
+        {
+            _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot(Volatile.Read(ref _lastInfoOverlayStatus), DateTimeOffset.Now));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "更新独立任务灵动岛信息失败，不影响任务执行");
+        }
+    }
 
     private void RefreshOverlayActivity(RuntimeTaskState state, InfoOverlayActivity? activity)
     {
@@ -53,6 +70,7 @@ public sealed partial class RuntimeTaskService
     private async Task<bool> ExecuteBattleInputWithOverlayAsync(RuntimeTaskState state, AutoBattleSettings settings,
         AutoBattlePlan plan, AutoBattleTurn turn, CancellationToken token)
     {
+        if (_isSuspended || !ReferenceEquals(CurrentState, state)) return false;
         var battleId = _battle.BattleId;
         try
         {

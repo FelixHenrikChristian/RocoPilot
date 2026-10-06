@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Views.Windows;
 
@@ -20,7 +21,7 @@ public sealed class RecognitionOverlayService : IRecognitionOverlayService
         _dispatcherQueue = App.MainWindow.DispatcherQueue;
     }
 
-    public void Show(RuntimeTaskState state)
+    public void Show(RuntimeTaskState state, RecognitionRegionConfig? regionConfig = null)
     {
         if (!state.Options.RecognitionOverlayEnabled)
         {
@@ -28,7 +29,7 @@ public sealed class RecognitionOverlayService : IRecognitionOverlayService
             return;
         }
 
-        RunOnDispatcher(() => ShowCore(state));
+        RunOnDispatcher(() => ShowCore(state, regionConfig ?? state.RecognitionRegionConfig));
     }
 
     public void ShowOcrResult(string regionId, string text)
@@ -56,21 +57,40 @@ public sealed class RecognitionOverlayService : IRecognitionOverlayService
         RunOnDispatcher(HideCore);
     }
 
-    private void ShowCore(RuntimeTaskState state)
+    private void ShowCore(RuntimeTaskState state, RecognitionRegionConfig regionConfig)
     {
-        try
+        if (!state.Options.RecognitionOverlayEnabled)
         {
             HideCore();
+            return;
+        }
 
-            _overlayWindow = new RecognitionOverlayWindow(
+        try
+        {
+            if (_overlayWindow?.TargetWindowHandle == state.TargetWindow.Hwnd)
+            {
+                _overlayWindow.UpdateRegions(regionConfig);
+                return;
+            }
+
+            HideCore();
+
+            var overlayWindow = new RecognitionOverlayWindow(
                 state.TargetWindow,
-                state.RecognitionRegionConfig);
-            _overlayWindow.Closed += (_, _) => _overlayWindow = null;
-            _overlayWindow.ShowOverlay();
+                regionConfig);
+            _overlayWindow = overlayWindow;
+            overlayWindow.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_overlayWindow, overlayWindow))
+                {
+                    _overlayWindow = null;
+                }
+            };
+            overlayWindow.ShowOverlay();
 
             _logger.LogDebug(
                 "识别区域遮罩已显示，区域数量：{RegionCount}",
-                state.RecognitionRegionConfig.Regions.Count(region => region.Enabled));
+                regionConfig.Regions.Count(region => region.Enabled));
         }
         catch (Exception ex)
         {

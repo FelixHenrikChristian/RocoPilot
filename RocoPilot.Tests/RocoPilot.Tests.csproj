@@ -19,5 +19,8 @@
     <Content Include="Fixtures\battle-chat-*.png" CopyToOutputDirectory="PreserveNewest">
       <TargetPath>Fixtures\%(Filename)%(Extension)</TargetPath>
     </Content>
+    <Content Include="Fixtures\flower-seed-*.png" CopyToOutputDirectory="PreserveNewest">
+      <TargetPath>Fixtures\%(Filename)%(Extension)</TargetPath>
+    </Content>
   </ItemGroup>
 </Project>

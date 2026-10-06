@@ -212,6 +212,91 @@
                         </Grid>
                     </StackPanel>
                 </Expander>
+                <Expander Style="{StaticResource CardExpanderStyle}">
+                    <Expander.Header>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="20"
+                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                                Glyph="&#xEB9F;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                <TextBlock FontWeight="SemiBold" Text="稀兽花种挑战" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="自动选择花种、传送并开始挑战。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Command="{x:Bind ViewModel.ToggleFlowerSeedChallengeCommand}"
+                                IsEnabled="{x:Bind ViewModel.IsFlowerSeedChallengeButtonEnabled, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="14"
+                                        Glyph="{x:Bind ViewModel.FlowerSeedChallengeButtonGlyph, Mode=OneWay}" />
+                                    <TextBlock Text="{x:Bind ViewModel.FlowerSeedChallengeButtonText, Mode=OneWay}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Expander.Header>
+                    <StackPanel Spacing="0">
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE8F1;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="目标花种" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="扫描当前花种后，选择要挑战的目标。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <ComboBox
+                                    Width="240"
+                                    VerticalAlignment="Center"
+                                    DisplayMemberPath="DisplayName"
+                                    IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
+                                    ItemsSource="{x:Bind ViewModel.FlowerSeedOptions}"
+                                    PlaceholderText="请先扫描花种"
+                                    SelectedItem="{x:Bind ViewModel.SelectedFlowerSeed, Mode=TwoWay}" />
+                                <Button
+                                    VerticalAlignment="Center"
+                                    Command="{x:Bind ViewModel.ToggleFlowerSeedScanCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsFlowerSeedScanButtonEnabled, Mode=OneWay}">
+                                    <TextBlock Text="{x:Bind ViewModel.FlowerSeedScanButtonText, Mode=OneWay}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Expander>
             </StackPanel>
         </ScrollViewer>
 

@@ -1,6 +1,6 @@
 namespace RocoPilot.Models.Overlay;
 
-public enum InfoOverlayActivityKind { Spirit, Skill, Capture, EnergyRecovery, PetSwitch, Waiting, Record, Error }
+public enum InfoOverlayActivityKind { Spirit, Skill, Capture, EnergyRecovery, PetSwitch, Waiting, Record, Error, Task }
 
 public sealed record InfoOverlayActivity(long Id, InfoOverlayActivityKind Kind, string Title,
     string Description, string CreatureName, DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt,
@@ -78,5 +78,12 @@ public sealed class InfoOverlayActivityTracker
                 count.HasValue ? $"记录更新于 {recordedAt.ToLocalTime():HH:mm:ss}" : "等待补齐赛季或精灵名称后归档",
                 name, publishedAt, publishedAt.AddSeconds(4), IsBattleBound: false);
         }
+    }
+
+    public InfoOverlayActivity CompleteTask(string title, string description, DateTimeOffset publishedAt)
+    {
+        lock (_gate)
+            return _current = new(++_nextId, InfoOverlayActivityKind.Task, title, description,
+                string.Empty, publishedAt, publishedAt.AddSeconds(4), IsBattleBound: false);
     }
 }

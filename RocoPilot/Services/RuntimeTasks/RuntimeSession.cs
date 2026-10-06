@@ -42,6 +42,28 @@ internal sealed class RuntimeSession(RuntimeTaskState state, IScreenCaptureServi
         }
     }
 
+    /// <summary>调用方先阻止新任务产生，等待后台识别结束；保持会话及截图资源可用。</summary>
+    public async Task DrainBackgroundAsync(CancellationToken cancellationToken = default)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Task[] jobs;
+            lock (_gate) jobs = _jobs.Where(job => !job.IsCompleted).ToArray();
+            if (jobs.Length == 0) return;
+
+            try
+            {
+                await Task.WhenAll(jobs).WaitAsync(cancellationToken);
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // 此处只建立完成屏障，识别结果/错误仍交给任务所有者处理。
+                // 不删除失败任务，停止会话时仍会观察并传播其错误。
+            }
+        }
+    }
+
     public void PublishFrame(CapturedFrame frame, long battleId)
     {
         var reference = frame.AddReference();

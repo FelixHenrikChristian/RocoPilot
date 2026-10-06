@@ -89,6 +89,7 @@ public sealed partial class InfoOverlayWindow
             IslandCategoryText.Text = presentation.Category;
             IslandCategoryText.Foreground = new SolidColorBrush(warning || error ? tint : CounterSecondaryForeground);
             IslandTitleText.Text = presentation.Title;
+            IslandTitleText.Visibility = string.IsNullOrWhiteSpace(presentation.Title) ? Visibility.Collapsed : Visibility.Visible;
             IslandDescriptionText.Text = presentation.Description;
             IslandDescriptionText.Visibility = string.IsNullOrWhiteSpace(presentation.Description) ? Visibility.Collapsed : Visibility.Visible;
             ToolTipService.SetToolTip(IslandDetails, string.Join("\n", new[] { presentation.Category, presentation.Title, presentation.Description }

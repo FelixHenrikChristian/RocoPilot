@@ -5,6 +5,8 @@ public sealed record InfoOverlayIslandPresentation(string Category, string Title
 {
     public static InfoOverlayIslandPresentation? Resolve(InfoOverlaySnapshot snapshot, InfoOverlayNotice? uidNotice, DateTimeOffset now)
     {
+        if (!string.IsNullOrWhiteSpace(snapshot.IndependentTaskName) && snapshot.IndependentTaskProgress is { } progress)
+            return new(progress.Stage, progress.Operation, progress.Recognition);
         if (snapshot.IsShinyProtectionActive)
         {
             var protectedCreatureName = snapshot.PendingShinyCapture?.CreatureName ?? snapshot.BattleCreatureName;
@@ -36,6 +38,7 @@ public sealed record InfoOverlayIslandPresentation(string Category, string Title
         var category = activity.Kind switch
         {
             InfoOverlayActivityKind.Spirit => "精灵识别", InfoOverlayActivityKind.Record => "统计记录",
+            InfoOverlayActivityKind.Task => "任务完成",
             InfoOverlayActivityKind.Error => "操作未完成",
             InfoOverlayActivityKind.Skill or InfoOverlayActivityKind.EnergyRecovery => "技能选择",
             InfoOverlayActivityKind.PetSwitch => "战斗流程",

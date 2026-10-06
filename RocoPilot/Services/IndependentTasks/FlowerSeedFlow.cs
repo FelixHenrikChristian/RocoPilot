@@ -19,7 +19,6 @@ internal sealed class FlowerSeedFlow(FlowerSeedOption? target)
     private bool _preparationSeen;
     private (int Number, double Y, bool Matched)[] _visibleRows = [];
     private double _rowSpacing = double.PositiveInfinity;
-    private int _nextRowNumber;
 
     public IReadOnlyList<FlowerSeedOption> Options => _options;
     public bool IsTopConfirmed => _topConfirmed;
@@ -97,7 +96,7 @@ internal sealed class FlowerSeedFlow(FlowerSeedOption? target)
                 .OrderBy(candidate => Math.Abs(candidate.Y - position.Y)).FirstOrDefault();
             var sameRow = previous.Number != 0 && Math.Abs(previous.Y - position.Y)
                 < (double.IsPositiveInfinity(_rowSpacing) ? .003 : _rowSpacing / 2);
-            row.Number = sameRow ? previous.Number : ++_nextRowNumber;
+            row.Number = sameRow ? previous.Number : _options.Count + 1;
             row.HasMatched = !string.IsNullOrWhiteSpace(row.Name) || sameRow && previous.Matched;
             var name = string.IsNullOrWhiteSpace(row.Name) ? row.RawName.Trim() : row.Name;
             if (!sameRow) _options.Add(new(row.Number, name));

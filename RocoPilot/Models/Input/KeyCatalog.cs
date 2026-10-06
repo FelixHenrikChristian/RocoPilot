@@ -23,12 +23,6 @@ public static class KeyCatalog
         return DefinitionsByVirtualKeyCore.TryGetValue(virtualKey, out keyDefinition!);
     }
 
-    public static bool IsModifierVirtualKey(int virtualKey)
-    {
-        return TryGetDefinitionByVirtualKey(virtualKey, out var keyDefinition)
-            && keyDefinition.IsModifier;
-    }
-
     public static string GetDisplayName(int virtualKey)
     {
         return TryGetDefinitionByVirtualKey(virtualKey, out var keyDefinition)

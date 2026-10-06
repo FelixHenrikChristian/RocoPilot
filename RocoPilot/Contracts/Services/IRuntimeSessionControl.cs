@@ -8,7 +8,6 @@ public interface IRuntimeSessionControl
     bool IsRunning { get; }
     bool IsSuspended { get; }
     RuntimeTaskState? CurrentState { get; }
-    void Suspend(string reason);
     Task SuspendAsync(string reason, CancellationToken cancellationToken = default);
     void Resume();
     void UpdateIndependentTaskStatus(string? taskName, IndependentTaskProgress? progress = null);

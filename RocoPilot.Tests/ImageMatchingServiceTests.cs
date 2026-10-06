@@ -13,35 +13,26 @@ namespace RocoPilot.Tests;
 public sealed class ImageMatchingServiceTests
 {
     [TestMethod]
-    public async Task DefaultAndExplicitAlgorithmsLocateTheSameTemplateAndRespectAlphaMask()
+    public async Task OpenCvMatchingLocatesTemplateAndRespectsAlphaMask()
     {
         var fixture = CreateFixture([(3, 2)]);
         try
         {
             var service = new ImageMatchingService();
 
-            foreach (var algorithm in new[]
-                     {
-                         ImageMatchAlgorithm.UseGlobalDefault,
-                         ImageMatchAlgorithm.WeightedRgbError,
-                         ImageMatchAlgorithm.OpenCvSqDiffNormalized
-                     })
-            {
-                var result = await service.MatchAsync(
-                    fixture.Frame,
-                    fixture.Region,
-                    fixture.TemplatePath,
-                    new ImageMatchOptions
-                    {
-                        Algorithm = algorithm,
-                        MinimumScore = 0.99
-                    });
+            var result = await service.MatchAsync(
+                fixture.Frame,
+                fixture.Region,
+                fixture.TemplatePath,
+                new ImageMatchOptions
+                {
+                    MinimumScore = 0.99
+                });
 
-                Assert.IsTrue(result.IsMatch, algorithm.ToString());
-                Assert.AreEqual(3, result.X, algorithm.ToString());
-                Assert.AreEqual(2, result.Y, algorithm.ToString());
-                Assert.IsGreaterThanOrEqualTo(0.999, result.Score, algorithm.ToString());
-            }
+            Assert.IsTrue(result.IsMatch);
+            Assert.AreEqual(3, result.X);
+            Assert.AreEqual(2, result.Y);
+            Assert.IsGreaterThanOrEqualTo(0.999, result.Score);
         }
         finally
         {
@@ -50,7 +41,7 @@ public sealed class ImageMatchingServiceTests
     }
 
     [TestMethod]
-    public async Task GlobalAlgorithmFindsMultipleNonOverlappingMatches()
+    public async Task OpenCvMatchingFindsMultipleNonOverlappingMatches()
     {
         var fixture = CreateFixture([(2, 3), (9, 3)]);
         try

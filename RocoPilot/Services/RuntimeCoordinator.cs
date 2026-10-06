@@ -18,7 +18,6 @@ public sealed class RuntimeCoordinator(
     }
 
     public bool IsRunning => runtime.IsRunning;
-    public bool IsSuspended => runtime.IsSuspended;
     public RuntimeTaskState? CurrentState => runtime.CurrentState;
     public bool EncounterStatisticsEnabled => runtime.EncounterStatisticsEnabled;
     public AutoBattleSettings AutoBattleSettings => runtime.AutoBattleSettings;
@@ -73,6 +72,4 @@ public sealed class RuntimeCoordinator(
     public void SetInfoOverlayEnabled(bool isEnabled) => runtime.SetInfoOverlayEnabled(isEnabled);
     public void SetInfoOverlayLocked(bool isLocked) => runtime.SetInfoOverlayLocked(isLocked);
     public void SetAutoBattleSettings(AutoBattleSettings settings) => runtime.SetAutoBattleSettings(settings);
-    public void Suspend(string reason) => runtime.Suspend(reason);
-    public void Resume() => runtime.Resume();
 }

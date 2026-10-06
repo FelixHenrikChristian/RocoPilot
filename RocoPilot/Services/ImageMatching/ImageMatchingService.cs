@@ -29,7 +29,7 @@ public sealed class ImageMatchingService : IImageMatchingService
 
     private readonly ConcurrentDictionary<TemplateCacheKey, Lazy<Task<ImageTemplate>>> _templateCache = new();
 
-    // 全局模板匹配算法统一在此调整。
+    // 当前模板匹配算法，用于诊断日志。
     public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
 
     public string TemplateDirectory
@@ -75,17 +75,13 @@ public sealed class ImageMatchingService : IImageMatchingService
             normalizedOptions.TemplateScaleY,
             cancellationToken);
 
-        return normalizedOptions.Algorithm switch
-        {
-            ImageMatchAlgorithm.OpenCvSqDiffNormalized => MatchTemplateWithOpenCvSqDiffNormalized(
-                frame,
-                region,
-                template,
-                resolvedTemplatePath,
-                normalizedOptions,
-                cancellationToken),
-            _ => MatchTemplate(frame, region, template, resolvedTemplatePath, normalizedOptions, cancellationToken)
-        };
+        return MatchTemplateWithOpenCvSqDiffNormalized(
+            frame,
+            region,
+            template,
+            resolvedTemplatePath,
+            normalizedOptions,
+            cancellationToken);
     }
 
     public async Task<ImageMatchCollectionResult> FindMatchesAsync(
@@ -126,27 +122,15 @@ public sealed class ImageMatchingService : IImageMatchingService
             normalizedOptions.TemplateScaleY,
             cancellationToken);
 
-        return normalizedOptions.Algorithm switch
-        {
-            ImageMatchAlgorithm.OpenCvSqDiffNormalized => FindTemplateMatchesWithOpenCvSqDiffNormalized(
-                frame,
-                region,
-                template,
-                resolvedTemplatePath,
-                maximumMatches,
-                maximumOverlapRatio,
-                normalizedOptions,
-                cancellationToken),
-            _ => FindTemplateMatches(
-                frame,
-                region,
-                template,
-                resolvedTemplatePath,
-                maximumMatches,
-                maximumOverlapRatio,
-                normalizedOptions,
-                cancellationToken)
-        };
+        return FindTemplateMatchesWithOpenCvSqDiffNormalized(
+            frame,
+            region,
+            template,
+            resolvedTemplatePath,
+            maximumMatches,
+            maximumOverlapRatio,
+            normalizedOptions,
+            cancellationToken);
     }
 
     private string ResolveTemplatePath(string templatePath)
@@ -159,25 +143,16 @@ public sealed class ImageMatchingService : IImageMatchingService
         return Path.GetFullPath(Path.Combine(TemplateDirectory, templatePath));
     }
 
-    private ImageMatchOptions NormalizeOptions(ImageMatchOptions? options)
+    private static ImageMatchOptions NormalizeOptions(ImageMatchOptions? options)
     {
-        var requestedAlgorithm = options?.Algorithm ?? ImageMatchAlgorithm.UseGlobalDefault;
         var normalized = new ImageMatchOptions
         {
-            Algorithm = requestedAlgorithm == ImageMatchAlgorithm.UseGlobalDefault
-                ? DefaultAlgorithm
-                : requestedAlgorithm,
             MinimumScore = options?.MinimumScore ?? 0.9,
             AlphaThreshold = options?.AlphaThreshold ?? 16,
             SearchStep = options?.SearchStep ?? 1,
             TemplateScaleX = NormalizeScale(options?.TemplateScaleX ?? 1),
             TemplateScaleY = NormalizeScale(options?.TemplateScaleY ?? 1)
         };
-        if (!IsConcreteAlgorithm(normalized.Algorithm))
-        {
-            throw new ArgumentOutOfRangeException(nameof(options), "A supported image matching algorithm is required.");
-        }
-
         if (double.IsNaN(normalized.MinimumScore) || normalized.MinimumScore < 0 || normalized.MinimumScore > 1)
         {
             throw new ArgumentOutOfRangeException(nameof(options), "MinimumScore must be between 0 and 1.");
@@ -189,12 +164,6 @@ public sealed class ImageMatchingService : IImageMatchingService
         }
 
         return normalized;
-    }
-
-    private static bool IsConcreteAlgorithm(ImageMatchAlgorithm algorithm)
-    {
-        return algorithm is ImageMatchAlgorithm.WeightedRgbError
-            or ImageMatchAlgorithm.OpenCvSqDiffNormalized;
     }
 
     private static ImageMatchResult MatchTemplateWithOpenCvSqDiffNormalized(
@@ -551,150 +520,6 @@ public sealed class ImageMatchingService : IImageMatchingService
         }
     }
 
-    private static ImageMatchResult MatchTemplate(
-        CapturedFrame frame,
-        RecognitionRegion region,
-        ImageTemplate template,
-        string templatePath,
-        ImageMatchOptions options,
-        CancellationToken cancellationToken)
-    {
-        ValidateFrame(frame);
-
-        if (!region.Enabled)
-        {
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
-
-        var searchArea = ClipRegion(region, frame);
-        if (searchArea.Width < template.Width || searchArea.Height < template.Height)
-        {
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
-
-        var bestScore = double.NegativeInfinity;
-        var bestX = searchArea.X;
-        var bestY = searchArea.Y;
-        var maxX = searchArea.Right - template.Width;
-        var maxY = searchArea.Bottom - template.Height;
-
-        for (var y = searchArea.Y; y <= maxY; y += options.SearchStep)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            for (var x = searchArea.X; x <= maxX; x += options.SearchStep)
-            {
-                double? competitiveScore = bestScore >= options.MinimumScore
-                    ? Math.Max(bestScore, options.MinimumScore)
-                    : null;
-                var score = ScoreAt(frame, template, x, y, competitiveScore);
-                if (score <= bestScore)
-                {
-                    continue;
-                }
-
-                bestScore = score;
-                bestX = x;
-                bestY = y;
-            }
-        }
-
-        if (double.IsNegativeInfinity(bestScore))
-        {
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
-
-        return new ImageMatchResult(
-            bestScore >= options.MinimumScore,
-            bestScore,
-            bestX,
-            bestY,
-            template.Width,
-            template.Height,
-            templatePath);
-    }
-
-    private static ImageMatchCollectionResult FindTemplateMatches(
-        CapturedFrame frame,
-        RecognitionRegion region,
-        ImageTemplate template,
-        string templatePath,
-        int maximumMatches,
-        double maximumOverlapRatio,
-        ImageMatchOptions options,
-        CancellationToken cancellationToken)
-    {
-        ValidateFrame(frame);
-
-        if (!region.Enabled)
-        {
-            return ImageMatchCollectionResult.NoMatch(0, templatePath);
-        }
-
-        var searchArea = ClipRegion(region, frame);
-        if (searchArea.Width < template.Width || searchArea.Height < template.Height)
-        {
-            return ImageMatchCollectionResult.NoMatch(0, templatePath);
-        }
-
-        var candidates = new List<ImageMatchResult>();
-        var bestScore = double.NegativeInfinity;
-        var maxX = searchArea.Right - template.Width;
-        var maxY = searchArea.Bottom - template.Height;
-
-        for (var y = searchArea.Y; y <= maxY; y += options.SearchStep)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            for (var x = searchArea.X; x <= maxX; x += options.SearchStep)
-            {
-                double? competitiveScore = candidates.Count > 0
-                    ? options.MinimumScore
-                    : null;
-                var score = ScoreAt(frame, template, x, y, competitiveScore);
-                bestScore = Math.Max(bestScore, score);
-                if (score < options.MinimumScore)
-                {
-                    continue;
-                }
-
-                candidates.Add(new ImageMatchResult(
-                    true,
-                    score,
-                    x,
-                    y,
-                    template.Width,
-                    template.Height,
-                    templatePath));
-            }
-        }
-
-        if (double.IsNegativeInfinity(bestScore))
-        {
-            bestScore = 0;
-        }
-
-        var matches = new List<ImageMatchResult>(Math.Min(maximumMatches, candidates.Count));
-        foreach (var candidate in candidates
-                     .OrderByDescending(candidate => candidate.Score)
-                     .ThenBy(candidate => candidate.Y)
-                     .ThenBy(candidate => candidate.X))
-        {
-            if (matches.Any(match => CalculateOverlapRatio(candidate, match) > maximumOverlapRatio))
-            {
-                continue;
-            }
-
-            matches.Add(candidate);
-            if (matches.Count >= maximumMatches)
-            {
-                break;
-            }
-        }
-
-        return new ImageMatchCollectionResult(matches, bestScore, templatePath);
-    }
-
     private static double CalculateOverlapRatio(ImageMatchResult first, ImageMatchResult second)
     {
         var intersectionLeft = Math.Max(first.X, second.X);
@@ -746,51 +571,16 @@ public sealed class ImageMatchingService : IImageMatchingService
             : new SearchArea(left, top, right - left, bottom - top);
     }
 
-    private static double ScoreAt(
-        CapturedFrame frame,
-        ImageTemplate template,
-        int originX,
-        int originY,
-        double? competitiveScore)
-    {
-        var weightedError = 0d;
-        var maximumWeightedError = template.TotalWeight * 765d;
-        var earlyExitError = competitiveScore.HasValue
-            ? (1d - competitiveScore.Value) * maximumWeightedError
-            : double.PositiveInfinity;
-
-        foreach (var pixel in template.ActivePixels)
-        {
-            var frameOffset = (((originY + pixel.Y) * frame.Width) + originX + pixel.X) * 4;
-            var error =
-                Math.Abs(frame.Pixels[frameOffset] - pixel.Blue)
-                + Math.Abs(frame.Pixels[frameOffset + 1] - pixel.Green)
-                + Math.Abs(frame.Pixels[frameOffset + 2] - pixel.Red);
-
-            weightedError += error * pixel.Weight;
-            if (weightedError > earlyExitError)
-            {
-                return 0;
-            }
-        }
-
-        return Math.Clamp(1d - (weightedError / maximumWeightedError), 0d, 1d);
-    }
-
     private sealed class ImageTemplate
     {
         private ImageTemplate(
             int width,
             int height,
-            IReadOnlyList<TemplatePixel> activePixels,
-            double totalWeight,
             byte[] bgrPixels,
             byte[] maskPixels)
         {
             Width = width;
             Height = height;
-            ActivePixels = activePixels;
-            TotalWeight = totalWeight;
             BgrPixels = bgrPixels;
             MaskPixels = maskPixels;
         }
@@ -801,16 +591,6 @@ public sealed class ImageMatchingService : IImageMatchingService
         }
 
         public int Height
-        {
-            get;
-        }
-
-        public IReadOnlyList<TemplatePixel> ActivePixels
-        {
-            get;
-        }
-
-        public double TotalWeight
         {
             get;
         }
@@ -838,8 +618,7 @@ public sealed class ImageMatchingService : IImageMatchingService
                 throw new ArgumentException("Template pixels must be BGRA32 data.", nameof(pixels));
             }
 
-            var activePixels = new List<TemplatePixel>();
-            var totalWeight = 0d;
+            var hasVisiblePixels = false;
             var bgrPixels = new byte[checked(width * height * 3)];
             var maskPixels = new byte[checked(width * height)];
 
@@ -860,20 +639,11 @@ public sealed class ImageMatchingService : IImageMatchingService
                     }
 
                     maskPixels[pixelIndex] = byte.MaxValue;
-
-                    var weight = alpha / 255d;
-                    activePixels.Add(new TemplatePixel(
-                        x,
-                        y,
-                        pixels[offset],
-                        pixels[offset + 1],
-                        pixels[offset + 2],
-                        weight));
-                    totalWeight += weight;
+                    hasVisiblePixels = true;
                 }
             }
 
-            if (activePixels.Count == 0)
+            if (!hasVisiblePixels)
             {
                 throw new InvalidOperationException("Image matching template has no visible pixels.");
             }
@@ -881,27 +651,12 @@ public sealed class ImageMatchingService : IImageMatchingService
             return new ImageTemplate(
                 width,
                 height,
-                activePixels,
-                totalWeight,
                 bgrPixels,
                 maskPixels);
         }
     }
 
-    private readonly record struct TemplatePixel(
-        int X,
-        int Y,
-        byte Blue,
-        byte Green,
-        byte Red,
-        double Weight);
-
-    private readonly record struct SearchArea(int X, int Y, int Width, int Height)
-    {
-        public int Right => X + Width;
-
-        public int Bottom => Y + Height;
-    }
+    private readonly record struct SearchArea(int X, int Y, int Width, int Height);
 
     private readonly record struct TemplateCacheKey(
         string TemplatePath,

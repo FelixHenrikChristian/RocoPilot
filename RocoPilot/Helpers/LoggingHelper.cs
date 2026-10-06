@@ -57,11 +57,6 @@ public static class LoggingHelper
         Log.Information("日志目录: {LogDirectory:l}", LogDirectory);
     }
 
-    public static void LogShutdown()
-    {
-        Log.Information("==================== RocoPilot 退出 ====================");
-    }
-
     private static string GetAppVersion()
     {
         if (RuntimeHelper.IsMSIX)

@@ -68,9 +68,6 @@ public partial class MainViewModel : ObservableRecipient
     public partial bool IsInfoOverlayLocked { get; set; }
 
     [ObservableProperty]
-    public partial CaptureTargetWindow? TargetGameWindow { get; set; }
-
-    [ObservableProperty]
     public partial bool IsLaunchNotificationOpen { get; set; }
 
     [ObservableProperty]
@@ -111,7 +108,6 @@ public partial class MainViewModel : ObservableRecipient
         SelectedCaptureMethod = CaptureMethods[0];
         SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
-        TargetGameWindow = _runtimeTaskService.CurrentState?.TargetWindow;
         if (_runtimeTaskService.CurrentState is { } currentState)
         {
             IsMaskOverlayEnabled = currentState.Options.RecognitionOverlayEnabled;
@@ -129,7 +125,6 @@ public partial class MainViewModel : ObservableRecipient
         {
             await _runtimeTaskService.StopAsync();
             IsRealtimeCaptureRunning = false;
-            TargetGameWindow = null;
             _logger.LogDebug("实时任务停止命令已完成");
             ShowLaunchNotification(InfoBarSeverity.Success, "任务已停止", "场景识别和实时任务已停止。");
             return;
@@ -169,7 +164,6 @@ public partial class MainViewModel : ObservableRecipient
         if (!result.Success || result.State is null)
         {
             IsRealtimeCaptureRunning = false;
-            TargetGameWindow = null;
             _logger.LogWarning("启动失败：{Message}", result.Message);
             ShowLaunchNotification(
                 InfoBarSeverity.Error,
@@ -179,7 +173,6 @@ public partial class MainViewModel : ObservableRecipient
         }
 
         var gameWindow = result.State.TargetWindow;
-        TargetGameWindow = gameWindow;
         IsRealtimeCaptureRunning = true;
         _logger.LogDebug(
             "启动成功：已找到游戏窗口。标题：{WindowTitle}  进程：{ProcessName}  PID：{ProcessId}  HWND：{WindowHandle}  窗口尺寸：{WindowWidth}x{WindowHeight}  客户区：{ClientWidth}x{ClientHeight}",

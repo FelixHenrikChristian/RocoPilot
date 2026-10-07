@@ -3,40 +3,56 @@ using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum FlowerSeedAction { None, OpenManual, Click, ScrollUp, ScrollDown, Approach, SelectChallenge, Interact, Complete }
+internal enum FlowerSeedAction { None, OpenManual, Click, ScrollUp, ScrollDown, Approach, SelectChallenge, Interact, Battle, Capture, Complete }
 
 internal readonly record struct FlowerSeedDecision(FlowerSeedAction Action, ImageMatchResult? Button = null);
 
 // 动作只消费当前匹配画面；滚动前后行位置用于确认列表边界。
-internal sealed class FlowerSeedFlow(FlowerSeedOption? target)
+internal sealed class FlowerSeedFlow(FlowerSeedOption? target, int runCount = 6)
 {
+    private enum ChallengePhase { Navigation, Starting, Battle, Settlement, Result }
+
     private readonly List<FlowerSeedOption> _options = [];
     private (string Name, double Y)[]? _beforeScroll;
     private int _unchangedScrolls;
     private bool _topConfirmed;
     private bool _targetRowSeen;
     private bool _targetMapSeen;
-    private bool _preparationSeen;
+    private ChallengePhase _challengePhase;
+    private bool _rewardsSeen;
     private (int Number, double Y, bool Matched)[] _visibleRows = [];
     private double _rowSpacing = double.PositiveInfinity;
 
     public IReadOnlyList<FlowerSeedOption> Options => _options;
     public bool IsTopConfirmed => _topConfirmed;
+    public int CompletedCount { get; private set; }
+    public int ConsecutiveFailures { get; private set; }
+    public int BattleNumber { get; private set; }
+    public bool IsBattleActive => _challengePhase == ChallengePhase.Battle;
 
     public FlowerSeedDecision Next(FlowerSeedScreen screen, int clientHeight)
     {
-        if (_preparationSeen && screen.Scene is not (FlowerSeedScene.Preparation or FlowerSeedScene.Battle))
-            return default;
+        if (screen.Scene is FlowerSeedScene.World or FlowerSeedScene.Interaction
+            && _challengePhase is ChallengePhase.Battle or ChallengePhase.Result)
+        {
+            if (_challengePhase == ChallengePhase.Result && CompletedCount >= runCount)
+                return new(FlowerSeedAction.Complete);
+            if (_challengePhase == ChallengePhase.Battle && ++ConsecutiveFailures >= 3)
+                throw new InvalidOperationException("花种挑战连续失败 3 次，任务已停止。请检查精灵状态后重新启动。");
+            _challengePhase = ChallengePhase.Navigation;
+            _rewardsSeen = false;
+        }
+        if (target is not null && CompletedCount >= runCount && screen.Scene != FlowerSeedScene.Result) return default;
 
         switch (screen.Scene)
         {
-            case FlowerSeedScene.World:
+            case FlowerSeedScene.World when _challengePhase == ChallengePhase.Navigation:
                 return new(_targetMapSeen ? FlowerSeedAction.Approach : FlowerSeedAction.OpenManual);
-            case FlowerSeedScene.Manual:
-            case FlowerSeedScene.ChallengePage:
-            case FlowerSeedScene.Confirmation when _targetMapSeen:
+            case FlowerSeedScene.Manual when _challengePhase == ChallengePhase.Navigation:
+            case FlowerSeedScene.ChallengePage when _challengePhase == ChallengePhase.Navigation:
+            case FlowerSeedScene.Confirmation when _targetMapSeen && _challengePhase == ChallengePhase.Navigation:
                 return Click(screen.Button);
-            case FlowerSeedScene.FlowerList:
+            case FlowerSeedScene.FlowerList when _challengePhase == ChallengePhase.Navigation:
                 if (screen.Rows.Count == 0) return default;
                 var rows = ReadPositions(screen.Rows, clientHeight);
                 if (_beforeScroll is { } previous)
@@ -60,20 +76,48 @@ internal sealed class FlowerSeedFlow(FlowerSeedOption? target)
                 if (target is not null)
                     throw new InvalidOperationException($"当前花种列表中未找到：{target.DisplayName}。");
                 return new(FlowerSeedAction.Complete);
-            case FlowerSeedScene.Map:
+            case FlowerSeedScene.Map when _challengePhase == ChallengePhase.Navigation:
                 if (!_targetRowSeen) return default;
                 _targetMapSeen = true;
                 return Click(screen.Button);
-            case FlowerSeedScene.Interaction:
+            case FlowerSeedScene.Interaction when _challengePhase == ChallengePhase.Navigation:
                 if (!_targetMapSeen) return new(FlowerSeedAction.OpenManual);
                 if (string.IsNullOrWhiteSpace(screen.Text)) return default;
                 return new(FlowerSeedScreenRecognizer.Normalize(screen.Text) == "挑战"
                     ? FlowerSeedAction.Interact : FlowerSeedAction.SelectChallenge);
-            case FlowerSeedScene.Preparation when _targetMapSeen:
-                _preparationSeen = true;
+            case FlowerSeedScene.Preparation when _targetMapSeen
+                && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting:
+                if (screen.Button is not { IsMatch: true }) return default;
+                _challengePhase = ChallengePhase.Starting;
                 return Click(screen.Button);
-            case FlowerSeedScene.Battle when _preparationSeen:
-                return new(FlowerSeedAction.Complete);
+            case FlowerSeedScene.MedalConfirmation when _challengePhase == ChallengePhase.Starting:
+                return Click(screen.Button);
+            case FlowerSeedScene.Battle when _challengePhase is ChallengePhase.Starting or ChallengePhase.Battle or ChallengePhase.Result:
+                if (!IsBattleActive)
+                {
+                    _challengePhase = ChallengePhase.Battle;
+                    _rewardsSeen = false;
+                    BattleNumber++;
+                }
+                return new(FlowerSeedAction.Battle);
+            case FlowerSeedScene.Capture when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement:
+                // 专属球保证捕捉成功；之后短暂出现的大世界 HUD 仍属于结算过渡。
+                _challengePhase = ChallengePhase.Settlement;
+                return new(FlowerSeedAction.Capture);
+            case FlowerSeedScene.Rewards when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement:
+                if (screen.Button is not { IsMatch: true }) return default;
+                _challengePhase = ChallengePhase.Settlement;
+                _rewardsSeen = true;
+                return Click(screen.Button);
+            case FlowerSeedScene.Result when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement or ChallengePhase.Result:
+                if (_challengePhase != ChallengePhase.Result)
+                {
+                    if (!_rewardsSeen) return default;
+                    CompletedCount++;
+                    ConsecutiveFailures = 0;
+                    _challengePhase = ChallengePhase.Result;
+                }
+                return Click(CompletedCount >= runCount ? screen.ExitButton : screen.Button);
             default:
                 return default;
         }

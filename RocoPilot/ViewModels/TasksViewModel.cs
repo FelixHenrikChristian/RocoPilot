@@ -70,6 +70,9 @@ public partial class TasksViewModel : ObservableRecipient
     public partial double LegendaryChallengeRunCount { get; set; }
 
     [ObservableProperty]
+    public partial double FlowerSeedRunCount { get; set; }
+
+    [ObservableProperty]
     public partial bool IsTaskNotificationOpen { get; set; }
 
     [ObservableProperty]
@@ -118,6 +121,7 @@ public partial class TasksViewModel : ObservableRecipient
         TaskNotificationMessage = string.Empty;
         BossBattleRunCount = IndependentTaskSettings.DefaultBossBattleRunCount;
         LegendaryChallengeRunCount = IndependentTaskSettings.DefaultLegendaryChallengeRunCount;
+        FlowerSeedRunCount = IndependentTaskSettings.DefaultFlowerSeedRunCount;
         _independentTaskService.StateChanged += IndependentTaskService_StateChanged;
         SyncRunningState();
     }
@@ -190,6 +194,11 @@ public partial class TasksViewModel : ObservableRecipient
         SaveSettingsIfLoaded();
     }
 
+    partial void OnFlowerSeedRunCountChanged(double value)
+    {
+        SaveSettingsIfLoaded();
+    }
+
     partial void OnSelectedFlowerSeedChanged(FlowerSeedOption? value)
     {
         SaveSettingsIfLoaded();
@@ -218,6 +227,9 @@ public partial class TasksViewModel : ObservableRecipient
             LegendaryChallengeRunCount = ToRunCount(
                 LegendaryChallengeRunCount,
                 IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
+            FlowerSeedRunCount = ToRunCount(
+                FlowerSeedRunCount,
+                IndependentTaskSettings.DefaultFlowerSeedRunCount),
             FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
             FlowerSeedOptions = [.. FlowerSeedOptions]
         }.Normalize();
@@ -230,6 +242,7 @@ public partial class TasksViewModel : ObservableRecipient
         {
             BossBattleRunCount = settings.BossBattleRunCount;
             LegendaryChallengeRunCount = settings.LegendaryChallengeRunCount;
+            FlowerSeedRunCount = settings.FlowerSeedRunCount;
             if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))
             {
                 FlowerSeedOptions.Clear();

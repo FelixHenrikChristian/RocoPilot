@@ -28,11 +28,11 @@
                                 Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                                 Glyph="&#xEB9F;" />
                             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
-                                <TextBlock FontWeight="SemiBold" Text="稀兽花种" />
+                                <TextBlock FontWeight="SemiBold" Text="花种挑战" />
                                 <TextBlock
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="自动选择花种、传送并开始挑战。"
+                                    Text="自动选择花种、连续战斗并捕捉，完成后退出。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
                             <Button
@@ -95,6 +95,78 @@
                                     <TextBlock Text="{x:Bind ViewModel.FlowerSeedScanButtonText, Mode=OneWay}" />
                                 </Button>
                             </StackPanel>
+                        </Grid>
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE8EE;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="战斗次数" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="失败不计入次数并自动重试；连续失败 3 次后停止并通知。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                <NumberBox
+                                    Width="140"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
+                                    Maximum="99"
+                                    Minimum="1"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    Value="{x:Bind ViewModel.FlowerSeedRunCount, Mode=TwoWay}" />
+                                <TextBlock VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="次" />
+                            </StackPanel>
+                        </Grid>
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE9F5;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="战斗配置" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="命定与稀兽花种共用释放顺序，启动后自动执行战斗。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
+                                Click="ConfigureFlowerSeedBattleButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE713;" />
+                                    <TextBlock Text="配置" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </StackPanel>
                 </Expander>

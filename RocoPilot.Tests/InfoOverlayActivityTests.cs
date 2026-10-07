@@ -21,6 +21,37 @@ public sealed class InfoOverlayActivityTests
         Assert.AreEqual(progress.Stage, presentation.Category);
         Assert.AreEqual(progress.Operation, presentation.Title);
         Assert.AreEqual(progress.Recognition, presentation.Description);
+        Assert.AreEqual("", presentation.CreatureName);
+    }
+
+    [TestMethod]
+    public void IndependentTaskUsesItsRecognizedCreatureInsteadOfThePreviousRealtimeBattle()
+    {
+        var progress = new IndependentTaskProgress("战斗", "技能 1", "成功 0/6 次", "伊贝粉粉");
+        var snapshot = new InfoOverlaySnapshot("已挂起", [], Now, Scene: InfoOverlayScene.Suspended,
+            BattleCreatureName: "栗鼠", IndependentTaskName: "花种挑战", IndependentTaskProgress: progress);
+
+        var presentation = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!;
+        Assert.AreEqual("伊贝粉粉", presentation.CreatureName);
+        Assert.AreEqual("技能 1", presentation.Title);
+        Assert.AreEqual("成功 0/6 次", presentation.Description);
+    }
+
+    [TestMethod]
+    [DataRow(AutoBattleAction.Skill, "1", "1", "技能 1")]
+    [DataRow(AutoBattleAction.Skill, "2", "2", "技能 2")]
+    [DataRow(AutoBattleAction.Skill, "3", "3", "技能 3")]
+    [DataRow(AutoBattleAction.Skill, "4", "4", "技能 4")]
+    [DataRow(AutoBattleAction.Skill, "X", "X", "回能")]
+    [DataRow(AutoBattleAction.EnergyRecovery, "X", null, "回能")]
+    [DataRow(AutoBattleAction.Capture, "W", null, "捕捉")]
+    [DataRow(AutoBattleAction.Skill, "自定义连招", null, "公共序列")]
+    [DataRow(AutoBattleAction.Skill, "1", null, "公共序列")]
+    public void BattleInputTitleDescribesTheActionWithoutRepeatingItsSequence(
+        AutoBattleAction action, string displayKey, string? fallbackSequence, string expected)
+    {
+        var plan = new AutoBattlePlan(action, "1, Space", "释放技能 1（1, Space），已发送", displayKey, fallbackSequence);
+        Assert.AreEqual(expected, InfoOverlayIslandPresentation.BattleInputTitle(plan));
     }
 
     [TestMethod]

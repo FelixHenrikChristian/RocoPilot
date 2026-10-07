@@ -3,10 +3,19 @@ namespace RocoPilot.Models.Overlay;
 public sealed record InfoOverlayIslandPresentation(string Category, string Title, string Description,
     string CreatureName = "", bool IsWarning = false, bool IsError = false)
 {
+    public static string BattleInputTitle(AutoBattlePlan plan) => plan.Action switch
+    {
+        AutoBattleAction.Capture => "捕捉",
+        AutoBattleAction.EnergyRecovery => "回能",
+        AutoBattleAction.Skill when plan.FallbackSequence is null => "公共序列",
+        _ => plan.DisplayKey is "1" or "2" or "3" or "4" ? $"技能 {plan.DisplayKey}"
+            : plan.DisplayKey == "X" ? "回能" : "公共序列"
+    };
+
     public static InfoOverlayIslandPresentation? Resolve(InfoOverlaySnapshot snapshot, InfoOverlayNotice? uidNotice, DateTimeOffset now)
     {
         if (!string.IsNullOrWhiteSpace(snapshot.IndependentTaskName) && snapshot.IndependentTaskProgress is { } progress)
-            return new(progress.Stage, progress.Operation, progress.Recognition);
+            return new(progress.Stage, progress.Operation, progress.Recognition, progress.CreatureName);
         if (snapshot.IsShinyProtectionActive)
         {
             var protectedCreatureName = snapshot.PendingShinyCapture?.CreatureName ?? snapshot.BattleCreatureName;

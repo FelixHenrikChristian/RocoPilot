@@ -51,18 +51,10 @@ public sealed partial class RuntimeTaskService
             _ => InfoOverlayActivityKind.Skill
         };
         var isCustomSequence = plan.Action == AutoBattleAction.Skill && plan.FallbackSequence is null;
-        var title = plan.Action switch
-        {
-            AutoBattleAction.Capture => "捕捉精灵",
-            AutoBattleAction.EnergyRecovery => "恢复能量",
-            _ when isCustomSequence => "执行公共序列",
-            _ => plan.DisplayKey is "1" or "2" or "3" or "4" ? $"使用技能 {plan.DisplayKey}"
-                : plan.DisplayKey == "X" ? "恢复能量" : "执行公共序列"
-        };
         var description = isCustomSequence && plan.DisplayKey != plan.Sequence
             ? plan.DisplayKey : string.Empty;
         RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turnId,
-            $"input:{turnId}:{plan.Action}:{sequence}", kind, title,
+            $"input:{turnId}:{plan.Action}:{sequence}", kind, InfoOverlayIslandPresentation.BattleInputTitle(plan),
             description,
             DateTimeOffset.Now, completed));
     }

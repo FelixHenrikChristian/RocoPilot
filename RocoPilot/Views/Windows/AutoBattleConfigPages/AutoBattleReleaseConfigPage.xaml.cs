@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
 
-public sealed partial class AutoBattleNormalConfigPage : Page
+public sealed partial class AutoBattleReleaseConfigPage : Page
 {
     private readonly AutoBattleConfigWindow _owner;
 
@@ -12,12 +12,24 @@ public sealed partial class AutoBattleNormalConfigPage : Page
         get;
     }
 
-    internal AutoBattleNormalConfigPage(
+    internal AutoBattleReleaseSequenceEditor ReleaseEditor { get; }
+
+    internal string BattleTypeName { get; }
+
+    internal string Description { get; }
+
+    internal AutoBattleReleaseConfigPage(
         AutoBattleConfigEditor editor,
-        AutoBattleConfigWindow owner)
+        AutoBattleConfigWindow owner,
+        AutoBattleConfigSection section)
     {
         Editor = editor;
         _owner = owner;
+        ReleaseEditor = section == AutoBattleConfigSection.FlowerSeed ? editor.FlowerSeedRelease : editor.NormalRelease;
+        BattleTypeName = section == AutoBattleConfigSection.FlowerSeed ? "花种战斗" : "普通战斗";
+        Description = section == AutoBattleConfigSection.FlowerSeed
+            ? "轮到自己操作时按顺序释放技能，每场挑战从第一步开始；命定与稀兽花种共用此配置。"
+            : "按顺序循环执行每个技能回合的动作。";
         InitializeComponent();
     }
 
@@ -25,20 +37,20 @@ public sealed partial class AutoBattleNormalConfigPage : Page
     {
         if (sender is FrameworkElement { Tag: string skillKey })
         {
-            Editor.AppendNormalSkill(skillKey);
+            ReleaseEditor.AppendSkill(skillKey);
         }
     }
 
     private void ClearReleaseSequenceButton_Click(object sender, RoutedEventArgs e)
     {
-        Editor.ClearNormalReleaseSequence();
+        ReleaseEditor.Items.Clear();
     }
 
     private void MoveStepEarlier_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })
         {
-            Editor.MoveNormalReleaseItemEarlier(item);
+            ReleaseEditor.MoveEarlier(item);
         }
     }
 
@@ -46,7 +58,7 @@ public sealed partial class AutoBattleNormalConfigPage : Page
     {
         if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })
         {
-            Editor.MoveNormalReleaseItemLater(item);
+            ReleaseEditor.MoveLater(item);
         }
     }
 
@@ -54,7 +66,7 @@ public sealed partial class AutoBattleNormalConfigPage : Page
     {
         if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })
         {
-            Editor.RemoveNormalReleaseItem(item);
+            ReleaseEditor.Items.Remove(item);
         }
     }
 
@@ -65,7 +77,7 @@ public sealed partial class AutoBattleNormalConfigPage : Page
             return;
         }
 
-        if (!Editor.TryInsertSharedPresetIntoNormal(preset, out var error))
+        if (!Editor.TryInsertSharedPreset(preset, ReleaseEditor, out var error))
         {
             _owner.ShowMessage(error.Title, error.Message);
         }

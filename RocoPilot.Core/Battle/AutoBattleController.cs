@@ -10,7 +10,7 @@ public sealed record AutoBattleTurn(
     int Number,
     DateTimeOffset StartedAt,
     AutoBattleReleaseStep ReleaseStep,
-    bool EnemyNameResolved = false,
+    bool SelectionReady = false,
     AutoBattleAction Action = AutoBattleAction.None,
     DateTimeOffset? LastActionAt = null);
 
@@ -70,19 +70,19 @@ public sealed class AutoBattleController
         }
     }
 
-    public bool IsEnemyNameRecognitionDue(AutoBattleSettings settings, DateTimeOffset now)
+    public bool IsSelectionPreparationDue(AutoBattleSettings settings, DateTimeOffset now)
     {
         lock (_gate)
-            return _turn is { EnemyNameResolved: false } turn
+            return _turn is { SelectionReady: false } turn
                 && now - turn.StartedAt >= TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs);
     }
 
-    public bool ConfirmEnemyName(long turnId)
+    public bool ConfirmSelectionReady(long turnId)
     {
         lock (_gate)
         {
             if (_turn is null || _turn.Id != turnId) return false;
-            _turn = _turn with { EnemyNameResolved = true };
+            _turn = _turn with { SelectionReady = true };
             return true;
         }
     }
@@ -91,7 +91,7 @@ public sealed class AutoBattleController
     {
         lock (_gate)
             return settings.IsEnabled && !_suspendedForShiny
-                && _turn is { EnemyNameResolved: true } turn
+                && _turn is { SelectionReady: true } turn
                 && now - turn.StartedAt >= TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs)
                 && (turn.LastActionAt is null
                     || now - turn.LastActionAt.Value >= TimeSpan.FromMilliseconds(settings.SkillSelectionRetryDelayMs));

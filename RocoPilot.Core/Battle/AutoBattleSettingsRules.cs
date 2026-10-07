@@ -84,6 +84,14 @@ public static class AutoBattleSettingsRules
         normalized.ReleaseSequence = ResolveReleaseSequence(normalized)
             .Select(step => step.Clone())
             .ToList();
+        normalized.FlowerSeedReleaseSequence = normalized.FlowerSeedReleaseSequence
+            .Select(NormalizeReleaseStep)
+            .OfType<AutoBattleReleaseStep>()
+            .ToList();
+        if (normalized.FlowerSeedReleaseSequence.Count == 0)
+        {
+            normalized.FlowerSeedReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
+        }
         if (!Enum.IsDefined(normalized.EncounterRelievedAction))
         {
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
@@ -221,7 +229,7 @@ public static class AutoBattleSettingsRules
 
     private static void ResolvePresetReferences(AutoBattleSettings settings)
     {
-        foreach (var step in settings.ReleaseSequence.Where(step => step.IsCustom))
+        foreach (var step in settings.ReleaseSequence.Concat(settings.FlowerSeedReleaseSequence).Where(step => step.IsCustom))
         {
             var preset = FindPreset(settings.TurnSequencePresets, step.PresetId);
             if (string.IsNullOrWhiteSpace(step.PresetId))

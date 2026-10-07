@@ -3,15 +3,16 @@ using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
+using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.ViewModels;
 using RocoPilot.Views.Windows;
+using RocoPilot.Views.Windows.AutoBattleConfigPages;
 
 namespace RocoPilot.Views;
 
 public sealed partial class RealtimePage : Page
 {
-    private AutoBattleConfigWindow? _autoBattleConfigWindow;
     private AutoBattleOtherConfigWindow? _autoBattleOtherConfigWindow;
     private SpiritCatalogWindow? _spiritCatalogWindow;
 
@@ -34,30 +35,22 @@ public sealed partial class RealtimePage : Page
         await ViewModel.LoadAsync();
     }
 
-    private void ConfigureAutoBattleButton_Click(object sender, RoutedEventArgs e)
+    private async void ConfigureAutoBattleButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_autoBattleConfigWindow is not null)
-        {
-            _autoBattleConfigWindow.Activate();
-            return;
-        }
-
-        _autoBattleConfigWindow = new AutoBattleConfigWindow(ViewModel);
-        _autoBattleConfigWindow.Closed += (_, _) => _autoBattleConfigWindow = null;
-        WindowPlacementHelper.SetOwner(_autoBattleConfigWindow, App.MainWindow);
-        WindowPlacementHelper.CenterOnParent(_autoBattleConfigWindow, App.MainWindow);
-        _autoBattleConfigWindow.Activate();
+        await AutoBattleConfigWindow.ShowAsync(AutoBattleConfigSection.SharedSequences);
     }
 
-    private void ConfigureAutoBattleOtherButton_Click(object sender, RoutedEventArgs e)
+    private async void ConfigureAutoBattleOtherButton_Click(object sender, RoutedEventArgs e)
     {
+        var runtime = App.GetService<IRuntimeTaskService>();
+        await runtime.LoadSettingsAsync();
         if (_autoBattleOtherConfigWindow is not null)
         {
             _autoBattleOtherConfigWindow.Activate();
             return;
         }
 
-        _autoBattleOtherConfigWindow = new AutoBattleOtherConfigWindow(ViewModel);
+        _autoBattleOtherConfigWindow = new AutoBattleOtherConfigWindow(runtime);
         _autoBattleOtherConfigWindow.Closed += (_, _) => _autoBattleOtherConfigWindow = null;
         WindowPlacementHelper.SetOwner(_autoBattleOtherConfigWindow, App.MainWindow);
         WindowPlacementHelper.CenterOnParent(_autoBattleOtherConfigWindow, App.MainWindow);

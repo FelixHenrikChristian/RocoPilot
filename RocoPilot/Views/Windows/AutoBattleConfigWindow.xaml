@@ -64,6 +64,14 @@
                         <FontIcon Glyph="&#xE768;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem
+                    x:Name="FlowerSeedBattleNavigationItem"
+                    Content="花种战斗"
+                    Tag="FlowerSeed">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xEB9F;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <ContentPresenter x:Name="ConfigPageHost" Margin="0,4,8,8" />

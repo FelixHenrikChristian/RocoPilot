@@ -9,15 +9,15 @@ public sealed class AutoBattleControllerTests
     private static readonly DateTimeOffset Now = new(2026, 9, 11, 0, 0, 0, TimeSpan.Zero);
 
     [TestMethod]
-    public void WaitsForActionDelayAndEnemyNameBeforeFirstAction()
+    public void WaitsForActionDelayAndSelectionReadinessBeforeFirstAction()
     {
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        Assert.IsFalse(battle.IsEnemyNameRecognitionDue(settings, Now.AddMilliseconds(499)));
-        Assert.IsTrue(battle.IsEnemyNameRecognitionDue(settings, Now.AddMilliseconds(500)));
+        Assert.IsFalse(battle.IsSelectionPreparationDue(settings, Now.AddMilliseconds(499)));
+        Assert.IsTrue(battle.IsSelectionPreparationDue(settings, Now.AddMilliseconds(500)));
         Assert.IsFalse(battle.CanAct(settings, Now.AddSeconds(1)));
-        battle.ConfirmEnemyName(turn.Id);
+        battle.ConfirmSelectionReady(turn.Id);
         Assert.IsFalse(battle.CanAct(settings, Now.AddMilliseconds(499)));
         Assert.IsTrue(battle.CanAct(settings, Now.AddMilliseconds(500)));
     }
@@ -37,12 +37,25 @@ public sealed class AutoBattleControllerTests
     }
 
     [TestMethod]
+    public void SelectionInterruptedBeforeSendingKeepsTheCurrentReleaseStep()
+    {
+        var settings = Settings();
+        var battle = new AutoBattleController();
+        var turn = battle.BeginSkillSelection(settings, Now);
+        battle.ConfirmSelectionReady(turn.Id);
+        battle.CompleteSkillSelection();
+        Assert.IsFalse(battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now));
+        Assert.AreEqual("1", battle.BeginSkillSelection(settings, Now.AddSeconds(1)).ReleaseStep.SkillKey);
+        Assert.AreEqual(0, battle.RoundIndex);
+    }
+
+    [TestMethod]
     public void FailedSkillRecoversEnergyAndKeepsOriginalSkillForNextTurn()
     {
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmEnemyName(turn.Id);
+        battle.ConfirmSelectionReady(turn.Id);
         battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now);
         Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(499)));
         Assert.IsTrue(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(500)));
@@ -101,7 +114,7 @@ public sealed class AutoBattleControllerTests
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmEnemyName(turn.Id);
+        battle.ConfirmSelectionReady(turn.Id);
         Assert.IsTrue(battle.ObserveShiny(battle.BattleId));
         Assert.IsFalse(battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now));
         Assert.IsFalse(battle.CanAct(settings, Now.AddSeconds(10)));
@@ -120,7 +133,7 @@ public sealed class AutoBattleControllerTests
         battle.ResetBattle();
         var next = battle.BeginSkillSelection(settings, Now);
         Assert.AreNotEqual(oldTurn.Id, next.Id);
-        Assert.IsFalse(battle.ConfirmEnemyName(oldTurn.Id));
+        Assert.IsFalse(battle.ConfirmSelectionReady(oldTurn.Id));
         Assert.IsFalse(battle.RecordAction(oldTurn.Id, AutoBattleAction.Skill, Now));
         Assert.IsFalse(battle.ObserveShiny(oldBattle));
         battle.ObserveBloodline(oldBattle, EncounterBloodlineKind.Normal);
@@ -174,7 +187,7 @@ public sealed class AutoBattleControllerTests
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmEnemyName(turn.Id);
+        battle.ConfirmSelectionReady(turn.Id);
         battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now);
         settings.IsEnabled = false;
         Assert.IsFalse(battle.CanAct(settings, Now.AddSeconds(10)));

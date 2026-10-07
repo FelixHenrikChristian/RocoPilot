@@ -1,5 +1,5 @@
 <Page
-    x:Class="RocoPilot.Views.Windows.AutoBattleConfigPages.AutoBattleNormalConfigPage"
+    x:Class="RocoPilot.Views.Windows.AutoBattleConfigPages.AutoBattleReleaseConfigPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -36,8 +36,8 @@
                     <FontIcon Glyph="&#xE768;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="普通战斗" />
-                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="按顺序循环执行每个技能回合的动作。" />
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="{x:Bind BattleTypeName}" />
+                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="{x:Bind Description}" />
                 </StackPanel>
             </Grid>
 
@@ -84,7 +84,7 @@
                             <TextBlock
                                 VerticalAlignment="Center"
                                 Style="{StaticResource ConfigSummaryTextStyle}"
-                                Text="{x:Bind Editor.NormalReleaseSummary, Mode=OneWay}" />
+                                Text="{x:Bind ReleaseEditor.Summary, Mode=OneWay}" />
                             <StackPanel
                                 Grid.Column="1"
                                 Orientation="Horizontal"
@@ -123,7 +123,7 @@
                         </Grid>
 
                         <Grid MinHeight="64">
-                            <GridView ItemsSource="{x:Bind Editor.NormalReleaseItems, Mode=OneWay}"
+                            <GridView ItemsSource="{x:Bind ReleaseEditor.Items, Mode=OneWay}"
                                       SelectionMode="None" IsSwipeEnabled="False"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -186,7 +186,7 @@
                             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="添加上方技能，或从下方插入公共序列"
-                                       Visibility="{x:Bind Editor.NormalReleaseEmptyVisibility, Mode=OneWay}" />
+                                       Visibility="{x:Bind ReleaseEditor.EmptyVisibility, Mode=OneWay}" />
                         </Grid>
                     </StackPanel>
                 </StackPanel>

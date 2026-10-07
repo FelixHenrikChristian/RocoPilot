@@ -62,7 +62,7 @@
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
                     <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="捕捉血脉" />
-                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="仅在「奇遇解除操作」选择捕捉时生效。" />
+                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="仅用于普通战斗，且「奇遇解除操作」选择捕捉时生效。" />
                 </StackPanel>
             </Grid>
 

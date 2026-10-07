@@ -31,18 +31,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     private string _spiritCatalogSummary = "图鉴数据待加载";
     private string _spiritCatalogSyncStatus = "可手动同步 wiki 图鉴";
     private bool _isAutoBattleEnabled;
-    private string _autoBattleRoundOrder = AutoBattleSettings.DefaultRoundOrder;
-    private string _autoBattleTurnSequence = AutoBattleSettings.DefaultTurnSequence;
-    private List<AutoBattleReleaseStep> _autoBattleReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
-    private List<AutoBattleTurnSequencePreset> _autoBattleTurnSequencePresets = [];
     private AutoBattleEncounterRelievedActionOption? _selectedAutoBattleEncounterRelievedActionOption;
-    private int _autoBattleSkillSelectionActionDelayMs = AutoBattleSettings.DefaultSkillSelectionActionDelayMs;
-    private int _autoBattleSkillSelectionRetryDelayMs = AutoBattleSettings.DefaultSkillSelectionRetryDelayMs;
-    private int _autoBattleKeyboardHoldDurationMs = AutoBattleSettings.DefaultKeyboardHoldDurationMs;
-    private int _autoBattleKeyboardIntervalMs = AutoBattleSettings.DefaultKeyboardIntervalMs;
-    private int _autoBattleCaptureKeyboardIntervalMs = AutoBattleSettings.DefaultCaptureKeyboardIntervalMs;
-    private BloodlineCaptureFilterSettings _bloodlineCaptureFilter =
-        BloodlineCaptureFilterSettings.CreateDefault();
 
     public IReadOnlyList<AutoBattleEncounterRelievedActionOption> AutoBattleEncounterRelievedActionOptions
     {
@@ -148,7 +137,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     }
 
     public string AutoBattleConfigurationSummary =>
-        "配置普通战斗的释放顺序，以及可复用的公共执行序列。";
+        "分别配置普通战斗与花种战斗的释放顺序，公共执行序列可复用。";
 
     public string AutoBattleOtherConfigurationSummary =>
         "包含高级时序选项；如无明确需求，建议保持默认设置。";
@@ -169,8 +158,6 @@ public partial class RealtimeViewModel : ObservableRecipient
 
     public string AutoBattleEncounterRelievedActionDescription =>
         SelectedAutoBattleEncounterRelievedActionOption?.Description ?? string.Empty;
-
-    public AutoBattleSettings AutoBattleSettings => BuildAutoBattleSettings();
 
     private AutoBattleEncounterRelievedAction SelectedAutoBattleEncounterRelievedAction =>
         SelectedAutoBattleEncounterRelievedActionOption?.Action ?? AutoBattleEncounterRelievedAction.RecoverEnergy;
@@ -379,60 +366,23 @@ public partial class RealtimeViewModel : ObservableRecipient
     private void ApplyAutoBattleSettings(AutoBattleSettings settings)
     {
         _isAutoBattleEnabled = settings.IsEnabled;
-        _autoBattleRoundOrder = settings.RoundOrder;
-        _autoBattleTurnSequence = settings.TurnSequence;
-        _autoBattleReleaseSequence = (settings.ReleaseSequence ?? []).Select(step => step.Clone()).ToList();
-        _autoBattleTurnSequencePresets = (settings.TurnSequencePresets ?? []).Select(preset => preset.Clone()).ToList();
         _selectedAutoBattleEncounterRelievedActionOption =
             FindAutoBattleEncounterRelievedActionOption(settings.EncounterRelievedAction);
-        _autoBattleSkillSelectionActionDelayMs = settings.SkillSelectionActionDelayMs;
-        _autoBattleSkillSelectionRetryDelayMs = settings.SkillSelectionRetryDelayMs;
-        _autoBattleKeyboardHoldDurationMs = settings.KeyboardHoldDurationMs;
-        _autoBattleKeyboardIntervalMs = settings.KeyboardIntervalMs;
-        _autoBattleCaptureKeyboardIntervalMs = settings.CaptureKeyboardIntervalMs;
-        _bloodlineCaptureFilter = (settings.BloodlineCaptureFilter
-            ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone();
 
         OnPropertyChanged(nameof(IsAutoBattleEnabled));
         OnPropertyChanged(nameof(SelectedAutoBattleEncounterRelievedActionOption));
         OnPropertyChanged(nameof(AutoBattleEncounterRelievedActionDescription));
-        OnPropertyChanged(nameof(AutoBattleSettings));
-    }
-
-    public void UpdateAutoBattleSettings(AutoBattleSettings settings)
-    {
-        ApplyAutoBattleSettings(settings.Clone());
-        SaveAutoBattleSettings();
     }
 
     private void SaveAutoBattleSettings()
     {
         if (CanPersistSettings)
         {
-            _runtimeTaskService.SetAutoBattleSettings(BuildAutoBattleSettings());
+            var settings = _runtimeTaskService.AutoBattleSettings;
+            settings.IsEnabled = IsAutoBattleEnabled;
+            settings.EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction;
+            _runtimeTaskService.SetAutoBattleSettings(settings);
         }
-
-        OnPropertyChanged(nameof(AutoBattleSettings));
-    }
-
-    private AutoBattleSettings BuildAutoBattleSettings()
-    {
-        return new AutoBattleSettings
-        {
-            IsEnabled = IsAutoBattleEnabled,
-            RoundOrder = _autoBattleRoundOrder,
-            TurnSequence = _autoBattleTurnSequence,
-            ReleaseSequence = _autoBattleReleaseSequence.Select(step => step.Clone()).ToList(),
-            TurnSequencePresets = _autoBattleTurnSequencePresets.Select(preset => preset.Clone()).ToList(),
-            EncounterRelievedAction = SelectedAutoBattleEncounterRelievedAction,
-            KeyboardInputMethod = _runtimeTaskService.AutoBattleSettings.KeyboardInputMethod,
-            SkillSelectionActionDelayMs = _autoBattleSkillSelectionActionDelayMs,
-            SkillSelectionRetryDelayMs = _autoBattleSkillSelectionRetryDelayMs,
-            KeyboardHoldDurationMs = _autoBattleKeyboardHoldDurationMs,
-            KeyboardIntervalMs = _autoBattleKeyboardIntervalMs,
-            CaptureKeyboardIntervalMs = _autoBattleCaptureKeyboardIntervalMs,
-            BloodlineCaptureFilter = _bloodlineCaptureFilter.Clone()
-        };
     }
 
     private AutoBattleEncounterRelievedActionOption FindAutoBattleEncounterRelievedActionOption(

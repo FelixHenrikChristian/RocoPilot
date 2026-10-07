@@ -28,7 +28,6 @@ public sealed partial class RuntimeTaskService
 
     public void SetAutoBattleSettings(AutoBattleSettings settings)
     {
-        var previousIsEnabled = _autoBattleSettings.IsEnabled;
         _autoBattleSettings = AutoBattleSettingsRules.Normalize(settings);
         if (CurrentState is { } state)
         {
@@ -42,10 +41,7 @@ public sealed partial class RuntimeTaskService
 
         UpdateInfoOverlayTaskIndicators();
         _ = SaveAutoBattleSettingsAsync(_autoBattleSettings);
-        if (previousIsEnabled != _autoBattleSettings.IsEnabled)
-        {
-            NotifySettingsChanged();
-        }
+        NotifySettingsChanged();
     }
 
     private async Task SaveAutoBattleSettingsAsync(AutoBattleSettings settings)
@@ -254,8 +250,8 @@ public sealed partial class RuntimeTaskService
         if (_isSuspended) return false;
         var turn = _battle.CurrentTurn;
         if (turn is null) return false;
-        if (turn.EnemyNameResolved) return true;
-        if (!_battle.IsEnemyNameRecognitionDue(settings, now)) return false;
+        if (turn.SelectionReady) return true;
+        if (!_battle.IsSelectionPreparationDue(settings, now)) return false;
 
         if (_autoBattleSkillSelectionEnemyNameTask is null
             || _autoBattleSkillSelectionEnemyNameTaskTurnId != turn.Id)
@@ -293,7 +289,7 @@ public sealed partial class RuntimeTaskService
         var season = _encounterSeasonConfigService.GetCurrentSeason();
         if (season is null)
         {
-            _battle.ConfirmEnemyName(turn.Id);
+            _battle.ConfirmSelectionReady(turn.Id);
             return true;
         }
 
@@ -301,7 +297,7 @@ public sealed partial class RuntimeTaskService
         {
             if (_encounterCaptureButtonStateTracker.HasSeenDisabled)
             {
-                _battle.ConfirmEnemyName(turn.Id);
+                _battle.ConfirmSelectionReady(turn.Id);
                 _logger.LogDebug(
                     "自动战斗：捕捉按钮处于禁用阶段，按奇遇第一形态继续普通战斗。EnemyNameRaw={EnemyNameRaw}",
                     FormatLogText(result.RawText));
@@ -318,7 +314,7 @@ public sealed partial class RuntimeTaskService
         }
 
         LogAutoBattleSkillSelectionEnemyNameResult(season, result);
-        if (_battle.ConfirmEnemyName(turn.Id))
+        if (_battle.ConfirmSelectionReady(turn.Id))
             RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(_battle.BattleId, turn.Id, result.MatchedName, DateTimeOffset.Now));
         return true;
     }

@@ -212,7 +212,7 @@
                             <TextBlock
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="仅在战斗中按配置执行操作；场景识别由启动任务统一进行。"
+                                Text="用于普通战斗；花种挑战由任务页启动并自动执行战斗。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
 

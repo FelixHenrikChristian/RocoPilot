@@ -4,29 +4,28 @@ using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Runtime;
-using RocoPilot.ViewModels;
 
 namespace RocoPilot.Views.Windows;
 
 public sealed partial class AutoBattleOtherConfigWindow : WindowEx
 {
-    private readonly RealtimeViewModel _viewModel;
+    private readonly IRuntimeTaskService _runtime;
     private readonly IThemeSelectorService _themeSelectorService;
 
-    public AutoBattleOtherConfigWindow(RealtimeViewModel viewModel)
+    public AutoBattleOtherConfigWindow(IRuntimeTaskService runtime)
     {
-        _viewModel = viewModel;
+        _runtime = runtime;
         _themeSelectorService = App.GetService<IThemeSelectorService>();
 
         InitializeComponent();
 
         ContentRoot.RequestedTheme = _themeSelectorService.Theme;
-        Title = "自动战斗其他配置";
+        Title = "战斗其他配置";
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
 
-        LoadSettings(_viewModel.AutoBattleSettings);
+        LoadSettings(_runtime.AutoBattleSettings);
     }
 
     private void LoadSettings(AutoBattleSettings settings)
@@ -59,13 +58,13 @@ public sealed partial class AutoBattleOtherConfigWindow : WindowEx
             return;
         }
 
-        var settings = _viewModel.AutoBattleSettings.Clone();
+        var settings = _runtime.AutoBattleSettings;
         settings.SkillSelectionActionDelayMs = actionDelayMs;
         settings.SkillSelectionRetryDelayMs = retryDelayMs;
         settings.KeyboardHoldDurationMs = holdDurationMs;
         settings.KeyboardIntervalMs = keyboardIntervalMs;
         settings.CaptureKeyboardIntervalMs = captureIntervalMs;
-        _viewModel.UpdateAutoBattleSettings(settings);
+        _runtime.SetAutoBattleSettings(settings);
         Close();
     }
 

@@ -46,6 +46,9 @@ public sealed class AutoBattleSettings
     } = CreateDefaultReleaseSequence();
 
     [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<AutoBattleReleaseStep> FlowerSeedReleaseSequence { get; set; } = CreateDefaultReleaseSequence();
+
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<AutoBattleTurnSequencePreset> TurnSequencePresets
     {
         get;
@@ -111,6 +114,7 @@ public sealed class AutoBattleSettings
             RoundOrder = DefaultRoundOrder,
             TurnSequence = DefaultTurnSequence,
             ReleaseSequence = CreateDefaultReleaseSequence(),
+            FlowerSeedReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
             KeyboardInputMethod = KeyboardInputMethod.PostMessage,
@@ -143,6 +147,7 @@ public sealed class AutoBattleSettings
             RoundOrder = RoundOrder,
             TurnSequence = TurnSequence,
             ReleaseSequence = (ReleaseSequence ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList(),
+            FlowerSeedReleaseSequence = (FlowerSeedReleaseSequence ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).OfType<AutoBattleTurnSequencePreset>().Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = EncounterRelievedAction,
             KeyboardInputMethod = KeyboardInputMethod,

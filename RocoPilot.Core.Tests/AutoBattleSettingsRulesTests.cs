@@ -123,4 +123,39 @@ public sealed class AutoBattleSettingsRulesTests
         Assert.AreEqual("Space, 4, X", AutoBattleSettingsRules.BuildReleaseSequence(settings, AutoBattleReleaseStep.CreateSkill("4")));
         Assert.AreEqual("1, 2", AutoBattleSettingsRules.BuildReleaseSequence(settings, AutoBattleReleaseStep.CreateCustom("组合", "1, 2")));
     }
+
+    [TestMethod]
+    public void FlowerSeedSequenceDefaultsIndependentlyOfLegacyNormalOrder()
+    {
+        var legacy = JsonConvert.DeserializeObject<AutoBattleSettings>("{\"RoundOrder\":\"4\"}")!;
+        var normalized = AutoBattleSettingsRules.Normalize(legacy);
+        Assert.AreEqual("4", normalized.ReleaseSequence.Single().SkillKey);
+        CollectionAssert.AreEqual(new[] { "1", "2", "3", "4", "X" },
+            normalized.FlowerSeedReleaseSequence.Select(step => step.SkillKey).ToArray());
+
+        normalized.FlowerSeedReleaseSequence[0].SkillKey = "3";
+        Assert.AreEqual("1", legacy.FlowerSeedReleaseSequence[0].SkillKey);
+    }
+
+    [TestMethod]
+    public void FlowerSeedSequenceSurvivesSerializationAndResolvesSharedPreset()
+    {
+        var preset = new AutoBattleTurnSequencePreset { Name = "连招", Sequence = "1, Space" };
+        var source = new AutoBattleSettings
+        {
+            TurnSequencePresets = [preset],
+            ReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")],
+            FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateCustom(preset.Name, preset.Sequence, preset.Id)]
+        };
+        var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(source))!;
+        Assert.AreEqual(1, reloaded.FlowerSeedReleaseSequence.Count);
+        reloaded.TurnSequencePresets[0].Name = "新连招";
+        reloaded.TurnSequencePresets[0].Sequence = "3, X";
+        var normalized = AutoBattleSettingsRules.Normalize(reloaded);
+        Assert.AreEqual("4", normalized.ReleaseSequence.Single().SkillKey);
+        Assert.AreEqual("新连招", normalized.FlowerSeedReleaseSequence.Single().Name);
+        Assert.AreEqual("3, X", AutoBattleSettingsRules.BuildReleaseSequence(normalized, normalized.FlowerSeedReleaseSequence[0]));
+        Assert.AreEqual("1, Space", source.FlowerSeedReleaseSequence[0].Sequence);
+        Assert.AreEqual(JsonConvert.SerializeObject(normalized), JsonConvert.SerializeObject(AutoBattleSettingsRules.Normalize(normalized)));
+    }
 }

@@ -46,9 +46,9 @@
                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="自动战斗高级选项" />
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="战斗高级选项" />
                     <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               Text="调整识别等待与按键节奏，建议保留默认值。" TextWrapping="Wrap" />
+                               Text="普通与花种战斗共用的识别等待与按键节奏，建议保留默认值。" TextWrapping="Wrap" />
                 </StackPanel>
             </Grid>
 
@@ -227,7 +227,7 @@
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="捕捉序列按键间隔" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="奇遇解除后，W、1、Space 之间的等待" />
+                                        Text="捕捉操作中相邻按键的等待" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"

@@ -3,43 +3,58 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.Contracts.Services;
-using RocoPilot.ViewModels;
+using RocoPilot.Helpers;
 using RocoPilot.Views.Windows.AutoBattleConfigPages;
 
 namespace RocoPilot.Views.Windows;
 
 public sealed partial class AutoBattleConfigWindow : WindowEx
 {
-    private readonly RealtimeViewModel _viewModel;
+    private static AutoBattleConfigWindow? _currentWindow;
+    private readonly IRuntimeTaskService _runtime;
     private readonly AutoBattleConfigEditor _editor;
     private readonly IReadOnlyDictionary<AutoBattleConfigSection, Page> _pages;
 
-    public AutoBattleConfigWindow(RealtimeViewModel viewModel)
+    internal static async Task ShowAsync(AutoBattleConfigSection section)
     {
-        _viewModel = viewModel;
+        var runtime = App.GetService<IRuntimeTaskService>();
+        await runtime.LoadSettingsAsync();
+        if (_currentWindow is null)
+        {
+            _currentWindow = new AutoBattleConfigWindow(runtime);
+            _currentWindow.Closed += (_, _) => _currentWindow = null;
+            WindowPlacementHelper.SetOwner(_currentWindow, App.MainWindow);
+            WindowPlacementHelper.CenterOnParent(_currentWindow, App.MainWindow);
+        }
+
+        _currentWindow.NavigateTo(section);
+        _currentWindow.Activate();
+    }
+
+    private AutoBattleConfigWindow(IRuntimeTaskService runtime)
+    {
+        _runtime = runtime;
 
         InitializeComponent();
 
         var themeSelectorService = App.GetService<IThemeSelectorService>();
         ContentRoot.RequestedTheme = themeSelectorService.Theme;
 
-        Title = "自动战斗配置";
+        Title = "战斗配置";
         AppWindow.Title = Title;
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets/WindowIcon.ico"));
         AppWindow.TitleBar.PreferredTheme = TitleBarTheme.UseDefaultAppMode;
 
         _editor = new AutoBattleConfigEditor(
-            _viewModel.AutoBattleSettings,
+            _runtime.AutoBattleSettings,
             App.GetService<IKeyboardInputService>());
         _pages = new Dictionary<AutoBattleConfigSection, Page>
         {
-            [AutoBattleConfigSection.Normal] = new AutoBattleNormalConfigPage(_editor, this),
+            [AutoBattleConfigSection.Normal] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.Normal),
+            [AutoBattleConfigSection.FlowerSeed] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.FlowerSeed),
             [AutoBattleConfigSection.SharedSequences] = new AutoBattleSharedSequencesPage(_editor),
             [AutoBattleConfigSection.BloodlineCapture] = new AutoBattleBloodlineCaptureConfigPage(_editor)
         };
-
-        BattleNavigationView.SelectedItem = SharedSequencesNavigationItem;
-        NavigateTo(AutoBattleConfigSection.SharedSequences);
     }
 
     internal void ShowMessage(
@@ -75,6 +90,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         BattleNavigationView.SelectedItem = section switch
         {
             AutoBattleConfigSection.Normal => NormalBattleNavigationItem,
+            AutoBattleConfigSection.FlowerSeed => FlowerSeedBattleNavigationItem,
             AutoBattleConfigSection.SharedSequences => SharedSequencesNavigationItem,
             AutoBattleConfigSection.BloodlineCapture => BloodlineCaptureNavigationItem,
             _ => NormalBattleNavigationItem
@@ -89,7 +105,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
         if (!_editor.TryBuildSettings(
-                _viewModel.AutoBattleSettings,
+                _runtime.AutoBattleSettings,
                 out var settings,
                 out var error))
         {
@@ -98,7 +114,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
             return;
         }
 
-        _viewModel.UpdateAutoBattleSettings(settings);
+        _runtime.SetAutoBattleSettings(settings);
         Close();
     }
 }

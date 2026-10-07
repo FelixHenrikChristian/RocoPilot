@@ -18,10 +18,9 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private readonly IKeyboardInputService _keyboardInputService;
     private readonly HashSet<AutoBattlePresetEditorItem> _observedPresets = [];
 
-    public ObservableCollection<AutoBattleReleaseEditorItem> NormalReleaseItems
-    {
-        get;
-    } = [];
+    public AutoBattleReleaseSequenceEditor NormalRelease { get; } = new();
+
+    public AutoBattleReleaseSequenceEditor FlowerSeedRelease { get; } = new();
 
     public ObservableCollection<AutoBattlePresetEditorItem> SharedPresetItems
     {
@@ -151,15 +150,9 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         }
     }
 
-    public Visibility NormalReleaseEmptyVisibility => NormalReleaseItems.Count == 0
-        ? Visibility.Visible
-        : Visibility.Collapsed;
-
     public Visibility SharedPresetEmptyVisibility => SharedPresetItems.Count == 0
         ? Visibility.Visible
         : Visibility.Collapsed;
-
-    public string NormalReleaseSummary => BuildReleaseSummary(NormalReleaseItems);
 
     public Visibility SharedPresetListVisibility => SharedPresetItems.Count > 0
         ? Visibility.Visible
@@ -175,35 +168,10 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     {
         _keyboardInputService = keyboardInputService;
 
-        NormalReleaseItems.CollectionChanged += NormalReleaseItems_CollectionChanged;
         SharedPresetItems.CollectionChanged += SharedPresetItems_CollectionChanged;
 
         LoadSettings(AutoBattleSettingsRules.Normalize(settings));
     }
-
-    public void AppendNormalSkill(string? skillKey)
-    {
-        if (AutoBattleSettingsRules.NormalizeSkillKey(skillKey) is { } normalizedSkillKey)
-        {
-            NormalReleaseItems.Add(AutoBattleReleaseEditorItem.CreateSkill(normalizedSkillKey));
-        }
-    }
-
-    public void ClearNormalReleaseSequence()
-    {
-        NormalReleaseItems.Clear();
-    }
-
-    public void RemoveNormalReleaseItem(AutoBattleReleaseEditorItem item)
-    {
-        NormalReleaseItems.Remove(item);
-    }
-
-    public void MoveNormalReleaseItemEarlier(AutoBattleReleaseEditorItem item)
-        => MoveItemEarlier(NormalReleaseItems, item);
-
-    public void MoveNormalReleaseItemLater(AutoBattleReleaseEditorItem item)
-        => MoveItemLater(NormalReleaseItems, item);
 
     public void AddSharedPreset()
     {
@@ -219,8 +187,9 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         SharedPresetItems.Remove(preset);
     }
 
-    public bool TryInsertSharedPresetIntoNormal(
+    public bool TryInsertSharedPreset(
         AutoBattlePresetEditorItem preset,
+        AutoBattleReleaseSequenceEditor releaseEditor,
         out AutoBattleConfigValidationError error)
     {
         if (!TryValidateNamedSequence(
@@ -233,7 +202,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             return false;
         }
 
-        NormalReleaseItems.Add(AutoBattleReleaseEditorItem.CreateCustom(
+        releaseEditor.Items.Add(AutoBattleReleaseEditorItem.CreateCustom(
             preset.Name.Trim(),
             preset.Sequence.Trim(),
             preset.Id));
@@ -248,10 +217,20 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         settings = source.Clone();
 
         if (!TryBuildReleaseSequence(
-                NormalReleaseItems,
+                NormalRelease.Items,
                 "普通战斗",
                 AutoBattleConfigSection.Normal,
                 out var releaseSequence,
+                out error))
+        {
+            return false;
+        }
+
+        if (!TryBuildReleaseSequence(
+                FlowerSeedRelease.Items,
+                "花种战斗",
+                AutoBattleConfigSection.FlowerSeed,
+                out var flowerSeedReleaseSequence,
                 out error))
         {
             return false;
@@ -288,6 +267,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         settings.RoundOrder = BuildRoundOrder(releaseSequence);
         settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         settings.ReleaseSequence = releaseSequence;
+        settings.FlowerSeedReleaseSequence = flowerSeedReleaseSequence;
         settings.TurnSequencePresets = presets;
         settings.BloodlineCaptureFilter = new BloodlineCaptureFilterSettings
         {
@@ -304,12 +284,14 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     private void LoadSettings(AutoBattleSettings settings)
     {
-        var releaseSequence = settings.ReleaseSequence is { Count: > 0 }
-            ? settings.ReleaseSequence
-            : AutoBattleSettings.CreateDefaultReleaseSequence();
-        foreach (var step in releaseSequence)
+        foreach (var step in settings.ReleaseSequence)
         {
-            NormalReleaseItems.Add(CreateReleaseEditorItem(step, settings.TurnSequence));
+            NormalRelease.Items.Add(CreateReleaseEditorItem(step, settings.TurnSequence));
+        }
+
+        foreach (var step in settings.FlowerSeedReleaseSequence)
+        {
+            FlowerSeedRelease.Items.Add(CreateReleaseEditorItem(step, AutoBattleSettings.DefaultTurnSequence));
         }
 
         foreach (var preset in settings.TurnSequencePresets ?? [])
@@ -320,12 +302,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
                 Name = preset.Name,
                 Sequence = preset.Sequence
             });
-        }
-
-        RefreshReleaseIndexes(NormalReleaseItems);
-        foreach (var item in NormalReleaseItems)
-        {
-            item.UpdateMoveAvailability(NormalReleaseItems.Count);
         }
 
         var bloodlineFilter = settings.BloodlineCaptureFilter
@@ -432,17 +408,6 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         return true;
     }
 
-    private void NormalReleaseItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
-    {
-        RefreshReleaseIndexes(NormalReleaseItems);
-        foreach (var item in NormalReleaseItems)
-        {
-            item.UpdateMoveAvailability(NormalReleaseItems.Count);
-        }
-        OnPropertyChanged(nameof(NormalReleaseEmptyVisibility));
-        OnPropertyChanged(nameof(NormalReleaseSummary));
-    }
-
     private void SharedPresetItems_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         foreach (var removed in _observedPresets.Where(preset => !SharedPresetItems.Contains(preset)).ToArray())
@@ -471,59 +436,8 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             return;
         }
 
-        foreach (var item in NormalReleaseItems.Where(item => item.PresetId == preset.Id))
-        {
-            item.UpdatePresetValues(preset.Name, preset.Sequence);
-        }
-
-        OnPropertyChanged(nameof(NormalReleaseSummary));
-    }
-
-    private static void MoveItemEarlier(
-        ObservableCollection<AutoBattleReleaseEditorItem> items,
-        AutoBattleReleaseEditorItem item)
-    {
-        var index = items.IndexOf(item);
-        if (index > 0)
-        {
-            items.Move(index, index - 1);
-        }
-    }
-
-    private static void MoveItemLater(
-        ObservableCollection<AutoBattleReleaseEditorItem> items,
-        AutoBattleReleaseEditorItem item)
-    {
-        var index = items.IndexOf(item);
-        if (index >= 0 && index < items.Count - 1)
-        {
-            items.Move(index, index + 1);
-        }
-    }
-
-    private static void RefreshReleaseIndexes(
-        IReadOnlyList<AutoBattleReleaseEditorItem> releaseItems)
-    {
-        for (var index = 0; index < releaseItems.Count; index++)
-        {
-            releaseItems[index].Position = index + 1;
-        }
-    }
-
-    private static string BuildReleaseSummary(
-        IReadOnlyCollection<AutoBattleReleaseEditorItem> releaseItems,
-        string emptyText = "未配置释放顺序")
-    {
-        if (releaseItems.Count == 0)
-        {
-            return emptyText;
-        }
-
-        var preview = string.Join(" → ", releaseItems.Take(8).Select(item => item.DisplayText));
-        var suffix = releaseItems.Count > 8
-            ? $"等 {releaseItems.Count} 步"
-            : $"{releaseItems.Count} 步";
-        return $"{preview} · {suffix}";
+        NormalRelease.UpdatePreset(preset);
+        FlowerSeedRelease.UpdatePreset(preset);
     }
 
     private static AutoBattleReleaseEditorItem CreateReleaseEditorItem(
@@ -565,9 +479,69 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
 }
 
+internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
+{
+    public ObservableCollection<AutoBattleReleaseEditorItem> Items { get; } = [];
+
+    public Visibility EmptyVisibility => Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public string Summary => Items.Count == 0
+        ? "未配置释放顺序"
+        : $"{string.Join(" → ", Items.Take(8).Select(item => item.DisplayText))} · "
+            + (Items.Count > 8 ? $"等 {Items.Count} 步" : $"{Items.Count} 步");
+
+    public AutoBattleReleaseSequenceEditor()
+    {
+        Items.CollectionChanged += Items_CollectionChanged;
+    }
+
+    public void AppendSkill(string? skillKey)
+    {
+        if (AutoBattleSettingsRules.NormalizeSkillKey(skillKey) is { } key)
+        {
+            Items.Add(AutoBattleReleaseEditorItem.CreateSkill(key));
+        }
+    }
+
+    public void MoveEarlier(AutoBattleReleaseEditorItem item)
+    {
+        var index = Items.IndexOf(item);
+        if (index > 0) Items.Move(index, index - 1);
+    }
+
+    public void MoveLater(AutoBattleReleaseEditorItem item)
+    {
+        var index = Items.IndexOf(item);
+        if (index >= 0 && index < Items.Count - 1) Items.Move(index, index + 1);
+    }
+
+    public void UpdatePreset(AutoBattlePresetEditorItem preset)
+    {
+        foreach (var item in Items.Where(item => item.PresetId == preset.Id))
+        {
+            item.UpdatePresetValues(preset.Name, preset.Sequence);
+        }
+
+        OnPropertyChanged(nameof(Summary));
+    }
+
+    private void Items_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        for (var index = 0; index < Items.Count; index++)
+        {
+            Items[index].Position = index + 1;
+            Items[index].UpdateMoveAvailability(Items.Count);
+        }
+
+        OnPropertyChanged(nameof(EmptyVisibility));
+        OnPropertyChanged(nameof(Summary));
+    }
+}
+
 internal enum AutoBattleConfigSection
 {
     Normal,
+    FlowerSeed,
     SharedSequences,
     BloodlineCapture
 }

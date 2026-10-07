@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Collections.Specialized;
+using System.Xml.Linq;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -64,7 +66,61 @@ public sealed class IndependentTaskServiceTests
         await WaitStoppedAsync(fixture.Service);
 
         Assert.AreEqual(new FlowerSeedOption(1, "电球羊羊"), fixture.Runner.Target);
+        Assert.AreEqual(6, fixture.Runner.RunCount);
+        Assert.AreEqual(("花种挑战完成，成功 6 次", "已退出并返回大世界"), fixture.Runtime.Results.Single());
+        Assert.AreEqual(0, fixture.Notifications.Payloads.Count);
         Assert.AreEqual(1, fixture.Runtime.Resumes);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task FailedChallengeReportsResultNotifiesAndResumesRuntime(bool notificationAccepted)
+    {
+        var fixture = new Fixture();
+        fixture.Runner.Failure = "连续 3 次失败：<友爱星飞> & 等待检查";
+        fixture.Notifications.ShowSucceeds = notificationAccepted;
+        await fixture.Service.LoadSettingsAsync();
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.FlowerSeedChallenge)).Success);
+
+        await WaitStoppedAsync(fixture.Service);
+
+        Assert.AreEqual(("花种挑战已停止", fixture.Runner.Failure), fixture.Runtime.Results.Single());
+        var toast = XDocument.Parse(fixture.Notifications.Payloads.Single());
+        CollectionAssert.AreEqual(new[] { "花种挑战已停止", fixture.Runner.Failure },
+            toast.Descendants("text").Select(element => element.Value).ToArray());
+        Assert.IsTrue(fixture.Runtime.Progress.Any(item => item.Name == "花种挑战"
+            && item.Progress?.Stage == "任务失败" && item.Progress.Operation == fixture.Runner.Failure));
+        Assert.AreEqual(1, fixture.Runtime.Resumes);
+        Assert.IsFalse(fixture.Runtime.IsSuspended);
+        Assert.IsFalse(fixture.Service.IsRunning);
+        Assert.IsNull(fixture.Runtime.LastTaskName);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task CancelledChallengeDoesNotNotifyOrReportCompletionAndResumesRuntime(bool cancelWhileDraining)
+    {
+        var fixture = new Fixture(blockDrain: cancelWhileDraining);
+        fixture.Runner.Hold = true;
+        await fixture.Service.LoadSettingsAsync();
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.FlowerSeedChallenge)).Success);
+        if (cancelWhileDraining)
+            await fixture.Runtime.DrainStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        else
+            await fixture.Runner.ChallengeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await fixture.Service.StopAsync();
+
+        Assert.AreEqual(0, fixture.Notifications.Payloads.Count);
+        Assert.AreEqual(0, fixture.Runtime.Results.Count);
+        Assert.IsFalse(fixture.Runtime.Progress.Any(item => item.Progress?.Stage == "任务失败"));
+        Assert.AreEqual(1, fixture.Runtime.Resumes);
+        Assert.IsFalse(fixture.Runtime.IsSuspended);
+        Assert.IsFalse(fixture.Service.IsRunning);
+        Assert.IsNull(fixture.Runtime.LastTaskName);
+        Assert.AreEqual(!cancelWhileDraining, fixture.Runner.ChallengeStarted.Task.IsCompleted);
     }
 
     [TestMethod]
@@ -185,7 +241,7 @@ public sealed class IndependentTaskServiceTests
     }
 
     [TestMethod]
-    public async Task ChallengeKeepsTheSelectedDuplicateNumberFromStartupAfterRuntimeDrains()
+    public async Task ChallengeKeepsStartupTargetRunCountAndCurrentBattleSettingsWhileRuntimeDrains()
     {
         var fixture = new Fixture(blockDrain: true);
         fixture.Runner.Hold = true;
@@ -193,21 +249,37 @@ public sealed class IndependentTaskServiceTests
         fixture.Service.SetSettings(new()
         {
             FlowerSeedOptions = [new(1, "小皮球"), new(2, "小皮球")],
-            FlowerSeedTargetNumber = 2
+            FlowerSeedTargetNumber = 2,
+            FlowerSeedRunCount = 4
         });
+        fixture.Runtime.BattleSettings.ReleaseSequence = [AutoBattleReleaseStep.CreateSkill("2")];
+        fixture.Runtime.BattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        fixture.Runtime.BattleSettings.KeyboardHoldDurationMs = 250;
         try
         {
             Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.FlowerSeedChallenge)).Success);
             await fixture.Runtime.DrainStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             var settings = fixture.Service.Settings;
             settings.FlowerSeedTargetNumber = 1;
+            settings.FlowerSeedRunCount = 9;
             fixture.Service.SetSettings(settings);
+            fixture.Runtime.BattleSettings.ReleaseSequence[0].SkillKey = "1";
+            fixture.Runtime.BattleSettings.FlowerSeedReleaseSequence[0].SkillKey = "3";
+            fixture.Runtime.BattleSettings.KeyboardHoldDurationMs = 500;
+            fixture.Runtime.BattleSettings.IsEnabled = true;
             Assert.IsFalse(fixture.Runner.ChallengeStarted.Task.IsCompleted);
 
             fixture.Runtime.DrainRelease.TrySetResult();
             await fixture.Runner.ChallengeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
             Assert.AreEqual(new FlowerSeedOption(2, "小皮球"), fixture.Runner.Target);
-            Assert.IsTrue(fixture.Runtime.Progress.Any(item => item.Name == "稀兽花种挑战"
+            Assert.AreEqual(4, fixture.Runner.RunCount);
+            Assert.IsNotNull(fixture.Runner.BattleSettings);
+            Assert.AreEqual("2", fixture.Runner.BattleSettings.ReleaseSequence.Single().SkillKey);
+            Assert.AreEqual("4", fixture.Runner.BattleSettings.FlowerSeedReleaseSequence.Single().SkillKey);
+            Assert.AreEqual(250, fixture.Runner.BattleSettings.KeyboardHoldDurationMs);
+            Assert.IsFalse(fixture.Runner.BattleSettings.IsEnabled);
+            Assert.AreNotSame(fixture.Runtime.CurrentState.Options.AutoBattleSettings, fixture.Runner.BattleSettings);
+            Assert.IsTrue(fixture.Runtime.Progress.Any(item => item.Name == "花种挑战"
                 && item.Progress?.Stage == "魔法师手册"));
         }
         finally
@@ -284,6 +356,7 @@ public sealed class IndependentTaskServiceTests
         public RuntimeStub Runtime { get; }
         public RunnerStub Runner { get; }
         public ControlledSettingsStore Store { get; } = new();
+        public NotificationStub Notifications { get; } = new();
         public IndependentTaskService Service { get; }
 
         public Fixture(bool blockDrain = false, bool suspended = false)
@@ -295,7 +368,7 @@ public sealed class IndependentTaskServiceTests
                 FlowerSeedOptions = [new(1, "友爱星飞"), new(2, "旧花种")],
                 FlowerSeedTargetNumber = 1
             });
-            Service = new(Runtime, Store, Runner, NullLogger<IndependentTaskService>.Instance);
+            Service = new(Runtime, Store, Runner, Notifications, NullLogger<IndependentTaskService>.Instance);
         }
     }
 
@@ -303,6 +376,8 @@ public sealed class IndependentTaskServiceTests
     {
         public bool IsRunning => true;
         public bool IsSuspended { get; private set; }
+        public AutoBattleSettings BattleSettings { get; } = new();
+        public AutoBattleSettings AutoBattleSettings => BattleSettings.Clone();
         public RuntimeTaskState CurrentState { get; } = new(new CaptureTargetWindow { Hwnd = 1 },
             new RecognitionRegionConfig(), new RuntimeTaskStartOptions(), DateTimeOffset.Now);
         public int Suspends;
@@ -345,17 +420,23 @@ public sealed class IndependentTaskServiceTests
         public bool Hold;
         public string? Failure;
         public FlowerSeedOption? Target;
+        public int RunCount;
+        public AutoBattleSettings? BattleSettings;
         public TaskCompletionSource ScanStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ChallengeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target,
+            int runCount, AutoBattleSettings battleSettings,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
         {
             Assert.IsTrue(runtime.IsSuspended && runtime.Drained);
             Assert.AreSame(runtime.CurrentState, state);
             Target = target;
+            RunCount = runCount;
+            BattleSettings = battleSettings;
             progress(new("魔法师手册", "点击挑战页", "学院作业"));
             ChallengeStarted.TrySetResult();
+            if (Failure is not null) throw new InvalidOperationException(Failure);
             if (Hold) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
 
@@ -369,6 +450,20 @@ public sealed class IndependentTaskServiceTests
             if (Failure is not null) throw new InvalidOperationException(Failure);
             if (Hold) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             return Options;
+        }
+    }
+
+    private sealed class NotificationStub : IAppNotificationService
+    {
+        public ConcurrentQueue<string> Payloads { get; } = new();
+        public bool ShowSucceeds = true;
+        public void Initialize() { }
+        public void Unregister() { }
+        public NameValueCollection ParseArguments(string arguments) => new();
+        public bool Show(string payload)
+        {
+            Payloads.Enqueue(payload);
+            return ShowSucceeds;
         }
     }
 }

@@ -7,17 +7,18 @@ using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
+using RocoPilot.Services.RuntimeTasks;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum FlowerSeedScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle }
+internal enum FlowerSeedScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result }
 internal sealed record FlowerSeedRow(string Name, ImageMatchResult Button, string RawName = "")
 {
     public int Number { get; set; }
     public bool HasMatched { get; set; }
 }
 internal sealed record FlowerSeedScreen(FlowerSeedScene Scene, IReadOnlyList<FlowerSeedRow> Rows,
-    ImageMatchResult? Button = null, string Text = "");
+    ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null);
 
 /// <summary>界面用全局默认模板算法定位，名称用默认 OCR 识别后复用当前图鉴匹配。</summary>
 public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
@@ -75,7 +76,28 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         var preparation = await Match("preparation", .3, .3, .65, .45);
         if (preparation is not null)
             return new(FlowerSeedScene.Preparation, [], await Match("start", .49, .75, .69, .9));
-        var prompt = await Match("interaction-f", .42, .24, .84, .9);
+        var medal = await Match("medal-confirmation", .32, .48, .68, .61);
+        if (medal is not null)
+            return new(FlowerSeedScene.MedalConfirmation, [], await Match("start", .49, .75, .69, .9));
+        var retry = await Match("result-retry", .49, .88, .65, .98);
+        if (retry is not null)
+        {
+            var exit = await Match("result-exit", .35, .88, .49, .98);
+            if (exit is not null) return new(FlowerSeedScene.Result, [], retry, ExitButton: exit);
+        }
+        var rewards = await Match("rewards", .08, .35, .25, .52);
+        if (rewards is not null)
+            return new(FlowerSeedScene.Rewards, [], new ImageMatchResult(true, rewards.Score,
+                clientX + (int)Math.Round(width * .5), clientY + (int)Math.Round(height * .9), 1, 1, "flower-rewards-dismiss"));
+        var exclusive = await Match("capture-exclusive", .08, .2, .23, .4);
+        if (exclusive is not null)
+        {
+            var capture = await Match("capture-button", .88, .84, 1, 1);
+            if (capture is not null) return new(FlowerSeedScene.Capture, [], capture);
+        }
+        // 交互菜单必须同时具有大世界 HUD，结束动画中的浅色图形不能判为挑战失败。
+        var world = await images.MatchAsync(frame, Area(.08, .02, .2, .09), "2048x1152/magic-point.png", options, cancellationToken);
+        var prompt = world.IsMatch ? await Match("interaction-f", .42, .24, .84, .9) : null;
         if (prompt is not null)
         {
             var line = new RecognitionRegion
@@ -89,16 +111,21 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             {
                 var text = await ocr.RecognizeAsync(frame, line, TextRecognitionDefaults.Method, cancellationToken);
                 reportOcr?.Invoke(line, string.IsNullOrWhiteSpace(text.Text) ? "OCR：无文本" : $"OCR：{text.Text}");
-                return new(FlowerSeedScene.Interaction, [], Text: Normalize(text.Text));
+                return new(FlowerSeedScene.Interaction, [], world, Text: Normalize(text.Text));
             }
         }
         // 只采用游戏 HUD 与战斗按钮的正向匹配，未知画面不会由上一输入推断。
-        var world = await images.MatchAsync(frame, Area(.08, .02, .2, .09), "2048x1152/magic-point.png", options, cancellationToken);
-        if (world.IsMatch) return new(FlowerSeedScene.World, []);
-        foreach (var template in new[] { "battle-button-skill", "battle-button-change", "battle-chat" })
+        if (world.IsMatch) return new(FlowerSeedScene.World, [], world);
+        foreach (var (template, screen) in new[]
         {
-            var battle = await images.MatchAsync(frame, Area(.68, .62, 1, 1), "2048x1152/" + template + ".png", options, cancellationToken);
-            if (battle.IsMatch) return new(FlowerSeedScene.Battle, []);
+            ("battle-button-skill", BattleScreen.SkillSelection),
+            ("battle-button-change", BattleScreen.PetSwitching),
+            ("battle-chat", BattleScreen.Chat)
+        })
+        {
+            var region = screen == BattleScreen.Chat ? Area(.92, .62, 1, .75) : Area(.68, .62, 1, 1);
+            var battle = await images.MatchAsync(frame, region, "2048x1152/" + template + ".png", options, cancellationToken);
+            if (battle.IsMatch) return new(FlowerSeedScene.Battle, [], battle, BattleScreen: screen);
         }
         return new(FlowerSeedScene.Unknown, []);
 

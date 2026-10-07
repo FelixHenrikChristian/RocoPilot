@@ -14,6 +14,20 @@ public sealed class FlowerSeedFlowTests
             names.Select((name, index) => new FlowerSeedRow(name, Button with { Y = 200 + index * 230 })).ToArray());
 
     [TestMethod]
+    public void ScanWithZeroRunCountStillNavigatesAndCompletesTheList()
+    {
+        var flow = new FlowerSeedFlow(null, 0);
+        Assert.AreEqual(FlowerSeedAction.OpenManual, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
+        var top = Page("友爱星飞");
+        Assert.AreEqual(FlowerSeedAction.ScrollUp, flow.Next(top, 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.ScrollUp, ExecuteScroll(flow, top).Action);
+        Assert.AreEqual(FlowerSeedAction.ScrollDown, ExecuteScroll(flow, top).Action);
+        Assert.AreEqual(FlowerSeedAction.ScrollDown, ExecuteScroll(flow, top).Action);
+        Assert.AreEqual(FlowerSeedAction.Complete, ExecuteScroll(flow, top).Action);
+        Assert.HasCount(1, flow.Options);
+    }
+
+    [TestMethod]
     public void ScanUsesCanonicalNamesOnceAndRequiresExecutedScrollsToConfirmBothEdges()
     {
         var flow = new FlowerSeedFlow(null);
@@ -158,7 +172,7 @@ public sealed class FlowerSeedFlowTests
     }
 
     [TestMethod]
-    public void ChallengeOnlyApproachesAfterMatchingTheTargetMapAndOnlyFinishesOnMatchedBattle()
+    public void ChallengeOnlyApproachesAfterMatchingTheTargetMapAndStartsOnMatchedBattle()
     {
         var flow = new FlowerSeedFlow(new FlowerSeedOption(1, "友爱星飞"));
         Assert.AreEqual(FlowerSeedAction.OpenManual, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
@@ -175,7 +189,10 @@ public sealed class FlowerSeedFlowTests
         Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Preparation, [], Button), 1152).Action);
         Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
         Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Unknown, []), 1152).Action);
-        Assert.AreEqual(FlowerSeedAction.Complete, flow.Next(new(FlowerSeedScene.Battle, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Battle, flow.Next(new(FlowerSeedScene.Battle, []), 1152).Action);
+        Assert.IsTrue(flow.IsBattleActive);
+        Assert.AreEqual(1, flow.BattleNumber);
+        Assert.AreEqual(0, flow.CompletedCount);
     }
 
     [TestMethod]
@@ -188,7 +205,7 @@ public sealed class FlowerSeedFlowTests
     }
 
     [TestMethod]
-    public void MissingMatchedButtonsCannotIssueClicksOrAdvanceToBattleCompletion()
+    public void MissingMatchedButtonsCannotIssueClicksOrStartBattle()
     {
         var flow = new FlowerSeedFlow(new FlowerSeedOption(1, "友爱星飞"));
         Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Manual, []), 1152).Action);
@@ -312,6 +329,189 @@ public sealed class FlowerSeedFlowTests
                     _ => $"花种{index + 1}"
                 }, Button with { Y = 100 + index * 228 - offset - Button.Height / 2 }, index == 10 ? "电球羊羊" : ""))
                 .ToArray());
+    }
+
+    [TestMethod]
+    public void OptionalMedalStartAndUnknownAnimationsKeepTheCurrentChallenge()
+    {
+        var flow = ReadyChallenge();
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.MedalConfirmation, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.MedalConfirmation, [], Button), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Unknown, []), 1152).Action);
+        StartBattle(flow);
+        Assert.AreEqual(FlowerSeedAction.Battle, flow.Next(new(FlowerSeedScene.Battle, []), 1152).Action);
+        Assert.AreEqual(1, flow.BattleNumber);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Unknown, []), 1152).Action);
+        Assert.IsTrue(flow.IsBattleActive);
+        Assert.AreEqual(FlowerSeedAction.Capture, flow.Next(new(FlowerSeedScene.Capture, []), 1152).Action);
+        Assert.AreEqual(0, flow.CompletedCount);
+        Assert.AreEqual(0, flow.ConsecutiveFailures);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void CaptureTransitionsDoNotCountAsFailureOrBlockRewards(bool interactionVisible)
+    {
+        var flow = ReadyChallenge(2);
+        FailBattle(flow);
+        FailBattle(flow);
+        StartBattle(flow);
+        Assert.AreEqual(FlowerSeedAction.Capture, flow.Next(new(FlowerSeedScene.Capture, []), 1152).Action);
+        var transition = interactionVisible ? FlowerSeedScene.Interaction : FlowerSeedScene.World;
+        for (var i = 0; i < 3; i++)
+            Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(transition, [], Text: "挑战"), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Unknown, []), 1152).Action);
+        Assert.AreEqual(2, flow.ConsecutiveFailures);
+        Assert.AreEqual(0, flow.CompletedCount);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(transition, [], Text: "挑战"), 1152).Action);
+        var result = new FlowerSeedScreen(FlowerSeedScene.Result, [], Button, ExitButton: Button);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(result, 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(result, 1152).Action);
+        Assert.AreEqual(1, flow.CompletedCount);
+        Assert.AreEqual(0, flow.ConsecutiveFailures);
+        StartBattle(flow);
+        Assert.AreEqual(4, flow.BattleNumber);
+    }
+
+    [TestMethod]
+    public void DefaultChallengeRepeatsSixSuccessfulSettlementsThenExitsAndConfirmsWorld()
+    {
+        var flow = ReadyChallenge();
+        var exit = Button with { X = 777, TemplatePath = "exit" };
+        var result = new FlowerSeedScreen(FlowerSeedScene.Result, [], Button, ExitButton: exit);
+        for (var number = 1; number <= 6; number++)
+        {
+            StartBattle(flow);
+            Assert.AreEqual(number, flow.BattleNumber);
+            Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152).Action);
+            Assert.AreEqual(number - 1, flow.CompletedCount);
+            var decision = flow.Next(result, 1152);
+            Assert.AreEqual(FlowerSeedAction.Click, decision.Action);
+            Assert.AreSame(number == 6 ? exit : Button, decision.Button);
+            Assert.AreEqual(number, flow.CompletedCount);
+            Assert.IsFalse(flow.IsBattleActive);
+            for (var i = 0; i < 3; i++)
+            {
+                Assert.AreEqual(FlowerSeedAction.Click, flow.Next(result, 1152).Action);
+                Assert.AreEqual(number, flow.CompletedCount);
+            }
+            Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152).Action);
+        }
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Battle, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Unknown, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Complete, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Complete, flow.Next(new(FlowerSeedScene.Interaction, [], Text: "挑战"), 1152).Action);
+    }
+
+    [TestMethod]
+    public void ResultWithoutCurrentRewardsCannotCountOrIssueRetryAndMissingButtonsWait()
+    {
+        var flow = ReadyChallenge(1);
+        StartBattle(flow);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Result, [], Button, ExitButton: Button), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Rewards, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Result, [], Button, ExitButton: Button), 1152).Action);
+        Assert.AreEqual(0, flow.CompletedCount);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Result, [], Button), 1152).Action);
+        Assert.AreEqual(1, flow.CompletedCount);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Result, [], ExitButton: Button), 1152).Action);
+        Assert.AreEqual(1, flow.CompletedCount);
+    }
+
+    [TestMethod]
+    public void FailureRetriesAtTheCurrentFlowerAndRepeatedWorldFramesOnlyCountOnce()
+    {
+        var flow = ReadyChallenge();
+        StartBattle(flow);
+        Assert.AreEqual(FlowerSeedAction.Approach, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
+        for (var i = 0; i < 3; i++)
+            Assert.AreEqual(FlowerSeedAction.Approach, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
+        Assert.AreEqual(1, flow.ConsecutiveFailures);
+        Assert.AreEqual(0, flow.CompletedCount);
+        Assert.IsFalse(flow.IsBattleActive);
+        Assert.AreEqual(FlowerSeedAction.Interact, flow.Next(new(FlowerSeedScene.Interaction, [], Text: "挑战"), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Confirmation, [], Button), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Preparation, [], Button), 1152).Action);
+        StartBattle(flow);
+        Assert.AreEqual(2, flow.BattleNumber);
+        Assert.AreEqual(FlowerSeedAction.Interact, flow.Next(new(FlowerSeedScene.Interaction, [], Text: "挑战"), 1152).Action);
+        Assert.AreEqual(2, flow.ConsecutiveFailures);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ReturningToTheFlowerAfterSuccessfulResultDoesNotCountAsFailure(bool interactionVisible)
+    {
+        var flow = ReadyChallenge(2);
+        StartBattle(flow);
+        flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152);
+        flow.Next(new(FlowerSeedScene.Result, [], Button, ExitButton: Button), 1152);
+        var scene = interactionVisible ? FlowerSeedScene.Interaction : FlowerSeedScene.World;
+        Assert.AreEqual(interactionVisible ? FlowerSeedAction.Interact : FlowerSeedAction.Approach,
+            flow.Next(new(scene, [], Text: "挑战"), 1152).Action);
+        Assert.AreEqual(1, flow.CompletedCount);
+        Assert.AreEqual(0, flow.ConsecutiveFailures);
+    }
+
+    [TestMethod]
+    public void ThreeConsecutiveFailuresStopButSuccessfulSettlementClearsFailures()
+    {
+        var flow = ReadyChallenge(2);
+        FailBattle(flow);
+        FailBattle(flow);
+        Assert.AreEqual(2, flow.ConsecutiveFailures);
+        StartBattle(flow);
+        flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152);
+        flow.Next(new(FlowerSeedScene.Result, [], Button, ExitButton: Button), 1152);
+        Assert.AreEqual(0, flow.ConsecutiveFailures);
+        Assert.AreEqual(1, flow.CompletedCount);
+        FailBattle(flow);
+        FailBattle(flow);
+        StartBattle(flow);
+        var failure = Assert.ThrowsExactly<InvalidOperationException>(() =>
+            flow.Next(new(FlowerSeedScene.World, []), 1152));
+        StringAssert.Contains(failure.Message, "连续失败 3 次");
+        Assert.AreEqual(3, flow.ConsecutiveFailures);
+        Assert.AreEqual(1, flow.CompletedCount);
+    }
+
+    [TestMethod]
+    public void MissingStartButtonAndOutOfOrderCaptureCannotStartAChallenge()
+    {
+        var flow = ReadyChallenge(startPreparation: false);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Preparation, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Battle, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Capture, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Rewards, [], Button), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.None, flow.Next(new(FlowerSeedScene.Result, [], Button), 1152).Action);
+        Assert.AreEqual(0, flow.BattleNumber);
+        Assert.AreEqual(0, flow.CompletedCount);
+    }
+
+    private static FlowerSeedFlow ReadyChallenge(int runCount = 6, bool startPreparation = true)
+    {
+        var flow = new FlowerSeedFlow(new FlowerSeedOption(1, "友爱星飞"), runCount);
+        var top = Page("友爱星飞");
+        flow.Next(top, 1152);
+        ExecuteScroll(flow, top);
+        ExecuteScroll(flow, top);
+        flow.Next(new(FlowerSeedScene.Map, [], Button), 1152);
+        if (startPreparation) flow.Next(new(FlowerSeedScene.Preparation, [], Button), 1152);
+        return flow;
+    }
+
+    private static void StartBattle(FlowerSeedFlow flow)
+        => Assert.AreEqual(FlowerSeedAction.Battle, flow.Next(new(FlowerSeedScene.Battle, []), 1152).Action);
+
+    private static void FailBattle(FlowerSeedFlow flow)
+    {
+        StartBattle(flow);
+        Assert.AreEqual(FlowerSeedAction.Approach, flow.Next(new(FlowerSeedScene.World, []), 1152).Action);
+        Assert.AreEqual(FlowerSeedAction.Click, flow.Next(new(FlowerSeedScene.Preparation, [], Button), 1152).Action);
     }
 
     private static FlowerSeedDecision ExecuteScroll(FlowerSeedFlow flow, FlowerSeedScreen screen)

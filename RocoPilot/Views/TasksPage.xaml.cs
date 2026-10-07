@@ -2,6 +2,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 using RocoPilot.ViewModels;
+using RocoPilot.Views.Windows;
+using RocoPilot.Views.Windows.AutoBattleConfigPages;
 
 namespace RocoPilot.Views;
 
@@ -23,5 +25,10 @@ public sealed partial class TasksPage : Page
     {
         Loaded -= TasksPage_Loaded;
         await ViewModel.LoadAsync();
+    }
+
+    private async void ConfigureFlowerSeedBattleButton_Click(object sender, RoutedEventArgs e)
+    {
+        await AutoBattleConfigWindow.ShowAsync(AutoBattleConfigSection.FlowerSeed);
     }
 }

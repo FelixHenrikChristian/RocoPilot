@@ -11,6 +11,7 @@ using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.RuntimeTasks;
 
 namespace RocoPilot.Tests;
 
@@ -49,7 +50,9 @@ public sealed class FlowerSeedChallengeRunnerTests
         var mouse = new Mouse();
         var runner = CreateRunner(capture, images, keyboard, mouse);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(CreateState(), new FlowerSeedOption(1, "友爱星飞"), _ => { }, cancellation.Token));
+        var state = CreateState();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"),
+            6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(1, images.FramesRead);
         Assert.AreEqual(0, keyboard.Keys.Count);
@@ -66,7 +69,9 @@ public sealed class FlowerSeedChallengeRunnerTests
         var mouse = new Mouse();
         var runner = CreateRunner(capture, images, keyboard, mouse);
 
-        await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(CreateState(), new FlowerSeedOption(1, "友爱星飞"), _ => { }, cancellation.Token));
+        var state = CreateState();
+        await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"),
+            6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         CollectionAssert.AreEqual(new[] { "F3" }, keyboard.Keys.Select(key => key.Key).ToArray());
         Assert.AreEqual(175, keyboard.Keys[0].Options.HoldDurationMs);
@@ -86,8 +91,9 @@ public sealed class FlowerSeedChallengeRunnerTests
         var ocr = new InteractionOcr();
         var runner = CreateRunner(capture, new Images(), new Keyboard(), new Mouse(), overlay, ocr);
 
+        var state = CreateState(enabled, hasBorder: true);
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(
-            CreateState(enabled, hasBorder: true), new FlowerSeedOption(1, "友爱星飞"), _ => { }, cancellation.Token));
+            state, new FlowerSeedOption(1, "友爱星飞"), 6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(1, ocr.Calls);
         Assert.AreEqual(1, overlay.Hides);
@@ -169,7 +175,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         var runner = CreateRunner(capture, new Images(), new Keyboard(), new Mouse(), overlay, ocr);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(
-            state, new FlowerSeedOption(1, "友爱星飞"), _ => { }, cancellation.Token));
+            state, new FlowerSeedOption(1, "友爱星飞"), 6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(1, ocr.Calls);
         Assert.HasCount(0, overlay.Shown);
@@ -177,10 +183,158 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.AreEqual(1, overlay.Hides);
     }
 
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task ChallengeUsesDedicatedSkillsAndExclusiveCaptureThenRepeatsAndExits(bool medalConfirmation)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var capture = new ChallengeCapture(medalConfirmation);
+        var state = CreateState();
+        state.Options.AutoBattleSettings.IsEnabled = false;
+        state.Options.AutoBattleSettings.TurnSequence = "R, {skill}";
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence =
+            [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var overlay = new Overlay();
+        var runner = CreateRunner(capture, new Images(), keyboard, mouse, overlay,
+            new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        List<IndependentTaskProgress> updates = [];
+
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 2,
+            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+
+        CollectionAssert.AreEqual(new[] { "F", "4", "1, Space", "4", "1, Space" },
+            keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.IsFalse(state.Options.AutoBattleSettings.IsEnabled);
+        Assert.IsTrue(keyboard.Keys.All(key => key.Options.HoldDurationMs == 175
+            && key.Options.Method == KeyboardInputMethod.Interception));
+        Assert.IsTrue(keyboard.Keys.Where(key => key.Key == "1, Space")
+            .All(key => key.Options.IntervalMs == state.Options.AutoBattleSettings.CaptureKeyboardIntervalMs));
+        Assert.AreEqual(2, capture.BattlesStarted);
+        Assert.AreEqual(1, capture.Retries);
+        Assert.AreEqual(1, capture.Exits);
+        Assert.AreEqual(4, capture.AnimationFrames);
+        Assert.AreEqual(4, capture.CaptureTransitionFrames);
+        Assert.AreEqual(medalConfirmation ? 1 : 0, capture.MedalStarts);
+        Assert.IsTrue(updates.Any(update => update.Recognition.Contains("正在确认当前界面", StringComparison.Ordinal)));
+        Assert.IsTrue(updates.Any(update => update.Operation == "技能 4"));
+        Assert.IsTrue(updates.Any(update => update.Operation == "捕捉"));
+        Assert.IsTrue(updates.All(update => update.CreatureName == "友爱星飞"));
+        Assert.IsFalse(updates.Any(update => update.Operation.Contains('（') || update.Operation.Contains("已发送", StringComparison.Ordinal)));
+        Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
+        Assert.AreEqual(1, overlay.Hides);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task LosingForegroundPausesInputUntilTheUserReturnsToTheGame(bool duringRecognition)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var capture = new ChallengeCapture();
+        var state = CreateState();
+        state.Options.AutoBattleSettings.KeyboardInputMethod = KeyboardInputMethod.PostMessage;
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        var keyboard = new Keyboard();
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var foregroundLost = false;
+        keyboard.DuringSequence = sequence =>
+        {
+            capture.OnKey(sequence);
+            if (!duringRecognition && sequence == "4") keyboard.Foreground = false;
+        };
+        var runner = CreateRunner(capture, new Images(), keyboard, mouse,
+            ocr: new InteractionOcr
+            {
+                ReadText = frame =>
+                {
+                    if (frame.Pixels[0] != 3) return string.Empty;
+                    if (duringRecognition && !foregroundLost)
+                    {
+                        foregroundLost = true;
+                        keyboard.Foreground = false;
+                    }
+                    return "挑战";
+                }
+            });
+        Task? userReturn = null;
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, state.Options.AutoBattleSettings, update =>
+        {
+            if (update.Operation != "已暂停，等待切回游戏" || userReturn is not null) return;
+            Assert.AreEqual(duringRecognition ? 0 : 2, keyboard.Keys.Count);
+            userReturn = Task.Run(async () =>
+            {
+                var frames = capture.Frames;
+                var inputs = keyboard.Keys.Count;
+                var clicks = mouse.Clicks;
+                await Task.Delay(650);
+                Assert.AreEqual(frames, capture.Frames);
+                Assert.AreEqual(inputs, keyboard.Keys.Count);
+                Assert.AreEqual(clicks, mouse.Clicks);
+                keyboard.Foreground = true;
+            });
+        }, cancellation.Token);
+
+        Assert.IsNotNull(userReturn);
+        await userReturn;
+        CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.AreEqual(1, capture.Exits);
+    }
+
+    [TestMethod]
+    public async Task IntermittentUnrecognizedSkillFramesDoNotRestartTheActionDelay()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(6));
+        var capture = new ChallengeCapture();
+        var images = new Images { IntermittentSkills = true };
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
+        var runner = CreateRunner(capture, images, keyboard, new Mouse { DuringClick = capture.OnClick },
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
+            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+
+        CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.IsTrue(images.SkillFrames >= 4);
+        Assert.AreEqual(1, capture.Exits);
+    }
+
+    [TestMethod]
+    public async Task FailedChallengeRetriesWithFAtTheSameFlowerAndRestartsTheFirstSkill()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var capture = new ChallengeCapture(failFirstBattle: true);
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence =
+            [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var runner = CreateRunner(capture, new Images(), keyboard, mouse,
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        List<IndependentTaskProgress> updates = [];
+
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
+            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+
+        CollectionAssert.AreEqual(new[] { "F", "4", "F", "4", "1, Space" },
+            keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.AreEqual(1, capture.Teleports);
+        Assert.AreEqual(2, capture.BattlesStarted);
+        Assert.AreEqual(0, capture.Retries);
+        Assert.AreEqual(1, capture.Exits);
+        Assert.AreEqual(2, capture.CaptureTransitionFrames);
+        Assert.AreEqual("挑战完成，成功1次，已返回大世界", updates[^1].Operation);
+    }
+
     private static FlowerSeedChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
-        => new(capture, new Window(), keyboard, mouse,
+        => new(capture, keyboard, mouse,
             new FlowerSeedScreenRecognizer(images, ocr ?? new UnusedOcr(), null!, null!, NullLogger<FlowerSeedScreenRecognizer>.Instance),
+            new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
             overlay ?? new Overlay(),
             NullLogger<FlowerSeedChallengeRunner>.Instance);
 
@@ -238,21 +392,154 @@ public sealed class FlowerSeedChallengeRunnerTests
         public void Release(CaptureTargetWindow targetWindow, CaptureMethod method) { }
     }
 
+    // 每次截图都是新帧；捕捉后的过渡画面会短暂命中大世界与交互 HUD。
+    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false) : IScreenCaptureService
+    {
+        private byte _scene = 6;
+        private int _animationFramesLeft;
+        public int BattlesStarted;
+        public int Retries;
+        public int Exits;
+        public int Teleports;
+        public int MedalStarts;
+        public int AnimationFrames;
+        public int CaptureTransitionFrames;
+        public int Frames;
+
+        public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
+        {
+            Frames++;
+            var scene = _scene;
+            if (scene == 2)
+            {
+                AnimationFrames++;
+                if (--_animationFramesLeft == 0) _scene = 15;
+            }
+            else if (scene is 18 or 19)
+            {
+                CaptureTransitionFrames++;
+                _scene = scene == 18 ? (byte)19 : (byte)16;
+                scene = scene == 18 ? (byte)0 : (byte)3;
+            }
+            var pixels = new byte[96 * 54 * 4];
+            Array.Fill(pixels, (byte)245);
+            pixels[0] = scene;
+            return new(96, 54, pixels);
+        }
+
+        public void OnKey(string sequence)
+        {
+            switch ((_scene, sequence))
+            {
+                case (3, "F"):
+                    _scene = 9;
+                    break;
+                case (12, "4"):
+                    if (failFirstBattle && BattlesStarted == 1) _scene = 3;
+                    else
+                    {
+                        _scene = 2;
+                        _animationFramesLeft = 2;
+                    }
+                    break;
+                case (15, "1, Space"):
+                    _scene = 18;
+                    break;
+                default:
+                    Assert.Fail($"场景 {_scene} 收到未预期按键：{sequence}");
+                    break;
+            }
+        }
+
+        public void OnClick(int x, int y)
+        {
+            switch (_scene)
+            {
+                case 6:
+                    _scene = 8;
+                    break;
+                case 8:
+                    Teleports++;
+                    _scene = 3;
+                    break;
+                case 9:
+                    _scene = 10;
+                    break;
+                case 10 when medalConfirmation && BattlesStarted == 0:
+                    _scene = 11;
+                    break;
+                case 10:
+                    StartBattle();
+                    break;
+                case 11:
+                    MedalStarts++;
+                    StartBattle();
+                    break;
+                case 16:
+                    _scene = 17;
+                    break;
+                case 17 when x == 60:
+                    Retries++;
+                    StartBattle();
+                    break;
+                case 17 when x == 41:
+                    Exits++;
+                    _scene = 0;
+                    break;
+                default:
+                    Assert.Fail($"场景 {_scene} 收到未预期点击：({x}, {y})");
+                    break;
+            }
+        }
+
+        private void StartBattle()
+        {
+            BattlesStarted++;
+            _scene = 12;
+        }
+
+        public void Release(CaptureTargetWindow targetWindow, CaptureMethod method) { }
+    }
+
     private sealed class Images : IImageMatchingService
     {
         public int FramesRead;
+        public bool IntermittentSkills;
+        public int SkillFrames;
         public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
         public string TemplateDirectory => "";
         public IReadOnlyList<string> ListTemplatePaths() => [];
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
         {
-            if (templatePath.EndsWith("/flower-tab.png", StringComparison.Ordinal)) FramesRead++;
+            if (templatePath.EndsWith("/flower-tab.png", StringComparison.Ordinal))
+            {
+                FramesRead++;
+                if (frame.Pixels[0] == 12) SkillFrames++;
+            }
+            if (IntermittentSkills && frame.Pixels[0] == 12 && SkillFrames % 2 == 0)
+                return Task.FromResult(ImageMatchResult.NoMatch(0, templatePath));
             if (frame.Pixels[0] is 4 or 5 or 6 or 7 && templatePath.EndsWith("/flower-tab.png", StringComparison.Ordinal))
                 return Task.FromResult(new ImageMatchResult(true, 1, 24, 3, 6, 2, templatePath));
             if (frame.Pixels[0] == 3 && templatePath.EndsWith("/interaction-f.png", StringComparison.Ordinal))
                 return Task.FromResult(new ImageMatchResult(true, 1, 51, 42, 2, 2, templatePath));
-            var matched = frame.Pixels[0] == 0 && templatePath.EndsWith("/magic-point.png", StringComparison.Ordinal)
+            var scenarioMatch = (frame.Pixels[0], Path.GetFileNameWithoutExtension(templatePath)) switch
+            {
+                (8, "map-header" or "map-teleport") => true,
+                (9, "confirmation-header" or "confirmation-challenge" or "confirmation-cancel") => true,
+                (10, "preparation" or "start") => true,
+                (11, "medal-confirmation" or "start") => true,
+                (12, "battle-button-skill") => true,
+                (15, "capture-exclusive" or "capture-button") => true,
+                (16, "rewards") => true,
+                (17, "result-retry" or "result-exit") => true,
+                _ => false
+            };
+            if (scenarioMatch)
+                return Task.FromResult(new ImageMatchResult(true, 1,
+                    templatePath.EndsWith("/result-exit.png", StringComparison.Ordinal) ? 36 : 55,
+                    48, 10, 4, templatePath));
+            var matched = frame.Pixels[0] is 0 or 3 && templatePath.EndsWith("/magic-point.png", StringComparison.Ordinal)
                 || frame.Pixels[0] == 1 && templatePath.EndsWith("/manual-header.png", StringComparison.Ordinal);
             return Task.FromResult(matched ? new ImageMatchResult(true, 1, 10, 1, 2, 2, templatePath) : ImageMatchResult.NoMatch(0, templatePath));
         }
@@ -271,41 +558,44 @@ public sealed class FlowerSeedChallengeRunnerTests
     private sealed class Keyboard : IKeyboardInputService
     {
         public Action? DuringKey;
+        public Action<string>? DuringSequence;
         public List<(string Key, KeyboardInputOptions Options)> Keys { get; } = [];
+        public volatile bool Foreground = true;
         public bool IsWindowAvailable(nint hwnd) => true;
-        public bool IsWindowForeground(nint hwnd) => true;
-        public bool RequiresForeground(KeyboardInputMethod method) => true;
+        public bool IsWindowForeground(nint hwnd) => Foreground;
+        public bool RequiresForeground(KeyboardInputMethod method) => method != KeyboardInputMethod.PostMessage;
         public void EnsureReady(KeyboardInputMethod method) { }
         public bool TryParseSequence(string sequence, out IReadOnlyList<KeyStroke> keyStrokes, out string error)
-        { keyStrokes = []; error = ""; return true; }
+        {
+            keyStrokes = sequence.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+                .Select(key => new KeyStroke([], new KeyDefinition(key, 0))).ToArray();
+            error = "";
+            return keyStrokes.Count > 0;
+        }
         public async Task SendSequenceAsync(nint hwnd, string sequence, KeyboardInputOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             Keys.Add((sequence, options!));
             DuringKey?.Invoke();
+            DuringSequence?.Invoke(sequence);
             await Task.Delay(10, cancellationToken);
         }
         public Task SendSequenceAsync(nint hwnd, IReadOnlyList<KeyStroke> keyStrokes, KeyboardInputOptions? options = null,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            CancellationToken cancellationToken = default)
+            => SendSequenceAsync(hwnd, string.Join(", ", keyStrokes.Select(key => key.DisplayText)), options, cancellationToken);
     }
 
     private sealed class Mouse : IMouseInputService
     {
         public int Clicks;
         public Action? DuringScroll;
+        public Action<int, int>? DuringClick;
         public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method = KeyboardInputMethod.SendInput,
-            CancellationToken cancellationToken = default) { Clicks++; return Task.CompletedTask; }
+            CancellationToken cancellationToken = default) { Clicks++; DuringClick?.Invoke(x, y); return Task.CompletedTask; }
         public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method = KeyboardInputMethod.SendInput,
             CancellationToken cancellationToken = default) { DuringScroll?.Invoke(); return Task.CompletedTask; }
         public Task ScrollAtCurrentPositionAsync(nint hwnd, int delta, KeyboardInputMethod method = KeyboardInputMethod.SendInput,
             CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    private sealed class Window : IGameWindowService
-    {
-        public string TargetProcessName => "game";
-        public CaptureTargetWindow? FindGameWindow() => null;
-        public bool TryBringGameWindowToForeground(CaptureTargetWindow window) => true;
     }
 
     private sealed class Overlay : IRecognitionOverlayService
@@ -329,6 +619,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public int Calls;
         public string Text = "你好";
         public Action? DuringRead;
+        public Func<CapturedFrame, string>? ReadText;
         public IReadOnlyList<TextRecognitionMethodOption> GetMethods() => [];
         public TextRecognitionMethodOption? GetDefaultMethod() => null;
         public Task<TextRecognitionResult> RecognizeAsync(byte[] imageBytes, TextRecognitionMethod method,
@@ -338,7 +629,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             Calls++;
             DuringRead?.Invoke();
-            return Task.FromResult(new TextRecognitionResult(method, "ONNX", null, [Text], 1));
+            return Task.FromResult(new TextRecognitionResult(method, "ONNX", null, [ReadText?.Invoke(frame) ?? Text], 1));
         }
     }
 

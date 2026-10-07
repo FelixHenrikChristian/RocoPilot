@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Xml.Linq;
 
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
@@ -16,6 +17,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly IRuntimeSessionControl _runtimeTaskService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly IFlowerSeedChallengeRunner _flowerSeedRunner;
+    private readonly IAppNotificationService _notifications;
     private readonly ILogger<IndependentTaskService> _logger;
 
     private readonly SemaphoreSlim _stateLock = new(1, 1);
@@ -38,11 +40,13 @@ public sealed class IndependentTaskService : IIndependentTaskService
         IRuntimeSessionControl runtimeTaskService,
         ILocalSettingsService localSettingsService,
         IFlowerSeedChallengeRunner flowerSeedRunner,
+        IAppNotificationService notifications,
         ILogger<IndependentTaskService> logger)
     {
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
         _flowerSeedRunner = flowerSeedRunner;
+        _notifications = notifications;
         _logger = logger;
     }
 
@@ -117,7 +121,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
             _taskCts = taskCts;
             _runningTaskKind = kind;
             var settings = _settings.Clone();
-            _taskLoop = Task.Run(() => RunTaskAsync(kind, settings, taskCts), CancellationToken.None);
+            var battleSettings = _runtimeTaskService.AutoBattleSettings;
+            _taskLoop = Task.Run(() => RunTaskAsync(kind, settings, battleSettings, taskCts), CancellationToken.None);
             _logger.LogInformation("独立任务已启动：{TaskName}", GetTaskDisplayName(kind));
         }
         finally
@@ -173,6 +178,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private async Task RunTaskAsync(
         IndependentTaskKind kind,
         IndependentTaskSettings settings,
+        AutoBattleSettings battleSettings,
         CancellationTokenSource taskCts)
     {
         var ownsSuspension = !_runtimeTaskService.IsSuspended;
@@ -189,7 +195,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 case IndependentTaskKind.FlowerSeedChallenge:
                     await _flowerSeedRunner.RunAsync(state,
                         settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
+                        settings.FlowerSeedRunCount, battleSettings,
                         UpdateProgress, taskCts.Token);
+                    _runtimeTaskService.ShowIndependentTaskResult($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
                     var options = await _flowerSeedRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
@@ -223,6 +231,16 @@ public sealed class IndependentTaskService : IIndependentTaskService
         {
             _logger.LogError(ex, "独立任务异常终止：{TaskName}", GetTaskDisplayName(kind));
             UpdateProgress(new("任务失败", ex.Message));
+            if (kind == IndependentTaskKind.FlowerSeedChallenge)
+            {
+                var title = "花种挑战已停止";
+                _runtimeTaskService.ShowIndependentTaskResult(title, ex.Message);
+                var payload = new XElement("toast", new XElement("visual",
+                    new XElement("binding", new XAttribute("template", "ToastGeneric"),
+                        new XElement("text", title), new XElement("text", ex.Message))));
+                if (!_notifications.Show(payload.ToString(SaveOptions.DisableFormatting)))
+                    _logger.LogWarning("花种挑战停止通知未显示：{Message}", ex.Message);
+            }
         }
         finally
         {
@@ -289,8 +307,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
         {
             IndependentTaskKind.BossBattle => "首领战斗",
             IndependentTaskKind.LegendaryChallenge => "传说精灵挑战",
-            IndependentTaskKind.FlowerSeedChallenge => "稀兽花种挑战",
-            IndependentTaskKind.FlowerSeedScan => "扫描稀兽花种",
+            IndependentTaskKind.FlowerSeedChallenge => "花种挑战",
+            IndependentTaskKind.FlowerSeedScan => "扫描花种",
             _ => "独立"
         };
     }

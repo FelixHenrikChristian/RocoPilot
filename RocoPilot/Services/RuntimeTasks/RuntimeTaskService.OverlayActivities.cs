@@ -51,8 +51,9 @@ public sealed partial class RuntimeTaskService
             _ => InfoOverlayActivityKind.Skill
         };
         var isCustomSequence = plan.Action == AutoBattleAction.Skill && plan.FallbackSequence is null;
-        var description = isCustomSequence && plan.DisplayKey != plan.Sequence
-            ? plan.DisplayKey : string.Empty;
+        var description = plan.Action == AutoBattleAction.Capture
+            ? $"血脉：{EncounterBloodlineRecognition.GetDisplayName(_battle.Bloodline)}"
+            : isCustomSequence && plan.DisplayKey != plan.Sequence ? plan.DisplayKey : string.Empty;
         RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turnId,
             $"input:{turnId}:{plan.Action}:{sequence}", kind, InfoOverlayIslandPresentation.BattleInputTitle(plan),
             description,

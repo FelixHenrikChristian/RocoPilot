@@ -51,6 +51,7 @@ public sealed class AutoBattleController
     public AutoBattlePhase Phase { get { lock (_gate) return _phase; } }
     public bool IsSuspendedForShiny { get { lock (_gate) return _suspendedForShiny; } }
     public bool IsEncounterRelieved { get { lock (_gate) return _encounterRelieved; } }
+    public EncounterBloodlineKind Bloodline { get { lock (_gate) return _bloodline; } }
     public AutoBattleTurn? CurrentTurn
     {
         get

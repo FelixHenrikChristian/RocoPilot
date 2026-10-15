@@ -30,6 +30,7 @@ public sealed class IndependentTaskServiceTests
         Assert.IsFalse(result.Success);
         StringAssert.Contains(result.Message, "目标花种");
         Assert.AreEqual(0, fixture.Runtime.Suspends);
+        Assert.AreEqual(0, fixture.Window.ForegroundCalls);
         Assert.IsFalse(fixture.Service.IsRunning);
     }
 
@@ -49,6 +50,40 @@ public sealed class IndependentTaskServiceTests
         Assert.IsFalse(result.Success);
         Assert.AreEqual(0, fixture.Runtime.Suspends);
         Assert.IsFalse(fixture.Runner.ChallengeStarted.Task.IsCompleted);
+        Assert.AreEqual(0, fixture.Window.ForegroundCalls);
+    }
+
+    [TestMethod]
+    [DataRow(IndependentTaskKind.FlowerSeedChallenge)]
+    [DataRow(IndependentTaskKind.FlowerSeedScan)]
+    public async Task StartingAnIndependentTaskBringsTheGameForwardOnceAfterRuntimeDrains(IndependentTaskKind kind)
+    {
+        var fixture = new Fixture(blockDrain: true);
+        fixture.Runner.Hold = true;
+        await fixture.Service.LoadSettingsAsync();
+        fixture.Window.OnForeground = window =>
+        {
+            Assert.IsTrue(fixture.Runtime.IsSuspended && fixture.Runtime.Drained);
+            Assert.AreSame(fixture.Runtime.CurrentState.TargetWindow, window);
+        };
+        try
+        {
+            Assert.IsTrue((await fixture.Service.StartAsync(kind)).Success);
+            await fixture.Runtime.DrainStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(0, fixture.Window.ForegroundCalls);
+            fixture.Runtime.DrainRelease.TrySetResult();
+            await (kind == IndependentTaskKind.FlowerSeedScan ? fixture.Runner.ScanStarted : fixture.Runner.ChallengeStarted)
+                .Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(1, fixture.Window.ForegroundCalls);
+            Assert.IsFalse((await fixture.Service.StartAsync(kind)).Success);
+            Assert.AreEqual(1, fixture.Window.ForegroundCalls);
+        }
+        finally
+        {
+            fixture.Runtime.DrainRelease.TrySetResult();
+            await fixture.Service.StopAsync();
+        }
+        Assert.AreEqual(1, fixture.Window.ForegroundCalls);
     }
 
     [TestMethod]
@@ -357,6 +392,7 @@ public sealed class IndependentTaskServiceTests
         public RunnerStub Runner { get; }
         public ControlledSettingsStore Store { get; } = new();
         public NotificationStub Notifications { get; } = new();
+        public WindowStub Window { get; } = new();
         public IndependentTaskService Service { get; }
 
         public Fixture(bool blockDrain = false, bool suspended = false)
@@ -368,7 +404,21 @@ public sealed class IndependentTaskServiceTests
                 FlowerSeedOptions = [new(1, "友爱星飞"), new(2, "旧花种")],
                 FlowerSeedTargetNumber = 1
             });
-            Service = new(Runtime, Store, Runner, Notifications, NullLogger<IndependentTaskService>.Instance);
+            Service = new(Runtime, Store, Runner, Notifications, Window, NullLogger<IndependentTaskService>.Instance);
+        }
+    }
+
+    private sealed class WindowStub : IGameWindowService
+    {
+        public int ForegroundCalls;
+        public Action<CaptureTargetWindow>? OnForeground;
+        public string TargetProcessName => "test-game";
+        public CaptureTargetWindow? FindGameWindow() => throw new NotSupportedException();
+        public bool TryBringGameWindowToForeground(CaptureTargetWindow window)
+        {
+            ForegroundCalls++;
+            OnForeground?.Invoke(window);
+            return true;
         }
     }
 

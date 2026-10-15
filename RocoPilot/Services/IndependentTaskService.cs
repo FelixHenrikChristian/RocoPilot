@@ -18,6 +18,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly ILocalSettingsService _localSettingsService;
     private readonly IFlowerSeedChallengeRunner _flowerSeedRunner;
     private readonly IAppNotificationService _notifications;
+    private readonly IGameWindowService _gameWindowService;
     private readonly ILogger<IndependentTaskService> _logger;
 
     private readonly SemaphoreSlim _stateLock = new(1, 1);
@@ -41,12 +42,14 @@ public sealed class IndependentTaskService : IIndependentTaskService
         ILocalSettingsService localSettingsService,
         IFlowerSeedChallengeRunner flowerSeedRunner,
         IAppNotificationService notifications,
+        IGameWindowService gameWindowService,
         ILogger<IndependentTaskService> logger)
     {
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
         _flowerSeedRunner = flowerSeedRunner;
         _notifications = notifications;
+        _gameWindowService = gameWindowService;
         _logger = logger;
     }
 
@@ -189,6 +192,11 @@ public sealed class IndependentTaskService : IIndependentTaskService
             await _runtimeTaskService.SuspendAsync($"{taskName}任务运行中", taskCts.Token);
             var state = _runtimeTaskService.CurrentState
                 ?? throw new InvalidOperationException("运行会话已结束，请先在启动页启动任务。");
+
+            if (_gameWindowService.TryBringGameWindowToForeground(state.TargetWindow))
+                _logger.LogInformation("独立任务启动：已将游戏窗口切换到前台。Task={TaskName}, Window={Window}", taskName, state.TargetWindow.DisplayName);
+            else
+                _logger.LogWarning("独立任务启动：未能将游戏窗口切换到前台。Task={TaskName}, Window={Window}", taskName, state.TargetWindow.DisplayName);
 
             switch (kind)
             {

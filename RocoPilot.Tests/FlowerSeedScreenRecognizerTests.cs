@@ -17,6 +17,8 @@ using RocoPilot.Services.IndependentTasks;
 using RocoPilot.Services.ImageMatching;
 using RocoPilot.Services.Spirits;
 using RocoPilot.Services.RuntimeTasks;
+using RocoPilot.Services.TextRecognition;
+using RocoPilot.Services.TextRecognition.Backends;
 
 namespace RocoPilot.Tests;
 
@@ -38,7 +40,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     public async Task RealChallengeScreensRecognizeTheirStageAndActionButtons(
         string fixture, string expectedScene, BattleScreen? expectedBattleScreen)
     {
-        var ocr = new NameOcr("挑战!");
+        var ocr = new NameOcr(expectedScene == nameof(FlowerSeedScene.Rewards) ? "获得奖励" : "挑战!");
         var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
             NullLogger<FlowerSeedScreenRecognizer>.Instance);
         using var frame = LoadFixture(fixture);
@@ -58,7 +60,7 @@ public sealed class FlowerSeedScreenRecognizerTests
             var region = ocr.Calls[0].Region;
             Assert.AreEqual((1265, 589, 150, 40), (region.X, region.Y, region.Width, region.Height));
         }
-        else Assert.HasCount(0, ocr.Calls);
+        else Assert.HasCount(screen.Scene == FlowerSeedScene.Rewards ? 1 : 0, ocr.Calls);
     }
 
     [TestMethod]
@@ -71,22 +73,61 @@ public sealed class FlowerSeedScreenRecognizerTests
     public async Task ChallengeStagesUseScaledTemplatesAndClientCoordinates(string fixture, string expectedScene)
     {
         var images = new ImageMatchingService();
-        var recognizer = new FlowerSeedScreenRecognizer(images, new NameOcr(), new Catalog(), new Seasons(.70),
+        var recognizer = new FlowerSeedScreenRecognizer(images, new NameOcr("获得奖励"), new Catalog(), new Seasons(.70),
             NullLogger<FlowerSeedScreenRecognizer>.Instance);
         using var frame = LoadFixture(fixture, 1280, 720, 12, 30);
 
         var screen = await recognizer.ReadAsync(frame, 12, 30, 1280, 720, CancellationToken.None);
 
-        var rewards = await images.MatchAsync(frame, new RecognitionRegion { X = 114, Y = 282, Width = 218, Height = 122 },
-            "2048x1152/flower-seed/rewards.png", new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = .625, TemplateScaleY = .625 });
-        if (expectedScene == nameof(FlowerSeedScene.Capture)) Assert.IsFalse(rewards.IsMatch,
-            $"捕捉画面误命中奖励模板：{rewards.Score:F6} @ ({rewards.X}, {rewards.Y})");
-        Assert.AreEqual(Enum.Parse<FlowerSeedScene>(expectedScene), screen.Scene,
-            $"奖励模板：{rewards.Score:F6} @ ({rewards.X}, {rewards.Y})");
+        Assert.AreEqual(Enum.Parse<FlowerSeedScene>(expectedScene), screen.Scene);
         Assert.IsNotNull(screen.Button);
         Assert.IsTrue(screen.Button.X >= 12 && screen.Button.Y >= 30);
         Assert.IsTrue(screen.Button.X + screen.Button.Width <= 1292 && screen.Button.Y + screen.Button.Height <= 750);
         if (screen.Scene == FlowerSeedScene.Rewards) Assert.AreEqual((652, 678), (screen.Button.X, screen.Button.Y));
+    }
+
+    [TestMethod]
+    [DataRow("flower-seed-rewards.png", 1280, 720)]
+    [DataRow("flower-seed-rewards.png", 1600, 900)]
+    [DataRow("flower-seed-rewards.png", 2048, 1152)]
+    [DataRow("flower-seed-rewards-single-row.png", 1280, 720)]
+    [DataRow("flower-seed-rewards-single-row.png", 1600, 900)]
+    [DataRow("flower-seed-rewards-single-row.png", 2048, 1152)]
+    public async Task RealOcrConfirmsBothRewardLayoutsAtDifferentResolutions(string fixture, int width, int height)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
+            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        using var frame = LoadFixture(fixture, width, height, 12, 30);
+        List<(RecognitionRegion Region, string Text)> previews = [];
+
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None,
+            (region, text) => previews.Add((region, text)));
+
+        Assert.AreEqual(FlowerSeedScene.Rewards, screen.Scene);
+        Assert.AreEqual("获得奖励", FlowerSeedScreenRecognizer.Normalize(screen.Text));
+        Assert.HasCount(1, previews);
+        Assert.AreEqual("花种奖励标题", previews[0].Region.Id);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task SnowBattleBackgroundCannotBecomeRewardsWhenBattleControlsDisappear(bool hideBattleControls)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
+            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        using var frame = LoadFixture("flower-seed-battle-snow.png");
+        if (hideBattleControls)
+            for (var y = 589; y < frame.Height; y++) Array.Clear(frame.Pixels, (y * frame.Width + 1089) * 4, (frame.Width - 1089) * 4);
+
+        var screen = await recognizer.ReadAsync(frame, 1, 31, 1600, 900, CancellationToken.None);
+
+        Assert.AreEqual(hideBattleControls ? FlowerSeedScene.Unknown : FlowerSeedScene.Battle, screen.Scene);
+        if (!hideBattleControls) Assert.AreEqual(BattleScreen.SkillSelection, screen.BattleScreen);
     }
 
     [TestMethod]
@@ -120,7 +161,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         var screen = await recognizer.ReadAsync(frame, 0, 0, frame.Width, frame.Height, CancellationToken.None);
 
         Assert.AreEqual(FlowerSeedScene.Unknown, screen.Scene);
-        Assert.HasCount(0, ocr.Calls);
+        Assert.HasCount(2, ocr.Calls);
     }
 
     [TestMethod]
@@ -412,7 +453,7 @@ public sealed class FlowerSeedScreenRecognizerTests
             TextRecognitionMethod method, CancellationToken cancellationToken = default)
         {
             Calls.Add((region, method));
-            return Task.FromResult(new TextRecognitionResult(method, "ONNX", null, [_names.Dequeue()], 1));
+            return Task.FromResult(new TextRecognitionResult(method, "ONNX", null, [_names.TryDequeue(out var text) ? text : string.Empty], 1));
         }
     }
 

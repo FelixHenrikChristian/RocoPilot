@@ -228,6 +228,26 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     [TestMethod]
+    public async Task ChallengeContinuesTheConfiguredSkillOrderUntilTheOpponentIsDefeated()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var capture = new ChallengeCapture(skillTurns: 2);
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence =
+            [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
+        var runner = CreateRunner(capture, new Images(), keyboard, new Mouse { DuringClick = capture.OnClick },
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
+            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+
+        CollectionAssert.AreEqual(new[] { "F", "4", "2", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.AreEqual(1, capture.BattlesStarted);
+        Assert.AreEqual(1, capture.Exits);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task LosingForegroundPausesInputUntilTheUserReturnsToTheGame(bool duringRecognition)
@@ -333,7 +353,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     private static FlowerSeedChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
-            new FlowerSeedScreenRecognizer(images, ocr ?? new UnusedOcr(), null!, null!, NullLogger<FlowerSeedScreenRecognizer>.Instance),
+            new FlowerSeedScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!, NullLogger<FlowerSeedScreenRecognizer>.Instance),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
             overlay ?? new Overlay(),
             NullLogger<FlowerSeedChallengeRunner>.Instance);
@@ -393,10 +413,11 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     // 每次截图都是新帧；捕捉后的过渡画面会短暂命中大世界与交互 HUD。
-    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false) : IScreenCaptureService
+    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false, int skillTurns = 1) : IScreenCaptureService
     {
         private byte _scene = 6;
         private int _animationFramesLeft;
+        private int _skillsUsed;
         public int BattlesStarted;
         public int Retries;
         public int Exits;
@@ -413,7 +434,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             if (scene == 2)
             {
                 AnimationFrames++;
-                if (--_animationFramesLeft == 0) _scene = 15;
+                if (--_animationFramesLeft == 0) _scene = _skillsUsed >= skillTurns ? (byte)15 : (byte)12;
+                if (_skillsUsed < skillTurns) scene = 13;
             }
             else if (scene is 18 or 19)
             {
@@ -434,7 +456,8 @@ public sealed class FlowerSeedChallengeRunnerTests
                 case (3, "F"):
                     _scene = 9;
                     break;
-                case (12, "4"):
+                case (12, "4" or "2"):
+                    _skillsUsed++;
                     if (failFirstBattle && BattlesStarted == 1) _scene = 3;
                     else
                     {
@@ -495,6 +518,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         private void StartBattle()
         {
             BattlesStarted++;
+            _skillsUsed = 0;
             _scene = 12;
         }
 
@@ -530,8 +554,8 @@ public sealed class FlowerSeedChallengeRunnerTests
                 (10, "preparation" or "start") => true,
                 (11, "medal-confirmation" or "start") => true,
                 (12, "battle-button-skill") => true,
+                (13, "battle-chat") => true,
                 (15, "capture-exclusive" or "capture-button") => true,
-                (16, "rewards") => true,
                 (17, "result-retry" or "result-exit") => true,
                 _ => false
             };
@@ -628,18 +652,12 @@ public sealed class FlowerSeedChallengeRunnerTests
             TextRecognitionMethod method, CancellationToken cancellationToken = default)
         {
             Calls++;
+            if (region.Id == "花种奖励标题")
+                return Task.FromResult(new TextRecognitionResult(method, "ONNX", null,
+                    [frame.Pixels[0] == 16 ? "获得奖励" : string.Empty], 1));
             DuringRead?.Invoke();
             return Task.FromResult(new TextRecognitionResult(method, "ONNX", null, [ReadText?.Invoke(frame) ?? Text], 1));
         }
     }
 
-    private sealed class UnusedOcr : ITextRecognitionService
-    {
-        public IReadOnlyList<TextRecognitionMethodOption> GetMethods() => [new(TextRecognitionMethod.OnnxOcrV5, "ONNX", "", true)];
-        public TextRecognitionMethodOption? GetDefaultMethod() => GetMethods()[0];
-        public Task<TextRecognitionResult> RecognizeAsync(byte[] imageBytes, TextRecognitionMethod method,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<TextRecognitionResult> RecognizeAsync(CapturedFrame frame, RecognitionRegion region, TextRecognitionMethod method,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    }
 }

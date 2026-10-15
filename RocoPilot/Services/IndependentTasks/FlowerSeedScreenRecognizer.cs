@@ -20,7 +20,7 @@ internal sealed record FlowerSeedRow(string Name, ImageMatchResult Button, strin
 internal sealed record FlowerSeedScreen(FlowerSeedScene Scene, IReadOnlyList<FlowerSeedRow> Rows,
     ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null);
 
-/// <summary>界面用全局默认模板算法定位，名称用默认 OCR 识别后复用当前图鉴匹配。</summary>
+/// <summary>界面控件用模板定位，奖励标题和花种名称使用默认 OCR 确认。</summary>
 public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
     ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<FlowerSeedScreenRecognizer> logger)
 {
@@ -85,10 +85,6 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             var exit = await Match("result-exit", .35, .88, .49, .98);
             if (exit is not null) return new(FlowerSeedScene.Result, [], retry, ExitButton: exit);
         }
-        var rewards = await Match("rewards", .08, .35, .25, .52);
-        if (rewards is not null)
-            return new(FlowerSeedScene.Rewards, [], new ImageMatchResult(true, rewards.Score,
-                clientX + (int)Math.Round(width * .5), clientY + (int)Math.Round(height * .9), 1, 1, "flower-rewards-dismiss"));
         var exclusive = await Match("capture-exclusive", .08, .2, .23, .4);
         if (exclusive is not null)
         {
@@ -126,6 +122,21 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             var region = screen == BattleScreen.Chat ? Area(.92, .62, 1, .75) : Area(.68, .62, 1, 1);
             var battle = await images.MatchAsync(frame, region, "2048x1152/" + template + ".png", options, cancellationToken);
             if (battle.IsMatch) return new(FlowerSeedScene.Battle, [], battle, BattleScreen: screen);
+        }
+        // 单排和双排奖励的标题高度不同；只识别单行文字，避免浅色战斗背景命中奖励模板。
+        foreach (var (top, bottom) in new[] { (.4, .445), (.47, .505) })
+        {
+            var region = Area(.132, top, .199, bottom, "花种奖励标题");
+            var result = await ocr.RecognizeAsync(frame, region, TextRecognitionDefaults.Method, cancellationToken);
+            var matched = Normalize(result.Text) == "获得奖励";
+            logger.LogDebug("花种奖励识别：OCR={Text}，匹配={Matched}，区域=({X},{Y},{Width},{Height})",
+                result.Text, matched, region.X, region.Y, region.Width, region.Height);
+            if (matched)
+            {
+                reportOcr?.Invoke(region, $"OCR：{result.Text}");
+                return new(FlowerSeedScene.Rewards, [], new ImageMatchResult(true, 1,
+                    clientX + (int)Math.Round(width * .5), clientY + (int)Math.Round(height * .9), 1, 1, "flower-rewards-dismiss"), Text: result.Text);
+            }
         }
         return new(FlowerSeedScene.Unknown, []);
 

@@ -70,15 +70,8 @@ internal static class RecognitionRegionImageHelper
             out var sourceWidth,
             out var sourceHeight);
 
-        var sourceRegion = new RecognitionRegion
-        {
-            Id = region.Id,
-            X = ScaleValue(region.X, configWidth, sourceWidth),
-            Y = ScaleValue(region.Y, configHeight, sourceHeight),
-            Width = Math.Max(1, ScaleValue(region.Width, configWidth, sourceWidth)),
-            Height = Math.Max(1, ScaleValue(region.Height, configHeight, sourceHeight)),
-            Enabled = region.Enabled
-        };
+        var sourceRegion = MapReferenceArea(0, 0, sourceWidth, sourceHeight, configWidth, configHeight,
+            region.X, region.Y, region.Width, region.Height, region.Anchor);
 
         var x = clientX + sourceRegion.X;
         var y = clientY + sourceRegion.Y;
@@ -98,6 +91,7 @@ internal static class RecognitionRegionImageHelper
                 Y = clampedY,
                 Width = clampedRight - clampedX,
                 Height = clampedBottom - clampedY,
+                Anchor = region.Anchor,
                 Enabled = region.Enabled
             };
     }
@@ -165,14 +159,41 @@ internal static class RecognitionRegionImageHelper
         return croppedPixels;
     }
 
-    private static int ScaleValue(int value, int sourceSize, int targetSize)
+    // 控件等比缩放，画布多出的空间按锚点分配；窗口边框偏移只在最后加入。
+    internal static RecognitionRegion MapReferenceArea(int clientX, int clientY, int width, int height,
+        double referenceWidth, double referenceHeight, double x, double y, double regionWidth, double regionHeight,
+        RecognitionAnchor anchor = RecognitionAnchor.Auto)
     {
-        if (sourceSize <= 0 || targetSize <= 0)
+        var scale = Math.Min(width / referenceWidth, height / referenceHeight);
+        var horizontal = anchor switch
         {
-            return value;
-        }
+            RecognitionAnchor.TopLeft or RecognitionAnchor.CenterLeft or RecognitionAnchor.BottomLeft => 0d,
+            RecognitionAnchor.TopRight or RecognitionAnchor.CenterRight or RecognitionAnchor.BottomRight => 1d,
+            RecognitionAnchor.Auto => AxisAnchor((x + regionWidth / 2) / referenceWidth),
+            _ => .5
+        };
+        var vertical = anchor switch
+        {
+            RecognitionAnchor.TopLeft or RecognitionAnchor.TopCenter or RecognitionAnchor.TopRight => 0d,
+            RecognitionAnchor.BottomLeft or RecognitionAnchor.BottomCenter or RecognitionAnchor.BottomRight => 1d,
+            RecognitionAnchor.Auto => AxisAnchor((y + regionHeight / 2) / referenceHeight),
+            _ => .5
+        };
+        var left = (int)Math.Round(x * scale + (width - referenceWidth * scale) * horizontal);
+        var top = (int)Math.Round(y * scale + (height - referenceHeight * scale) * vertical);
+        var right = Math.Clamp(left + (int)Math.Round(regionWidth * scale), 0, width);
+        var bottom = Math.Clamp(top + (int)Math.Round(regionHeight * scale), 0, height);
+        left = Math.Clamp(left, 0, width);
+        top = Math.Clamp(top, 0, height);
+        return new RecognitionRegion
+        {
+            X = clientX + left, Y = clientY + top,
+            Width = Math.Max(0, right - left), Height = Math.Max(0, bottom - top),
+            Anchor = anchor
+        };
 
-        return (int)Math.Round(value * (double)targetSize / sourceSize);
+        // 未指定时按所在的三等分区域选择靠边或居中；布局特殊的控件显式指定锚点。
+        static double AxisAnchor(double center) => center < 1d / 3 ? 0 : center > 2d / 3 ? 1 : .5;
     }
 
     private static int ClampToRange(int value, int min, int max)

@@ -2,8 +2,16 @@ using System.Text.Json.Serialization;
 
 namespace RocoPilot.Models.Recognition;
 
+public enum RecognitionAnchor
+{
+    Auto, TopLeft, TopCenter, TopRight, CenterLeft, Center, CenterRight, BottomLeft, BottomCenter, BottomRight
+}
+
 public sealed class RecognitionRegion
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public RecognitionAnchor Anchor { get; set; }
+
     [JsonIgnore]
     public bool IsMatched { get; set; }
 

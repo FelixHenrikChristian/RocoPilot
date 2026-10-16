@@ -68,20 +68,9 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         var resolvedTemplatePath = ResolveTemplatePath(templatePath);
         var normalizedOptions = NormalizeOptions(options);
-        var template = await GetTemplateAsync(
-            resolvedTemplatePath,
-            normalizedOptions.AlphaThreshold,
-            normalizedOptions.TemplateScaleX,
-            normalizedOptions.TemplateScaleY,
-            cancellationToken);
-
-        return MatchTemplateWithOpenCvSqDiffNormalized(
-            frame,
-            region,
-            template,
-            resolvedTemplatePath,
-            normalizedOptions,
-            cancellationToken);
+        var (_, best) = await MatchTemplatesAsync(frame, region, resolvedTemplatePath,
+            normalizedOptions, 1, .5, true, cancellationToken);
+        return best;
     }
 
     public async Task<ImageMatchCollectionResult> FindMatchesAsync(
@@ -115,22 +104,9 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         var resolvedTemplatePath = ResolveTemplatePath(templatePath);
         var normalizedOptions = NormalizeOptions(options);
-        var template = await GetTemplateAsync(
-            resolvedTemplatePath,
-            normalizedOptions.AlphaThreshold,
-            normalizedOptions.TemplateScaleX,
-            normalizedOptions.TemplateScaleY,
-            cancellationToken);
-
-        return FindTemplateMatchesWithOpenCvSqDiffNormalized(
-            frame,
-            region,
-            template,
-            resolvedTemplatePath,
-            maximumMatches,
-            maximumOverlapRatio,
-            normalizedOptions,
-            cancellationToken);
+        var (matches, best) = await MatchTemplatesAsync(frame, region, resolvedTemplatePath,
+            normalizedOptions, maximumMatches, maximumOverlapRatio, false, cancellationToken);
+        return new ImageMatchCollectionResult(matches, best.Score, resolvedTemplatePath);
     }
 
     private string ResolveTemplatePath(string templatePath)
@@ -148,6 +124,7 @@ public sealed class ImageMatchingService : IImageMatchingService
         var normalized = new ImageMatchOptions
         {
             MinimumScore = options?.MinimumScore ?? 0.9,
+            ScaleTolerance = options?.ScaleTolerance ?? .04,
             AlphaThreshold = options?.AlphaThreshold ?? 16,
             SearchStep = options?.SearchStep ?? 1,
             TemplateScaleX = NormalizeScale(options?.TemplateScaleX ?? 1),
@@ -163,228 +140,101 @@ public sealed class ImageMatchingService : IImageMatchingService
             throw new ArgumentOutOfRangeException(nameof(options), "SearchStep must be greater than 0.");
         }
 
+        if (!double.IsFinite(normalized.ScaleTolerance) || normalized.ScaleTolerance < 0 || normalized.ScaleTolerance >= 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), "ScaleTolerance must be between 0 (inclusive) and 1 (exclusive).");
+        }
+
         return normalized;
     }
 
-    private static ImageMatchResult MatchTemplateWithOpenCvSqDiffNormalized(
-        CapturedFrame frame,
-        RecognitionRegion region,
-        ImageTemplate template,
-        string templatePath,
-        ImageMatchOptions options,
-        CancellationToken cancellationToken)
+    // 单目标和列表共用匹配流程，截图只转换一次；不同尺度的候选统一去重。
+    private async Task<(IReadOnlyList<ImageMatchResult> Matches, ImageMatchResult Best)> MatchTemplatesAsync(
+        CapturedFrame frame, RecognitionRegion region, string templatePath, ImageMatchOptions options,
+        int maximumMatches, double maximumOverlapRatio, bool singleMatch, CancellationToken cancellationToken)
     {
         ValidateFrame(frame);
         cancellationToken.ThrowIfCancellationRequested();
-
-        if (!region.Enabled)
-        {
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
-
+        var best = ImageMatchResult.NoMatch(0, templatePath);
         var searchArea = ClipRegion(region, frame);
-        if (searchArea.Width < template.Width || searchArea.Height < template.Height)
-        {
-            return ImageMatchResult.NoMatch(0, templatePath);
-        }
+        if (!region.Enabled || searchArea.Width <= 0 || searchArea.Height <= 0) return ([], best);
 
-        GCHandle frameHandle = default;
-        GCHandle templateHandle = default;
-        GCHandle maskHandle = default;
+        var frameHandle = GCHandle.Alloc(frame.Pixels, GCHandleType.Pinned);
         try
         {
-            frameHandle = GCHandle.Alloc(frame.Pixels, GCHandleType.Pinned);
-            templateHandle = GCHandle.Alloc(template.BgrPixels, GCHandleType.Pinned);
-            maskHandle = GCHandle.Alloc(template.MaskPixels, GCHandleType.Pinned);
-
-            using var frameBgra = Mat.FromPixelData(
-                frame.Height,
-                frame.Width,
-                MatType.CV_8UC4,
-                frameHandle.AddrOfPinnedObject());
-            using var searchBgra = new Mat(
-                frameBgra,
-                new Rect(searchArea.X, searchArea.Y, searchArea.Width, searchArea.Height));
+            using var frameBgra = Mat.FromPixelData(frame.Height, frame.Width, MatType.CV_8UC4, frameHandle.AddrOfPinnedObject());
+            using var searchBgra = new Mat(frameBgra, new Rect(searchArea.X, searchArea.Y, searchArea.Width, searchArea.Height));
             using var searchBgr = new Mat();
             Cv2.CvtColor(searchBgra, searchBgr, ColorConversionCodes.BGRA2BGR);
-            using var templateBgr = Mat.FromPixelData(
-                template.Height,
-                template.Width,
-                MatType.CV_8UC3,
-                templateHandle.AddrOfPinnedObject());
-            using var templateMask = Mat.FromPixelData(
-                template.Height,
-                template.Width,
-                MatType.CV_8UC1,
-                maskHandle.AddrOfPinnedObject());
-            using var result = new Mat();
-            Cv2.MatchTemplate(
-                searchBgr,
-                templateBgr,
-                result,
-                TemplateMatchModes.SqDiffNormed,
-                templateMask);
-            cancellationToken.ThrowIfCancellationRequested();
-            Cv2.MinMaxLoc(
-                result,
-                out var minimumValue,
-                out _,
-                out var minimumLocation,
-                out _);
-            var score = SqDiffValueToScore(minimumValue);
-            return new ImageMatchResult(
-                score >= options.MinimumScore,
-                score,
-                searchArea.X + minimumLocation.X,
-                searchArea.Y + minimumLocation.Y,
-                template.Width,
-                template.Height,
-                templatePath);
-        }
-        finally
-        {
-            if (maskHandle.IsAllocated)
-            {
-                maskHandle.Free();
-            }
-
-            if (templateHandle.IsAllocated)
-            {
-                templateHandle.Free();
-            }
-
-            if (frameHandle.IsAllocated)
-            {
-                frameHandle.Free();
-            }
-        }
-    }
-
-    private static ImageMatchCollectionResult FindTemplateMatchesWithOpenCvSqDiffNormalized(
-        CapturedFrame frame,
-        RecognitionRegion region,
-        ImageTemplate template,
-        string templatePath,
-        int maximumMatches,
-        double maximumOverlapRatio,
-        ImageMatchOptions options,
-        CancellationToken cancellationToken)
-    {
-        ValidateFrame(frame);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (!region.Enabled)
-        {
-            return ImageMatchCollectionResult.NoMatch(0, templatePath);
-        }
-
-        var searchArea = ClipRegion(region, frame);
-        if (searchArea.Width < template.Width || searchArea.Height < template.Height)
-        {
-            return ImageMatchCollectionResult.NoMatch(0, templatePath);
-        }
-
-        GCHandle frameHandle = default;
-        GCHandle templateHandle = default;
-        GCHandle maskHandle = default;
-        try
-        {
-            frameHandle = GCHandle.Alloc(frame.Pixels, GCHandleType.Pinned);
-            templateHandle = GCHandle.Alloc(template.BgrPixels, GCHandleType.Pinned);
-            maskHandle = GCHandle.Alloc(template.MaskPixels, GCHandleType.Pinned);
-
-            using var frameBgra = Mat.FromPixelData(
-                frame.Height,
-                frame.Width,
-                MatType.CV_8UC4,
-                frameHandle.AddrOfPinnedObject());
-            using var searchBgra = new Mat(
-                frameBgra,
-                new Rect(searchArea.X, searchArea.Y, searchArea.Width, searchArea.Height));
-            using var searchBgr = new Mat();
-            Cv2.CvtColor(searchBgra, searchBgr, ColorConversionCodes.BGRA2BGR);
-            using var templateBgr = Mat.FromPixelData(
-                template.Height,
-                template.Width,
-                MatType.CV_8UC3,
-                templateHandle.AddrOfPinnedObject());
-            using var templateMask = Mat.FromPixelData(
-                template.Height,
-                template.Width,
-                MatType.CV_8UC1,
-                maskHandle.AddrOfPinnedObject());
-            using var result = new Mat();
-            Cv2.MatchTemplate(
-                searchBgr,
-                templateBgr,
-                result,
-                TemplateMatchModes.SqDiffNormed,
-                templateMask);
-
             var candidates = new List<ImageMatchResult>();
-            var bestScore = 0d;
-            var resultRows = result.Rows;
-            var resultColumns = result.Cols;
-            for (var y = 0; y < resultRows; y += options.SearchStep)
+            var sizes = new HashSet<(int, int)>();
+            double[] factors = options.ScaleTolerance == 0 ? [1] :
+                [1, 1 - options.ScaleTolerance / 2, 1 + options.ScaleTolerance / 2,
+                    1 - options.ScaleTolerance, 1 + options.ScaleTolerance];
+            foreach (var factor in factors)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                var template = await GetTemplateAsync(templatePath, options.AlphaThreshold,
+                    NormalizeScale(options.TemplateScaleX * factor), NormalizeScale(options.TemplateScaleY * factor), cancellationToken);
+                if (!sizes.Add((template.Width, template.Height))
+                    || template.Width > searchArea.Width || template.Height > searchArea.Height) continue;
 
-                for (var x = 0; x < resultColumns; x += options.SearchStep)
+                var templateHandle = GCHandle.Alloc(template.BgrPixels, GCHandleType.Pinned);
+                var maskHandle = GCHandle.Alloc(template.MaskPixels, GCHandleType.Pinned);
+                try
                 {
-                    var score = SqDiffValueToScore(result.At<float>(y, x));
-                    bestScore = Math.Max(bestScore, score);
-                    if (score < options.MinimumScore)
+                    using var templateBgr = Mat.FromPixelData(template.Height, template.Width, MatType.CV_8UC3, templateHandle.AddrOfPinnedObject());
+                    using var mask = Mat.FromPixelData(template.Height, template.Width, MatType.CV_8UC1, maskHandle.AddrOfPinnedObject());
+                    using var result = new Mat();
+                    Cv2.MatchTemplate(searchBgr, templateBgr, result, TemplateMatchModes.SqDiffNormed, mask);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    Cv2.MinMaxLoc(result, out var minimum, out _, out var location, out _);
+                    var score = SqDiffValueToScore(minimum);
+                    var match = new ImageMatchResult(score >= options.MinimumScore, score,
+                        searchArea.X + location.X, searchArea.Y + location.Y, template.Width, template.Height, templatePath);
+                    if (best.Width == 0 || match.Score > best.Score) best = match;
+                    if (singleMatch)
                     {
+                        // 基准尺度已可靠命中时不额外搜索；未命中才比较周边尺度。
+                        if (factor == 1 && match.IsMatch) return ([match], match);
                         continue;
                     }
 
-                    candidates.Add(new ImageMatchResult(
-                        true,
-                        score,
-                        searchArea.X + x,
-                        searchArea.Y + y,
-                        template.Width,
-                        template.Height,
-                        templatePath));
+                    var rows = result.Rows;
+                    var columns = result.Cols;
+                    for (var y = 0; y < rows; y += options.SearchStep)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        for (var x = 0; x < columns; x += options.SearchStep)
+                        {
+                            var candidateScore = SqDiffValueToScore(result.At<float>(y, x));
+                            if (candidateScore < options.MinimumScore) continue;
+                            candidates.Add(new ImageMatchResult(true, candidateScore, searchArea.X + x, searchArea.Y + y,
+                                template.Width, template.Height, templatePath));
+                        }
+                    }
+                }
+                finally
+                {
+                    maskHandle.Free();
+                    templateHandle.Free();
                 }
             }
 
-            var matches = new List<ImageMatchResult>(Math.Min(maximumMatches, candidates.Count));
-            foreach (var candidate in candidates
-                         .OrderByDescending(candidate => candidate.Score)
-                         .ThenBy(candidate => candidate.Y)
-                         .ThenBy(candidate => candidate.X))
+            if (singleMatch) return (best.IsMatch ? [best] : [], best);
+            var matches = new List<ImageMatchResult>();
+            foreach (var candidate in candidates.OrderByDescending(candidate => candidate.Score)
+                         .ThenBy(candidate => candidate.Y).ThenBy(candidate => candidate.X))
             {
-                if (matches.Any(match => CalculateOverlapRatio(candidate, match) > maximumOverlapRatio))
-                {
-                    continue;
-                }
-
+                if (matches.Any(match => CalculateOverlapRatio(candidate, match) > maximumOverlapRatio)) continue;
                 matches.Add(candidate);
-                if (matches.Count >= maximumMatches)
-                {
-                    break;
-                }
+                if (matches.Count >= maximumMatches) break;
             }
-
-            return new ImageMatchCollectionResult(matches, bestScore, templatePath);
+            return (matches, best);
         }
         finally
         {
-            if (maskHandle.IsAllocated)
-            {
-                maskHandle.Free();
-            }
-
-            if (templateHandle.IsAllocated)
-            {
-                templateHandle.Free();
-            }
-
-            if (frameHandle.IsAllocated)
-            {
-                frameHandle.Free();
-            }
+            frameHandle.Free();
         }
     }
 

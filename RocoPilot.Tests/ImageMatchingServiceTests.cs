@@ -13,6 +13,35 @@ namespace RocoPilot.Tests;
 public sealed class ImageMatchingServiceTests
 {
     [TestMethod]
+    public async Task ScaleSearchFindsBothTitlesWithoutCountingDifferentScalesTwice()
+    {
+        using var screenshot = Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "flower-seed-manual-1080p.png"));
+        using var title = new Mat(screenshot, new Rect(180, 10, 135, 45));
+        using var canvas = new Mat(65, 340, MatType.CV_8UC3, Scalar.All(240));
+        foreach (var x in new[] { 10, 180 })
+        {
+            using var target = new Mat(canvas, new Rect(x, 10, title.Width, title.Height));
+            title.CopyTo(target);
+        }
+        using var bgra = new Mat();
+        Cv2.CvtColor(canvas, bgra, ColorConversionCodes.BGR2BGRA);
+        var pixels = new byte[bgra.Width * bgra.Height * 4];
+        System.Runtime.InteropServices.Marshal.Copy(bgra.Data, pixels, 0, pixels.Length);
+        using var frame = new CapturedFrame(bgra.Width, bgra.Height, pixels);
+        var service = new ImageMatchingService();
+        var area = new RecognitionRegion { Width = frame.Width, Height = frame.Height };
+        var options = new ImageMatchOptions { TemplateScaleX = .9375, TemplateScaleY = .9375, MinimumScore = .90 };
+
+        var result = await service.FindMatchesAsync(frame, area, "2048x1152/flower-seed/manual-header.png", 8, options);
+
+        Assert.HasCount(2, result.Matches);
+        CollectionAssert.AreEquivalent(new[] { 17, 187 }, result.Matches.Select(match => match.X).ToArray());
+        Assert.IsTrue(result.Matches.All(match => match.Width == 119 && match.Height == 26));
+        Array.Clear(pixels);
+        Assert.IsFalse((await service.MatchAsync(frame, area, "2048x1152/flower-seed/manual-header.png", options)).IsMatch);
+    }
+
+    [TestMethod]
     public async Task OpenCvMatchingLocatesTemplateAndRespectsAlphaMask()
     {
         var fixture = CreateFixture([(3, 2)]);

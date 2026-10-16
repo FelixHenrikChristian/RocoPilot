@@ -1,11 +1,10 @@
-Put image matching templates in resolution-specific subdirectories.
+以 `2048x1152/` 为基准保存素材，不为每个窗口尺寸重复截图。目录表示素材的参考画布尺寸，匹配时按客户区等比缩放。
 
-Directory names use the matching recognition-region resolution, for example:
+- 匹配器默认检查预计比例及附近 ±2%、±4% 的尺寸，复用缩放素材缓存。单目标在预计尺寸达到阈值时直接返回；列表跨尺度统一去重。
+- 搜索区域与控件大小分别处理：`RecognitionRegion.Anchor` 可指定靠边或居中，默认按参考区域所在位置选择锚点。坐标转换包含客户区偏移。
+- 保留现有 `1920x1440/` 素材及区域配置，用于已支持的 4:3 布局。仅凭缩放不能保证不同布局、不同控件外观等价，替换前需要完整界面样本验证。
+- 推荐 PNG；透明区域不参与匹配。素材应覆盖可区分的图案，避免只剩少量通用边缘像素。
 
-- `2048x1152/`
-- `1920x1440/`
+诊断时可将 `ImageMatchOptions.ScaleTolerance` 设为 `0` 比较固定尺度结果。默认匹配阈值不会因尺度搜索而降低。
 
-Recommended format: PNG with transparent background.
-At runtime this folder is copied to:
-
-Configuration/RecognitionAssets/ImageMatching
+运行时复制目录：`Configuration/RecognitionAssets/ImageMatching`。

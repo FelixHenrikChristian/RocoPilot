@@ -10,6 +10,7 @@ using Microsoft.UI.Xaml.Shapes;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
+using RocoPilot.Services.Recognition;
 
 using Windows.Graphics;
 using Windows.UI;
@@ -246,29 +247,30 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
             ? _regionConfig.ResolutionHeight
             : _currentClientBounds.Height;
 
-        var widthScale = (double)_currentClientBounds.Width / configWidth / rasterizationScale;
-        var heightScale = (double)_currentClientBounds.Height / configHeight / rasterizationScale;
-
         foreach (var region in _regionConfig.Regions.Where(IsDrawableRegion))
         {
             _ = _regionVisualStates.TryGetValue(region.Id, out var visualState);
-            AddRegion(region, widthScale, heightScale, canvasWidth, canvasHeight, visualState, now);
+            var mapped = RecognitionRegionImageHelper.MapReferenceArea(0, 0,
+                _currentClientBounds.Width, _currentClientBounds.Height, configWidth, configHeight,
+                region.X, region.Y, region.Width, region.Height, region.Anchor);
+            mapped.Id = region.Id;
+            mapped.IsMatched = region.IsMatched;
+            AddRegion(mapped, rasterizationScale, canvasWidth, canvasHeight, visualState, now);
         }
     }
 
     private void AddRegion(
         RecognitionRegion region,
-        double widthScale,
-        double heightScale,
+        double rasterizationScale,
         double canvasWidth,
         double canvasHeight,
         RegionVisualState? visualState,
         DateTimeOffset now)
     {
-        var x = region.X * widthScale;
-        var y = region.Y * heightScale;
-        var width = region.Width * widthScale;
-        var height = region.Height * heightScale;
+        var x = region.X / rasterizationScale;
+        var y = region.Y / rasterizationScale;
+        var width = region.Width / rasterizationScale;
+        var height = region.Height / rasterizationScale;
 
         if (width <= 0 || height <= 0)
         {

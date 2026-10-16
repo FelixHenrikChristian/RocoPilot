@@ -205,7 +205,7 @@ public sealed class FlowerSeedChallengeRunner(
                                 var row = screen.Rows[screen.Rows.Count / 2];
                                 await mouse.ScrollAsync(window.Hwnd, (int)Math.Round(nativeWidth * .23),
                                     (int)Math.Round((row.Button.Y + row.Button.Height / 2d - clientY) * nativeHeight / height),
-                                    decision.Action == FlowerSeedAction.ScrollUp ? 3600 : -360, inputMethod, token);
+                                    decision.Action == FlowerSeedAction.ScrollUp ? 3600 : -720, inputMethod, token);
                                 flow.RecordScroll(screen, height);
                                 break;
                             case FlowerSeedAction.Approach:

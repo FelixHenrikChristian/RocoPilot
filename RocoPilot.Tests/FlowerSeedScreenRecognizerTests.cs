@@ -26,6 +26,99 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedScreenRecognizerTests
 {
     [TestMethod]
+    public async Task SelectedTabEndsClickingEvenThoughTheTabTemplateStillMatches()
+    {
+        var recognizer = new FlowerSeedScreenRecognizer(new ListImages(2048, 1152, 0, 0), new NameOcr(),
+            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        using var frame = CreateFrame(2048, 1152, 0, 0);
+        Array.Clear(frame.Pixels);
+        var tab = await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.ChallengePage, "flower-tab", 0,
+            0, 0, 2048, 1152, CancellationToken.None);
+        Assert.IsNotNull(tab);
+
+        Array.Fill(frame.Pixels, (byte)245);
+
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.ChallengePage, "flower-tab", 0,
+            0, 0, 2048, 1152, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task RewardClickEndsWhenItsOcrTitleDisappears()
+    {
+        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr("获得奖励", "", ""),
+            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        using var frame = CreateFrame(2048, 1152, 0, 0);
+
+        Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.Rewards, "flower-rewards-dismiss", 0,
+            0, 0, 2048, 1152, CancellationToken.None));
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.Rewards, "flower-rewards-dismiss", 0,
+            0, 0, 2048, 1152, CancellationToken.None));
+    }
+
+    [TestMethod]
+    public async Task DisappearedListButtonCannotBeReplacedByAnIdenticalButtonInAnotherRow()
+    {
+        var images = new ImageMatchingService();
+        var recognizer = new FlowerSeedScreenRecognizer(images, new NameOcr(), new Catalog(), new Seasons(.70),
+            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        using var template = Cv2.ImRead(Path.Combine(images.TemplateDirectory, "2048x1152/flower-seed/list-teleport.png"), ImreadModes.Unchanged);
+        Assert.IsFalse(template.Empty());
+        var templateWidth = template.Width;
+        var templateHeight = template.Height;
+        using var canvas = new Mat(1152, 2048, MatType.CV_8UC4, Scalar.All(230));
+        foreach (var y in new[] { 280, 510 })
+        {
+            using var region = new Mat(canvas, new Rect(1700, y, templateWidth, templateHeight));
+            template.CopyTo(region);
+        }
+        var pixels = new byte[2048 * 1152 * 4];
+        System.Runtime.InteropServices.Marshal.Copy(canvas.Data, pixels, 0, pixels.Length);
+        using var frame = new CapturedFrame(2048, 1152, pixels);
+        var rowY = (280 + templateHeight / 2d) / 1152;
+        var first = await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.FlowerList, "list-teleport.png", rowY,
+            0, 0, 2048, 1152, CancellationToken.None);
+        Assert.IsNotNull(first);
+        Assert.AreEqual(280, first.Y);
+
+        for (var y = 280; y < 280 + templateHeight; y++)
+            Array.Clear(pixels, (y * 2048 + 1700) * 4, templateWidth * 4);
+
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.FlowerList, "list-teleport.png", rowY,
+            0, 0, 2048, 1152, CancellationToken.None));
+    }
+
+    [TestMethod]
+    [DataRow("flower-seed-map.png")]
+    [DataRow("flower-seed-confirmation.png")]
+    [DataRow("flower-seed-preparation.png")]
+    [DataRow("flower-seed-medal-confirmation.png")]
+    [DataRow("flower-seed-result.png")]
+    public async Task ClickTargetIsRecheckedUntilItsTemplateDisappears(string fixture)
+    {
+        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(""),
+            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var map = fixture == "flower-seed-map.png"; // 地图样本含原游戏窗口边框。
+        var clientX = map ? 1 : 12;
+        var width = map ? 1366 : 1280;
+        var height = map ? 768 : 720;
+        using var frame = map ? LoadFixture(fixture) : LoadFixture(fixture, width, height, clientX, 30);
+        var screen = await recognizer.ReadAsync(frame, clientX, 30, width, height, CancellationToken.None);
+        Assert.IsNotNull(screen.Button);
+        var original = screen.Button;
+
+        var found = await recognizer.FindClickTargetAsync(frame, screen.Scene, original.TemplatePath, 0,
+            clientX, 30, width, height, CancellationToken.None);
+
+        Assert.IsNotNull(found);
+        Assert.AreEqual((original.X, original.Y), (found.X, found.Y));
+        for (var y = original.Y; y < original.Y + original.Height; y++)
+            Array.Clear(frame.Pixels, (y * frame.Width + original.X) * 4, original.Width * 4);
+
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, original.TemplatePath, 0,
+            clientX, 30, width, height, CancellationToken.None));
+    }
+
+    [TestMethod]
     [DataRow("flower-seed-battle.png", nameof(FlowerSeedScene.Battle), BattleScreen.SkillSelection)]
     [DataRow("flower-seed-battle-detail.png", nameof(FlowerSeedScene.Battle), BattleScreen.SkillSelection)]
     [DataRow("flower-seed-capture.png", nameof(FlowerSeedScene.Capture), null)]

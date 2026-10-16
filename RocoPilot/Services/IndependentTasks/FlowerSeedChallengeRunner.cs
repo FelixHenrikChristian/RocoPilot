@@ -1,6 +1,9 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Models.Capture;
+using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Input;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
@@ -54,40 +57,14 @@ public sealed class FlowerSeedChallengeRunner(
         var lastActionScene = FlowerSeedScene.Unknown;
         var lastFrameTime = DateTimeOffset.MinValue;
         var minimumFrameAt = DateTimeOffset.UtcNow;
+        CapturedFrame? pendingFrame = null;
         logger.LogInformation("花种任务启动：{Target}，输入方式：{Method}", target?.DisplayName ?? "扫描全部花种", inputMethod);
 
         try
         {
             while (true)
             {
-                token.ThrowIfCancellationRequested();
-                if (!keyboard.IsWindowAvailable(window.Hwnd))
-                    throw new InvalidOperationException("游戏窗口已关闭。");
-                if (!keyboard.IsWindowForeground(window.Hwnd))
-                {
-                    overlay.Hide();
-                    Publish(lastProgress with { Operation = "已暂停，等待切回游戏" });
-                    await Task.Delay(400, token);
-                    lastAdvance = DateTimeOffset.UtcNow;
-                    minimumFrameAt = lastAdvance;
-                    continue;
-                }
-                if (DateTimeOffset.UtcNow - lastAdvance > TimeSpan.FromSeconds(90))
-                    throw new TimeoutException($"等待画面匹配超时，最后确认步骤：{lastProgress.Stage}。");
-
-                using var frame = await Task.Run(() => capture.Capture(window, state.Options.CaptureMethod), token);
-                if (frame is null)
-                {
-                    Publish(lastProgress with { Recognition = "正在读取游戏画面" });
-                    await Task.Delay(200, token);
-                    continue;
-                }
-                if (frame.CapturedAt <= lastFrameTime || frame.CapturedAt < minimumFrameAt)
-                {
-                    await Task.Delay(120, token);
-                    continue;
-                }
-                lastFrameTime = frame.CapturedAt;
+                using var frame = await CaptureNextFrameAsync();
                 _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(frame, window,
                     out var clientX, out var clientY, out var width, out var height);
                 List<(RecognitionRegion Region, string Text)> previews = [];
@@ -204,7 +181,7 @@ public sealed class FlowerSeedChallengeRunner(
                 if (!keyboard.IsWindowForeground(window.Hwnd)) continue;
                 if (decision.Action != FlowerSeedAction.None
                     && (decision.Action != FlowerSeedAction.Battle || plan is not null)
-                    && (decision.Action == FlowerSeedAction.Battle || screen.Scene != lastActionScene
+                    && (decision.Action is FlowerSeedAction.Battle or FlowerSeedAction.Click || screen.Scene != lastActionScene
                         || DateTimeOffset.UtcNow - lastAction >= TimeSpan.FromMilliseconds(700)))
                 {
                     try
@@ -219,10 +196,7 @@ public sealed class FlowerSeedChallengeRunner(
                                 await SendKey("F3", settings.KeyboardHoldDurationMs);
                                 break;
                             case FlowerSeedAction.Click:
-                                var button = decision.Button!;
-                                await mouse.ClickAsync(window.Hwnd,
-                                    (int)Math.Round((button.X + button.Width / 2d - clientX) * nativeWidth / width),
-                                    (int)Math.Round((button.Y + button.Height / 2d - clientY) * nativeHeight / height), inputMethod, token);
+                                await ClickUntilDisappearsAsync(screen.Scene, decision.Button!, clientX, clientY, width, height);
                                 break;
                             case FlowerSeedAction.ScrollUp:
                             case FlowerSeedAction.ScrollDown:
@@ -278,7 +252,93 @@ public sealed class FlowerSeedChallengeRunner(
         }
         finally
         {
+            pendingFrame?.Dispose();
             overlay.Hide();
+        }
+
+        async Task<CapturedFrame> CaptureNextFrameAsync(Stopwatch? clickTimer = null, string? clickDescription = null)
+        {
+            while (true)
+            {
+                token.ThrowIfCancellationRequested();
+                if (!keyboard.IsWindowAvailable(window.Hwnd))
+                    throw new InvalidOperationException("游戏窗口已关闭。");
+                if (!keyboard.IsWindowForeground(window.Hwnd))
+                {
+                    clickTimer?.Stop();
+                    pendingFrame?.Dispose();
+                    pendingFrame = null;
+                    overlay.Hide();
+                    Publish(lastProgress with { Operation = "已暂停，等待切回游戏" });
+                    await Task.Delay(400, token);
+                    lastAdvance = DateTimeOffset.UtcNow;
+                    minimumFrameAt = lastAdvance;
+                    continue;
+                }
+                clickTimer?.Start();
+                if (clickTimer?.Elapsed >= TimeSpan.FromSeconds(10))
+                    throw new TimeoutException($"{clickDescription}：10 秒内未确认点击目标消失。");
+                if (DateTimeOffset.UtcNow - lastAdvance > TimeSpan.FromSeconds(90))
+                    throw new TimeoutException($"等待画面匹配超时，最后确认步骤：{lastProgress.Stage}。");
+                if (pendingFrame is { } confirmed)
+                {
+                    pendingFrame = null;
+                    return confirmed;
+                }
+                var frame = await Task.Run(() => capture.Capture(window, state.Options.CaptureMethod), token);
+                if (frame is null)
+                {
+                    Publish(lastProgress with { Recognition = "正在读取游戏画面" });
+                    await Task.Delay(200, token);
+                    continue;
+                }
+                if (frame.CapturedAt <= lastFrameTime || frame.CapturedAt < minimumFrameAt)
+                {
+                    frame.Dispose();
+                    await Task.Delay(120, token);
+                    continue;
+                }
+                lastFrameTime = frame.CapturedAt;
+                return frame;
+            }
+        }
+
+        async Task ClickUntilDisappearsAsync(FlowerSeedScene scene, ImageMatchResult initial,
+            int clientX, int clientY, int width, int height)
+        {
+            var timer = Stopwatch.StartNew();
+            var operation = Operation(FlowerSeedAction.Click, scene);
+            var rowY = (initial.Y + initial.Height / 2d - clientY) / height;
+            ImageMatchResult? button = initial;
+            var attempts = 0;
+            while (button is not null)
+            {
+                token.ThrowIfCancellationRequested();
+                if (timer.Elapsed >= TimeSpan.FromSeconds(10))
+                    throw new TimeoutException($"{operation}：点击 {attempts} 次后目标仍未消失（{initial.TemplatePath}）。");
+                if (keyboard.IsWindowForeground(window.Hwnd))
+                {
+                    var nativeWidth = window.ClientWidth > 0 ? window.ClientWidth : width;
+                    var nativeHeight = window.ClientHeight > 0 ? window.ClientHeight : height;
+                    var x = (int)Math.Round((button.X + button.Width / 2d - clientX) * nativeWidth / width);
+                    var y = (int)Math.Round((button.Y + button.Height / 2d - clientY) * nativeHeight / height);
+                    Publish(lastProgress with { Operation = operation });
+                    await mouse.ClickAsync(window.Hwnd, x, y, inputMethod, token);
+                    minimumFrameAt = DateTimeOffset.UtcNow;
+                    logger.LogDebug("花种点击：{Operation}，第 {Attempt} 次，模板 {Template}，得分 {Score:F3}，客户区坐标 ({X},{Y})",
+                        operation, ++attempts, button.TemplatePath, button.Score, x, y);
+                }
+                await Task.Delay(700, token);
+                using var next = await CaptureNextFrameAsync(timer, $"{operation}（{initial.TemplatePath}，已点击 {attempts} 次）");
+                _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(next, window,
+                    out clientX, out clientY, out width, out height);
+                button = await recognizer.FindClickTargetAsync(next, scene, initial.TemplatePath, rowY,
+                    clientX, clientY, width, height, token);
+                // 消失这一帧也交给后续流程；WGC 静止画面未必立即产生另一张新帧。
+                if (button is null) pendingFrame = next.AddReference();
+            }
+            lastAdvance = DateTimeOffset.UtcNow;
+            logger.LogDebug("花种点击完成：{Operation}，目标已消失，共点击 {Attempts} 次", operation, attempts);
         }
 
         Task SendKey(string key, int holdDuration)

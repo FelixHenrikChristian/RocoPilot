@@ -26,6 +26,72 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedScreenRecognizerTests
 {
     [TestMethod]
+    [DataRow(1920, 1080, 0, 0)]
+    [DataRow(2560, 1080, 12, 30)]
+    [DataRow(1920, 1440, 12, 30)]
+    public async Task ManualUsesActualNavigationMatchAndRechecksIt(int width, int height, int clientX, int clientY)
+    {
+        // 宽屏/高屏用同一张真实截图贴在左上，验证锚定和边框偏移，不模拟游戏的其他布局。
+        using var source = LoadFixture("flower-seed-manual-1080p.png");
+        using var frame = CreateFrame(width, height, clientX, clientY);
+        for (var y = 0; y < source.Height; y++)
+            Array.Copy(source.Pixels, y * source.Width * 4, frame.Pixels,
+                ((y + clientY) * frame.Width + clientX) * 4, source.Width * 4);
+        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(),
+            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+
+        var screen = await recognizer.ReadAsync(frame, clientX, clientY, width, height, CancellationToken.None);
+
+        Assert.AreEqual(FlowerSeedScene.Manual, screen.Scene);
+        Assert.IsNotNull(screen.Button);
+        var button = screen.Button;
+        Assert.IsTrue(button.X + button.Width / 2 - clientX is >= 140 and <= 180);
+        Assert.IsTrue(button.Y + button.Height / 2 - clientY is >= 270 and <= 306);
+        Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, button.TemplatePath, 0,
+            clientX, clientY, width, height, CancellationToken.None));
+        for (var y = button.Y; y < button.Y + button.Height; y++)
+            Array.Clear(frame.Pixels, (y * frame.Width + button.X) * 4, button.Width * 4);
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, button.TemplatePath, 0,
+            clientX, clientY, width, height, CancellationToken.None));
+    }
+
+    [TestMethod]
+    [DataRow(1280, 720)]
+    [DataRow(2560, 1440)]
+    public async Task ScaledManualScreenshotLocatesNavigation(int width, int height)
+    {
+        using var frame = LoadFixture("flower-seed-manual-1080p.png", width, height, 12, 30);
+        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(),
+            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None);
+        Assert.AreEqual(FlowerSeedScene.Manual, screen.Scene);
+        Assert.IsNotNull(screen.Button);
+        var x = (screen.Button.X + screen.Button.Width / 2d - 12) * 1920 / width;
+        var y = (screen.Button.Y + screen.Button.Height / 2d - 30) * 1080 / height;
+        Assert.IsTrue(x is >= 140 and <= 180 && y is >= 270 and <= 306);
+    }
+
+    [TestMethod]
+    public async Task ManualHeaderNeedsSmallScaleAdjustmentOnActual1080pScreenshot()
+    {
+        using var frame = LoadFixture("flower-seed-manual-1080p.png");
+        var images = new ImageMatchingService();
+        var area = new RecognitionRegion { X = 154, Y = 5, Width = 230, Height = 59 };
+        var options = new ImageMatchOptions
+        {
+            TemplateScaleX = .9375, TemplateScaleY = .9375, MinimumScore = .9, ScaleTolerance = 0
+        };
+        var fixedScale = await images.MatchAsync(frame, area, "2048x1152/flower-seed/manual-header.png", options);
+        Assert.IsFalse(fixedScale.IsMatch, $"固定比例：{fixedScale.Score:F3}");
+
+        options.ScaleTolerance = .04;
+        var adjusted = await images.MatchAsync(frame, area, "2048x1152/flower-seed/manual-header.png", options);
+        Assert.IsTrue(adjusted.IsMatch, $"自适应比例：{adjusted.Score:F3}");
+        Assert.IsGreaterThan(.94, adjusted.Score);
+        Assert.AreEqual((187, 19, 119, 26), (adjusted.X, adjusted.Y, adjusted.Width, adjusted.Height));
+    }
+
+    [TestMethod]
     public async Task SelectedTabEndsClickingEvenThoughTheTabTemplateStillMatches()
     {
         var recognizer = new FlowerSeedScreenRecognizer(new ListImages(2048, 1152, 0, 0), new NameOcr(),

@@ -157,7 +157,7 @@ public sealed class RuntimeFrameRecognizer(
         debugLog.Write(
             CreateDebugLogKey("template-result", taskName, targetName, region.Id, templatePath),
             CreateBooleanDebugFingerprint(result.IsMatch),
-            "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}",
+            "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}, MatchRegion={MatchX},{MatchY},{MatchWidth}x{MatchHeight}",
             taskName,
             targetName,
             region.Id,
@@ -168,7 +168,8 @@ public sealed class RuntimeFrameRecognizer(
             frameRegion.X,
             frameRegion.Y,
             frameRegion.Width,
-            frameRegion.Height);
+            frameRegion.Height,
+            result.X, result.Y, result.Width, result.Height);
         return result;
     }
 
@@ -240,7 +241,7 @@ public sealed class RuntimeFrameRecognizer(
 
         var scaleX = sourceWidth > 0 ? sourceWidth / (double)configWidth : 1;
         var scaleY = sourceHeight > 0 ? sourceHeight / (double)configHeight : 1;
-        return CloneImageMatchOptions(options, scaleX, scaleY);
+        return CloneImageMatchOptions(options, Math.Min(scaleX, scaleY), Math.Min(scaleX, scaleY));
     }
 
     private static ImageMatchOptions CloneImageMatchOptions(ImageMatchOptions options, double scaleX, double scaleY)
@@ -248,6 +249,7 @@ public sealed class RuntimeFrameRecognizer(
         return new ImageMatchOptions
         {
             MinimumScore = options.MinimumScore,
+            ScaleTolerance = options.ScaleTolerance,
             AlphaThreshold = options.AlphaThreshold,
             SearchStep = options.SearchStep,
             TemplateScaleX = options.TemplateScaleX * scaleX,

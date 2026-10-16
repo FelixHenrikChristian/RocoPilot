@@ -8,6 +8,7 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Services.RuntimeTasks;
+using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
@@ -25,22 +26,23 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
     ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<FlowerSeedScreenRecognizer> logger)
 {
     // 首次定位与点击后的复查共用同一模板、区域和阈值。
-    private static readonly Dictionary<string, (double Left, double Top, double Right, double Bottom)> ButtonAreas = new()
+    private static readonly Dictionary<string, (double Left, double Top, double Right, double Bottom, RecognitionAnchor Anchor)> ButtonAreas = new()
     {
-        ["flower-tab"] = (.2, .015, .48, .1),
-        ["flower-tab-inactive"] = (.2, .015, .48, .1),
-        ["list-teleport"] = (.78, .12, .94, .98),
-        ["map-teleport"] = (.68, .88, .92, .98),
-        ["confirmation-challenge"] = (.5, .74, .72, .94),
-        ["start"] = (.49, .75, .69, .9),
-        ["result-retry"] = (.49, .88, .65, .98),
-        ["result-exit"] = (.35, .88, .49, .98)
+        ["manual-challenge"] = (.04, .18, .13, .35, RecognitionAnchor.TopLeft),
+        ["flower-tab"] = (.2, .015, .48, .1, RecognitionAnchor.TopLeft),
+        ["flower-tab-inactive"] = (.2, .015, .48, .1, RecognitionAnchor.TopLeft),
+        ["list-teleport"] = (.78, .12, .94, .98, RecognitionAnchor.CenterRight),
+        ["map-teleport"] = (.68, .88, .92, .98, RecognitionAnchor.BottomRight),
+        ["confirmation-challenge"] = (.5, .74, .72, .94, RecognitionAnchor.Center),
+        ["start"] = (.49, .75, .69, .9, RecognitionAnchor.Center),
+        ["result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
+        ["result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter)
     };
 
     internal async Task<FlowerSeedScreen> ReadAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken cancellationToken, Action<RecognitionRegion, string>? reportOcr = null)
     {
-        var scale = height / 1152d;
+        var scale = Math.Min(width / 2048d, height / 1152d);
         var options = new ImageMatchOptions
         {
             MinimumScore = .94,
@@ -50,8 +52,8 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         if (tab is not null)
         {
             if (!IsTabSelected(frame, tab)) return new(FlowerSeedScene.ChallengePage, [], tab);
-            var (left, top, right, bottom) = ButtonAreas["list-teleport"];
-            var buttons = await images.FindMatchesAsync(frame, Area(left, top, right, bottom),
+            var (left, top, right, bottom, anchor) = ButtonAreas["list-teleport"];
+            var buttons = await images.FindMatchesAsync(frame, Area(left, top, right, bottom, anchor: anchor),
                 "2048x1152/flower-seed/list-teleport.png", 8, options, cancellationToken: cancellationToken);
             List<FlowerSeedRow> rows = [];
             foreach (var button in buttons.Matches.Where(button => button.IsMatch).OrderBy(button => button.Y))
@@ -66,9 +68,7 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         }
         var manual = await Match("manual-header", .08, .005, .2, .06, .90);
         if (manual is not null)
-            return new(FlowerSeedScene.Manual, [], new ImageMatchResult(true, manual.Score,
-                clientX + (int)Math.Round(140 * scale), clientY + (int)Math.Round(280 * scale),
-                (int)Math.Round(60 * scale), (int)Math.Round(60 * scale), "manual-challenge-navigation"));
+            return new(FlowerSeedScene.Manual, [], await Button("manual-challenge"));
         // 确认页两类花种都使用共有的“花种”标题字样。
         var confirmation = await Match("confirmation-header", .5, .25, .78, .5);
         if (confirmation is not null)
@@ -105,7 +105,7 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             if (capture is not null) return new(FlowerSeedScene.Capture, [], capture);
         }
         // 交互菜单必须同时具有大世界 HUD，结束动画中的浅色图形不能判为挑战失败。
-        var world = await images.MatchAsync(frame, Area(.08, .02, .2, .09), "2048x1152/magic-point.png", options, cancellationToken);
+        var world = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
         var prompt = world.IsMatch ? await Match("interaction-f", .42, .24, .84, .9) : null;
         if (prompt is not null)
         {
@@ -142,9 +142,9 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         Task<ImageMatchResult?> Button(string template)
             => MatchButtonAsync(frame, template, clientX, clientY, width, height, cancellationToken);
 
-        RecognitionRegion Area(double left, double top, double right, double bottom, string id = "")
+        RecognitionRegion Area(double left, double top, double right, double bottom, string id = "", RecognitionAnchor anchor = RecognitionAnchor.Auto)
         {
-            var region = CreateArea(clientX, clientY, width, height, left, top, right, bottom);
+            var region = CreateArea(clientX, clientY, width, height, left, top, right, bottom, anchor);
             region.Id = id;
             return region;
         }
@@ -152,6 +152,9 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         {
             options.MinimumScore = score;
             var result = await images.MatchAsync(frame, Area(left, top, right, bottom), "2048x1152/flower-seed/" + template + ".png", options, cancellationToken);
+            if (template == "manual-header")
+                logger.LogDebug("花种手册识别：匹配={Matched}，得分={Score:F3}，预计比例={Scale:F4}，目标=({X},{Y},{Width},{Height})",
+                    result.IsMatch, result.Score, scale, result.X, result.Y, result.Width, result.Height);
             options.MinimumScore = .94;
             return result.IsMatch ? result : null;
         }
@@ -171,14 +174,13 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
     internal async Task<ImageMatchResult?> FindClickTargetAsync(CapturedFrame frame, FlowerSeedScene scene,
         string templatePath, double rowY, int clientX, int clientY, int width, int height, CancellationToken token)
     {
+        if (scene is FlowerSeedScene.World or FlowerSeedScene.Interaction)
+        {
+            var hud = await MatchWorldHudAsync(frame, clientX, clientY, width, height, token);
+            return hud.IsMatch ? hud : null;
+        }
         if (scene == FlowerSeedScene.Rewards)
             return (await ReadRewardsAsync(frame, clientX, clientY, width, height, token))?.Button;
-        if (scene == FlowerSeedScene.Manual)
-        {
-            // 手册入口是相对标题的坐标，并非独立按钮模板，沿用手册自身的识别规则。
-            var screen = await ReadAsync(frame, clientX, clientY, width, height, token);
-            return screen.Scene == FlowerSeedScene.Manual ? screen.Button : null;
-        }
         if (scene == FlowerSeedScene.ChallengePage)
         {
             var tab = await MatchButtonAsync(frame, "flower-tab", clientX, clientY, width, height, token)
@@ -189,20 +191,36 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             clientX, clientY, width, height, token, scene == FlowerSeedScene.FlowerList ? rowY : null);
     }
 
+    // F3 的完成确认只复查原 HUD，避免全界面识别耗时影响开关按键的等待。
+    private Task<ImageMatchResult> MatchWorldHudAsync(CapturedFrame frame, int clientX, int clientY,
+        int width, int height, CancellationToken token)
+    {
+        var scale = Math.Min(width / 2048d, height / 1152d);
+        return images.MatchAsync(frame, CreateArea(clientX, clientY, width, height, .08, .02, .2, .09),
+            "2048x1152/magic-point.png",
+            new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
+    }
+
     private async Task<ImageMatchResult?> MatchButtonAsync(CapturedFrame frame, string template,
         int clientX, int clientY, int width, int height, CancellationToken token, double? rowY = null)
     {
-        var (left, top, right, bottom) = ButtonAreas[template];
+        var (left, top, right, bottom, anchor) = ButtonAreas[template];
+        var area = CreateArea(clientX, clientY, width, height, left, top, right, bottom, anchor);
         if (rowY is { } center)
         {
             // 行间距大于按钮高度；限制纵向搜索范围，避免误点邻近花种。
-            top = Math.Max(top, center - .02);
-            bottom = Math.Min(bottom, center + .02);
+            var y = Math.Max(area.Y, clientY + (int)Math.Round((center - .02) * height));
+            var end = Math.Min(area.Y + area.Height, clientY + (int)Math.Round((center + .02) * height));
+            area.Y = y;
+            area.Height = Math.Max(0, end - y);
         }
-        var scale = height / 1152d;
-        var result = await images.MatchAsync(frame, CreateArea(clientX, clientY, width, height, left, top, right, bottom),
+        var scale = Math.Min(width / 2048d, height / 1152d);
+        var result = await images.MatchAsync(frame, area,
             $"2048x1152/flower-seed/{template}.png",
             new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
+        if (template == "manual-challenge")
+            logger.LogDebug("花种手册挑战入口：匹配={Matched}，得分={Score:F3}，目标=({X},{Y},{Width},{Height})",
+                result.IsMatch, result.Score, result.X, result.Y, result.Width, result.Height);
         return result.IsMatch ? result : null;
     }
 
@@ -227,12 +245,9 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
     }
 
     private static RecognitionRegion CreateArea(int x, int y, int width, int height,
-        double left, double top, double right, double bottom) => new()
-    {
-        X = x + (int)Math.Round(width * left), Y = y + (int)Math.Round(height * top),
-        Width = Math.Max(1, (int)Math.Round(width * (right - left))),
-        Height = Math.Max(1, (int)Math.Round(height * (bottom - top)))
-    };
+        double left, double top, double right, double bottom, RecognitionAnchor anchor = RecognitionAnchor.Auto) =>
+        RecognitionRegionImageHelper.MapReferenceArea(x, y, width, height, 2048, 1152,
+            left * 2048, top * 1152, (right - left) * 2048, (bottom - top) * 1152, anchor);
 
     internal static string Normalize(string text) => string.Concat(text.Where(char.IsLetterOrDigit));
     private static bool IsTabSelected(CapturedFrame frame, ImageMatchResult tab)

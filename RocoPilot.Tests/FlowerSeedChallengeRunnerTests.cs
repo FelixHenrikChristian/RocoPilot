@@ -19,6 +19,52 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedChallengeRunnerTests
 {
     [TestMethod]
+    [DataRow((byte)0)]
+    [DataRow((byte)3)]
+    public async Task F3IsNotRepeatedWhenAnOldWorldObservationTakesLongerThanTheRetryInterval(byte initialScene)
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var capture = new CaptureStub(cancellation, initialScene);
+        var images = new Images();
+        var delayed = false;
+        var keyboard = new Keyboard { DuringSequence = _ =>
+        {
+            capture.NextScene = initialScene; // 按键完成后仍有一张大世界过渡帧。
+            images.BeforeWorldMatch = () =>
+            {
+                if (delayed) return;
+                delayed = true;
+                capture.NextScene = 1; // 识别旧画面时，游戏已经进入手册。
+                Thread.Sleep(850);
+            };
+        } };
+        var mouse = new Mouse { DuringClick = (_, _) => cancellation.Cancel() };
+        var runner = CreateRunner(capture, images, keyboard, mouse);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => runner.ScanAsync(CreateState(), _ => { }, cancellation.Token));
+
+        Assert.IsTrue(delayed);
+        CollectionAssert.AreEqual(new[] { "F3" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.AreEqual(1, mouse.Clicks); // 消失帧直接交给下一步，静止手册没有新帧也能点击。
+        Assert.AreEqual(2, images.FramesRead); // 等待期间只查 HUD，不重复识别整套场景。
+    }
+
+    [TestMethod]
+    public async Task F3TimesOutWithoutTogglingAgainWhenWorldHudNeverDisappears()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        var keyboard = new Keyboard();
+        var mouse = new Mouse();
+        var runner = CreateRunner(new FreshListCapture { Scene = 0 }, new Images(), keyboard, mouse);
+
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => runner.ScanAsync(CreateState(), _ => { }, cancellation.Token));
+
+        StringAssert.Contains(error.Message, "F3");
+        CollectionAssert.AreEqual(new[] { "F3" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.AreEqual(0, mouse.Clicks);
+    }
+
+    [TestMethod]
     public async Task ScanningProgressUsesNumberedFlowersAndStableOperations()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -671,6 +717,7 @@ public sealed class FlowerSeedChallengeRunnerTests
 
     private sealed class Images : IImageMatchingService
     {
+        public Action? BeforeWorldMatch;
         public int FramesRead;
         public bool IntermittentSkills;
         public int SkillFrames;
@@ -682,6 +729,8 @@ public sealed class FlowerSeedChallengeRunnerTests
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
         {
+            if (frame.Pixels[0] is 0 or 3 && templatePath.EndsWith("/magic-point.png", StringComparison.Ordinal))
+                BeforeWorldMatch?.Invoke();
             if (templatePath.EndsWith("/flower-tab.png", StringComparison.Ordinal))
             {
                 FramesRead++;
@@ -715,7 +764,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                         : templatePath.EndsWith("/map-teleport.png", StringComparison.Ordinal) ? MapButtonX : 55,
                     48, 10, 4, templatePath));
             var matched = frame.Pixels[0] is 0 or 3 && templatePath.EndsWith("/magic-point.png", StringComparison.Ordinal)
-                || frame.Pixels[0] == 1 && templatePath.EndsWith("/manual-header.png", StringComparison.Ordinal);
+                || frame.Pixels[0] == 1 && Path.GetFileNameWithoutExtension(templatePath) is "manual-header" or "manual-challenge";
             return Task.FromResult(matched ? new ImageMatchResult(true, 1, 10, 1, 2, 2, templatePath) : ImageMatchResult.NoMatch(0, templatePath));
         }
         public Task<ImageMatchCollectionResult> FindMatchesAsync(CapturedFrame frame, RecognitionRegion region,

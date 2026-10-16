@@ -15,7 +15,7 @@ public sealed record InfoOverlayIslandPresentation(string Category, string Title
     public static InfoOverlayIslandPresentation? Resolve(InfoOverlaySnapshot snapshot, InfoOverlayNotice? uidNotice, DateTimeOffset now)
     {
         if (!string.IsNullOrWhiteSpace(snapshot.IndependentTaskName) && snapshot.IndependentTaskProgress is { } progress)
-            return new(progress.Stage, progress.Operation, progress.Recognition, progress.CreatureName);
+            return progress.IsBattleWaiting ? null : new(progress.Stage, progress.Operation, progress.Recognition, progress.CreatureName);
         if (snapshot.IsShinyProtectionActive)
         {
             var protectedCreatureName = snapshot.PendingShinyCapture?.CreatureName ?? snapshot.BattleCreatureName;

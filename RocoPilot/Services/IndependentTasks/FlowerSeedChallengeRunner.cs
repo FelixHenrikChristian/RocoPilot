@@ -168,7 +168,10 @@ public sealed class FlowerSeedChallengeRunner(
                     FlowerSeedAction.Capture => "捕捉",
                     _ => Operation(decision.Action, screen.Scene)
                 };
-                Publish(lastProgress with { Operation = operation, Recognition = target is null ? recognized
+                Publish(lastProgress with { Operation = operation,
+                    IsBattleWaiting = flow.IsBattleActive && plan is null
+                        && screen.Scene is FlowerSeedScene.Battle or FlowerSeedScene.Unknown,
+                    Recognition = target is null ? recognized
                     : screen.Scene is FlowerSeedScene.Battle or FlowerSeedScene.Capture or FlowerSeedScene.Rewards or FlowerSeedScene.Result
                         ? $"{creatureName} · 成功 {flow.CompletedCount}/{runCount}"
                         : $"成功 {flow.CompletedCount}/{runCount} 次 · {recognized}" });
@@ -220,7 +223,7 @@ public sealed class FlowerSeedChallengeRunner(
                                 if (!await battleInput.ExecuteAsync(window.Hwnd, settings, plan!, token,
                                         (sequence, completed) =>
                                         {
-                                            Publish(lastProgress with { Operation = InfoOverlayIslandPresentation.BattleInputTitle(plan!) });
+                                            Publish(lastProgress with { Operation = InfoOverlayIslandPresentation.BattleInputTitle(plan!), IsBattleWaiting = false });
                                             logger.LogDebug("花种按键：第 {Battle} 场，第 {Turn} 回合，{Action}，序列 {Sequence}，{Status}",
                                                 battleNumber, battle.TurnNumber, plan!.Action, sequence, completed ? "发送完成" : "开始发送");
                                         }))
@@ -244,7 +247,7 @@ public sealed class FlowerSeedChallengeRunner(
                     catch (InvalidOperationException) when (!keyboard.IsWindowForeground(window.Hwnd))
                     {
                         minimumFrameAt = DateTimeOffset.UtcNow;
-                        Publish(lastProgress with { Operation = "已暂停，等待切回游戏" });
+                        Publish(lastProgress with { Operation = "已暂停，等待切回游戏", IsBattleWaiting = false });
                     }
                 }
                 if (!previewEnabled) await Task.Delay(180, token);
@@ -269,7 +272,7 @@ public sealed class FlowerSeedChallengeRunner(
                     pendingFrame?.Dispose();
                     pendingFrame = null;
                     overlay.Hide();
-                    Publish(lastProgress with { Operation = "已暂停，等待切回游戏" });
+                    Publish(lastProgress with { Operation = "已暂停，等待切回游戏", IsBattleWaiting = false });
                     await Task.Delay(400, token);
                     lastAdvance = DateTimeOffset.UtcNow;
                     minimumFrameAt = lastAdvance;

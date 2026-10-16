@@ -294,7 +294,9 @@ public sealed class FlowerSeedFlowTests
     }
 
     [TestMethod]
-    public void FullTwentyFourRowScanKeepsEveryEntryInOrderAcrossPartialScrolls()
+    [DataRow(84)]
+    [DataRow(168)]
+    public void FullTwentyFourRowScanKeepsEveryEntryInOrderAcrossPartialScrolls(int step)
     {
         const int lastOffset = 19 * 228;
         var flow = new FlowerSeedFlow(null);
@@ -303,11 +305,14 @@ public sealed class FlowerSeedFlowTests
         ExecuteScroll(flow, screen);
         ExecuteScroll(flow, screen);
 
-        for (var offset = 84; offset < lastOffset + 84; offset += 84)
+        for (var offset = step; offset < lastOffset + step; offset += step)
         {
             flow.RecordScroll(screen, 1152);
             screen = AtOffset(Math.Min(offset, lastOffset));
             Assert.AreEqual(FlowerSeedAction.ScrollDown, flow.Next(screen, 1152).Action);
+            foreach (var row in screen.Rows)
+                Assert.AreEqual((row.Button.Y + Button.Height / 2 + Math.Min(offset, lastOffset) - 100) / 228 + 1,
+                    row.Number, $"滚动至 {offset} 时行号错误");
         }
 
         Assert.AreEqual(FlowerSeedAction.ScrollDown, ExecuteScroll(flow, screen).Action);

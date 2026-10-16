@@ -135,11 +135,12 @@ internal sealed class FlowerSeedFlow(FlowerSeedOption? target, int runCount = 6)
         List<(int Number, double Y, bool Matched)> current = [];
         foreach (var (row, position) in rows.Zip(positions))
         {
-            // 扫描每次只滚动小于半行的距离，邻近位置可延续可见花种的身份。
-            var previous = _visibleRows.Where(candidate => current.All(item => item.Number != candidate.Number))
+            // 向下扫描时条目只会上移；步长小于一行即可延续身份，容许匹配位置轻微抖动。
+            var previous = _visibleRows.Where(candidate => candidate.Y >= position.Y - .003
+                    && current.All(item => item.Number != candidate.Number))
                 .OrderBy(candidate => Math.Abs(candidate.Y - position.Y)).FirstOrDefault();
             var sameRow = previous.Number != 0 && Math.Abs(previous.Y - position.Y)
-                < (double.IsPositiveInfinity(_rowSpacing) ? .003 : _rowSpacing / 2);
+                < (double.IsPositiveInfinity(_rowSpacing) ? .003 : _rowSpacing - .003);
             row.Number = sameRow ? previous.Number : _options.Count + 1;
             row.HasMatched = !string.IsNullOrWhiteSpace(row.Name) || sameRow && previous.Matched;
             var name = string.IsNullOrWhiteSpace(row.Name) ? row.RawName.Trim() : row.Name;

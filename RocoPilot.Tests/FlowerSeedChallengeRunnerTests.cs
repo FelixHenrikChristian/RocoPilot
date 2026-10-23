@@ -19,6 +19,35 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedChallengeRunnerTests
 {
     [TestMethod]
+    public async Task SlowSkillResponseDoesNotSendRecoveryOrChangeOverlayToRecovery()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var capture = new ChallengeCapture();
+        var state = CreateState();
+        state.Options.AutoBattleSettings.SkillSelectionRetryDelayMs = 4000;
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        Task? delayedSkill = null;
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            if (sequence == "4") delayedSkill = Task.Run(async () =>
+            {
+                await Task.Delay(1500, cancellation.Token);
+                capture.OnKey(sequence);
+            });
+            else capture.OnKey(sequence);
+        } };
+        var runner = CreateRunner(capture, new Images(), keyboard, new Mouse { DuringClick = capture.OnClick },
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        List<IndependentTaskProgress> updates = [];
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
+            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+        Assert.IsNotNull(delayedSkill);
+        await delayedSkill;
+        CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.IsFalse(updates.Any(update => update.Operation.Contains("回能")));
+    }
+
+    [TestMethod]
     [DataRow((byte)0)]
     [DataRow((byte)3)]
     public async Task F3IsNotRepeatedWhenAnOldWorldObservationTakesLongerThanTheRetryInterval(byte initialScene)

@@ -31,7 +31,6 @@ public sealed record AutoBattlePlan(
 public sealed class AutoBattleController
 {
     private static readonly TimeSpan BloodlineWaitTimeout = TimeSpan.FromSeconds(4);
-    private static readonly TimeSpan SkillFailureCheckDelay = TimeSpan.FromMilliseconds(500);
     private readonly object _gate = new();
     private long _battleId;
     private long _nextTurnId;
@@ -103,7 +102,7 @@ public sealed class AutoBattleController
         lock (_gate)
             return settings.IsEnabled && !_suspendedForShiny
                 && _turn is { Action: AutoBattleAction.Skill, LastActionAt: { } lastActionAt }
-                && now - lastActionAt >= SkillFailureCheckDelay;
+                && now - lastActionAt >= TimeSpan.FromMilliseconds(settings.SkillSelectionRetryDelayMs);
     }
 
     public AutoBattlePlan PlanSkillSelection(AutoBattleSettings settings, bool bloodlineRecognitionAvailable, DateTimeOffset now)

@@ -33,6 +33,28 @@ public sealed class LegendaryChallengeFlowTests
     }
 
     [TestMethod]
+    [DataRow(1, 3)]
+    [DataRow(2, 1)]
+    [DataRow(3, 2)]
+    public void DifficultyMustBeConfirmedBeforeStartingAndIsCheckedAgainOnReturn(int target, int current)
+    {
+        var flow = new ManualChallengeFlow(null, 3, "圣羽翼王", legendaryDifficulty: target);
+        Next(flow, ManualChallengeScene.LegendaryList, rows: [new("圣羽翼王", Confirm)]);
+        Next(flow, ManualChallengeScene.Map, text: "圣羽翼王");
+        var option = new ManualChallengeRow(new string('I', target), Mark) { Number = target };
+        var wrong = new ManualChallengeScreen(ManualChallengeScene.LegendaryConfirmation, [option], Confirm, Difficulty: current);
+        Assert.AreEqual(ManualChallengeAction.None, flow.Next(wrong with { Difficulty = 0 }, 1152).Action);
+        Assert.AreEqual(Mark, flow.Next(wrong, 1152).Button);
+        Assert.AreEqual(Mark, flow.Next(wrong, 1152).Button);
+        Assert.AreEqual(Confirm, flow.Next(wrong with { Difficulty = target }, 1152).Button);
+        Next(flow, ManualChallengeScene.Preparation);
+        Next(flow, ManualChallengeScene.Battle);
+        Next(flow, ManualChallengeScene.Capture);
+        Next(flow, ManualChallengeScene.Result);
+        Assert.AreEqual(Mark, flow.Next(wrong, 1152).Button);
+    }
+
+    [TestMethod]
     public void SkippingAnimationPreservesBattlePhaseAndCounters()
     {
         var flow = Navigate(true);

@@ -354,6 +354,26 @@
                                 SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
                         </Grid>
 
+                        <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon VerticalAlignment="Center" FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Glyph="&#xE9D9;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="挑战难度" />
+                                <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="开始挑战前选择指定难度，默认 III。" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox Grid.Column="2" Width="240" VerticalAlignment="Center"
+                                AutomationProperties.Name="传说精灵挑战难度"
+                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.LegendaryDifficulties}"
+                                SelectedIndex="{x:Bind ViewModel.SelectedLegendaryDifficultyIndex, Mode=TwoWay}" />
+                        </Grid>
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />

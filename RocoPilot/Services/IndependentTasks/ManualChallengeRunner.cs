@@ -23,9 +23,9 @@ public sealed class ManualChallengeRunner(
     ILogger<ManualChallengeRunner> logger) : IManualChallengeRunner
 {
     public async Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
-        bool useLegendaryMark, AutoBattleSettings battleSettings,
+        int difficulty, bool useLegendaryMark, AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
-        => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken, targetName, useLegendaryMark);
+        => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken, targetName, useLegendaryMark, difficulty);
 
     public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target, int runCount, AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress,
@@ -38,11 +38,12 @@ public sealed class ManualChallengeRunner(
 
     private async Task<IReadOnlyList<FlowerSeedOption>> RunCoreAsync(RuntimeTaskState state, FlowerSeedOption? target,
         int runCount, AutoBattleSettings battleSettings,
-        Action<IndependentTaskProgress> progress, CancellationToken token, string? legendaryTarget = null, bool useLegendaryMark = true)
+        Action<IndependentTaskProgress> progress, CancellationToken token, string? legendaryTarget = null, bool useLegendaryMark = true,
+        int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty)
     {
         var legendary = legendaryTarget is not null;
         var scanning = target is null && !legendary;
-        var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark);
+        var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark, legendaryDifficulty);
         var settings = AutoBattleSettingsRules.Normalize(battleSettings);
         if (!scanning)
         {
@@ -186,6 +187,8 @@ public sealed class ManualChallengeRunner(
                         : screen.BattleScreen != BattleScreen.SkillSelection ? "等待行动"
                         : battle.CurrentTurn?.Action == AutoBattleAction.EnergyRecovery ? "等待重试" : "准备技能",
                     ManualChallengeAction.Capture => "捕捉",
+                    ManualChallengeAction.Click when screen.Scene == ManualChallengeScene.LegendaryConfirmation
+                        && screen.Difficulty != legendaryDifficulty => $"选择难度 {new string('I', legendaryDifficulty)}",
                     _ => Operation(decision.Action, screen.Scene)
                 };
                 Publish(lastProgress with { Operation = operation,
@@ -378,7 +381,10 @@ public sealed class ManualChallengeRunner(
             int clientX, int clientY, int width, int height)
         {
             var timer = Stopwatch.StartNew();
-            var operation = flow.StopReason is not null ? "退出并停止：" + flow.StopReason : Operation(action, scene);
+            var operation = flow.StopReason is not null ? "退出并停止：" + flow.StopReason
+                : scene == ManualChallengeScene.LegendaryConfirmation
+                    && Path.GetFileNameWithoutExtension(initial.TemplatePath).StartsWith("difficulty-", StringComparison.Ordinal)
+                    ? $"选择难度 {new string('I', legendaryDifficulty)}" : Operation(action, scene);
             var rowY = (initial.Y + initial.Height / 2d - clientY) / height;
             ImageMatchResult? button = initial;
             var attempts = 0;

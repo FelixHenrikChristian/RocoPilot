@@ -25,10 +25,14 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
     {
         Editor = editor;
         _owner = owner;
-        ReleaseEditor = section == AutoBattleConfigSection.FlowerSeed ? editor.FlowerSeedRelease : editor.NormalRelease;
-        BattleTypeName = section == AutoBattleConfigSection.FlowerSeed ? "花种战斗" : "普通战斗";
-        Description = section == AutoBattleConfigSection.FlowerSeed
-            ? "轮到自己操作时按顺序释放技能，每场挑战从第一步开始；命定与稀兽花种共用此配置。"
+        (ReleaseEditor, BattleTypeName) = section switch
+        {
+            AutoBattleConfigSection.FlowerSeed => (editor.FlowerSeedRelease, "花种战斗"),
+            AutoBattleConfigSection.Legendary => (editor.LegendaryRelease, "传说精灵战斗"),
+            _ => (editor.NormalRelease, "普通战斗")
+        };
+        Description = section is AutoBattleConfigSection.FlowerSeed or AutoBattleConfigSection.Legendary
+            ? "轮到自己操作时按顺序释放技能，每场挑战从第一步开始，可插入公共执行序列。"
             : "按顺序循环执行每个技能回合的动作。";
         InitializeComponent();
     }

@@ -33,6 +33,22 @@ public sealed class LegendaryChallengeFlowTests
     }
 
     [TestMethod]
+    public void SkippingAnimationPreservesBattlePhaseAndCounters()
+    {
+        var flow = Navigate(true);
+        Next(flow, ManualChallengeScene.Preparation);
+        Assert.AreEqual(ManualChallengeAction.Escape, Next(flow, ManualChallengeScene.SkippableAnimation).Action);
+        Assert.AreEqual(0, flow.BattleNumber);
+        Assert.AreEqual(ManualChallengeAction.Battle, Next(flow, ManualChallengeScene.Battle).Action);
+        Assert.AreEqual(ManualChallengeAction.Escape, Next(flow, ManualChallengeScene.SkippableAnimation).Action);
+        Assert.IsTrue(flow.IsBattleActive);
+        Assert.AreEqual(ManualChallengeAction.Battle, Next(flow, ManualChallengeScene.Battle).Action);
+        Assert.AreEqual(1, flow.BattleNumber);
+        Assert.AreEqual(0, flow.CompletedCount);
+        Assert.AreEqual(0, flow.ConsecutiveFailures);
+    }
+
+    [TestMethod]
     public void StopsBeforeBattleWhenMarksAreDisabled()
     {
         var flow = Navigate(false);

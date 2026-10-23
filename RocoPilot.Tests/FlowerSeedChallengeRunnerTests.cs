@@ -50,12 +50,13 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             await run;
             var expected = switchPet
-                ? new[] { "W", "F", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space",
-                    "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space" }
-                : new[] { "W", "F", "4", "Esc", "1, Space", "4", "Esc", "1, Space" };
+                ? new[] { "W", "F", "Esc", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space",
+                    "Esc", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space" }
+                : new[] { "W", "F", "Esc", "4", "Esc", "1, Space", "Esc", "4", "Esc", "1, Space" };
             CollectionAssert.AreEqual(expected,
                 keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(2, capture.Captures);
+            Assert.IsTrue(updates.Any(update => update.Operation == "按Esc跳过动画"));
             Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
         }
         else
@@ -107,6 +108,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             {
                 ("message", "W") => "interaction-gold",
                 ("interaction-gold", "F") => "confirmation",
+                ("skip", "Esc") => "battle",
                 ("confirmation", "Esc") => "world",
                 ("battle", "4") => switchPet ? "pet-switching" : "capture-contract",
                 ("battle", "2") when switchPet => "capture-contract",
@@ -124,7 +126,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 "confirmation" => "insufficient",
                 "insufficient" when x > 650 => "preparation",
                 "insufficient" when x < 650 => "confirmation",
-                "preparation" => "battle",
+                "preparation" => "skip",
                 "capture-contract" when x is > 640 and < 750 && y < 450 => "capture-legendary",
                 "capture-legendary" when y > 550 => "rewards",
                 "result" when Captures < 2 && x > 650 => "insufficient",

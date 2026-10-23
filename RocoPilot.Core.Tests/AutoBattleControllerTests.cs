@@ -50,21 +50,26 @@ public sealed class AutoBattleControllerTests
     }
 
     [TestMethod]
-    public void FailedSkillRecoversEnergyAndKeepsOriginalSkillForNextTurn()
+    [DataRow(750)]
+    [DataRow(4000)]
+    [DataRow(8000)]
+    public void FailedSkillRecoversEnergyAndKeepsOriginalSkillForNextTurn(int retryDelay)
     {
         var settings = Settings();
+        settings.SkillSelectionRetryDelayMs = retryDelay;
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
         battle.ConfirmSelectionReady(turn.Id);
         battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now);
-        Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(499)));
-        Assert.IsTrue(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(500)));
-        battle.RecordAction(turn.Id, AutoBattleAction.EnergyRecovery, Now.AddMilliseconds(500));
-        Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddSeconds(1)));
-        Assert.IsFalse(battle.CanAct(settings, Now.AddMilliseconds(4499)));
-        Assert.IsTrue(battle.CanAct(settings, Now.AddMilliseconds(4500)));
+        Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(500)));
+        Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(retryDelay - 1)));
+        Assert.IsTrue(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(retryDelay)));
+        battle.RecordAction(turn.Id, AutoBattleAction.EnergyRecovery, Now.AddMilliseconds(retryDelay));
+        Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(retryDelay + 500)));
+        Assert.IsFalse(battle.CanAct(settings, Now.AddMilliseconds(retryDelay * 2 - 1)));
+        Assert.IsTrue(battle.CanAct(settings, Now.AddMilliseconds(retryDelay * 2)));
         battle.CompleteSkillSelection();
-        Assert.AreEqual("1", battle.BeginSkillSelection(settings, Now.AddSeconds(5)).ReleaseStep.SkillKey);
+        Assert.AreEqual("1", battle.BeginSkillSelection(settings, Now.AddMilliseconds(retryDelay * 2 + 1)).ReleaseStep.SkillKey);
     }
 
     [TestMethod]

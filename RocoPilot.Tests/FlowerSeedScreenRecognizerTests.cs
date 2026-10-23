@@ -30,6 +30,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("list", nameof(ManualChallengeScene.LegendaryList))]
     [DataRow("map", nameof(ManualChallengeScene.Map))]
     [DataRow("world", nameof(ManualChallengeScene.World))]
+    [DataRow("skip", nameof(ManualChallengeScene.SkippableAnimation))]
     [DataRow("message", nameof(ManualChallengeScene.Interaction))]
     [DataRow("interaction-dark", nameof(ManualChallengeScene.Interaction))]
     [DataRow("interaction-gold", nameof(ManualChallengeScene.Interaction))]
@@ -113,6 +114,44 @@ public sealed class FlowerSeedScreenRecognizerTests
         Assert.AreEqual(ManualChallengeScene.Interaction, screen.Scene);
         Assert.AreEqual("查看留言", screen.Text);
         Assert.IsTrue(screen.HasChallengeOption);
+    }
+
+    [TestMethod]
+    [DataRow(0, 2048, 1152)]
+    [DataRow(1, 2048, 1152)]
+    [DataRow(2, 2048, 1152)]
+    [DataRow(0, 1280, 720)]
+    [DataRow(1, 1280, 720)]
+    [DataRow(2, 1280, 720)]
+    public async Task SkipRequiresBothControlsAndIgnoresChangingBackground(int backgroundKind, int width, int height)
+    {
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(),
+            new Catalog(), new Seasons(.7), NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        // 0：没有控件；1：只有图标；2：只有 Esc；3：完整跳过控件。
+        for (var controls = 0; controls <= 3; controls++)
+        {
+            using var frame = LoadFixture("legendary-skip.png", width, height, 12, 30, source =>
+            {
+                using var background = new Mat(source.Size(), source.Type(), backgroundKind == 0 ? Scalar.Black : Scalar.White);
+                var sourceWidth = source.Width;
+                var sourceHeight = source.Height;
+                if (backgroundKind == 2)
+                    for (var y = 0; y < sourceHeight; y += 16)
+                        for (var x = 0; x < sourceWidth; x += 16)
+                            Cv2.Rectangle(background, new Rect(x, y, 16, 16),
+                                (x / 16 + y / 16) % 2 == 0 ? new Scalar(30, 210, 80) : new Scalar(240, 60, 180), -1);
+                using var mask = new Mat(source.Size(), MatType.CV_8UC1, Scalar.Black);
+                if ((controls & 1) != 0) Cv2.Circle(mask, new Point(154, 60), 26, Scalar.White, -1);
+                if ((controls & 2) != 0) Cv2.Ellipse(mask, new Point(154, 105), new Size(26, 12), 0, 0, 360, Scalar.White, -1);
+                source.CopyTo(background, mask);
+                background.CopyTo(source);
+            });
+
+            var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+
+            Assert.AreEqual(controls == 3, screen.Scene == ManualChallengeScene.SkippableAnimation,
+                $"背景 {backgroundKind}，控件 {controls}，分辨率 {width}x{height}");
+        }
     }
 
     [TestMethod]
@@ -680,10 +719,12 @@ public sealed class FlowerSeedScreenRecognizerTests
         Assert.IsTrue(images.SearchRegion.Y + images.SearchRegion.Height <= clientY + height);
     }
 
-    internal static CapturedFrame LoadFixture(string fileName, int width = 0, int height = 0, int clientX = 0, int clientY = 0)
+    internal static CapturedFrame LoadFixture(string fileName, int width = 0, int height = 0, int clientX = 0, int clientY = 0,
+        Action<Mat>? transform = null)
     {
         using var source = Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName), ImreadModes.Color);
         Assert.IsFalse(source.Empty(), $"未读取到测试样本：{fileName}");
+        transform?.Invoke(source);
         if (width > 0 && height > 0) Cv2.Resize(source, source, new Size(width, height), interpolation: InterpolationFlags.Area);
         using var image = new Mat();
         Cv2.CvtColor(source, image, ColorConversionCodes.BGR2BGRA);

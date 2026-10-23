@@ -60,6 +60,8 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
 
         switch (screen.Scene)
         {
+            case ManualChallengeScene.SkippableAnimation:
+                return new(ManualChallengeAction.Escape);
             case ManualChallengeScene.World when _challengePhase == ChallengePhase.Navigation:
                 return new(_targetMapSeen ? ManualChallengeAction.Approach : ManualChallengeAction.OpenManual);
             case ManualChallengeScene.Manual when _challengePhase == ChallengePhase.Navigation:

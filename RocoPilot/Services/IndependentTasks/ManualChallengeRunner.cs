@@ -468,6 +468,7 @@ public sealed class ManualChallengeRunner(
         ManualChallengeScene.Preparation => "挑战准备",
         ManualChallengeScene.MedalConfirmation => "确认奖牌提示",
         ManualChallengeScene.Battle => "战斗",
+        ManualChallengeScene.SkippableAnimation => "可跳过动画",
         ManualChallengeScene.Capture => "捕捉",
         ManualChallengeScene.Rewards => "获得奖励",
         ManualChallengeScene.Result => "挑战结果",
@@ -482,7 +483,12 @@ public sealed class ManualChallengeRunner(
         ManualChallengeAction.Approach => "按W靠近挑战目标",
         ManualChallengeAction.SelectChallenge => "滚轮切换到挑战选项",
         ManualChallengeAction.Interact => "按F选择挑战",
-        ManualChallengeAction.Escape => scene == ManualChallengeScene.LegendaryRewards ? "按Esc关闭奖励" : "按Esc退出挑战",
+        ManualChallengeAction.Escape => scene switch
+        {
+            ManualChallengeScene.SkippableAnimation => "按Esc跳过动画",
+            ManualChallengeScene.LegendaryRewards => "按Esc关闭奖励",
+            _ => "按Esc退出挑战"
+        },
         ManualChallengeAction.Click => scene switch
         {
             ManualChallengeScene.Manual => "打开挑战页面",

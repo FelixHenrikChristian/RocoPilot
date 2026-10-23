@@ -12,7 +12,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -58,6 +58,9 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             MinimumScore = .94,
             TemplateScaleX = scale, TemplateScaleY = scale
         };
+        // 遮罩只保留跳过图标与 Esc 键帽的内部，排除动画背景及混色边缘。
+        var skip = await Match("animation-skip", .04, .015, .11, .12);
+        if (skip is not null) return new(ManualChallengeScene.SkippableAnimation, [], skip);
         var tab = legendary ? await ReadLegendaryTabAsync(frame, clientX, clientY, width, height, cancellationToken)
             : await Button("flower-tab") ?? await Button("flower-tab-inactive");
         if (tab is not null)

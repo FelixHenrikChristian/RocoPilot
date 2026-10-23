@@ -8,6 +8,28 @@ namespace RocoPilot.Core.Tests;
 public sealed class AutoBattleSettingsRulesTests
 {
     [TestMethod]
+    public void LegendarySequenceResolvesSharedPresetsWithoutChangingFlowerSequence()
+    {
+        var preset = new AutoBattleTurnSequencePreset { Name = "公共", Sequence = "4, X" };
+        var settings = new AutoBattleSettings
+        {
+            TurnSequencePresets = [preset],
+            FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("2")],
+            LegendaryReleaseSequence = [AutoBattleReleaseStep.CreateCustom("旧名称", "1", preset.Id)]
+        };
+        var normalized = AutoBattleSettingsRules.Normalize(settings);
+        Assert.AreEqual("4, X", normalized.LegendaryReleaseSequence.Single().Sequence);
+        Assert.AreEqual("2", normalized.FlowerSeedReleaseSequence.Single().SkillKey);
+        Assert.AreEqual("1", settings.LegendaryReleaseSequence.Single().Sequence);
+        normalized.LegendaryReleaseSequence.Clear();
+        Assert.AreEqual(1, settings.LegendaryReleaseSequence.Count);
+        Assert.AreEqual(5, AutoBattleSettingsRules.Normalize(normalized).LegendaryReleaseSequence.Count);
+
+        var oldSettings = JsonConvert.DeserializeObject<AutoBattleSettings>("{}")!;
+        Assert.AreEqual(5, AutoBattleSettingsRules.Normalize(oldSettings).LegendaryReleaseSequence.Count);
+    }
+
+    [TestMethod]
     public void MigratesLegacyRoundOrderWithoutOverwritingCustomSequence()
     {
         var legacy = JsonConvert.DeserializeObject<AutoBattleSettings>("{\"RoundOrder\":\"4; x 2\"}")!;

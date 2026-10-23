@@ -52,6 +52,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         {
             [AutoBattleConfigSection.Normal] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.Normal),
             [AutoBattleConfigSection.FlowerSeed] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.FlowerSeed),
+            [AutoBattleConfigSection.Legendary] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.Legendary),
             [AutoBattleConfigSection.SharedSequences] = new AutoBattleSharedSequencesPage(_editor),
             [AutoBattleConfigSection.BloodlineCapture] = new AutoBattleBloodlineCaptureConfigPage(_editor)
         };
@@ -91,6 +92,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
         {
             AutoBattleConfigSection.Normal => NormalBattleNavigationItem,
             AutoBattleConfigSection.FlowerSeed => FlowerSeedBattleNavigationItem,
+            AutoBattleConfigSection.Legendary => LegendaryBattleNavigationItem,
             AutoBattleConfigSection.SharedSequences => SharedSequencesNavigationItem,
             AutoBattleConfigSection.BloodlineCapture => BloodlineCaptureNavigationItem,
             _ => NormalBattleNavigationItem

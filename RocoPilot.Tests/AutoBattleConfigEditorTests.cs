@@ -254,16 +254,18 @@ public sealed class AutoBattleConfigEditorTests
     }
 
     [TestMethod]
-    public void SharedPresetUpdatesReferencesInBothBattleTypesAfterReopening()
+    public void SharedPresetUpdatesReferencesInAllBattleTypesAfterReopening()
     {
         var settings = AutoBattleSettings.CreateDefault();
         settings.TurnSequencePresets = [new() { Name = "连招", Sequence = "1, Space" }];
         var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
         editor.NormalRelease.Items.Clear();
         editor.FlowerSeedRelease.Items.Clear();
+        editor.LegendaryRelease.Items.Clear();
         var preset = editor.SharedPresetItems.Single();
         Assert.IsTrue(editor.TryInsertSharedPreset(preset, editor.NormalRelease, out _));
         Assert.IsTrue(editor.TryInsertSharedPreset(preset, editor.FlowerSeedRelease, out _));
+        Assert.IsTrue(editor.TryInsertSharedPreset(preset, editor.LegendaryRelease, out _));
         Assert.IsTrue(editor.TryBuildSettings(settings, out var saved, out _));
         var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(saved))!;
         var reopened = new AutoBattleConfigEditor(reloaded, new KeyboardInputService());
@@ -272,11 +274,40 @@ public sealed class AutoBattleConfigEditorTests
 
         StringAssert.Contains(reopened.NormalRelease.Summary, "新连招");
         StringAssert.Contains(reopened.FlowerSeedRelease.Summary, "新连招");
+        StringAssert.Contains(reopened.LegendaryRelease.Summary, "新连招");
         Assert.AreEqual("3, X", reopened.FlowerSeedRelease.Items.Single().Sequence);
         Assert.IsTrue(reopened.TryBuildSettings(reloaded, out var result, out _));
         Assert.AreEqual(preset.Id, result.FlowerSeedReleaseSequence.Single().PresetId);
         Assert.AreEqual("3, X", result.ReleaseSequence.Single().Sequence);
         Assert.AreEqual("3, X", result.FlowerSeedReleaseSequence.Single().Sequence);
+        Assert.AreEqual("3, X", result.LegendaryReleaseSequence.Single().Sequence);
+        Assert.AreEqual(preset.Id, result.LegendaryReleaseSequence.Single().PresetId);
+    }
+
+    [TestMethod]
+    public void LegendarySequenceIsSavedAndReopenedIndependently()
+    {
+        var source = AutoBattleSettings.CreateDefault();
+        source.ReleaseSequence = [AutoBattleReleaseStep.CreateSkill("1")];
+        source.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("2")];
+        var editor = new AutoBattleConfigEditor(source, new KeyboardInputService());
+        editor.LegendaryRelease.Items.Clear();
+        editor.LegendaryRelease.AppendSkill("4");
+        Assert.IsTrue(editor.TryBuildSettings(source, out var result, out _));
+        var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(result))!;
+        var reopened = new AutoBattleConfigEditor(reloaded, new KeyboardInputService());
+
+        Assert.AreEqual("1", reopened.NormalRelease.Items.Single().SkillKey);
+        Assert.AreEqual("2", reopened.FlowerSeedRelease.Items.Single().SkillKey);
+        Assert.AreEqual("4", reopened.LegendaryRelease.Items.Single().SkillKey);
+        Assert.AreEqual(5, source.LegendaryReleaseSequence.Count);
+
+        reopened.FlowerSeedRelease.AppendSkill("3");
+        Assert.IsTrue(reopened.TryBuildSettings(reloaded, out var updated, out _));
+        Assert.AreEqual("4", updated.LegendaryReleaseSequence.Single().SkillKey);
+        reopened.LegendaryRelease.Items.Clear();
+        Assert.IsFalse(reopened.TryBuildSettings(updated, out _, out var error));
+        Assert.AreEqual(AutoBattleConfigSection.Legendary, error.Section);
     }
 
     [TestMethod]

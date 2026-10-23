@@ -137,7 +137,7 @@ public partial class RealtimeViewModel : ObservableRecipient
     }
 
     public string AutoBattleConfigurationSummary =>
-        "分别配置普通战斗与花种战斗的释放顺序，公共执行序列可复用。";
+        "分别配置普通、花种和传说精灵战斗的释放顺序，公共执行序列可复用。";
 
     public string AutoBattleOtherConfigurationSummary =>
         "包含高级时序选项；如无明确需求，建议保持默认设置。";

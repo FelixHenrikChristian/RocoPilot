@@ -84,14 +84,8 @@ public static class AutoBattleSettingsRules
         normalized.ReleaseSequence = ResolveReleaseSequence(normalized)
             .Select(step => step.Clone())
             .ToList();
-        normalized.FlowerSeedReleaseSequence = normalized.FlowerSeedReleaseSequence
-            .Select(NormalizeReleaseStep)
-            .OfType<AutoBattleReleaseStep>()
-            .ToList();
-        if (normalized.FlowerSeedReleaseSequence.Count == 0)
-        {
-            normalized.FlowerSeedReleaseSequence = AutoBattleSettings.CreateDefaultReleaseSequence();
-        }
+        normalized.FlowerSeedReleaseSequence = NormalizeChallengeSequence(normalized.FlowerSeedReleaseSequence);
+        normalized.LegendaryReleaseSequence = NormalizeChallengeSequence(normalized.LegendaryReleaseSequence);
         if (!Enum.IsDefined(normalized.EncounterRelievedAction))
         {
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
@@ -127,6 +121,12 @@ public static class AutoBattleSettingsRules
             .Clone();
 
         return normalized;
+    }
+
+    private static List<AutoBattleReleaseStep> NormalizeChallengeSequence(IEnumerable<AutoBattleReleaseStep> sequence)
+    {
+        var steps = sequence.Select(NormalizeReleaseStep).OfType<AutoBattleReleaseStep>().ToList();
+        return steps.Count > 0 ? steps : AutoBattleSettings.CreateDefaultReleaseSequence();
     }
 
     private static IReadOnlyList<AutoBattleReleaseStep> ResolveReleaseSequence(AutoBattleSettings settings)
@@ -229,7 +229,8 @@ public static class AutoBattleSettingsRules
 
     private static void ResolvePresetReferences(AutoBattleSettings settings)
     {
-        foreach (var step in settings.ReleaseSequence.Concat(settings.FlowerSeedReleaseSequence).Where(step => step.IsCustom))
+        foreach (var step in settings.ReleaseSequence.Concat(settings.FlowerSeedReleaseSequence)
+                     .Concat(settings.LegendaryReleaseSequence).Where(step => step.IsCustom))
         {
             var preset = FindPreset(settings.TurnSequencePresets, step.PresetId);
             if (string.IsNullOrWhiteSpace(step.PresetId))

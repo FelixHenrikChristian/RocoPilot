@@ -22,6 +22,8 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     public AutoBattleReleaseSequenceEditor FlowerSeedRelease { get; } = new();
 
+    public AutoBattleReleaseSequenceEditor LegendaryRelease { get; } = new();
+
     public ObservableCollection<AutoBattlePresetEditorItem> SharedPresetItems
     {
         get;
@@ -236,6 +238,16 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             return false;
         }
 
+        if (!TryBuildReleaseSequence(
+                LegendaryRelease.Items,
+                "传说精灵战斗",
+                AutoBattleConfigSection.Legendary,
+                out var legendaryReleaseSequence,
+                out error))
+        {
+            return false;
+        }
+
         var presets = new List<AutoBattleTurnSequencePreset>();
         foreach (var preset in SharedPresetItems)
         {
@@ -268,6 +280,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         settings.ReleaseSequence = releaseSequence;
         settings.FlowerSeedReleaseSequence = flowerSeedReleaseSequence;
+        settings.LegendaryReleaseSequence = legendaryReleaseSequence;
         settings.TurnSequencePresets = presets;
         settings.BloodlineCaptureFilter = new BloodlineCaptureFilterSettings
         {
@@ -292,6 +305,11 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         foreach (var step in settings.FlowerSeedReleaseSequence)
         {
             FlowerSeedRelease.Items.Add(CreateReleaseEditorItem(step, AutoBattleSettings.DefaultTurnSequence));
+        }
+
+        foreach (var step in settings.LegendaryReleaseSequence)
+        {
+            LegendaryRelease.Items.Add(CreateReleaseEditorItem(step, AutoBattleSettings.DefaultTurnSequence));
         }
 
         foreach (var preset in settings.TurnSequencePresets ?? [])
@@ -438,6 +456,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
         NormalRelease.UpdatePreset(preset);
         FlowerSeedRelease.UpdatePreset(preset);
+        LegendaryRelease.UpdatePreset(preset);
     }
 
     private static AutoBattleReleaseEditorItem CreateReleaseEditorItem(
@@ -542,6 +561,7 @@ internal enum AutoBattleConfigSection
 {
     Normal,
     FlowerSeed,
+    Legendary,
     SharedSequences,
     BloodlineCapture
 }

@@ -38,6 +38,7 @@ public partial class TasksViewModel : ObservableRecipient
     [NotifyPropertyChangedFor(nameof(LegendaryChallengeButtonText))]
     [NotifyPropertyChangedFor(nameof(LegendaryChallengeButtonGlyph))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeConfigurationEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeButtonEnabled))]
     public partial bool IsLegendaryChallengeRunning { get; set; }
 
     [ObservableProperty]
@@ -55,7 +56,18 @@ public partial class TasksViewModel : ObservableRecipient
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedConfigurationEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedScanButtonEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeConfigurationEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeButtonEnabled))]
     public partial bool IsIndependentTaskRunning { get; set; }
+
+    [ObservableProperty]
+    public partial string SelectedLegendaryTarget { get; set; }
+
+    [ObservableProperty]
+    public partial bool UseLegendaryMarkWhenInsufficient { get; set; }
+
+    public IReadOnlyList<string> LegendaryTargets => IndependentTaskSettings.LegendaryTargets;
+
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
@@ -94,7 +106,9 @@ public partial class TasksViewModel : ObservableRecipient
 
     public string LegendaryChallengeButtonGlyph => IsLegendaryChallengeRunning ? StopButtonGlyph : StartButtonGlyph;
 
-    public bool IsLegendaryChallengeConfigurationEnabled => !IsLegendaryChallengeRunning;
+    public bool IsLegendaryChallengeConfigurationEnabled => !IsIndependentTaskRunning;
+
+    public bool IsLegendaryChallengeButtonEnabled => IsLegendaryChallengeRunning || !IsIndependentTaskRunning;
 
     public string FlowerSeedChallengeButtonText => IsFlowerSeedChallengeRunning ? StopButtonText : StartButtonText;
 
@@ -121,6 +135,8 @@ public partial class TasksViewModel : ObservableRecipient
         TaskNotificationMessage = string.Empty;
         BossBattleRunCount = IndependentTaskSettings.DefaultBossBattleRunCount;
         LegendaryChallengeRunCount = IndependentTaskSettings.DefaultLegendaryChallengeRunCount;
+        SelectedLegendaryTarget = LegendaryTargets[0];
+        UseLegendaryMarkWhenInsufficient = true;
         FlowerSeedRunCount = IndependentTaskSettings.DefaultFlowerSeedRunCount;
         _independentTaskService.StateChanged += IndependentTaskService_StateChanged;
         SyncRunningState();
@@ -194,6 +210,9 @@ public partial class TasksViewModel : ObservableRecipient
         SaveSettingsIfLoaded();
     }
 
+    partial void OnSelectedLegendaryTargetChanged(string value) => SaveSettingsIfLoaded();
+    partial void OnUseLegendaryMarkWhenInsufficientChanged(bool value) => SaveSettingsIfLoaded();
+
     partial void OnFlowerSeedRunCountChanged(double value)
     {
         SaveSettingsIfLoaded();
@@ -227,6 +246,8 @@ public partial class TasksViewModel : ObservableRecipient
             LegendaryChallengeRunCount = ToRunCount(
                 LegendaryChallengeRunCount,
                 IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
+            LegendaryTargetName = SelectedLegendaryTarget,
+            UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
             FlowerSeedRunCount = ToRunCount(
                 FlowerSeedRunCount,
                 IndependentTaskSettings.DefaultFlowerSeedRunCount),
@@ -242,6 +263,8 @@ public partial class TasksViewModel : ObservableRecipient
         {
             BossBattleRunCount = settings.BossBattleRunCount;
             LegendaryChallengeRunCount = settings.LegendaryChallengeRunCount;
+            SelectedLegendaryTarget = settings.LegendaryTargetName;
+            UseLegendaryMarkWhenInsufficient = settings.UseLegendaryMarkWhenInsufficient;
             FlowerSeedRunCount = settings.FlowerSeedRunCount;
             if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))
             {

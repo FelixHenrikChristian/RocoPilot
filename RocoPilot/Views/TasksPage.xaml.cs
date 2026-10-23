@@ -31,4 +31,9 @@ public sealed partial class TasksPage : Page
     {
         await AutoBattleConfigWindow.ShowAsync(AutoBattleConfigSection.FlowerSeed);
     }
+
+    private async void ConfigureLegendaryBattleButton_Click(object sender, RoutedEventArgs e)
+    {
+        await AutoBattleConfigWindow.ShowAsync(AutoBattleConfigSection.Legendary);
+    }
 }

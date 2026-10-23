@@ -12,6 +12,9 @@ using RocoPilot.Models.Runtime;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Services.IndependentTasks;
 using RocoPilot.Services.RuntimeTasks;
+using RocoPilot.Services.ImageMatching;
+using RocoPilot.Services.TextRecognition;
+using RocoPilot.Services.TextRecognition.Backends;
 
 namespace RocoPilot.Tests;
 
@@ -19,32 +22,116 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedChallengeRunnerTests
 {
     [TestMethod]
-    public async Task SlowSkillResponseDoesNotSendRecoveryOrChangeOverlayToRecovery()
+    [DataRow(true, false)]
+    [DataRow(false, false)]
+    [DataRow(true, true)]
+    public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(bool allowMarks, bool switchPet)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var capture = new ChallengeCapture();
-        var state = CreateState();
-        state.Options.AutoBattleSettings.SkillSelectionRetryDelayMs = 4000;
-        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
-        Task? delayedSkill = null;
-        var keyboard = new Keyboard { DuringSequence = sequence =>
-        {
-            if (sequence == "4") delayedSkill = Task.Run(async () =>
-            {
-                await Task.Delay(1500, cancellation.Token);
-                capture.OnKey(sequence);
-            });
-            else capture.OnKey(sequence);
-        } };
-        var runner = CreateRunner(capture, new Images(), keyboard, new Mouse { DuringClick = capture.OnClick },
-            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+        var capture = new LegendaryReplay(switchPet);
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
         List<IndependentTaskProgress> updates = [];
-        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
+            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
+            new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
+            NullLogger<ManualChallengeRunner>.Instance);
+        var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
+            new RecognitionRegionConfig(), new RuntimeTaskStartOptions(), DateTimeOffset.Now);
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("2")];
+        state.Options.AutoBattleSettings.LegendaryReleaseSequence =
+            [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
+        var run = runner.RunLegendaryAsync(state, "圣羽翼王", 2, allowMarks,
             state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
-        Assert.IsNotNull(delayedSkill);
-        await delayedSkill;
-        CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
-        Assert.IsFalse(updates.Any(update => update.Operation.Contains("回能")));
+        if (allowMarks)
+        {
+            await run;
+            var expected = switchPet
+                ? new[] { "F", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space",
+                    "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space" }
+                : new[] { "F", "4", "Esc", "1, Space", "4", "Esc", "1, Space" };
+            CollectionAssert.AreEqual(expected,
+                keyboard.Keys.Select(key => key.Key).ToArray());
+            Assert.AreEqual(2, capture.Captures);
+            Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<InvalidOperationException>(() => run);
+            StringAssert.Contains(error.Message, "契约印记");
+            CollectionAssert.AreEqual(new[] { "F", "Esc" }, keyboard.Keys.Select(key => key.Key).ToArray());
+            Assert.AreEqual(0, capture.Captures);
+        }
+        Assert.AreEqual("world", capture.Scene);
+    }
+
+    private sealed class LegendaryReplay(bool switchPet = false) : IScreenCaptureService
+    {
+        private string _selectedSlot = "";
+        private int _confirmAttempts;
+        private readonly Dictionary<string, byte[]> _pixels = [];
+        public string Scene = "list";
+        public int Captures;
+        public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
+        {
+            if (!_pixels.TryGetValue(Scene, out var pixels))
+            {
+                using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{Scene}.png", 1280, 720);
+                _pixels[Scene] = pixels = frame.Pixels;
+            }
+            return new(1280, 720, pixels);
+        }
+        public void OnKey(string sequence)
+        {
+            if (Scene == "pet-switching")
+            {
+                Assert.IsTrue(sequence is "1" or "2");
+                _selectedSlot = sequence;
+                _confirmAttempts = 0;
+                Scene = "pet-confirmation";
+                return;
+            }
+            if (Scene == "pet-confirmation")
+            {
+                Assert.AreEqual("Space", sequence);
+                // 第一只无法出战；第二只的第一次确认被吞掉，必须重试 Space 而非重新选择。
+                if (_selectedSlot == "1") Scene = "pet-switching";
+                else if (++_confirmAttempts == 2) Scene = "battle";
+                return;
+            }
+            if (Scene == "capture" && sequence == "1, Space") Captures++;
+            Scene = (Scene, sequence) switch
+            {
+                ("interaction-gold", "F") => "confirmation",
+                ("confirmation", "Esc") => "world",
+                ("battle", "4") => switchPet ? "pet-switching" : "capture-contract",
+                ("battle", "2") when switchPet => "capture-contract",
+                ("rewards", "Esc") => "capture",
+                ("capture", "1, Space") => "result",
+                _ => throw new AssertFailedException($"{Scene} 收到未预期按键：{sequence}")
+            };
+        }
+        public void OnClick(int x, int y)
+        {
+            Scene = Scene switch
+            {
+                "list" => "map",
+                "map" => "interaction-gold",
+                "confirmation" => "insufficient",
+                "insufficient" when x > 650 => "preparation",
+                "insufficient" when x < 650 => "confirmation",
+                "preparation" => "battle",
+                "capture-contract" when x is > 640 and < 750 && y < 450 => "capture-legendary",
+                "capture-legendary" when y > 550 => "rewards",
+                "result" when Captures < 2 && x > 650 => "insufficient",
+                "result" when Captures == 2 && x < 650 => "world",
+                _ => throw new AssertFailedException($"{Scene} 收到未预期点击：{x},{y}")
+            };
+        }
+        public void Release(CaptureTargetWindow targetWindow, CaptureMethod method) { }
     }
 
     [TestMethod]
@@ -300,6 +387,35 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.IsFalse(updates.Any(update => update.Operation.Contains('（') || update.Operation.Contains("已发送", StringComparison.Ordinal)));
         Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
         Assert.AreEqual(1, overlay.Hides);
+    }
+
+    [TestMethod]
+    public async Task SlowSkillResponseDoesNotSendRecoveryOrChangeOverlayToRecovery()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var capture = new ChallengeCapture();
+        var state = CreateState();
+        state.Options.AutoBattleSettings.SkillSelectionRetryDelayMs = 4000;
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        Task? delayedSkill = null;
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            if (sequence == "4") delayedSkill = Task.Run(async () =>
+            {
+                await Task.Delay(1500, cancellation.Token);
+                capture.OnKey(sequence);
+            });
+            else capture.OnKey(sequence);
+        } };
+        var runner = CreateRunner(capture, new Images(), keyboard, new Mouse { DuringClick = capture.OnClick },
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        List<IndependentTaskProgress> updates = [];
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
+            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+        Assert.IsNotNull(delayedSkill);
+        await delayedSkill;
+        CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
+        Assert.IsFalse(updates.Any(update => update.Operation.Contains("回能")));
     }
 
     [TestMethod]
@@ -568,13 +684,13 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.AreEqual("挑战完成，成功1次，已返回大世界", updates[^1].Operation);
     }
 
-    private static FlowerSeedChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
+    private static ManualChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
-            new FlowerSeedScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!, NullLogger<FlowerSeedScreenRecognizer>.Instance),
+            new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!, NullLogger<ManualChallengeScreenRecognizer>.Instance),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
             overlay ?? new Overlay(),
-            NullLogger<FlowerSeedChallengeRunner>.Instance);
+            NullLogger<ManualChallengeRunner>.Instance);
 
     private static RuntimeTaskState CreateState(bool overlayEnabled = false, bool hasBorder = false) => new(new CaptureTargetWindow
     {

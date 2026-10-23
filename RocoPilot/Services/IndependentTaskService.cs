@@ -16,7 +16,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
 {
     private readonly IRuntimeSessionControl _runtimeTaskService;
     private readonly ILocalSettingsService _localSettingsService;
-    private readonly IFlowerSeedChallengeRunner _flowerSeedRunner;
+    private readonly IManualChallengeRunner _challengeRunner;
     private readonly IAppNotificationService _notifications;
     private readonly IGameWindowService _gameWindowService;
     private readonly ILogger<IndependentTaskService> _logger;
@@ -40,14 +40,14 @@ public sealed class IndependentTaskService : IIndependentTaskService
     public IndependentTaskService(
         IRuntimeSessionControl runtimeTaskService,
         ILocalSettingsService localSettingsService,
-        IFlowerSeedChallengeRunner flowerSeedRunner,
+        IManualChallengeRunner challengeRunner,
         IAppNotificationService notifications,
         IGameWindowService gameWindowService,
         ILogger<IndependentTaskService> logger)
     {
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
-        _flowerSeedRunner = flowerSeedRunner;
+        _challengeRunner = challengeRunner;
         _notifications = notifications;
         _gameWindowService = gameWindowService;
         _logger = logger;
@@ -200,15 +200,20 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
             switch (kind)
             {
+                case IndependentTaskKind.LegendaryChallenge:
+                    await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
+                        settings.LegendaryChallengeRunCount, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
+                    _runtimeTaskService.ShowIndependentTaskResult($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
+                    break;
                 case IndependentTaskKind.FlowerSeedChallenge:
-                    await _flowerSeedRunner.RunAsync(state,
+                    await _challengeRunner.RunAsync(state,
                         settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
                         settings.FlowerSeedRunCount, battleSettings,
                         UpdateProgress, taskCts.Token);
                     _runtimeTaskService.ShowIndependentTaskResult($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
-                    var options = await _flowerSeedRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
+                    var options = await _challengeRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
                     await _stateLock.WaitAsync(taskCts.Token);
                     try
@@ -227,7 +232,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {_settings.FlowerSeedOptions.Count} 个花种", "花种选项已更新");
                     break;
                 default:
-                    // 首领和传说任务尚未接入执行逻辑，保持现有手动停止行为。
+                    // 首领任务尚未接入执行逻辑。
                     await Task.Delay(Timeout.InfiniteTimeSpan, taskCts.Token);
                     break;
             }
@@ -239,15 +244,15 @@ public sealed class IndependentTaskService : IIndependentTaskService
         {
             _logger.LogError(ex, "独立任务异常终止：{TaskName}", GetTaskDisplayName(kind));
             UpdateProgress(new("任务失败", ex.Message));
-            if (kind == IndependentTaskKind.FlowerSeedChallenge)
+            if (kind is IndependentTaskKind.FlowerSeedChallenge or IndependentTaskKind.LegendaryChallenge)
             {
-                var title = "花种挑战已停止";
+                var title = $"{taskName}已停止";
                 _runtimeTaskService.ShowIndependentTaskResult(title, ex.Message);
                 var payload = new XElement("toast", new XElement("visual",
                     new XElement("binding", new XAttribute("template", "ToastGeneric"),
                         new XElement("text", title), new XElement("text", ex.Message))));
                 if (!_notifications.Show(payload.ToString(SaveOptions.DisableFormatting)))
-                    _logger.LogWarning("花种挑战停止通知未显示：{Message}", ex.Message);
+                    _logger.LogWarning("挑战停止通知未显示：{Message}", ex.Message);
             }
         }
         finally

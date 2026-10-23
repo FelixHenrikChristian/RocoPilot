@@ -100,8 +100,8 @@ public partial class App : Application
             services.AddSingleton<IGameWindowService, GameWindowService>();
             services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
             services.AddSingleton<IMouseInputService, MouseInputService>();
-            services.AddSingleton<FlowerSeedScreenRecognizer>();
-            services.AddSingleton<IFlowerSeedChallengeRunner, FlowerSeedChallengeRunner>();
+            services.AddSingleton<ManualChallengeScreenRecognizer>();
+            services.AddSingleton<IManualChallengeRunner, ManualChallengeRunner>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();
             services.AddSingleton<RuntimeDebugLogger>();

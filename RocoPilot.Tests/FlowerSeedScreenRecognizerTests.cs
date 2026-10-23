@@ -35,6 +35,9 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("interaction-dark", nameof(ManualChallengeScene.Interaction))]
     [DataRow("interaction-gold", nameof(ManualChallengeScene.Interaction))]
     [DataRow("confirmation", nameof(ManualChallengeScene.LegendaryConfirmation))]
+    [DataRow("difficulty-1", nameof(ManualChallengeScene.LegendaryConfirmation))]
+    [DataRow("difficulty-2", nameof(ManualChallengeScene.LegendaryConfirmation))]
+    [DataRow("difficulty-3", nameof(ManualChallengeScene.LegendaryConfirmation))]
     [DataRow("insufficient", nameof(ManualChallengeScene.InsufficientContractMark))]
     [DataRow("preparation", nameof(ManualChallengeScene.Preparation))]
     [DataRow("battle", nameof(ManualChallengeScene.Battle))]
@@ -70,6 +73,21 @@ public sealed class FlowerSeedScreenRecognizerTests
             if (fixture == "pet-switching") Assert.AreEqual(BattleScreen.PetSwitching, screen.BattleScreen, diagnostic);
             if (fixture == "pet-confirmation") Assert.AreEqual(BattleScreen.PetSwitchConfirmation, screen.BattleScreen, diagnostic);
             if (fixture == "confirmation") Assert.HasCount(0, texts, diagnostic);
+            if (screen.Scene == ManualChallengeScene.LegendaryConfirmation)
+            {
+                var selected = fixture == "confirmation" ? 3 : int.Parse(fixture[^1..]);
+                Assert.AreEqual(selected, screen.Difficulty, diagnostic);
+                CollectionAssert.AreEqual(Enumerable.Range(1, 3).Where(number => number != selected).ToArray(),
+                    screen.Rows.Select(row => row.Number).ToArray(), diagnostic);
+                foreach (var row in screen.Rows)
+                {
+                    Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, row.Button.TemplatePath,
+                        0, 12, 30, width, height, CancellationToken.None, legendary: true), diagnostic);
+                    using var switched = LoadFixture($"legendary-difficulty-{row.Number}.png", width, height, 12, 30);
+                    Assert.IsNull(await recognizer.FindClickTargetAsync(switched, screen.Scene, row.Button.TemplatePath,
+                        0, 12, 30, width, height, CancellationToken.None, legendary: true), diagnostic);
+                }
+            }
             if (screen.Marks is { } marks)
             {
                 Assert.HasCount(0, texts, diagnostic);
@@ -152,6 +170,30 @@ public sealed class FlowerSeedScreenRecognizerTests
             Assert.AreEqual(controls == 3, screen.Scene == ManualChallengeScene.SkippableAnimation,
                 $"背景 {backgroundKind}，控件 {controls}，分辨率 {width}x{height}");
         }
+    }
+
+    [TestMethod]
+    [DataRow(1)]
+    [DataRow(2)]
+    [DataRow(3)]
+    public async Task DifficultyRecognitionDoesNotDependOnBubbleOutline(int difficulty)
+    {
+        using var frame = LoadFixture($"legendary-difficulty-{difficulty}.png", 1280, 720, 12, 30, source =>
+        {
+            foreach (var y in new[] { 174, 283, 393 })
+            {
+                using var centerArea = new Mat(source, new Rect(149, y, 40, 40));
+                using var center = centerArea.Clone();
+                Cv2.Rectangle(source, new Rect(115, y - 30, 110, 100), new Scalar(80, 40, 170), -1);
+                using var destination = new Mat(source, new Rect(149, y, 40, 40));
+                center.CopyTo(destination);
+            }
+        });
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(), null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, 1280, 720, CancellationToken.None, legendary: true);
+        Assert.AreEqual(difficulty, screen.Difficulty);
+        Assert.AreEqual(2, screen.Rows.Count);
     }
 
     [TestMethod]

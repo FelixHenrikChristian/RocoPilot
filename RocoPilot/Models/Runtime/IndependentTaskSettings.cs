@@ -9,11 +9,13 @@ public sealed class IndependentTaskSettings
     public const int MaximumRunCount = 99;
     public const int DefaultBossBattleRunCount = 3;
     public const int DefaultLegendaryChallengeRunCount = 3;
+    public const int DefaultLegendaryDifficulty = 3;
     public const int DefaultFlowerSeedRunCount = 6;
 
     public static IReadOnlyList<string> LegendaryTargets { get; } = Array.AsReadOnly(new[] { "圣羽翼王", "龙息帕尔" });
 
     public string LegendaryTargetName { get; set; } = LegendaryTargets[0];
+    public int LegendaryDifficulty { get; set; } = DefaultLegendaryDifficulty;
     public bool UseLegendaryMarkWhenInsufficient { get; set; } = true;
 
     public int BossBattleRunCount
@@ -46,6 +48,7 @@ public sealed class IndependentTaskSettings
             BossBattleRunCount = BossBattleRunCount,
             LegendaryChallengeRunCount = LegendaryChallengeRunCount,
             LegendaryTargetName = LegendaryTargetName,
+            LegendaryDifficulty = LegendaryDifficulty,
             UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
             FlowerSeedRunCount = FlowerSeedRunCount,
             FlowerSeedTargetNumber = FlowerSeedTargetNumber,
@@ -60,6 +63,7 @@ public sealed class IndependentTaskSettings
             BossBattleRunCount = Math.Clamp(BossBattleRunCount, MinimumRunCount, MaximumRunCount),
             LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount),
             LegendaryTargetName = LegendaryTargets.Contains(LegendaryTargetName) ? LegendaryTargetName : LegendaryTargets[0],
+            LegendaryDifficulty = LegendaryDifficulty is >= 1 and <= 3 ? LegendaryDifficulty : DefaultLegendaryDifficulty,
             UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
             FlowerSeedRunCount = Math.Clamp(FlowerSeedRunCount, MinimumRunCount, MaximumRunCount),
             FlowerSeedTargetNumber = FlowerSeedTargetNumber,

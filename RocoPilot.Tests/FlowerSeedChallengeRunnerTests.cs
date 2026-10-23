@@ -22,17 +22,22 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedChallengeRunnerTests
 {
     [TestMethod]
-    [DataRow(true, false)]
-    [DataRow(false, false)]
-    [DataRow(true, true)]
-    public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(bool allowMarks, bool switchPet)
+    [DataRow(true, false, 1)]
+    [DataRow(false, false, 2)]
+    [DataRow(true, true, 3)]
+    public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(bool allowMarks, bool switchPet, int difficulty)
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var capture = new LegendaryReplay(switchPet);
+        var capture = new LegendaryReplay(switchPet, difficulty);
         var keyboard = new Keyboard { DuringSequence = capture.OnKey };
         List<IndependentTaskProgress> updates = [];
-        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var mouse = new Mouse { DuringClick = (x, y) =>
+        {
+            if (capture.Scene == "confirmation" && x < 200)
+                Assert.AreEqual($"选择难度 {new string('I', difficulty)}", updates[^1].Operation);
+            capture.OnClick(x, y);
+        } };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), null!, null!,
             NullLogger<ManualChallengeScreenRecognizer>.Instance);
@@ -44,7 +49,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("2")];
         state.Options.AutoBattleSettings.LegendaryReleaseSequence =
             [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
-        var run = runner.RunLegendaryAsync(state, "圣羽翼王", 2, allowMarks,
+        var run = runner.RunLegendaryAsync(state, "圣羽翼王", 2, difficulty, allowMarks,
             state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
         if (allowMarks)
         {
@@ -67,15 +72,17 @@ public sealed class FlowerSeedChallengeRunnerTests
             Assert.AreEqual(0, capture.Captures);
         }
         Assert.AreEqual("world", capture.Scene);
+        Assert.AreEqual(difficulty == 3 ? 0 : 2, capture.DifficultyClicks);
     }
 
-    private sealed class LegendaryReplay(bool switchPet = false) : IScreenCaptureService
+    private sealed class LegendaryReplay(bool switchPet = false, int difficulty = 3) : IScreenCaptureService
     {
         private string _selectedSlot = "";
         private int _confirmAttempts;
         private readonly Dictionary<string, byte[]> _pixels = [];
         public string Scene = "list";
         public int Captures;
+        public int DifficultyClicks;
         public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
         {
             if (!_pixels.TryGetValue(Scene, out var pixels))
@@ -109,7 +116,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 ("message", "W") => "interaction-gold",
                 ("interaction-gold", "F") => "confirmation",
                 ("skip", "Esc") => "battle",
-                ("confirmation", "Esc") => "world",
+                ("confirmation" or "difficulty-1" or "difficulty-2", "Esc") => "world",
                 ("battle", "4") => switchPet ? "pet-switching" : "capture-contract",
                 ("battle", "2") when switchPet => "capture-contract",
                 ("rewards", "Esc") => "capture",
@@ -119,11 +126,19 @@ public sealed class FlowerSeedChallengeRunnerTests
         }
         public void OnClick(int x, int y)
         {
+            if (Scene == "confirmation" && x < 200)
+            {
+                Assert.AreEqual((int)Math.Round((194 + (difficulty - 1) * 110) * 720d / 1152), y, 3);
+                // 第一次点击丢失；必须复查并重试，不能直接开始挑战。
+                if (++DifficultyClicks == 2) Scene = $"difficulty-{difficulty}";
+                return;
+            }
             Scene = Scene switch
             {
                 "list" => "map",
                 "map" => "message",
-                "confirmation" => "insufficient",
+                "confirmation" when difficulty == 3 => "insufficient",
+                "difficulty-1" or "difficulty-2" => "insufficient",
                 "insufficient" when x > 650 => "preparation",
                 "insufficient" when x < 650 => "confirmation",
                 "preparation" => "skip",

@@ -8,6 +8,7 @@ public interface IManualChallengeRunner
         RuntimeTaskState state,
         string targetName,
         int runCount,
+        int difficulty,
         bool useLegendaryMark,
         AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress,

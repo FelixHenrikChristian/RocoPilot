@@ -67,7 +67,10 @@ public partial class TasksViewModel : ObservableRecipient
     public partial bool UseLegendaryMarkWhenInsufficient { get; set; }
 
     public IReadOnlyList<string> LegendaryTargets => IndependentTaskSettings.LegendaryTargets;
+    public IReadOnlyList<string> LegendaryDifficulties { get; } = ["I", "II", "III"];
 
+    [ObservableProperty]
+    public partial int SelectedLegendaryDifficultyIndex { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
@@ -136,6 +139,7 @@ public partial class TasksViewModel : ObservableRecipient
         BossBattleRunCount = IndependentTaskSettings.DefaultBossBattleRunCount;
         LegendaryChallengeRunCount = IndependentTaskSettings.DefaultLegendaryChallengeRunCount;
         SelectedLegendaryTarget = LegendaryTargets[0];
+        SelectedLegendaryDifficultyIndex = IndependentTaskSettings.DefaultLegendaryDifficulty - 1;
         UseLegendaryMarkWhenInsufficient = true;
         FlowerSeedRunCount = IndependentTaskSettings.DefaultFlowerSeedRunCount;
         _independentTaskService.StateChanged += IndependentTaskService_StateChanged;
@@ -211,6 +215,7 @@ public partial class TasksViewModel : ObservableRecipient
     }
 
     partial void OnSelectedLegendaryTargetChanged(string value) => SaveSettingsIfLoaded();
+    partial void OnSelectedLegendaryDifficultyIndexChanged(int value) => SaveSettingsIfLoaded();
     partial void OnUseLegendaryMarkWhenInsufficientChanged(bool value) => SaveSettingsIfLoaded();
 
     partial void OnFlowerSeedRunCountChanged(double value)
@@ -247,6 +252,7 @@ public partial class TasksViewModel : ObservableRecipient
                 LegendaryChallengeRunCount,
                 IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
             LegendaryTargetName = SelectedLegendaryTarget,
+            LegendaryDifficulty = SelectedLegendaryDifficultyIndex + 1,
             UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
             FlowerSeedRunCount = ToRunCount(
                 FlowerSeedRunCount,
@@ -264,6 +270,7 @@ public partial class TasksViewModel : ObservableRecipient
             BossBattleRunCount = settings.BossBattleRunCount;
             LegendaryChallengeRunCount = settings.LegendaryChallengeRunCount;
             SelectedLegendaryTarget = settings.LegendaryTargetName;
+            SelectedLegendaryDifficultyIndex = settings.LegendaryDifficulty - 1;
             UseLegendaryMarkWhenInsufficient = settings.UseLegendaryMarkWhenInsufficient;
             FlowerSeedRunCount = settings.FlowerSeedRunCount;
             if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))

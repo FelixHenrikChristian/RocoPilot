@@ -202,7 +202,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
             {
                 case IndependentTaskKind.LegendaryChallenge:
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
-                        settings.LegendaryChallengeRunCount, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
+                        settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
                     _runtimeTaskService.ShowIndependentTaskResult($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:

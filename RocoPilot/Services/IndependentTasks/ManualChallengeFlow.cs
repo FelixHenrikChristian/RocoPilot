@@ -9,7 +9,7 @@ internal readonly record struct ManualChallengeDecision(ManualChallengeAction Ac
 
 // 动作只消费当前匹配画面；滚动前后行位置用于确认列表边界。
 internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount = 6, string? legendaryTarget = null,
-    bool useLegendaryMark = true)
+    bool useLegendaryMark = true, int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty)
 {
     private enum ChallengePhase { Navigation, Starting, Battle, Settlement, Result }
 
@@ -70,7 +70,9 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 return Click(screen.Button);
             case ManualChallengeScene.LegendaryConfirmation when _targetMapSeen
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Result:
-                return Click(screen.Button);
+                if (screen.Difficulty == 0) return default;
+                return Click(screen.Difficulty == legendaryDifficulty ? screen.Button
+                    : screen.Rows.FirstOrDefault(row => row.Number == legendaryDifficulty)?.Button);
             case ManualChallengeScene.InsufficientContractMark when _targetMapSeen
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
                 if (useLegendaryMark)

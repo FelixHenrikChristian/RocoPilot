@@ -22,7 +22,7 @@ internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, 
 }
 internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOnlyList<ManualChallengeRow> Rows,
     ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null,
-    LegendaryCaptureMarks? Marks = null, bool HasChallengeOption = false);
+    LegendaryCaptureMarks? Marks = null, bool HasChallengeOption = false, int Difficulty = 0);
 
 /// <summary>界面控件用模板定位，奖励标题和花种名称使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
@@ -41,6 +41,9 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         ["result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
         ["result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter),
         ["legendary-tab"] = (.37, .015, .46, .1, RecognitionAnchor.TopLeft),
+        ["legendary-difficulty-1"] = (.065, .14, .102, .195, RecognitionAnchor.TopLeft),
+        ["legendary-difficulty-2"] = (.065, .235, .102, .29, RecognitionAnchor.TopLeft),
+        ["legendary-difficulty-3"] = (.065, .33, .102, .385, RecognitionAnchor.TopLeft),
         ["legendary-challenge"] = (.66, .88, .94, .98, RecognitionAnchor.BottomRight),
         ["legendary-confirm"] = (.5, .75, .65, .9, RecognitionAnchor.Center),
         ["legendary-cancel"] = (.35, .75, .49, .9, RecognitionAnchor.Center),
@@ -95,7 +98,23 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             var rewards = await Match("legendary-rewards", .43, .34, .57, .44);
             if (rewards is not null) return new(ManualChallengeScene.LegendaryRewards, [], rewards);
             if (await Match("legendary-confirmation-header", .65, .10, .83, .22) is not null)
-                return new(ManualChallengeScene.LegendaryConfirmation, [], await Button("legendary-challenge"));
+            {
+                List<ManualChallengeRow> difficulties = [];
+                var selectedDifficulty = 0;
+                for (var number = 1; number <= 3; number++)
+                {
+                    var name = $"legendary-difficulty-{number}";
+                    var (left, top, right, bottom, anchor) = ButtonAreas[name];
+                    // 只匹配罗马数字及其中心底色，不使用会变形的气泡轮廓。
+                    var selected = await images.MatchAsync(frame, Area(left, top, right, bottom, anchor: anchor),
+                        TemplatePath(name + "-selected"), options, cancellationToken);
+                    if (selected.IsMatch) selectedDifficulty = number;
+                    else if (await Button(name) is { } button)
+                        difficulties.Add(new(new string('I', number), button) { Number = number });
+                }
+                return new(ManualChallengeScene.LegendaryConfirmation, difficulties, await Button("legendary-challenge"),
+                    Difficulty: selectedDifficulty);
+            }
         }
         // 确认页两类花种都使用共有的“花种”标题字样。
         var confirmation = legendary ? null : await Match("confirmation-header", .5, .25, .78, .5);

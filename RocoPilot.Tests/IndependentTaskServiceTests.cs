@@ -25,9 +25,11 @@ public sealed class IndependentTaskServiceTests
         await fixture.Service.LoadSettingsAsync();
         var settings = fixture.Service.Settings;
         Assert.AreEqual(3, settings.LegendaryChallengeRunCount);
+        Assert.AreEqual(3, settings.LegendaryDifficulty);
         Assert.IsTrue(settings.UseLegendaryMarkWhenInsufficient);
         settings.LegendaryTargetName = "龙息帕尔";
         settings.LegendaryChallengeRunCount = 5;
+        settings.LegendaryDifficulty = 2;
         settings.UseLegendaryMarkWhenInsufficient = false;
         fixture.Service.SetSettings(settings);
 
@@ -37,9 +39,23 @@ public sealed class IndependentTaskServiceTests
 
         Assert.AreEqual("龙息帕尔", fixture.Runner.Target!.Name);
         Assert.AreEqual(5, fixture.Runner.RunCount);
+        Assert.AreEqual(2, fixture.Runner.Difficulty);
+        Assert.AreEqual(2, fixture.Store.ReadSaved<IndependentTaskSettings>(SettingsKeys.IndependentTaskSettings)!.LegendaryDifficulty);
         Assert.IsFalse(fixture.Runner.UseLegendaryMark);
         Assert.AreEqual(1, fixture.Runtime.Resumes);
         Assert.IsTrue(fixture.Runtime.Results.Any(result => result.Title == "传说精灵挑战完成，成功 5 次"));
+    }
+
+    [TestMethod]
+    public void DifficultySurvivesSettingsRoundTripAndOldSettingsDefaultToThree()
+    {
+        var old = System.Text.Json.JsonSerializer.Deserialize<IndependentTaskSettings>("{}")!;
+        Assert.AreEqual(3, old.Normalize().LegendaryDifficulty);
+        var settings = new IndependentTaskSettings { LegendaryDifficulty = 1 };
+        var saved = System.Text.Json.JsonSerializer.Serialize(settings.Clone().Normalize());
+        Assert.AreEqual(1, System.Text.Json.JsonSerializer.Deserialize<IndependentTaskSettings>(saved)!.LegendaryDifficulty);
+        settings.LegendaryDifficulty = 4;
+        Assert.AreEqual(3, settings.Normalize().LegendaryDifficulty);
     }
 
     [TestMethod]
@@ -492,14 +508,16 @@ public sealed class IndependentTaskServiceTests
     private sealed class RunnerStub(RuntimeStub runtime) : IManualChallengeRunner
     {
         public Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
-            bool useLegendaryMark, AutoBattleSettings battleSettings,
+            int difficulty, bool useLegendaryMark, AutoBattleSettings battleSettings,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
         {
             UseLegendaryMark = useLegendaryMark;
+            Difficulty = difficulty;
             return RunAsync(state, new(0, targetName), runCount, battleSettings, progress, cancellationToken);
         }
 
         public bool UseLegendaryMark;
+        public int Difficulty;
 
         public IReadOnlyList<FlowerSeedOption> Options = [new(1, "小皮球")];
         public bool Hold;

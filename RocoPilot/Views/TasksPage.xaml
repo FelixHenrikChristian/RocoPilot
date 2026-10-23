@@ -38,7 +38,7 @@
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
-                                Command="{x:Bind ViewModel.ToggleFlowerSeedChallengeCommand}"
+                                Click="ToggleFlowerSeedChallengeButton_Click"
                                 IsEnabled="{x:Bind ViewModel.IsFlowerSeedChallengeButtonEnabled, Mode=OneWay}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon
@@ -81,7 +81,7 @@
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <ComboBox
-                                    Width="240"
+                                    Width="200"
                                     VerticalAlignment="Center"
                                     DisplayMemberPath="DisplayName"
                                     IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
@@ -90,9 +90,13 @@
                                     SelectedItem="{x:Bind ViewModel.SelectedFlowerSeed, Mode=TwoWay}" />
                                 <Button
                                     VerticalAlignment="Center"
+                                    Width="32" Height="32" Padding="0"
+                                    AutomationProperties.Name="{x:Bind ViewModel.FlowerSeedScanButtonLabel, Mode=OneWay}"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.FlowerSeedScanButtonLabel, Mode=OneWay}"
                                     Command="{x:Bind ViewModel.ToggleFlowerSeedScanCommand}"
                                     IsEnabled="{x:Bind ViewModel.IsFlowerSeedScanButtonEnabled, Mode=OneWay}">
-                                    <TextBlock Text="{x:Bind ViewModel.FlowerSeedScanButtonText, Mode=OneWay}" />
+                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14"
+                                        Glyph="{x:Bind ViewModel.FlowerSeedScanButtonGlyph, Mode=OneWay}" />
                                 </Button>
                             </StackPanel>
                         </Grid>
@@ -122,7 +126,7 @@
                             </StackPanel>
                             <StackPanel Grid.Column="2" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
                                 <NumberBox
-                                    Width="140"
+                                    Width="96"
                                     VerticalAlignment="Center"
                                     IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
                                     Maximum="99"
@@ -171,105 +175,6 @@
                     </StackPanel>
                 </Expander>
 
-                <Expander Style="{StaticResource CardExpanderStyle}">
-                    <Expander.Header>
-                        <Grid ColumnSpacing="12">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-
-                            <FontIcon
-                                Grid.Column="0"
-                                VerticalAlignment="Center"
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                FontSize="20"
-                                Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                                Glyph="&#xE7FC;" />
-
-                            <StackPanel
-                                Grid.Column="1"
-                                VerticalAlignment="Center"
-                                Spacing="3">
-                                <TextBlock
-                                    FontWeight="SemiBold"
-                                    Text="精灵首领"
-                                    TextWrapping="Wrap" />
-                                <TextBlock
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="开发中"
-                                    TextWrapping="Wrap" />
-                            </StackPanel>
-
-                            <!--  执行逻辑尚未接入，发布版本临时禁用启动入口  -->
-                            <Button
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                Command="{x:Bind ViewModel.ToggleBossBattleCommand}"
-                                IsEnabled="False"
-                                ToolTipService.ToolTip="功能开发中，暂未开放。">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon
-                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                        FontSize="14"
-                                        Glyph="{x:Bind ViewModel.BossBattleButtonGlyph, Mode=OneWay}" />
-                                    <TextBlock Text="{x:Bind ViewModel.BossBattleButtonText, Mode=OneWay}" />
-                                </StackPanel>
-                            </Button>
-                        </Grid>
-                    </Expander.Header>
-
-                    <StackPanel Spacing="0">
-                        <Border
-                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0" />
-
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <FontIcon
-                                Grid.Column="0"
-                                VerticalAlignment="Center"
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                FontSize="18"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Glyph="&#xE8EE;" />
-                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="执行次数" TextWrapping="Wrap" />
-                                <TextBlock
-                                    Margin="0,2,0,0"
-                                    FontSize="12"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="单次启动连续挑战的场数；每日体力通常仅支持 3 次。"
-                                    TextWrapping="Wrap" />
-                            </StackPanel>
-                            <StackPanel
-                                Grid.Column="2"
-                                VerticalAlignment="Center"
-                                Orientation="Horizontal"
-                                Spacing="8">
-                                <NumberBox
-                                    Width="140"
-                                    VerticalAlignment="Center"
-                                    IsEnabled="{x:Bind ViewModel.IsBossBattleConfigurationEnabled, Mode=OneWay}"
-                                    Maximum="99"
-                                    Minimum="1"
-                                    SmallChange="1"
-                                    SpinButtonPlacementMode="Compact"
-                                    Value="{x:Bind ViewModel.BossBattleRunCount, Mode=TwoWay}" />
-                                <TextBlock
-                                    VerticalAlignment="Center"
-                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="次" />
-                            </StackPanel>
-                        </Grid>
-                    </StackPanel>
-                </Expander>
                 <Expander Style="{StaticResource CardExpanderStyle}">
                     <Expander.Header>
                         <Grid ColumnSpacing="12">
@@ -347,7 +252,7 @@
                             </StackPanel>
                             <ComboBox
                                 Grid.Column="2"
-                                Width="240"
+                                Width="160"
                                 VerticalAlignment="Center"
                                 IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
                                 ItemsSource="{x:Bind ViewModel.LegendaryTargets}"
@@ -366,9 +271,9 @@
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                 <TextBlock Text="挑战难度" />
                                 <TextBlock Margin="0,2,0,0" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="开始挑战前选择指定难度，默认 III。" TextWrapping="Wrap" />
+                                    Text="开始挑战前选择指定难度。" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ComboBox Grid.Column="2" Width="240" VerticalAlignment="Center"
+                            <ComboBox Grid.Column="2" Width="140" VerticalAlignment="Center"
                                 AutomationProperties.Name="传说精灵挑战难度"
                                 IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
                                 ItemsSource="{x:Bind ViewModel.LegendaryDifficulties}"
@@ -405,7 +310,7 @@
                                 Orientation="Horizontal"
                                 Spacing="8">
                                 <NumberBox
-                                    Width="140"
+                                    Width="96"
                                     VerticalAlignment="Center"
                                     IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
                                     Maximum="99"

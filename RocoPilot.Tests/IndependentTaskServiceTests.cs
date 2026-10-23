@@ -380,7 +380,7 @@ public sealed class IndependentTaskServiceTests
     }
 
     [TestMethod]
-    [DataRow(IndependentTaskKind.BossBattle)]
+    [DataRow(IndependentTaskKind.FlowerSeedChallenge)]
     [DataRow(IndependentTaskKind.LegendaryChallenge)]
     public async Task ExistingTasksRemainExclusiveAndRunUntilStopped(IndependentTaskKind kind)
     {

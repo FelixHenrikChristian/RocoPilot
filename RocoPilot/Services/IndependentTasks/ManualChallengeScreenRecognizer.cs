@@ -12,18 +12,21 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum FlowerSeedScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result }
-internal sealed record FlowerSeedRow(string Name, ImageMatchResult Button, string RawName = "")
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards }
+internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
+    ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
+internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
 {
     public int Number { get; set; }
     public bool HasMatched { get; set; }
 }
-internal sealed record FlowerSeedScreen(FlowerSeedScene Scene, IReadOnlyList<FlowerSeedRow> Rows,
-    ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null);
+internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOnlyList<ManualChallengeRow> Rows,
+    ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null,
+    LegendaryCaptureMarks? Marks = null);
 
 /// <summary>界面控件用模板定位，奖励标题和花种名称使用默认 OCR 确认。</summary>
-public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
-    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<FlowerSeedScreenRecognizer> logger)
+public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
+    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<ManualChallengeScreenRecognizer> logger)
 {
     // 首次定位与点击后的复查共用同一模板、区域和阈值。
     private static readonly Dictionary<string, (double Left, double Top, double Right, double Bottom, RecognitionAnchor Anchor)> ButtonAreas = new()
@@ -36,11 +39,18 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         ["confirmation-challenge"] = (.5, .74, .72, .94, RecognitionAnchor.Center),
         ["start"] = (.49, .75, .69, .9, RecognitionAnchor.Center),
         ["result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
-        ["result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter)
+        ["result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter),
+        ["legendary-tab"] = (.37, .015, .46, .1, RecognitionAnchor.TopLeft),
+        ["legendary-challenge"] = (.66, .88, .94, .98, RecognitionAnchor.BottomRight),
+        ["legendary-confirm"] = (.5, .75, .65, .9, RecognitionAnchor.Center),
+        ["legendary-cancel"] = (.35, .75, .49, .9, RecognitionAnchor.Center),
+        ["legendary-result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
+        ["legendary-result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter)
     };
 
-    internal async Task<FlowerSeedScreen> ReadAsync(CapturedFrame frame, int clientX, int clientY,
-        int width, int height, CancellationToken cancellationToken, Action<RecognitionRegion, string>? reportOcr = null)
+    internal async Task<ManualChallengeScreen> ReadAsync(CapturedFrame frame, int clientX, int clientY,
+        int width, int height, CancellationToken cancellationToken, Action<RecognitionRegion, string>? reportOcr = null,
+        bool legendary = false)
     {
         var scale = Math.Min(width / 2048d, height / 1152d);
         var options = new ImageMatchOptions
@@ -48,14 +58,15 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             MinimumScore = .94,
             TemplateScaleX = scale, TemplateScaleY = scale
         };
-        var tab = await Button("flower-tab") ?? await Button("flower-tab-inactive");
+        var tab = legendary ? await ReadLegendaryTabAsync(frame, clientX, clientY, width, height, cancellationToken)
+            : await Button("flower-tab") ?? await Button("flower-tab-inactive");
         if (tab is not null)
         {
-            if (!IsTabSelected(frame, tab)) return new(FlowerSeedScene.ChallengePage, [], tab);
+            if (!IsTabSelected(frame, tab)) return new(ManualChallengeScene.ChallengePage, [], tab);
             var (left, top, right, bottom, anchor) = ButtonAreas["list-teleport"];
             var buttons = await images.FindMatchesAsync(frame, Area(left, top, right, bottom, anchor: anchor),
                 "2048x1152/flower-seed/list-teleport.png", 8, options, cancellationToken: cancellationToken);
-            List<FlowerSeedRow> rows = [];
+            List<ManualChallengeRow> rows = [];
             foreach (var button in buttons.Matches.Where(button => button.IsMatch).OrderBy(button => button.Y))
             {
                 var region = Area(.305, 0, .45, .0434, $"花种名称 {rows.Count + 1}");
@@ -64,45 +75,59 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
                 var name = await ReadName(region);
                 rows.Add(new(name.Name, button, name.RawName));
             }
-            return rows.Count == 0 ? new(FlowerSeedScene.Unknown, []) : new(FlowerSeedScene.FlowerList, rows);
+            return rows.Count == 0 ? new(ManualChallengeScene.Unknown, [])
+                : new(legendary ? ManualChallengeScene.LegendaryList : ManualChallengeScene.FlowerList, rows);
         }
         var manual = await Match("manual-header", .08, .005, .2, .06, .90);
         if (manual is not null)
-            return new(FlowerSeedScene.Manual, [], await Button("manual-challenge"));
+            return new(ManualChallengeScene.Manual, [], await Button("manual-challenge"));
+        if (legendary)
+        {
+            // 弹窗先于后方详情页判断，避免把被遮罩的开始挑战按钮当成当前目标。
+            if (await Match("legendary-insufficient", .32, .48, .69, .61) is not null)
+                return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
+                    ExitButton: await Button("legendary-cancel"));
+            var captureConfirmation = await ReadCaptureConfirmationAsync(frame, clientX, clientY, width, height, cancellationToken);
+            if (captureConfirmation is not null) return captureConfirmation;
+            var rewards = await Match("legendary-rewards", .43, .34, .57, .44);
+            if (rewards is not null) return new(ManualChallengeScene.LegendaryRewards, [], rewards);
+            if (await Match("legendary-confirmation-header", .65, .10, .83, .22) is not null)
+                return new(ManualChallengeScene.LegendaryConfirmation, [], await Button("legendary-challenge"));
+        }
         // 确认页两类花种都使用共有的“花种”标题字样。
-        var confirmation = await Match("confirmation-header", .5, .25, .78, .5);
+        var confirmation = legendary ? null : await Match("confirmation-header", .5, .25, .78, .5);
         if (confirmation is not null)
         {
             var challenge = await Button("confirmation-challenge");
             var cancel = await Match("confirmation-cancel", .3, .74, .52, .94);
             return challenge is not null && cancel is not null
-                ? new(FlowerSeedScene.Confirmation, [], challenge) : new(FlowerSeedScene.Unknown, []);
+                ? new(ManualChallengeScene.Confirmation, [], challenge) : new(ManualChallengeScene.Unknown, []);
         }
         // 标题只匹配共有的“花种”，兼容“命定花种”和“稀兽花种”。
-        var map = await Match("map-header", .65, .015, .85, .09);
+        var map = await Match(legendary ? "legendary-map-header" : "map-header", .65, .015, .85, .09);
         if (map is not null)
         {
             var teleport = await Button("map-teleport");
             var name = await ReadName(Area(.72, .184, .87, .2274, "地图花种名称"));
-            return new(FlowerSeedScene.Map, [], teleport, name.Name);
+            return new(ManualChallengeScene.Map, [], teleport, name.Name);
         }
         var preparation = await Match("preparation", .3, .3, .65, .45);
         if (preparation is not null)
-            return new(FlowerSeedScene.Preparation, [], await Button("start"));
+            return new(ManualChallengeScene.Preparation, [], await Button("start"));
         var medal = await Match("medal-confirmation", .32, .48, .68, .61);
         if (medal is not null)
-            return new(FlowerSeedScene.MedalConfirmation, [], await Button("start"));
-        var retry = await Button("result-retry");
+            return new(ManualChallengeScene.MedalConfirmation, [], await Button("start"));
+        var retry = await Button(legendary ? "legendary-result-retry" : "result-retry");
         if (retry is not null)
         {
-            var exit = await Button("result-exit");
-            if (exit is not null) return new(FlowerSeedScene.Result, [], retry, ExitButton: exit);
+            var exit = await Button(legendary ? "legendary-result-exit" : "result-exit");
+            if (exit is not null) return new(ManualChallengeScene.Result, [], retry, ExitButton: exit);
         }
         var exclusive = await Match("capture-exclusive", .08, .2, .23, .4);
         if (exclusive is not null)
         {
             var capture = await Match("capture-button", .88, .84, 1, 1);
-            if (capture is not null) return new(FlowerSeedScene.Capture, [], capture);
+            if (capture is not null) return new(ManualChallengeScene.Capture, [], capture);
         }
         // 交互菜单必须同时具有大世界 HUD，结束动画中的浅色图形不能判为挑战失败。
         var world = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
@@ -120,11 +145,22 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
             {
                 var text = await ocr.RecognizeAsync(frame, line, TextRecognitionDefaults.Method, cancellationToken);
                 reportOcr?.Invoke(line, string.IsNullOrWhiteSpace(text.Text) ? "OCR：无文本" : $"OCR：{text.Text}");
-                return new(FlowerSeedScene.Interaction, [], world, Text: Normalize(text.Text));
+                return new(ManualChallengeScene.Interaction, [], world, Text: Normalize(text.Text));
             }
         }
         // 只采用游戏 HUD 与战斗按钮的正向匹配，未知画面不会由上一输入推断。
-        if (world.IsMatch) return new(FlowerSeedScene.World, [], world);
+        if (world.IsMatch) return new(ManualChallengeScene.World, [], world);
+        // 传说挑战倒下后仍显示“技能”按钮；用左侧候选精灵血条外框和战斗聊天共同确认。
+        // 血条模板遮掉填充部分，不依赖候选精灵的剩余生命值。
+        if (legendary && (await Match("legendary-pet-health", .10, .25, .25, .80)
+                ?? await Match("legendary-pet-health-selected", .10, .25, .25, .80)) is { } petHealth
+            && (await images.MatchAsync(frame, Area(.92, .62, 1, .75), "2048x1152/battle-chat.png",
+                options, cancellationToken)).IsMatch)
+        {
+            var confirm = await Match("legendary-pet-confirmation", .45, .6, .72, .88);
+            return new(ManualChallengeScene.Battle, [], confirm ?? petHealth,
+                BattleScreen: confirm is null ? BattleScreen.PetSwitching : BattleScreen.PetSwitchConfirmation);
+        }
         foreach (var (template, screen) in new[]
         {
             ("battle-button-skill", BattleScreen.SkillSelection),
@@ -134,10 +170,10 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         {
             var region = screen == BattleScreen.Chat ? Area(.92, .62, 1, .75) : Area(.68, .62, 1, 1);
             var battle = await images.MatchAsync(frame, region, "2048x1152/" + template + ".png", options, cancellationToken);
-            if (battle.IsMatch) return new(FlowerSeedScene.Battle, [], battle, BattleScreen: screen);
+            if (battle.IsMatch) return new(ManualChallengeScene.Battle, [], battle, BattleScreen: screen);
         }
         return await ReadRewardsAsync(frame, clientX, clientY, width, height, cancellationToken, reportOcr)
-            ?? new(FlowerSeedScene.Unknown, []);
+            ?? new(ManualChallengeScene.Unknown, []);
 
         Task<ImageMatchResult?> Button(string template)
             => MatchButtonAsync(frame, template, clientX, clientY, width, height, cancellationToken);
@@ -151,7 +187,7 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         async Task<ImageMatchResult?> Match(string template, double left, double top, double right, double bottom, double score = .94)
         {
             options.MinimumScore = score;
-            var result = await images.MatchAsync(frame, Area(left, top, right, bottom), "2048x1152/flower-seed/" + template + ".png", options, cancellationToken);
+            var result = await images.MatchAsync(frame, Area(left, top, right, bottom), TemplatePath(template), options, cancellationToken);
             if (template == "manual-header")
                 logger.LogDebug("花种手册识别：匹配={Matched}，得分={Score:F3}，预计比例={Scale:F4}，目标=({X},{Y},{Width},{Height})",
                     result.IsMatch, result.Score, scale, result.X, result.Y, result.Width, result.Height);
@@ -161,7 +197,9 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         async Task<(string Name, string RawName)> ReadName(RecognitionRegion region)
         {
             var result = await ocr.RecognizeAsync(frame, region, TextRecognitionDefaults.Method, cancellationToken);
-            var name = string.IsNullOrWhiteSpace(result.Text) ? string.Empty
+            var name = legendary ? Models.Runtime.IndependentTaskSettings.LegendaryTargets.FirstOrDefault(
+                    candidate => candidate == Normalize(result.Text)) ?? string.Empty
+                : string.IsNullOrWhiteSpace(result.Text) ? string.Empty
                 : await catalog.MatchSpiritNameAsync(result.Text, seasons.Load().SpiritNameMatchThreshold, cancellationToken);
             logger.LogDebug("花种名称识别：OCR={RawName}，图鉴={MatchedName}，区域=({X},{Y},{Width},{Height})",
                 result.Text, name, region.X, region.Y, region.Width, region.Height);
@@ -171,24 +209,77 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
     }
 
     // 复查原点击目标，不要求下一页出现。列表有多个相同按钮，只复查原目标行。
-    internal async Task<ImageMatchResult?> FindClickTargetAsync(CapturedFrame frame, FlowerSeedScene scene,
-        string templatePath, double rowY, int clientX, int clientY, int width, int height, CancellationToken token)
+    internal async Task<ImageMatchResult?> FindClickTargetAsync(CapturedFrame frame, ManualChallengeScene scene,
+        string templatePath, double rowY, int clientX, int clientY, int width, int height, CancellationToken token,
+        bool legendary = false)
     {
-        if (scene is FlowerSeedScene.World or FlowerSeedScene.Interaction)
+        if (scene is ManualChallengeScene.World or ManualChallengeScene.Interaction)
         {
             var hud = await MatchWorldHudAsync(frame, clientX, clientY, width, height, token);
             return hud.IsMatch ? hud : null;
         }
-        if (scene == FlowerSeedScene.Rewards)
+        if (scene == ManualChallengeScene.Rewards)
             return (await ReadRewardsAsync(frame, clientX, clientY, width, height, token))?.Button;
-        if (scene == FlowerSeedScene.ChallengePage)
+        if (scene == ManualChallengeScene.CaptureConfirmation)
         {
-            var tab = await MatchButtonAsync(frame, "flower-tab", clientX, clientY, width, height, token)
+            var current = await ReadCaptureConfirmationAsync(frame, clientX, clientY, width, height, token);
+            if (current?.Marks is not { } marks) return null;
+            if (templatePath == "legendary-select-contract") return marks.LegendarySelected ? marks.ContractButton : null;
+            if (templatePath == "legendary-select-mark") return marks.LegendarySelected ? null : marks.LegendaryButton;
+        }
+        if (scene == ManualChallengeScene.ChallengePage)
+        {
+            var tab = legendary ? await ReadLegendaryTabAsync(frame, clientX, clientY, width, height, token)
+                : await MatchButtonAsync(frame, "flower-tab", clientX, clientY, width, height, token)
                 ?? await MatchButtonAsync(frame, "flower-tab-inactive", clientX, clientY, width, height, token);
             return tab is not null && !IsTabSelected(frame, tab) ? tab : null;
         }
-        return await MatchButtonAsync(frame, Path.GetFileNameWithoutExtension(templatePath),
-            clientX, clientY, width, height, token, scene == FlowerSeedScene.FlowerList ? rowY : null);
+        var template = Path.GetFileNameWithoutExtension(templatePath);
+        if (templatePath.Replace('\\', '/').Contains("/legendary/")) template = "legendary-" + template;
+        return await MatchButtonAsync(frame, template,
+            clientX, clientY, width, height, token,
+            scene is ManualChallengeScene.FlowerList or ManualChallengeScene.LegendaryList ? rowY : null);
+    }
+
+    private async Task<ImageMatchResult?> ReadLegendaryTabAsync(CapturedFrame frame, int clientX, int clientY,
+        int width, int height, CancellationToken token)
+    {
+        var selected = await MatchButtonAsync(frame, "legendary-tab", clientX, clientY, width, height, token);
+        if (selected is not null) return selected;
+        // 其它挑战标签选中时，传说文字变灰；在花种标签确认的同一栏读取文字。
+        if (await MatchButtonAsync(frame, "flower-tab", clientX, clientY, width, height, token) is null
+            && await MatchButtonAsync(frame, "flower-tab-inactive", clientX, clientY, width, height, token) is null)
+            return null;
+        var region = CreateArea(clientX, clientY, width, height, 780d / 2048, 42d / 1152, 918d / 2048, 82d / 1152,
+            RecognitionAnchor.TopLeft);
+        var text = await ocr.RecognizeAsync(frame, region, TextRecognitionDefaults.Method, token);
+        if (Normalize(text.Text) != "传说精灵") return null;
+        var button = CreateArea(clientX, clientY, width, height, 790d / 2048, 48d / 1152, 902d / 2048, 76d / 1152,
+            RecognitionAnchor.TopLeft);
+        return new(true, 1, button.X, button.Y, button.Width, button.Height, TemplatePath("legendary-tab"));
+    }
+
+    private static string TemplatePath(string name) => name.StartsWith("legendary-", StringComparison.Ordinal)
+        ? $"2048x1152/legendary/{name[10..]}.png" : $"2048x1152/flower-seed/{name}.png";
+
+    private async Task<ManualChallengeScreen?> ReadCaptureConfirmationAsync(CapturedFrame frame, int x, int y,
+        int width, int height, CancellationToken token)
+    {
+        var scale = Math.Min(width / 2048d, height / 1152d);
+        var options = new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale };
+        var header = await images.MatchAsync(frame, CreateArea(x, y, width, height, .44, .34, .56, .41),
+            TemplatePath("legendary-capture-header"), options, token);
+        if (!header.IsMatch) return null;
+        var contractArea = CreateArea(x, y, width, height, .42, .45, .50, .56);
+        var markArea = CreateArea(x, y, width, height, .50, .45, .58, .56);
+        var contract = await images.MatchAsync(frame, contractArea, TemplatePath("legendary-contract-selected"), options, token);
+        var mark = await images.MatchAsync(frame, markArea, TemplatePath("legendary-mark-selected"), options, token);
+        if (!contract.IsMatch && !mark.IsMatch) return new(ManualChallengeScene.Unknown, []);
+        return new(ManualChallengeScene.CaptureConfirmation, [],
+            await MatchButtonAsync(frame, "legendary-confirm", x, y, width, height, token),
+            Marks: new(mark.IsMatch,
+                new(true, 1, contractArea.X, contractArea.Y, contractArea.Width, contractArea.Height, "legendary-select-contract"),
+                new(true, 1, markArea.X, markArea.Y, markArea.Width, markArea.Height, "legendary-select-mark")));
     }
 
     // F3 的完成确认只复查原 HUD，避免全界面识别耗时影响开关按键的等待。
@@ -216,7 +307,7 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         }
         var scale = Math.Min(width / 2048d, height / 1152d);
         var result = await images.MatchAsync(frame, area,
-            $"2048x1152/flower-seed/{template}.png",
+            TemplatePath(template),
             new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
         if (template == "manual-challenge")
             logger.LogDebug("花种手册挑战入口：匹配={Matched}，得分={Score:F3}，目标=({X},{Y},{Width},{Height})",
@@ -224,7 +315,7 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
         return result.IsMatch ? result : null;
     }
 
-    private async Task<FlowerSeedScreen?> ReadRewardsAsync(CapturedFrame frame, int clientX, int clientY,
+    private async Task<ManualChallengeScreen?> ReadRewardsAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken token, Action<RecognitionRegion, string>? reportOcr = null)
     {
         // 单排和双排奖励的标题高度不同；只识别单行文字。
@@ -238,7 +329,7 @@ public sealed class FlowerSeedScreenRecognizer(IImageMatchingService images, ITe
                 result.Text, matched, region.X, region.Y, region.Width, region.Height);
             if (!matched) continue;
             reportOcr?.Invoke(region, $"OCR：{result.Text}");
-            return new(FlowerSeedScene.Rewards, [], new ImageMatchResult(true, 1,
+            return new(ManualChallengeScene.Rewards, [], new ImageMatchResult(true, 1,
                 clientX + (int)Math.Round(width * .5), clientY + (int)Math.Round(height * .9), 1, 1, "flower-rewards-dismiss"), Text: result.Text);
         }
         return null;

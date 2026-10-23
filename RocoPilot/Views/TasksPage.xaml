@@ -154,7 +154,7 @@
                                     Margin="0,2,0,0"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="命定与稀兽花种共用释放顺序，启动后自动执行战斗。"
+                                    Text="独立配置花种释放顺序，可插入公共执行序列。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
                             <Button
@@ -298,17 +298,16 @@
                                 <TextBlock
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="开发中"
+                                    Text="自动挑战目标精灵、选择印记并捕捉，完成后退出。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
 
-                            <!--  执行逻辑尚未接入，发布版本临时禁用启动入口  -->
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Command="{x:Bind ViewModel.ToggleLegendaryChallengeCommand}"
-                                IsEnabled="False"
-                                ToolTipService.ToolTip="功能开发中，暂未开放。">
+                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeButtonEnabled, Mode=OneWay}"
+                                ToolTipService.ToolTip="按设定次数挑战并捕捉目标精灵。">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
@@ -332,6 +331,39 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE8F1;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="目标精灵" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="选择要挑战的传说精灵。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ComboBox
+                                Grid.Column="2"
+                                Width="240"
+                                VerticalAlignment="Center"
+                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                ItemsSource="{x:Bind ViewModel.LegendaryTargets}"
+                                SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
+                        </Grid>
+
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
                                 Grid.Column="0"
                                 VerticalAlignment="Center"
                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
@@ -339,12 +371,12 @@
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Glyph="&#xE8EE;" />
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="执行次数" TextWrapping="Wrap" />
+                                <TextBlock Text="战斗次数" />
                                 <TextBlock
                                     Margin="0,2,0,0"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="单次启动连续挑战的场数；每周体力通常仅支持 3 次。"
+                                    Text="默认 3 次；成功捕捉后计数，连续失败 3 次后停止。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel
@@ -366,6 +398,78 @@
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Text="次" />
                             </StackPanel>
+                        </Grid>
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE734;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="使用传说印记" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="体力或周捕捉次数不足时使用；关闭后遇到不足提示即停止。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                Grid.Column="2"
+                                Width="44"
+                                MinWidth="44"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Padding="0"
+                                AutomationProperties.Name="体力或周捕捉次数不足时使用传说印记"
+                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                IsOn="{x:Bind ViewModel.UseLegendaryMarkWhenInsufficient, Mode=TwoWay}"
+                                OffContent=""
+                                OnContent="" />
+                        </Grid>
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE9F5;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="战斗配置" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="独立配置传说精灵释放顺序，可插入公共执行序列。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                Click="ConfigureLegendaryBattleButton_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE713;" />
+                                    <TextBlock Text="配置" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </StackPanel>
                 </Expander>

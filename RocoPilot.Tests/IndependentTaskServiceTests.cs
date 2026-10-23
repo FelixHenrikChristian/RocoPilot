@@ -19,6 +19,30 @@ namespace RocoPilot.Tests;
 public sealed class IndependentTaskServiceTests
 {
     [TestMethod]
+    public async Task LegendaryUsesConfiguredTargetCountAndMarkPreference()
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        var settings = fixture.Service.Settings;
+        Assert.AreEqual(3, settings.LegendaryChallengeRunCount);
+        Assert.IsTrue(settings.UseLegendaryMarkWhenInsufficient);
+        settings.LegendaryTargetName = "龙息帕尔";
+        settings.LegendaryChallengeRunCount = 5;
+        settings.UseLegendaryMarkWhenInsufficient = false;
+        fixture.Service.SetSettings(settings);
+
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryChallenge)).Success);
+        await fixture.Runner.ChallengeStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await WaitStoppedAsync(fixture.Service);
+
+        Assert.AreEqual("龙息帕尔", fixture.Runner.Target!.Name);
+        Assert.AreEqual(5, fixture.Runner.RunCount);
+        Assert.IsFalse(fixture.Runner.UseLegendaryMark);
+        Assert.AreEqual(1, fixture.Runtime.Resumes);
+        Assert.IsTrue(fixture.Runtime.Results.Any(result => result.Title == "传说精灵挑战完成，成功 5 次"));
+    }
+
+    [TestMethod]
     public async Task ChallengeWithoutTargetDoesNotSuspendRuntime()
     {
         var fixture = new Fixture();
@@ -345,6 +369,7 @@ public sealed class IndependentTaskServiceTests
     public async Task ExistingTasksRemainExclusiveAndRunUntilStopped(IndependentTaskKind kind)
     {
         var fixture = new Fixture();
+        fixture.Runner.Hold = true;
         await fixture.Service.LoadSettingsAsync();
         Assert.IsTrue((await fixture.Service.StartAsync(kind)).Success);
         await fixture.Runtime.DrainStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -464,8 +489,18 @@ public sealed class IndependentTaskServiceTests
         }
     }
 
-    private sealed class RunnerStub(RuntimeStub runtime) : IFlowerSeedChallengeRunner
+    private sealed class RunnerStub(RuntimeStub runtime) : IManualChallengeRunner
     {
+        public Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
+            bool useLegendaryMark, AutoBattleSettings battleSettings,
+            Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
+        {
+            UseLegendaryMark = useLegendaryMark;
+            return RunAsync(state, new(0, targetName), runCount, battleSettings, progress, cancellationToken);
+        }
+
+        public bool UseLegendaryMark;
+
         public IReadOnlyList<FlowerSeedOption> Options = [new(1, "小皮球")];
         public bool Hold;
         public string? Failure;

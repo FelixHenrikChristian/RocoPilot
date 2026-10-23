@@ -5,7 +5,7 @@ using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Services.RuntimeTasks;
 
-public enum BattleScreen { SkillSelection, PetSwitching, Chat, Unknown }
+public enum BattleScreen { SkillSelection, PetSwitching, Chat, Unknown, PetSwitchConfirmation }
 
 public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
 {

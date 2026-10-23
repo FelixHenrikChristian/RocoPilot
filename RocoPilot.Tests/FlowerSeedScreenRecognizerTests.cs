@@ -26,6 +26,79 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedScreenRecognizerTests
 {
     [TestMethod]
+    [DataRow("manual", nameof(ManualChallengeScene.Manual))]
+    [DataRow("list", nameof(ManualChallengeScene.LegendaryList))]
+    [DataRow("map", nameof(ManualChallengeScene.Map))]
+    [DataRow("world", nameof(ManualChallengeScene.World))]
+    [DataRow("interaction-dark", nameof(ManualChallengeScene.Interaction))]
+    [DataRow("interaction-gold", nameof(ManualChallengeScene.Interaction))]
+    [DataRow("confirmation", nameof(ManualChallengeScene.LegendaryConfirmation))]
+    [DataRow("insufficient", nameof(ManualChallengeScene.InsufficientContractMark))]
+    [DataRow("preparation", nameof(ManualChallengeScene.Preparation))]
+    [DataRow("battle", nameof(ManualChallengeScene.Battle))]
+    [DataRow("pet-switching", nameof(ManualChallengeScene.Battle))]
+    [DataRow("pet-confirmation", nameof(ManualChallengeScene.Battle))]
+    [DataRow("capture-contract", nameof(ManualChallengeScene.CaptureConfirmation))]
+    [DataRow("capture-legendary", nameof(ManualChallengeScene.CaptureConfirmation))]
+    [DataRow("rewards", nameof(ManualChallengeScene.LegendaryRewards))]
+    [DataRow("capture", nameof(ManualChallengeScene.Capture))]
+    [DataRow("result", nameof(ManualChallengeScene.Result))]
+    public async Task LegendaryScreensUseRealTemplatesAndOcr(string fixture, string expected)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        foreach (var (width, height) in new[] { (2048, 1152), (1280, 720) })
+        {
+            using var frame = LoadFixture($"legendary-{fixture}.png", width, height, 12, 30);
+            List<string> texts = [];
+            var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None,
+                (_, text) => texts.Add(text), legendary: true);
+            var diagnostic = $"{fixture} {width}x{height} OCR: {string.Join(" | ", texts)}";
+            Assert.AreEqual(Enum.Parse<ManualChallengeScene>(expected), screen.Scene, diagnostic);
+            if (fixture == "list") CollectionAssert.AreEqual(new[] { "圣羽翼王", "龙息帕尔" }, screen.Rows.Select(row => row.Name).ToArray(), diagnostic);
+            else Assert.IsNotNull(screen.Button, diagnostic);
+            if (fixture == "map") Assert.AreEqual("圣羽翼王", screen.Text, diagnostic);
+            if (fixture.StartsWith("interaction")) Assert.AreEqual("挑战", screen.Text, diagnostic);
+            if (fixture == "battle") Assert.AreEqual(BattleScreen.SkillSelection, screen.BattleScreen, diagnostic);
+            if (fixture == "pet-switching") Assert.AreEqual(BattleScreen.PetSwitching, screen.BattleScreen, diagnostic);
+            if (fixture == "pet-confirmation") Assert.AreEqual(BattleScreen.PetSwitchConfirmation, screen.BattleScreen, diagnostic);
+            if (fixture == "confirmation") Assert.HasCount(0, texts, diagnostic);
+            if (screen.Marks is { } marks)
+            {
+                Assert.HasCount(0, texts, diagnostic);
+                Assert.AreEqual(fixture == "capture-legendary", marks.LegendarySelected, diagnostic);
+            }
+            if (screen.Scene is ManualChallengeScene.LegendaryConfirmation or ManualChallengeScene.InsufficientContractMark
+                or ManualChallengeScene.Preparation or ManualChallengeScene.Map or ManualChallengeScene.Result or ManualChallengeScene.CaptureConfirmation)
+            {
+                var rechecked = await recognizer.FindClickTargetAsync(frame, screen.Scene, screen.Button!.TemplatePath,
+                    0, 12, 30, width, height, CancellationToken.None, legendary: true);
+                Assert.IsNotNull(rechecked, diagnostic);
+                Assert.AreEqual((screen.Button.X, screen.Button.Y), (rechecked.X, rechecked.Y), diagnostic);
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task LegendaryPetHealthTemplateDoesNotRequireFullHealth()
+    {
+        using var frame = LoadFixture("legendary-pet-switching.png");
+        // 清空第一只候选精灵血条的填充，保留 UI 外框。
+        for (var y = 387; y <= 393; y++)
+            for (var x = 330; x < 402; x++)
+            {
+                var offset = (y * frame.Width + x) * 4;
+                frame.Pixels[offset] = frame.Pixels[offset + 1] = frame.Pixels[offset + 2] = 30;
+            }
+        var match = await new ImageMatchingService().MatchAsync(frame,
+            new RecognitionRegion { X = 320, Y = 375, Width = 100, Height = 32 },
+            "2048x1152/legendary/pet-health.png", new ImageMatchOptions { MinimumScore = .94 });
+        Assert.IsTrue(match.IsMatch, $"血条外框匹配分数：{match.Score}");
+    }
+
+    [TestMethod]
     [DataRow(1920, 1080, 0, 0)]
     [DataRow(2560, 1080, 12, 30)]
     [DataRow(1920, 1440, 12, 30)]
@@ -37,12 +110,12 @@ public sealed class FlowerSeedScreenRecognizerTests
         for (var y = 0; y < source.Height; y++)
             Array.Copy(source.Pixels, y * source.Width * 4, frame.Pixels,
                 ((y + clientY) * frame.Width + clientX) * 4, source.Width * 4);
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(),
-            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(),
+            new Catalog(), new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
 
         var screen = await recognizer.ReadAsync(frame, clientX, clientY, width, height, CancellationToken.None);
 
-        Assert.AreEqual(FlowerSeedScene.Manual, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.Manual, screen.Scene);
         Assert.IsNotNull(screen.Button);
         var button = screen.Button;
         Assert.IsTrue(button.X + button.Width / 2 - clientX is >= 140 and <= 180);
@@ -61,10 +134,10 @@ public sealed class FlowerSeedScreenRecognizerTests
     public async Task ScaledManualScreenshotLocatesNavigation(int width, int height)
     {
         using var frame = LoadFixture("flower-seed-manual-1080p.png", width, height, 12, 30);
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(),
-            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(),
+            new Catalog(), new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None);
-        Assert.AreEqual(FlowerSeedScene.Manual, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.Manual, screen.Scene);
         Assert.IsNotNull(screen.Button);
         var x = (screen.Button.X + screen.Button.Width / 2d - 12) * 1920 / width;
         var y = (screen.Button.Y + screen.Button.Height / 2d - 30) * 1080 / height;
@@ -94,30 +167,30 @@ public sealed class FlowerSeedScreenRecognizerTests
     [TestMethod]
     public async Task SelectedTabEndsClickingEvenThoughTheTabTemplateStillMatches()
     {
-        var recognizer = new FlowerSeedScreenRecognizer(new ListImages(2048, 1152, 0, 0), new NameOcr(),
-            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ListImages(2048, 1152, 0, 0), new NameOcr(),
+            new Catalog(), new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(2048, 1152, 0, 0);
         Array.Clear(frame.Pixels);
-        var tab = await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.ChallengePage, "flower-tab", 0,
+        var tab = await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.ChallengePage, "flower-tab", 0,
             0, 0, 2048, 1152, CancellationToken.None);
         Assert.IsNotNull(tab);
 
         Array.Fill(frame.Pixels, (byte)245);
 
-        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.ChallengePage, "flower-tab", 0,
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.ChallengePage, "flower-tab", 0,
             0, 0, 2048, 1152, CancellationToken.None));
     }
 
     [TestMethod]
     public async Task RewardClickEndsWhenItsOcrTitleDisappears()
     {
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr("获得奖励", "", ""),
-            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr("获得奖励", "", ""),
+            new Catalog(), new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(2048, 1152, 0, 0);
 
-        Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.Rewards, "flower-rewards-dismiss", 0,
+        Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.Rewards, "flower-rewards-dismiss", 0,
             0, 0, 2048, 1152, CancellationToken.None));
-        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.Rewards, "flower-rewards-dismiss", 0,
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.Rewards, "flower-rewards-dismiss", 0,
             0, 0, 2048, 1152, CancellationToken.None));
     }
 
@@ -125,8 +198,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     public async Task DisappearedListButtonCannotBeReplacedByAnIdenticalButtonInAnotherRow()
     {
         var images = new ImageMatchingService();
-        var recognizer = new FlowerSeedScreenRecognizer(images, new NameOcr(), new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, new NameOcr(), new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var template = Cv2.ImRead(Path.Combine(images.TemplateDirectory, "2048x1152/flower-seed/list-teleport.png"), ImreadModes.Unchanged);
         Assert.IsFalse(template.Empty());
         var templateWidth = template.Width;
@@ -141,7 +214,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         System.Runtime.InteropServices.Marshal.Copy(canvas.Data, pixels, 0, pixels.Length);
         using var frame = new CapturedFrame(2048, 1152, pixels);
         var rowY = (280 + templateHeight / 2d) / 1152;
-        var first = await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.FlowerList, "list-teleport.png", rowY,
+        var first = await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.FlowerList, "list-teleport.png", rowY,
             0, 0, 2048, 1152, CancellationToken.None);
         Assert.IsNotNull(first);
         Assert.AreEqual(280, first.Y);
@@ -149,7 +222,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         for (var y = 280; y < 280 + templateHeight; y++)
             Array.Clear(pixels, (y * 2048 + 1700) * 4, templateWidth * 4);
 
-        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, FlowerSeedScene.FlowerList, "list-teleport.png", rowY,
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.FlowerList, "list-teleport.png", rowY,
             0, 0, 2048, 1152, CancellationToken.None));
     }
 
@@ -161,8 +234,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("flower-seed-result.png")]
     public async Task ClickTargetIsRecheckedUntilItsTemplateDisappears(string fixture)
     {
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(""),
-            new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(""),
+            new Catalog(), new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
         var map = fixture == "flower-seed-map.png"; // 地图样本含原游戏窗口边框。
         var clientX = map ? 1 : 12;
         var width = map ? 1366 : 1280;
@@ -185,64 +258,64 @@ public sealed class FlowerSeedScreenRecognizerTests
     }
 
     [TestMethod]
-    [DataRow("flower-seed-battle.png", nameof(FlowerSeedScene.Battle), BattleScreen.SkillSelection)]
-    [DataRow("flower-seed-battle-detail.png", nameof(FlowerSeedScene.Battle), BattleScreen.SkillSelection)]
-    [DataRow("flower-seed-capture.png", nameof(FlowerSeedScene.Capture), null)]
-    [DataRow("flower-seed-capture-duck.png", nameof(FlowerSeedScene.Capture), null)]
-    [DataRow("flower-seed-rewards.png", nameof(FlowerSeedScene.Rewards), null)]
-    [DataRow("flower-seed-rewards-single-row.png", nameof(FlowerSeedScene.Rewards), null)]
-    [DataRow("flower-seed-result.png", nameof(FlowerSeedScene.Result), null)]
-    [DataRow("flower-seed-fated-confirmation.png", nameof(FlowerSeedScene.Confirmation), null)]
-    [DataRow("flower-seed-preparation.png", nameof(FlowerSeedScene.Preparation), null)]
-    [DataRow("flower-seed-medal-confirmation.png", nameof(FlowerSeedScene.MedalConfirmation), null)]
-    [DataRow("flower-seed-failure-world.png", nameof(FlowerSeedScene.Interaction), null)]
+    [DataRow("flower-seed-battle.png", nameof(ManualChallengeScene.Battle), BattleScreen.SkillSelection)]
+    [DataRow("flower-seed-battle-detail.png", nameof(ManualChallengeScene.Battle), BattleScreen.SkillSelection)]
+    [DataRow("flower-seed-capture.png", nameof(ManualChallengeScene.Capture), null)]
+    [DataRow("flower-seed-capture-duck.png", nameof(ManualChallengeScene.Capture), null)]
+    [DataRow("flower-seed-rewards.png", nameof(ManualChallengeScene.Rewards), null)]
+    [DataRow("flower-seed-rewards-single-row.png", nameof(ManualChallengeScene.Rewards), null)]
+    [DataRow("flower-seed-result.png", nameof(ManualChallengeScene.Result), null)]
+    [DataRow("flower-seed-fated-confirmation.png", nameof(ManualChallengeScene.Confirmation), null)]
+    [DataRow("flower-seed-preparation.png", nameof(ManualChallengeScene.Preparation), null)]
+    [DataRow("flower-seed-medal-confirmation.png", nameof(ManualChallengeScene.MedalConfirmation), null)]
+    [DataRow("flower-seed-failure-world.png", nameof(ManualChallengeScene.Interaction), null)]
     public async Task RealChallengeScreensRecognizeTheirStageAndActionButtons(
         string fixture, string expectedScene, BattleScreen? expectedBattleScreen)
     {
-        var ocr = new NameOcr(expectedScene == nameof(FlowerSeedScene.Rewards) ? "获得奖励" : "挑战!");
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var ocr = new NameOcr(expectedScene == nameof(ManualChallengeScene.Rewards) ? "获得奖励" : "挑战!");
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture(fixture);
 
         var screen = await recognizer.ReadAsync(frame, 0, 0, frame.Width, frame.Height, CancellationToken.None);
 
-        Assert.AreEqual(Enum.Parse<FlowerSeedScene>(expectedScene), screen.Scene);
+        Assert.AreEqual(Enum.Parse<ManualChallengeScene>(expectedScene), screen.Scene);
         Assert.AreEqual(expectedBattleScreen, screen.BattleScreen);
-        if (screen.Scene is FlowerSeedScene.Capture or FlowerSeedScene.Rewards or FlowerSeedScene.Result
-            or FlowerSeedScene.Confirmation or FlowerSeedScene.Preparation or FlowerSeedScene.MedalConfirmation)
+        if (screen.Scene is ManualChallengeScene.Capture or ManualChallengeScene.Rewards or ManualChallengeScene.Result
+            or ManualChallengeScene.Confirmation or ManualChallengeScene.Preparation or ManualChallengeScene.MedalConfirmation)
             Assert.IsTrue(screen.Button is { IsMatch: true });
-        if (screen.Scene == FlowerSeedScene.Result) Assert.IsTrue(screen.ExitButton is { IsMatch: true });
-        if (screen.Scene == FlowerSeedScene.Interaction)
+        if (screen.Scene == ManualChallengeScene.Result) Assert.IsTrue(screen.ExitButton is { IsMatch: true });
+        if (screen.Scene == ManualChallengeScene.Interaction)
         {
             Assert.AreEqual("挑战", screen.Text);
             Assert.HasCount(1, ocr.Calls);
             var region = ocr.Calls[0].Region;
             Assert.AreEqual((1265, 589, 150, 40), (region.X, region.Y, region.Width, region.Height));
         }
-        else Assert.HasCount(screen.Scene == FlowerSeedScene.Rewards ? 1 : 0, ocr.Calls);
+        else Assert.HasCount(screen.Scene == ManualChallengeScene.Rewards ? 1 : 0, ocr.Calls);
     }
 
     [TestMethod]
-    [DataRow("flower-seed-capture.png", nameof(FlowerSeedScene.Capture))]
-    [DataRow("flower-seed-capture-duck.png", nameof(FlowerSeedScene.Capture))]
-    [DataRow("flower-seed-rewards.png", nameof(FlowerSeedScene.Rewards))]
-    [DataRow("flower-seed-rewards-single-row.png", nameof(FlowerSeedScene.Rewards))]
-    [DataRow("flower-seed-result.png", nameof(FlowerSeedScene.Result))]
-    [DataRow("flower-seed-medal-confirmation.png", nameof(FlowerSeedScene.MedalConfirmation))]
+    [DataRow("flower-seed-capture.png", nameof(ManualChallengeScene.Capture))]
+    [DataRow("flower-seed-capture-duck.png", nameof(ManualChallengeScene.Capture))]
+    [DataRow("flower-seed-rewards.png", nameof(ManualChallengeScene.Rewards))]
+    [DataRow("flower-seed-rewards-single-row.png", nameof(ManualChallengeScene.Rewards))]
+    [DataRow("flower-seed-result.png", nameof(ManualChallengeScene.Result))]
+    [DataRow("flower-seed-medal-confirmation.png", nameof(ManualChallengeScene.MedalConfirmation))]
     public async Task ChallengeStagesUseScaledTemplatesAndClientCoordinates(string fixture, string expectedScene)
     {
         var images = new ImageMatchingService();
-        var recognizer = new FlowerSeedScreenRecognizer(images, new NameOcr("获得奖励"), new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, new NameOcr("获得奖励"), new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture(fixture, 1280, 720, 12, 30);
 
         var screen = await recognizer.ReadAsync(frame, 12, 30, 1280, 720, CancellationToken.None);
 
-        Assert.AreEqual(Enum.Parse<FlowerSeedScene>(expectedScene), screen.Scene);
+        Assert.AreEqual(Enum.Parse<ManualChallengeScene>(expectedScene), screen.Scene);
         Assert.IsNotNull(screen.Button);
         Assert.IsTrue(screen.Button.X >= 12 && screen.Button.Y >= 30);
         Assert.IsTrue(screen.Button.X + screen.Button.Width <= 1292 && screen.Button.Y + screen.Button.Height <= 750);
-        if (screen.Scene == FlowerSeedScene.Rewards) Assert.AreEqual((652, 678), (screen.Button.X, screen.Button.Y));
+        if (screen.Scene == ManualChallengeScene.Rewards) Assert.AreEqual((652, 678), (screen.Button.X, screen.Button.Y));
     }
 
     [TestMethod]
@@ -256,16 +329,16 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture(fixture, width, height, 12, 30);
         List<(RecognitionRegion Region, string Text)> previews = [];
 
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None,
             (region, text) => previews.Add((region, text)));
 
-        Assert.AreEqual(FlowerSeedScene.Rewards, screen.Scene);
-        Assert.AreEqual("获得奖励", FlowerSeedScreenRecognizer.Normalize(screen.Text));
+        Assert.AreEqual(ManualChallengeScene.Rewards, screen.Scene);
+        Assert.AreEqual("获得奖励", ManualChallengeScreenRecognizer.Normalize(screen.Text));
         Assert.HasCount(1, previews);
         Assert.AreEqual("花种奖励标题", previews[0].Region.Id);
     }
@@ -277,49 +350,49 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture("flower-seed-battle-snow.png");
         if (hideBattleControls)
             for (var y = 589; y < frame.Height; y++) Array.Clear(frame.Pixels, (y * frame.Width + 1089) * 4, (frame.Width - 1089) * 4);
 
         var screen = await recognizer.ReadAsync(frame, 1, 31, 1600, 900, CancellationToken.None);
 
-        Assert.AreEqual(hideBattleControls ? FlowerSeedScene.Unknown : FlowerSeedScene.Battle, screen.Scene);
+        Assert.AreEqual(hideBattleControls ? ManualChallengeScene.Unknown : ManualChallengeScene.Battle, screen.Scene);
         if (!hideBattleControls) Assert.AreEqual(BattleScreen.SkillSelection, screen.BattleScreen);
     }
 
     [TestMethod]
-    [DataRow("flower-seed-capture.png", 250, 290, 140, 60, nameof(FlowerSeedScene.Capture))]
-    [DataRow("flower-seed-capture.png", 1880, 1000, 160, 150, nameof(FlowerSeedScene.Capture))]
-    [DataRow("flower-seed-result.png", 830, 1040, 120, 90, nameof(FlowerSeedScene.Result))]
-    [DataRow("flower-seed-result.png", 1080, 1040, 180, 90, nameof(FlowerSeedScene.Result))]
+    [DataRow("flower-seed-capture.png", 250, 290, 140, 60, nameof(ManualChallengeScene.Capture))]
+    [DataRow("flower-seed-capture.png", 1880, 1000, 160, 150, nameof(ManualChallengeScene.Capture))]
+    [DataRow("flower-seed-result.png", 830, 1040, 120, 90, nameof(ManualChallengeScene.Result))]
+    [DataRow("flower-seed-result.png", 1080, 1040, 180, 90, nameof(ManualChallengeScene.Result))]
     public async Task CaptureAndResultRequireBothStageMarkers(
         string fixture, int x, int y, int width, int height, string excludedScene)
     {
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), new NameOcr(""), new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(""), new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture(fixture);
         for (var row = y; row < y + height; row++) Array.Clear(frame.Pixels, (row * frame.Width + x) * 4, width * 4);
 
         var screen = await recognizer.ReadAsync(frame, 0, 0, frame.Width, frame.Height, CancellationToken.None);
 
-        Assert.AreNotEqual(Enum.Parse<FlowerSeedScene>(excludedScene), screen.Scene);
+        Assert.AreNotEqual(Enum.Parse<ManualChallengeScene>(excludedScene), screen.Scene);
     }
 
     [TestMethod]
     public async Task InteractionMarkerWithoutWorldHudCannotEndTheBattle()
     {
         var ocr = new NameOcr("挑战!");
-        var recognizer = new FlowerSeedScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture("flower-seed-failure-world.png");
         // 只保留交互菜单特征，模拟击败动画中偶然命中 F 与浅色选项的画面。
         for (var y = 23; y < 104; y++) Array.Clear(frame.Pixels, (y * frame.Width + 164) * 4, 246 * 4);
 
         var screen = await recognizer.ReadAsync(frame, 0, 0, frame.Width, frame.Height, CancellationToken.None);
 
-        Assert.AreEqual(FlowerSeedScene.Unknown, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.Unknown, screen.Scene);
         Assert.HasCount(2, ocr.Calls);
     }
 
@@ -327,8 +400,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     public async Task BattleChatAloneDoesNotPermitSkillInput()
     {
         var images = new ImageMatchingService();
-        var recognizer = new FlowerSeedScreenRecognizer(images, new NameOcr(""), new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, new NameOcr(""), new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture("flower-seed-battle.png");
         var originalChat = await images.MatchAsync(frame, new RecognitionRegion { X = 1393, Y = 714, Width = 655, Height = 438 },
             "2048x1152/battle-chat.png", new ImageMatchOptions { MinimumScore = .94 });
@@ -341,7 +414,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         var tightChat = await images.MatchAsync(frame, new RecognitionRegion { X = 1918, Y = 728, Width = 105, Height = 105 },
             "2048x1152/battle-chat.png", new ImageMatchOptions { MinimumScore = .94 });
         Assert.IsTrue(originalChat.IsMatch && tightChat.IsMatch);
-        Assert.AreEqual(FlowerSeedScene.Battle, screen.Scene,
+        Assert.AreEqual(ManualChallengeScene.Battle, screen.Scene,
             $"聊天模板：原图 {originalChat.Score:F6} @ ({originalChat.X}, {originalChat.Y})；清除技能后 {chat.Score:F6} @ ({chat.X}, {chat.Y})；聊天区 {tightChat.Score:F6} @ ({tightChat.X}, {tightChat.Y})");
         Assert.AreEqual(BattleScreen.Chat, screen.BattleScreen);
     }
@@ -351,8 +424,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         var images = new ImageMatchingService();
         var ocr = new NameOcr();
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture("flower-seed-confirmation.png");
         var options = new ImageMatchOptions { MinimumScore = .94 };
         var headerArea = new RecognitionRegion { X = 1024, Y = 288, Width = 573, Height = 288 };
@@ -373,7 +446,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         Assert.IsTrue(cancel.IsMatch, $"取消按钮得分：{cancel.Score:F4}");
         var screen = await recognizer.ReadAsync(frame, 0, 0, 2048, 1152, CancellationToken.None);
 
-        Assert.AreEqual(FlowerSeedScene.Confirmation, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.Confirmation, screen.Scene);
         Assert.IsNotNull(screen.Button);
         var clickX = screen.Button.X + screen.Button.Width / 2d;
         var clickY = screen.Button.Y + screen.Button.Height / 2d;
@@ -406,8 +479,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         var images = new ImageMatchingService();
         var ocr = new NameOcr("卷毛鸭");
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = LoadFixture("flower-seed-map.png");
         var headerArea = new RecognitionRegion { X = 889, Y = 42, Width = 273, Height = 58 };
         var options = new ImageMatchOptions
@@ -423,7 +496,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         Assert.IsTrue(sharedHeader.IsMatch, $"花种公共标题得分：{sharedHeader.Score:F4}");
         var screen = await recognizer.ReadAsync(frame, 1, 30, 1366, 768, CancellationToken.None);
 
-        Assert.AreEqual(FlowerSeedScene.Map, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.Map, screen.Scene);
         Assert.IsNotNull(screen.Button);
         Assert.IsTrue(screen.Button.IsMatch, $"地图传送得分：{screen.Button.Score:F4}");
         var clickX = screen.Button.X + screen.Button.Width / 2d;
@@ -459,11 +532,11 @@ public sealed class FlowerSeedScreenRecognizerTests
         var images = new ListImages(2048, 1152, 0, 0);
         var ocr = new NameOcr("友爰星飞", "小皮球", "友爱星飞", "小皮球");
         var catalog = new Catalog();
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, catalog, new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, catalog, new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(2048, 1152, 0, 0);
 
         var first = await recognizer.ReadAsync(frame, 0, 0, 2048, 1152, CancellationToken.None);
-        Assert.AreEqual(FlowerSeedScene.FlowerList, first.Scene);
+        Assert.AreEqual(ManualChallengeScene.FlowerList, first.Scene);
         CollectionAssert.AreEqual(new[] { "友爱星飞", "小皮球" }, first.Rows.Select(row => row.Name).ToArray());
         Assert.HasCount(2, ocr.Calls);
 
@@ -481,7 +554,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         var ocr = new NameOcr("友爰星飞", "完全未知", "友爰星飞", "完全未知");
         var catalog = new Catalog();
         var seasons = new Seasons(.70);
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, catalog, seasons, NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, catalog, seasons, NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(2048, 1152, 0, 0);
 
         var accepted = await recognizer.ReadAsync(frame, 0, 0, 2048, 1152, CancellationToken.None);
@@ -501,8 +574,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         var images = new ListImages(1280, 720, 12, 30);
         var ocr = new NameOcr("友爰星飞", "完全未知");
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(1280, 720, 12, 30);
         List<(RecognitionRegion Region, string Text)> previews = [];
 
@@ -527,8 +600,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         var images = new ListImages(2048, 1152, 0, 0);
         var ocr = new NameOcr("友爱星飞", "小皮球", "友爱星飞", "小皮球");
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
-            NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(2048, 1152, 0, 0);
 
         var before = await recognizer.ReadAsync(frame, 0, 0, 2048, 1152, CancellationToken.None);
@@ -556,12 +629,12 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         var images = new ListImages(width, height, clientX, clientY);
         var ocr = new NameOcr("友爱星飞", "小皮球");
-        var recognizer = new FlowerSeedScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70), NullLogger<FlowerSeedScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, ocr, new Catalog(), new Seasons(.70), NullLogger<ManualChallengeScreenRecognizer>.Instance);
         using var frame = CreateFrame(width, height, clientX, clientY);
 
         var screen = await recognizer.ReadAsync(frame, clientX, clientY, width, height, CancellationToken.None);
 
-        Assert.AreEqual(FlowerSeedScene.FlowerList, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.FlowerList, screen.Scene);
         Assert.HasCount(2, ocr.Calls);
         var crop = ocr.Calls[0].Region;
         Assert.AreEqual((expectedX, expectedY, expectedWidth, expectedHeight),
@@ -573,7 +646,7 @@ public sealed class FlowerSeedScreenRecognizerTests
         Assert.IsTrue(images.SearchRegion.Y + images.SearchRegion.Height <= clientY + height);
     }
 
-    private static CapturedFrame LoadFixture(string fileName, int width = 0, int height = 0, int clientX = 0, int clientY = 0)
+    internal static CapturedFrame LoadFixture(string fileName, int width = 0, int height = 0, int clientX = 0, int clientY = 0)
     {
         using var source = Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName), ImreadModes.Color);
         Assert.IsFalse(source.Empty(), $"未读取到测试样本：{fileName}");

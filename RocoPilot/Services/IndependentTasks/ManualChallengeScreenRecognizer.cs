@@ -22,7 +22,7 @@ internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, 
 }
 internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOnlyList<ManualChallengeRow> Rows,
     ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null,
-    LegendaryCaptureMarks? Marks = null);
+    LegendaryCaptureMarks? Marks = null, bool HasChallengeOption = false);
 
 /// <summary>界面控件用模板定位，奖励标题和花种名称使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
@@ -145,7 +145,32 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             {
                 var text = await ocr.RecognizeAsync(frame, line, TextRecognitionDefaults.Method, cancellationToken);
                 reportOcr?.Invoke(line, string.IsNullOrWhiteSpace(text.Text) ? "OCR：无文本" : $"OCR：{text.Text}");
-                return new(ManualChallengeScene.Interaction, [], world, Text: Normalize(text.Text));
+                var selected = Normalize(text.Text);
+                var hasChallenge = selected == "挑战";
+                if (!hasChallenge && selected.Length > 0)
+                {
+                    // 只在交互图标列查找挑战，再识别对应行；不能因出现留言就原地滚轮。
+                    var menu = Area(.42, .24, .84, .9);
+                    menu.X = (int)Math.Round(prompt.X + 35 * scale);
+                    menu.Width = (int)Math.Round(60 * scale);
+                    var challenges = await images.FindMatchesAsync(frame, menu, TemplatePath("interaction-challenge"),
+                        6, options, cancellationToken: cancellationToken);
+                    foreach (var icon in challenges.Matches.Where(match => match.IsMatch))
+                    {
+                        var option = new RecognitionRegion
+                        {
+                            Id = "挑战交互选项",
+                            X = (int)Math.Round(icon.X + 42 * scale), Y = (int)Math.Round(icon.Y - 2 * scale),
+                            Width = line.Width, Height = line.Height
+                        };
+                        var candidate = await ocr.RecognizeAsync(frame, option, TextRecognitionDefaults.Method, cancellationToken);
+                        reportOcr?.Invoke(option, $"OCR：{candidate.Text}");
+                        if (Normalize(candidate.Text) != "挑战") continue;
+                        hasChallenge = true;
+                        break;
+                    }
+                }
+                return new(ManualChallengeScene.Interaction, [], world, Text: selected, HasChallengeOption: hasChallenge);
             }
         }
         // 只采用游戏 HUD 与战斗按钮的正向匹配，未知画面不会由上一输入推断。

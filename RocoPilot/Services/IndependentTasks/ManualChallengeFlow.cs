@@ -116,7 +116,8 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 if (!_targetMapSeen) return new(ManualChallengeAction.OpenManual);
                 if (string.IsNullOrWhiteSpace(screen.Text)) return default;
                 return new(ManualChallengeScreenRecognizer.Normalize(screen.Text) == "挑战"
-                    ? ManualChallengeAction.Interact : ManualChallengeAction.SelectChallenge);
+                    ? ManualChallengeAction.Interact
+                    : screen.HasChallengeOption ? ManualChallengeAction.SelectChallenge : ManualChallengeAction.Approach);
             case ManualChallengeScene.Preparation when _targetMapSeen
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
                 if (screen.Button is not { IsMatch: true }) return default;

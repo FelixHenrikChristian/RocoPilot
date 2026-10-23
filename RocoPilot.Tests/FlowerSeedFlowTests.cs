@@ -184,7 +184,8 @@ public sealed class FlowerSeedFlowTests
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Unknown, []), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.Map, [], Button, "友爱星飞"), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.Approach, flow.Next(new(ManualChallengeScene.World, []), 1152).Action);
-        Assert.AreEqual(ManualChallengeAction.SelectChallenge, flow.Next(new(ManualChallengeScene.Interaction, [], Text: "你好"), 1152).Action);
+        Assert.AreEqual(ManualChallengeAction.Approach, flow.Next(new(ManualChallengeScene.Interaction, [], Text: "查看留言"), 1152).Action);
+        Assert.AreEqual(ManualChallengeAction.SelectChallenge, flow.Next(new(ManualChallengeScene.Interaction, [], Text: "查看留言", HasChallengeOption: true), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.Interact, flow.Next(new(ManualChallengeScene.Interaction, [], Text: "挑战！"), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.Preparation, [], Button), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.World, []), 1152).Action);

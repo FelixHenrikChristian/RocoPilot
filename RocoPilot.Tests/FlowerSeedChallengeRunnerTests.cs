@@ -50,9 +50,9 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             await run;
             var expected = switchPet
-                ? new[] { "F", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space",
+                ? new[] { "W", "F", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space",
                     "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space" }
-                : new[] { "F", "4", "Esc", "1, Space", "4", "Esc", "1, Space" };
+                : new[] { "W", "F", "4", "Esc", "1, Space", "4", "Esc", "1, Space" };
             CollectionAssert.AreEqual(expected,
                 keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(2, capture.Captures);
@@ -62,7 +62,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             var error = await Assert.ThrowsAsync<InvalidOperationException>(() => run);
             StringAssert.Contains(error.Message, "契约印记");
-            CollectionAssert.AreEqual(new[] { "F", "Esc" }, keyboard.Keys.Select(key => key.Key).ToArray());
+            CollectionAssert.AreEqual(new[] { "W", "F", "Esc" }, keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(0, capture.Captures);
         }
         Assert.AreEqual("world", capture.Scene);
@@ -105,6 +105,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             if (Scene == "capture" && sequence == "1, Space") Captures++;
             Scene = (Scene, sequence) switch
             {
+                ("message", "W") => "interaction-gold",
                 ("interaction-gold", "F") => "confirmation",
                 ("confirmation", "Esc") => "world",
                 ("battle", "4") => switchPet ? "pet-switching" : "capture-contract",
@@ -119,7 +120,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             Scene = Scene switch
             {
                 "list" => "map",
-                "map" => "interaction-gold",
+                "map" => "message",
                 "confirmation" => "insufficient",
                 "insufficient" when x > 650 => "preparation",
                 "insufficient" when x < 650 => "confirmation",

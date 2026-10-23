@@ -30,6 +30,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("list", nameof(ManualChallengeScene.LegendaryList))]
     [DataRow("map", nameof(ManualChallengeScene.Map))]
     [DataRow("world", nameof(ManualChallengeScene.World))]
+    [DataRow("message", nameof(ManualChallengeScene.Interaction))]
     [DataRow("interaction-dark", nameof(ManualChallengeScene.Interaction))]
     [DataRow("interaction-gold", nameof(ManualChallengeScene.Interaction))]
     [DataRow("confirmation", nameof(ManualChallengeScene.LegendaryConfirmation))]
@@ -61,6 +62,9 @@ public sealed class FlowerSeedScreenRecognizerTests
             else Assert.IsNotNull(screen.Button, diagnostic);
             if (fixture == "map") Assert.AreEqual("圣羽翼王", screen.Text, diagnostic);
             if (fixture.StartsWith("interaction")) Assert.AreEqual("挑战", screen.Text, diagnostic);
+            if (fixture == "message") Assert.AreEqual("查看留言", screen.Text, diagnostic);
+            if (screen.Scene == ManualChallengeScene.Interaction)
+                Assert.AreEqual(fixture != "message", screen.HasChallengeOption, diagnostic);
             if (fixture == "battle") Assert.AreEqual(BattleScreen.SkillSelection, screen.BattleScreen, diagnostic);
             if (fixture == "pet-switching") Assert.AreEqual(BattleScreen.PetSwitching, screen.BattleScreen, diagnostic);
             if (fixture == "pet-confirmation") Assert.AreEqual(BattleScreen.PetSwitchConfirmation, screen.BattleScreen, diagnostic);
@@ -79,6 +83,36 @@ public sealed class FlowerSeedScreenRecognizerTests
                 Assert.AreEqual((screen.Button.X, screen.Button.Y), (rechecked.X, rechecked.Y), diagnostic);
             }
         }
+    }
+
+    [TestMethod]
+    [DataRow("gold", -72, 2048, 1152)]
+    [DataRow("dark", 72, 2048, 1152)]
+    [DataRow("gold", 72, 1280, 720)]
+    [DataRow("dark", -72, 1280, 720)]
+    public async Task ChallengeInAnotherInteractionRowIsRecognizedWithoutSelectingTheMessage(
+        string color, int offsetY, int width, int height)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
+            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        using var frame = LoadFixture("legendary-message.png", width, height, 12, 30);
+        using var challenge = LoadFixture($"legendary-interaction-{color}.png", width, height, 12, 30);
+        var scale = height / 1152d;
+        var x = 12 + (int)Math.Round(1217 * scale);
+        var y = 30 + (int)Math.Round(582 * scale);
+        var rowBytes = (int)Math.Round(282 * scale) * 4;
+        // 用真实截图中的挑战行构造上下两种排列，保留留言行旁的 F 选中标记。
+        for (var row = 0; row < (int)Math.Round(48 * scale); row++)
+            Array.Copy(challenge.Pixels, ((y + row) * frame.Width + x) * 4,
+                frame.Pixels, ((y + row + (int)Math.Round(offsetY * scale)) * frame.Width + x) * 4, rowBytes);
+
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+
+        Assert.AreEqual(ManualChallengeScene.Interaction, screen.Scene);
+        Assert.AreEqual("查看留言", screen.Text);
+        Assert.IsTrue(screen.HasChallengeOption);
     }
 
     [TestMethod]

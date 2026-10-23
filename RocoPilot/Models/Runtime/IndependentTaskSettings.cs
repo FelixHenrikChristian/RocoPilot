@@ -7,7 +7,6 @@ public sealed class IndependentTaskSettings
 {
     public const int MinimumRunCount = 1;
     public const int MaximumRunCount = 99;
-    public const int DefaultBossBattleRunCount = 3;
     public const int DefaultLegendaryChallengeRunCount = 3;
     public const int DefaultLegendaryDifficulty = 3;
     public const int DefaultFlowerSeedRunCount = 6;
@@ -17,12 +16,6 @@ public sealed class IndependentTaskSettings
     public string LegendaryTargetName { get; set; } = LegendaryTargets[0];
     public int LegendaryDifficulty { get; set; } = DefaultLegendaryDifficulty;
     public bool UseLegendaryMarkWhenInsufficient { get; set; } = true;
-
-    public int BossBattleRunCount
-    {
-        get;
-        set;
-    } = DefaultBossBattleRunCount;
 
     public int LegendaryChallengeRunCount
     {
@@ -45,7 +38,6 @@ public sealed class IndependentTaskSettings
     {
         return new IndependentTaskSettings
         {
-            BossBattleRunCount = BossBattleRunCount,
             LegendaryChallengeRunCount = LegendaryChallengeRunCount,
             LegendaryTargetName = LegendaryTargetName,
             LegendaryDifficulty = LegendaryDifficulty,
@@ -60,7 +52,6 @@ public sealed class IndependentTaskSettings
     {
         return new IndependentTaskSettings
         {
-            BossBattleRunCount = Math.Clamp(BossBattleRunCount, MinimumRunCount, MaximumRunCount),
             LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount),
             LegendaryTargetName = LegendaryTargets.Contains(LegendaryTargetName) ? LegendaryTargetName : LegendaryTargets[0],
             LegendaryDifficulty = LegendaryDifficulty is >= 1 and <= 3 ? LegendaryDifficulty : DefaultLegendaryDifficulty,

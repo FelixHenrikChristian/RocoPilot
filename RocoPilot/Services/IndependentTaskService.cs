@@ -8,7 +8,7 @@ using RocoPilot.Models.Runtime;
 namespace RocoPilot.Services;
 
 /// <summary>
-/// 独立任务调度：首领战斗、传说精灵挑战等限次任务按需启动，跑完即止。
+/// 独立任务调度：花种挑战、传说精灵挑战等限次任务按需启动，跑完即止。
 /// 独立任务基于启动页建立的运行会话工作：启动前需实时任务处于运行状态，
 /// 运行期间自动挂起实时识别循环并复用其捕获会话，结束后自动恢复。
 /// </summary>
@@ -231,10 +231,6 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     NotifyStateChanged();
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {_settings.FlowerSeedOptions.Count} 个花种", "花种选项已更新");
                     break;
-                default:
-                    // 首领任务尚未接入执行逻辑。
-                    await Task.Delay(Timeout.InfiniteTimeSpan, taskCts.Token);
-                    break;
             }
         }
         catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
@@ -318,7 +314,6 @@ public sealed class IndependentTaskService : IIndependentTaskService
     {
         return kind switch
         {
-            IndependentTaskKind.BossBattle => "首领战斗",
             IndependentTaskKind.LegendaryChallenge => "传说精灵挑战",
             IndependentTaskKind.FlowerSeedChallenge => "花种挑战",
             IndependentTaskKind.FlowerSeedScan => "扫描花种",

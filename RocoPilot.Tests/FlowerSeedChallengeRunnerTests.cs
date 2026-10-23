@@ -22,14 +22,17 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedChallengeRunnerTests
 {
     [TestMethod]
-    [DataRow(true, false, 1)]
-    [DataRow(false, false, 2)]
-    [DataRow(true, true, 3)]
-    public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(bool allowMarks, bool switchPet, int difficulty)
+    [DataRow(true, false, 1, "insufficient")]
+    [DataRow(false, false, 2, "insufficient")]
+    [DataRow(true, true, 3, "insufficient")]
+    [DataRow(false, false, 1, "exhausted")]
+    [DataRow(true, false, 3, "exhausted")]
+    public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(
+        bool allowMarks, bool switchPet, int difficulty, string shortage)
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var capture = new LegendaryReplay(switchPet, difficulty);
+        var capture = new LegendaryReplay(switchPet, difficulty, shortage);
         var keyboard = new Keyboard { DuringSequence = capture.OnKey };
         List<IndependentTaskProgress> updates = [];
         var mouse = new Mouse { DuringClick = (x, y) =>
@@ -75,7 +78,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.AreEqual(difficulty == 3 ? 0 : 2, capture.DifficultyClicks);
     }
 
-    private sealed class LegendaryReplay(bool switchPet = false, int difficulty = 3) : IScreenCaptureService
+    private sealed class LegendaryReplay(bool switchPet = false, int difficulty = 3, string shortage = "insufficient") : IScreenCaptureService
     {
         private string _selectedSlot = "";
         private int _confirmAttempts;
@@ -87,7 +90,8 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             if (!_pixels.TryGetValue(Scene, out var pixels))
             {
-                using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{Scene}.png", 1280, 720);
+                var fixture = Scene == "insufficient" ? shortage : Scene;
+                using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{fixture}.png", 1280, 720);
                 _pixels[Scene] = pixels = frame.Pixels;
             }
             return new(1280, 720, pixels);

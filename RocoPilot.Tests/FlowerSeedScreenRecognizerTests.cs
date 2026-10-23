@@ -39,6 +39,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("difficulty-2", nameof(ManualChallengeScene.LegendaryConfirmation))]
     [DataRow("difficulty-3", nameof(ManualChallengeScene.LegendaryConfirmation))]
     [DataRow("insufficient", nameof(ManualChallengeScene.InsufficientContractMark))]
+    [DataRow("exhausted", nameof(ManualChallengeScene.InsufficientContractMark))]
     [DataRow("preparation", nameof(ManualChallengeScene.Preparation))]
     [DataRow("battle", nameof(ManualChallengeScene.Battle))]
     [DataRow("pet-switching", nameof(ManualChallengeScene.Battle))]
@@ -92,6 +93,12 @@ public sealed class FlowerSeedScreenRecognizerTests
             {
                 Assert.HasCount(0, texts, diagnostic);
                 Assert.AreEqual(fixture == "capture-legendary", marks.LegendarySelected, diagnostic);
+            }
+            if (screen.Scene == ManualChallengeScene.InsufficientContractMark)
+            {
+                Assert.IsNotNull(screen.ExitButton, diagnostic);
+                Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, screen.ExitButton.TemplatePath,
+                    0, 12, 30, width, height, CancellationToken.None, legendary: true), diagnostic);
             }
             if (screen.Scene is ManualChallengeScene.LegendaryConfirmation or ManualChallengeScene.InsufficientContractMark
                 or ManualChallengeScene.Preparation or ManualChallengeScene.Map or ManualChallengeScene.Result or ManualChallengeScene.CaptureConfirmation)

@@ -467,7 +467,7 @@ public sealed class ManualChallengeRunner(
         ManualChallengeScene.Interaction => "挑战交互菜单",
         ManualChallengeScene.LegendaryList => "传说精灵列表",
         ManualChallengeScene.LegendaryConfirmation => "传说精灵挑战详情",
-        ManualChallengeScene.InsufficientContractMark => "契约印记不足提示",
+        ManualChallengeScene.InsufficientContractMark => "契约印记或本周捕捉次数不足提示",
         ManualChallengeScene.CaptureConfirmation => "选择捕捉印记",
         ManualChallengeScene.LegendaryRewards => "印记奖励",
         ManualChallengeScene.Confirmation => "确认花种挑战",

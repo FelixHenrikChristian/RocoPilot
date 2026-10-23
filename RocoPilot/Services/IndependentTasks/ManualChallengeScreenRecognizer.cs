@@ -90,6 +90,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (legendary)
         {
             // 弹窗先于后方详情页判断，避免把被遮罩的开始挑战按钮当成当前目标。
+            // 只匹配共有的“参与挑战将只能”，兼容印记不足与周次数用尽时不同的换行位置。
             if (await Match("legendary-insufficient", .32, .48, .69, .61) is not null)
                 return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
                     ExitButton: await Button("legendary-cancel"));

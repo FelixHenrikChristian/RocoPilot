@@ -1,6 +1,4 @@
-using System.Collections.Concurrent;
-using System.Collections.Specialized;
-using System.Xml.Linq;
+﻿using System.Collections.Concurrent;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -18,6 +16,59 @@ namespace RocoPilot.Tests;
 [TestClass]
 public sealed class IndependentTaskServiceTests
 {
+    [TestMethod]
+    [DataRow(IndependentTaskKind.FlowerSeedChallenge, false)]
+    [DataRow(IndependentTaskKind.FlowerSeedChallenge, true)]
+    [DataRow(IndependentTaskKind.LegendaryChallenge, false)]
+    [DataRow(IndependentTaskKind.LegendaryChallenge, true)]
+    [DataRow(IndependentTaskKind.FlowerSeedScan, false)]
+    [DataRow(IndependentTaskKind.FlowerSeedScan, true)]
+    public async Task TaskResultsRespectNotificationSettingsAndSkipSuccessfulScans(IndependentTaskKind kind, bool fails)
+    {
+        foreach (var enabled in new[] { true, false })
+        {
+            var fixture = new Fixture();
+            await fixture.Notifications.SetEnabledAsync(enabled);
+            if (fails) fixture.Runner.Failure = "测试失败原因";
+            await fixture.Service.LoadSettingsAsync();
+            Assert.IsTrue((await fixture.Service.StartAsync(kind)).Success);
+
+            await WaitStoppedAsync(fixture.Service);
+
+            var shouldNotify = enabled && (kind != IndependentTaskKind.FlowerSeedScan || fails);
+            Assert.AreEqual(shouldNotify ? 1 : 0, fixture.Notifications.Payloads.Count);
+            if (shouldNotify)
+            {
+                var notification = fixture.Notifications.Payloads.Single();
+                var result = fixture.Runtime.Results.Single();
+                Assert.AreEqual((result.Title, result.Description), notification);
+                StringAssert.Contains(notification.Title, fails ? "已停止" : "完成");
+                if (fails) Assert.AreEqual(fixture.Runner.Failure, notification.Message);
+            }
+            Assert.AreEqual(1, fixture.Runtime.Resumes);
+            Assert.IsFalse(fixture.Service.IsRunning);
+        }
+    }
+
+    [TestMethod]
+    [DataRow(IndependentTaskKind.LegendaryChallenge)]
+    [DataRow(IndependentTaskKind.FlowerSeedScan)]
+    public async Task ManuallyStoppedTasksDoNotNotify(IndependentTaskKind kind)
+    {
+        var fixture = new Fixture();
+        fixture.Runner.Hold = true;
+        await fixture.Service.LoadSettingsAsync();
+        Assert.IsTrue((await fixture.Service.StartAsync(kind)).Success);
+        await (kind == IndependentTaskKind.FlowerSeedScan ? fixture.Runner.ScanStarted : fixture.Runner.ChallengeStarted)
+            .Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        await fixture.Service.StopAsync();
+
+        Assert.HasCount(0, fixture.Notifications.Payloads);
+        Assert.HasCount(0, fixture.Runtime.Results);
+        Assert.AreEqual(1, fixture.Runtime.Resumes);
+    }
+
     [TestMethod]
     public async Task LegendaryUsesConfiguredTargetCountAndMarkPreference()
     {
@@ -143,7 +194,7 @@ public sealed class IndependentTaskServiceTests
         Assert.AreEqual(new FlowerSeedOption(1, "电球羊羊"), fixture.Runner.Target);
         Assert.AreEqual(6, fixture.Runner.RunCount);
         Assert.AreEqual(("花种挑战完成，成功 6 次", "已退出并返回大世界"), fixture.Runtime.Results.Single());
-        Assert.AreEqual(0, fixture.Notifications.Payloads.Count);
+        Assert.HasCount(1, fixture.Notifications.Payloads);
         Assert.AreEqual(1, fixture.Runtime.Resumes);
     }
 
@@ -161,9 +212,7 @@ public sealed class IndependentTaskServiceTests
         await WaitStoppedAsync(fixture.Service);
 
         Assert.AreEqual(("花种挑战已停止", fixture.Runner.Failure), fixture.Runtime.Results.Single());
-        var toast = XDocument.Parse(fixture.Notifications.Payloads.Single());
-        CollectionAssert.AreEqual(new[] { "花种挑战已停止", fixture.Runner.Failure },
-            toast.Descendants("text").Select(element => element.Value).ToArray());
+        Assert.AreEqual(("花种挑战已停止", fixture.Runner.Failure), fixture.Notifications.Payloads.Single());
         Assert.IsTrue(fixture.Runtime.Progress.Any(item => item.Name == "花种挑战"
             && item.Progress?.Stage == "任务失败" && item.Progress.Operation == fixture.Runner.Failure));
         Assert.AreEqual(1, fixture.Runtime.Resumes);
@@ -256,7 +305,8 @@ public sealed class IndependentTaskServiceTests
 
         AssertCleared(fixture.Service.Settings);
         AssertCleared(fixture.Store.ReadSaved<IndependentTaskSettings>(SettingsKeys.IndependentTaskSettings)!);
-        Assert.AreEqual(0, fixture.Runtime.Results.Count);
+        Assert.AreEqual(("扫描花种已停止", fixture.Runner.Failure), fixture.Runtime.Results.Single());
+        Assert.HasCount(1, fixture.Notifications.Payloads);
         Assert.IsTrue(fixture.Runtime.Progress.Any(item => item.Progress?.Stage == "任务失败"
             && item.Progress.Operation == "未识别到花种列表"));
         Assert.AreEqual(1, fixture.Runtime.Resumes);
@@ -292,6 +342,7 @@ public sealed class IndependentTaskServiceTests
         Assert.AreEqual(1, rescanned.FlowerSeedOptions.Count);
         Assert.AreEqual("扫描完成，共识别 1 个花种", fixture.Runtime.Results.Last().Title);
         Assert.AreEqual(2, fixture.Runtime.Results.Count);
+        Assert.HasCount(0, fixture.Notifications.Payloads);
     }
 
     [TestMethod]
@@ -558,15 +609,19 @@ public sealed class IndependentTaskServiceTests
 
     private sealed class NotificationStub : IAppNotificationService
     {
-        public ConcurrentQueue<string> Payloads { get; } = new();
+        public ConcurrentQueue<(string Title, string Message)> Payloads { get; } = new();
         public bool ShowSucceeds = true;
-        public void Initialize() { }
+        public string? LastError => null;
+        public bool IsEnabled { get; private set; } = true;
+        public bool IsSoundEnabled { get; private set; } = true;
+        public Task InitializeAsync() => Task.CompletedTask;
+        public Task SetEnabledAsync(bool enabled) { IsEnabled = enabled; return Task.CompletedTask; }
+        public Task SetSoundEnabledAsync(bool enabled) { IsSoundEnabled = enabled; return Task.CompletedTask; }
         public void Unregister() { }
-        public NameValueCollection ParseArguments(string arguments) => new();
-        public bool Show(string payload)
+        public Task<bool> ShowAsync(string title, string message, string? imagePath = null)
         {
-            Payloads.Enqueue(payload);
-            return ShowSucceeds;
+            Payloads.Enqueue((title, message));
+            return Task.FromResult(ShowSucceeds);
         }
     }
 }

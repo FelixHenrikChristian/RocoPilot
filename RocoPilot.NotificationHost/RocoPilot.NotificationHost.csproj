@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22000.0</TargetFramework>
+    <Platforms>x86;x64;arm64</Platforms>
+    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier>win-$(Platform)</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <AssemblyTitle>RocoPilot</AssemblyTitle>
+    <Product>RocoPilot</Product>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../RocoPilot/Assets/WindowIcon.ico</ApplicationIcon>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
+    <!-- Override the toolkit's legacy drawing dependency with the current .NET runtime version. -->
+    <PackageReference Include="System.Drawing.Common" Version="10.0.8" />
+  </ItemGroup>
+  <Target Name="GetNotificationHostFiles" DependsOnTargets="Build" Returns="@(NotificationHostFiles)">
+    <ItemGroup>
+      <NotificationHostFiles Include="$(TargetDir)$(AssemblyName).exe;$(TargetPath);$(TargetDir)$(AssemblyName).deps.json;$(TargetDir)$(AssemblyName).runtimeconfig.json" />
+      <NotificationHostFiles Include="@(ReferenceCopyLocalPaths)"
+                             Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'CommunityToolkit.WinUI.Notifications' or '%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'System.Drawing.Common' or '%(ReferenceCopyLocalPaths.NuGetPackageId)' == 'Microsoft.Win32.SystemEvents'" />
+    </ItemGroup>
+  </Target>
+</Project>

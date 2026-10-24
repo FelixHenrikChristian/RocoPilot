@@ -57,7 +57,20 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RocoPilot.Core\RocoPilot.Core.csproj" />
+    <ProjectReference Include="..\RocoPilot.NotificationHost\RocoPilot.NotificationHost.csproj" ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
+
+  <!-- Share the .NET runtime; include the notification helper and its additional libraries. -->
+  <Target Name="IncludeNotificationHost" BeforeTargets="GetCopyToOutputDirectoryItems;GetCopyToPublishDirectoryItems">
+    <MSBuild Projects="..\RocoPilot.NotificationHost\RocoPilot.NotificationHost.csproj"
+             Targets="GetNotificationHostFiles" Properties="Configuration=$(Configuration);Platform=$(Platform);RuntimeIdentifier=$(RuntimeIdentifier)">
+      <Output TaskParameter="TargetOutputs" ItemName="NotificationHostOutput" />
+    </MSBuild>
+    <ItemGroup>
+      <ContentWithTargetPath Include="@(NotificationHostOutput)" TargetPath="%(Filename)%(Extension)"
+                             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <InternalsVisibleTo Include="RocoPilot.Tests" />

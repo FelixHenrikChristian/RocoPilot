@@ -15,6 +15,7 @@ public class ActivationService : IActivationService
     private readonly IEnumerable<IActivationHandler> _activationHandlers;
     private readonly IThemeSelectorService _themeSelectorService;
     private readonly IStatisticsSyncService _statisticsSyncService;
+    private readonly IAppNotificationService _notifications;
     private readonly ILogger<ActivationService> _logger;
     private UIElement? _shell = null;
 
@@ -23,12 +24,14 @@ public class ActivationService : IActivationService
         IEnumerable<IActivationHandler> activationHandlers,
         IThemeSelectorService themeSelectorService,
         IStatisticsSyncService statisticsSyncService,
+        IAppNotificationService notifications,
         ILogger<ActivationService> logger)
     {
         _defaultHandler = defaultHandler;
         _activationHandlers = activationHandlers;
         _themeSelectorService = themeSelectorService;
         _statisticsSyncService = statisticsSyncService;
+        _notifications = notifications;
         _logger = logger;
     }
 
@@ -71,8 +74,8 @@ public class ActivationService : IActivationService
 
     private async Task InitializeAsync()
     {
-        await _themeSelectorService.InitializeAsync().ConfigureAwait(false);
-        await Task.CompletedTask;
+        await _themeSelectorService.InitializeAsync();
+        await _notifications.InitializeAsync();
     }
 
     private async Task StartupAsync()

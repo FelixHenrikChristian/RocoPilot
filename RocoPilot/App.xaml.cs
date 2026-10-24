@@ -85,9 +85,6 @@ public partial class App : Application
             // Default Activation Handler
             services.AddTransient<ActivationHandler<LaunchActivatedEventArgs>, DefaultActivationHandler>();
 
-            // Other Activation Handlers
-            services.AddTransient<IActivationHandler, AppNotificationActivationHandler>();
-
             // Services
             services.AddSingleton<IAppNotificationService, AppNotificationService>();
             services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
@@ -153,6 +150,8 @@ public partial class App : Application
             // Views and ViewModels
             services.AddTransient<SettingsViewModel>();
             services.AddTransient<SettingsPage>();
+            services.AddTransient<NotificationSettingsViewModel>();
+            services.AddTransient<NotificationSettingsPage>();
             services.AddSingleton<MainViewModel>();
             services.AddTransient<MainPage>();
             services.AddSingleton<RealtimeViewModel>();
@@ -178,7 +177,6 @@ public partial class App : Application
         }).
         Build();
 
-        App.GetService<IAppNotificationService>().Initialize();
         _ = App.GetService<OnnxOcrV5SingleLineTextRecognitionBackend>().PrewarmAsync();
 
         UnhandledException += App_UnhandledException;
@@ -193,8 +191,6 @@ public partial class App : Application
     protected async override void OnLaunched(LaunchActivatedEventArgs args)
     {
         base.OnLaunched(args);
-
-        App.GetService<IAppNotificationService>().Show(string.Format("AppNotificationSamplePayload".GetLocalized(), AppContext.BaseDirectory));
 
         await App.GetService<IActivationService>().ActivateAsync(args);
     }

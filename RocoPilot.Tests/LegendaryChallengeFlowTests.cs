@@ -131,6 +131,26 @@ public sealed class LegendaryChallengeFlowTests
     [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
+    public void MissingLegendaryMarkAlwaysCancelsExitsAndStops(bool allowMarks)
+    {
+        var flow = Navigate(allowMarks);
+        Assert.AreEqual(Exit, Next(flow, ManualChallengeScene.MissingLegendaryMark).Button);
+        StringAssert.Contains(flow.StopReason!, "缺少可用专属印记");
+        Assert.AreEqual(Exit, Next(flow, ManualChallengeScene.MissingLegendaryMark).Button);
+        Assert.AreEqual(ManualChallengeAction.None, Next(flow, ManualChallengeScene.Unknown).Action);
+        Assert.AreEqual(ManualChallengeAction.Escape, Next(flow, ManualChallengeScene.LegendaryConfirmation).Action);
+        Assert.AreEqual(ManualChallengeAction.Stop, Next(flow, ManualChallengeScene.Interaction).Action);
+        Assert.AreEqual(ManualChallengeAction.Stop, Next(flow, ManualChallengeScene.World).Action);
+        Assert.AreEqual(0, flow.CompletedCount);
+        Assert.AreEqual(0, flow.BattleNumber);
+        var alreadyOpen = new ManualChallengeFlow(null, 3, "银月狼王", allowMarks);
+        Assert.AreEqual(Exit, Next(alreadyOpen, ManualChallengeScene.MissingLegendaryMark).Button);
+        Assert.IsNotNull(alreadyOpen.StopReason);
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
     public void UsesContractFirstWhenBothResourcesAllowIt(bool allowMarks)
     {
         var flow = StartBattle(allowMarks);

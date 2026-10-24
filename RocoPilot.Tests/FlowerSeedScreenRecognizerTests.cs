@@ -26,6 +26,49 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedScreenRecognizerTests
 {
     [TestMethod]
+    [DataRow(2048, 1152, false)]
+    [DataRow(1280, 720, false)]
+    [DataRow(2048, 1152, true)]
+    [DataRow(1280, 720, true)]
+    public async Task MissingMarkPromptIgnoresMarkNameAndTextPosition(int width, int height, bool changedName)
+    {
+        using var frame = LoadFixture("legendary-missing-mark.png", width, height, 12, 30, source =>
+        {
+            if (!changedName) return;
+            using var phrase = new Mat(source, new Rect(1080, 620, 168, 30)).Clone();
+            var background = source.At<Vec3b>(600, 600);
+            Cv2.Rectangle(source, new Rect(650, 610, 760, 55), new Scalar(background.Item0, background.Item1, background.Item2), -1);
+            // 改变名称和长度，并将固定短语移到下一行，验证不依赖原印记名称或整句位置。
+            Cv2.PutText(source, "AnotherExclusiveMark", new Point(700, 640), HersheyFonts.HersheySimplex, .8, Scalar.Black, 2);
+            using var destination = new Mat(source, new Rect(940, 690, phrase.Width, phrase.Height));
+            phrase.CopyTo(destination);
+        });
+        var ocr = new NameOcr();
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.55),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.MissingLegendaryMark, screen.Scene);
+        Assert.IsNotNull(screen.ExitButton);
+        Assert.HasCount(0, ocr.Calls);
+        Assert.IsNotNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, screen.ExitButton.TemplatePath,
+            0, 12, 30, width, height, CancellationToken.None, legendary: true));
+    }
+
+    [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public async Task MissingMarkPromptRequiresBothFixedPhraseAndCancelButton(bool removePhrase)
+    {
+        using var frame = LoadFixture("legendary-missing-mark.png", transform: source =>
+            Cv2.Rectangle(source, removePhrase ? new Rect(1078, 618, 175, 35) : new Rect(730, 900, 265, 95), Scalar.Black, -1));
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), new NameOcr(), new Catalog(), new Seasons(.55),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 0, 0, 2048, 1152, CancellationToken.None, legendary: true);
+        Assert.AreNotEqual(ManualChallengeScene.MissingLegendaryMark, screen.Scene);
+        if (!removePhrase) Assert.AreEqual(ManualChallengeScene.Unknown, screen.Scene);
+    }
+
+    [TestMethod]
     public async Task WolfTeleportScreenshotRecognizesSelectedChallengeInteraction()
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();

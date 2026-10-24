@@ -12,7 +12,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -90,6 +90,13 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (legendary)
         {
             // 弹窗先于后方详情页判断，避免把被遮罩的开始挑战按钮当成当前目标。
+            // 只匹配“无法进行捕捉”，不依赖各传说精灵的专属印记名称。
+            if (await Match("legendary-missing-mark", .25, .42, .75, .66) is { } missingMark)
+            {
+                var cancel = await Button("legendary-cancel");
+                return cancel is null ? new(ManualChallengeScene.Unknown, [])
+                    : new(ManualChallengeScene.MissingLegendaryMark, [], missingMark, ExitButton: cancel);
+            }
             // 只匹配共有的“参与挑战将只能”，兼容印记不足与周次数用尽时不同的换行位置。
             if (await Match("legendary-insufficient", .32, .48, .69, .61) is not null)
                 return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),

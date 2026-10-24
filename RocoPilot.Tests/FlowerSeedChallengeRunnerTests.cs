@@ -56,6 +56,8 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(true, false, 3, "exhausted", false)]
     [DataRow(true, false, 3, "insufficient", true)]
     [DataRow(false, false, 3, "insufficient", true)]
+    [DataRow(true, false, 3, "missing-mark", true)]
+    [DataRow(false, false, 3, "missing-mark", true)]
     public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(
         bool allowMarks, bool switchPet, int difficulty, string shortage, bool directTeleport)
     {
@@ -84,7 +86,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
         var run = runner.RunLegendaryAsync(state, directTeleport ? "银月狼王" : "圣羽翼王", 2, difficulty, allowMarks,
             state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
-        if (allowMarks)
+        if (allowMarks && shortage != "missing-mark")
         {
             await run;
             var expected = switchPet
@@ -100,12 +102,13 @@ public sealed class FlowerSeedChallengeRunnerTests
         else
         {
             var error = await Assert.ThrowsAsync<InvalidOperationException>(() => run);
-            StringAssert.Contains(error.Message, "契约印记");
+            StringAssert.Contains(error.Message, shortage == "missing-mark" ? "银月狼王缺少可用专属印记" : "契约印记");
             CollectionAssert.AreEqual(directTeleport ? new[] { "F", "Esc" } : new[] { "W", "F", "Esc" },
                 keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(0, capture.Captures);
         }
         Assert.AreEqual("world", capture.Scene);
+        if (shortage == "missing-mark") Assert.AreEqual(2, capture.CancelClicks);
         Assert.AreEqual(difficulty == 3 ? 0 : 2, capture.DifficultyClicks);
     }
 
@@ -118,6 +121,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public string Scene = "list";
         public int Captures;
         public int DifficultyClicks;
+        public int CancelClicks;
         public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
         {
             if (!_pixels.TryGetValue(Scene, out var pixels))
@@ -171,6 +175,12 @@ public sealed class FlowerSeedChallengeRunnerTests
         }
         public void OnClick(int x, int y)
         {
+            if (Scene == "insufficient" && shortage == "missing-mark")
+            {
+                Assert.IsTrue(x < 650, "无法捕捉时只能点击取消。");
+                // 第一次取消未生效时，应复查并重试，不能直接按 ESC 或重新开始挑战。
+                if (++CancelClicks == 1) return;
+            }
             if (Scene == "confirmation" && x < 200)
             {
                 Assert.AreEqual((int)Math.Round((194 + (difficulty - 1) * 110) * 720d / 1152), y, 3);

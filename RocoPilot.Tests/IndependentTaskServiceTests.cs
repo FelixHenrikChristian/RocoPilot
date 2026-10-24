@@ -17,6 +17,32 @@ namespace RocoPilot.Tests;
 public sealed class IndependentTaskServiceTests
 {
     [TestMethod]
+    [DataRow(true, true)]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    [DataRow(false, false)]
+    public async Task MissingLegendaryMarkReportsStopAndRespectsNotificationSetting(bool allowMarks, bool notificationsEnabled)
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        await fixture.Notifications.SetEnabledAsync(notificationsEnabled);
+        var settings = fixture.Service.Settings;
+        settings.LegendaryTargetName = "银月狼王";
+        settings.UseLegendaryMarkWhenInsufficient = allowMarks;
+        fixture.Service.SetSettings(settings);
+        fixture.Runner.Failure = "银月狼王缺少可用专属印记，无法捕捉，已退出挑战。";
+
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryChallenge)).Success);
+        await WaitStoppedAsync(fixture.Service);
+
+        var expected = ("传说精灵挑战已停止", fixture.Runner.Failure);
+        Assert.AreEqual(expected, fixture.Runtime.Results.Single());
+        Assert.AreEqual(notificationsEnabled ? 1 : 0, fixture.Notifications.Payloads.Count);
+        if (notificationsEnabled) Assert.AreEqual(expected, fixture.Notifications.Payloads.Single());
+        Assert.AreEqual(1, fixture.Runtime.Resumes);
+    }
+
+    [TestMethod]
     [DataRow(IndependentTaskKind.FlowerSeedChallenge, false)]
     [DataRow(IndependentTaskKind.FlowerSeedChallenge, true)]
     [DataRow(IndependentTaskKind.LegendaryChallenge, false)]

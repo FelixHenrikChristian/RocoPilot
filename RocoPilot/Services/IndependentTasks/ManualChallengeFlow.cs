@@ -41,7 +41,7 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
             return screen.Scene switch
             {
                 ManualChallengeScene.World or ManualChallengeScene.Interaction => new(ManualChallengeAction.Stop),
-                ManualChallengeScene.InsufficientContractMark => Click(screen.ExitButton),
+                ManualChallengeScene.InsufficientContractMark or ManualChallengeScene.MissingLegendaryMark => Click(screen.ExitButton),
                 ManualChallengeScene.LegendaryConfirmation => new(ManualChallengeAction.Escape),
                 _ => default
             };
@@ -79,6 +79,9 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 if (screen.Difficulty == 0) return default;
                 return Click(screen.Difficulty == legendaryDifficulty ? screen.Button
                     : screen.Rows.FirstOrDefault(row => row.Number == legendaryDifficulty)?.Button);
+            case ManualChallengeScene.MissingLegendaryMark when legendaryTarget is not null:
+                StopReason = $"{legendaryTarget}缺少可用专属印记，无法捕捉，已退出挑战。";
+                return Click(screen.ExitButton);
             case ManualChallengeScene.InsufficientContractMark when _targetStage == TargetStage.Confirmed
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
                 if (useLegendaryMark)

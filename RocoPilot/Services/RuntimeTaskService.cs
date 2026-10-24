@@ -40,6 +40,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private readonly IHotkeyService _hotkeyService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
     private readonly IInfoOverlayService _infoOverlayService;
+    private readonly ShinyEncounterNotification _shinyNotification;
     private readonly ILogger<RuntimeTaskService> _logger;
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
@@ -123,6 +124,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         IHotkeyService hotkeyService,
         IRecognitionOverlayService recognitionOverlayService,
         IInfoOverlayService infoOverlayService,
+        ShinyEncounterNotification shinyNotification,
         ILogger<RuntimeTaskService> logger)
     {
         _gameWindowService = gameWindowService;
@@ -143,6 +145,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _hotkeyService.HotkeyTriggered += HotkeyService_HotkeyTriggered;
         _recognitionOverlayService = recognitionOverlayService;
         _infoOverlayService = infoOverlayService;
+        _shinyNotification = shinyNotification;
         _logger = logger;
     }
 

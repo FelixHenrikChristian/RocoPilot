@@ -524,7 +524,8 @@ public sealed partial class RuntimeTaskService
         }
 
         if (battleId != _battle.BattleId) return false;
-        ApplyAutoBattleShinySuspension(tipText, "异色识别", battleId);
+        if (ApplyAutoBattleShinySuspension(tipText, "异色识别", battleId))
+            await _shinyNotification.NotifyAsync(frame);
         if (EncounterStatisticsEnabled && !_statisticsService.IsActiveAccountSelectionRequired && accountUid is not null)
         {
             RuntimePendingShinyCapture capture;

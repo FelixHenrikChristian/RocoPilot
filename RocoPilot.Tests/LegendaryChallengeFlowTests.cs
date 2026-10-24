@@ -14,13 +14,34 @@ public sealed class LegendaryChallengeFlowTests
     private static readonly ImageMatchResult Mark = Confirm with { TemplatePath = "mark" };
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void LegendaryDirectTeleportContinuesAtTheSelectedTargetWithoutReopeningManual(bool worldFirst)
+    {
+        var flow = new ManualChallengeFlow(null, 3, "银月狼王");
+        Assert.AreEqual(ManualChallengeAction.OpenManual, Next(flow, ManualChallengeScene.Interaction, text: "挑战").Action);
+        Assert.AreEqual(ManualChallengeAction.Click,
+            Next(flow, ManualChallengeScene.LegendaryList, rows: [new("银月狼王", Confirm)]).Action);
+        Assert.AreEqual(ManualChallengeAction.None, Next(flow, ManualChallengeScene.Unknown).Action);
+        if (worldFirst)
+            Assert.AreEqual(ManualChallengeAction.Approach, Next(flow, ManualChallengeScene.World).Action);
+        Assert.AreEqual(ManualChallengeAction.Interact, Next(flow, ManualChallengeScene.Interaction, text: "挑战").Action);
+        Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.LegendaryConfirmation, [],
+            Confirm, Difficulty: 3), 1152).Action);
+        Assert.AreEqual(ManualChallengeAction.Click, Next(flow, ManualChallengeScene.Preparation).Action);
+        Assert.AreEqual(ManualChallengeAction.Battle, Next(flow, ManualChallengeScene.Battle).Action);
+    }
+
+    [TestMethod]
     [DataRow("圣羽翼王")]
     [DataRow("龙息帕尔")]
+    [DataRow("银月狼王")]
+    [DataRow("全新精灵")]
     public void ChoosesByNameAndVerifiesMapBeforeInteracting(string name)
     {
         var flow = new ManualChallengeFlow(null, 3, name);
         var selected = Next(flow, ManualChallengeScene.LegendaryList, rows:
-            [new("龙息帕尔", Mark), new("圣羽翼王", Contract)]);
+            [new("龙息帕尔", Mark), new("圣羽翼王", Contract), new("银月狼王", Contract), new("全新精灵", Contract)]);
         Assert.AreEqual(name == "龙息帕尔" ? Mark : Contract, selected.Button);
         Assert.AreEqual(ManualChallengeAction.None, Next(flow, ManualChallengeScene.Map, text: "其他精灵").Action);
         Assert.AreEqual(ManualChallengeAction.OpenManual, Next(flow, ManualChallengeScene.Interaction, text: "挑战！").Action);
@@ -30,6 +51,30 @@ public sealed class LegendaryChallengeFlowTests
         Assert.AreEqual(ManualChallengeAction.SelectChallenge, flow.Next(new(ManualChallengeScene.Interaction, [],
             Text: "查看留言", HasChallengeOption: true), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.Interact, Next(flow, ManualChallengeScene.Interaction, text: "挑战！").Action);
+    }
+
+    [TestMethod]
+    public void LegendaryScanScrollsToBothBoundariesWithoutTeleporting()
+    {
+        var flow = new ManualChallengeFlow(null, 0);
+        var top = new ManualChallengeScreen(ManualChallengeScene.LegendaryList,
+            [new("圣羽翼王", Confirm with { Y = 200 }), new("银月狼王", Confirm with { Y = 400 })]);
+        var bottom = new ManualChallengeScreen(ManualChallengeScene.LegendaryList,
+            [new("银月狼王", Confirm with { Y = 244 }), new("全新精灵", Confirm with { Y = 444 })]);
+        for (var i = 0; i < 2; i++)
+        {
+            Assert.AreEqual(ManualChallengeAction.ScrollUp, flow.Next(top, 1152).Action);
+            flow.RecordScroll(top, 1152);
+        }
+        Assert.AreEqual(ManualChallengeAction.ScrollDown, flow.Next(top, 1152).Action);
+        flow.RecordScroll(top, 1152);
+        for (var i = 0; i < 2; i++)
+        {
+            Assert.AreEqual(ManualChallengeAction.ScrollDown, flow.Next(bottom, 1152).Action);
+            flow.RecordScroll(bottom, 1152);
+        }
+        Assert.AreEqual(ManualChallengeAction.Complete, flow.Next(bottom, 1152).Action);
+        CollectionAssert.AreEqual(new[] { "圣羽翼王", "银月狼王", "全新精灵" }, flow.Options.Select(option => option.Name).ToArray());
     }
 
     [TestMethod]

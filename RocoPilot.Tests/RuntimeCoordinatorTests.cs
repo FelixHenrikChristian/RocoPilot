@@ -96,6 +96,7 @@ public sealed class RuntimeCoordinatorTests
         public bool IsRunning => false;
         public IndependentTaskKind? RunningTaskKind => null;
         public IndependentTaskSettings Settings => IndependentTaskSettings.CreateDefault();
+        public IReadOnlyList<string> LegendaryTargets => IndependentTaskSettings.LegendaryTargets;
         public Task LoadSettingsAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public void SetSettings(IndependentTaskSettings settings) { }
         public Task<IndependentTaskStartResult> StartAsync(IndependentTaskKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException();

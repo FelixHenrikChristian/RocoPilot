@@ -11,7 +11,7 @@ public sealed class IndependentTaskSettings
     public const int DefaultLegendaryDifficulty = 3;
     public const int DefaultFlowerSeedRunCount = 6;
 
-    public static IReadOnlyList<string> LegendaryTargets { get; } = Array.AsReadOnly(new[] { "圣羽翼王", "龙息帕尔" });
+    public static IReadOnlyList<string> LegendaryTargets { get; } = Array.AsReadOnly(new[] { "圣羽翼王", "龙息帕尔", "银月狼王" });
 
     public string LegendaryTargetName { get; set; } = LegendaryTargets[0];
     public int LegendaryDifficulty { get; set; } = DefaultLegendaryDifficulty;
@@ -48,12 +48,13 @@ public sealed class IndependentTaskSettings
         };
     }
 
-    public IndependentTaskSettings Normalize()
+    public IndependentTaskSettings Normalize(IReadOnlyList<string>? legendaryTargets = null)
     {
         return new IndependentTaskSettings
         {
             LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount),
-            LegendaryTargetName = LegendaryTargets.Contains(LegendaryTargetName) ? LegendaryTargetName : LegendaryTargets[0],
+            LegendaryTargetName = (legendaryTargets ?? LegendaryTargets).Contains(LegendaryTargetName)
+                ? LegendaryTargetName : legendaryTargets is null ? LegendaryTargets[0] : string.Empty,
             LegendaryDifficulty = LegendaryDifficulty is >= 1 and <= 3 ? LegendaryDifficulty : DefaultLegendaryDifficulty,
             UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
             FlowerSeedRunCount = Math.Clamp(FlowerSeedRunCount, MinimumRunCount, MaximumRunCount),

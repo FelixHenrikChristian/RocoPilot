@@ -26,6 +26,58 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedScreenRecognizerTests
 {
     [TestMethod]
+    public async Task WolfTeleportScreenshotRecognizesSelectedChallengeInteraction()
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
+            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Catalog(), new Seasons(.55),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        using var frame = LoadFixture("legendary-wolf-interaction.png");
+        var screen = await recognizer.ReadAsync(frame, 1, 44, 2048, 1152, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.Interaction, screen.Scene);
+        Assert.AreEqual("挑战", screen.Text);
+        Assert.IsTrue(screen.HasChallengeOption);
+    }
+
+    [TestMethod]
+    public async Task CurrentSeasonScreenshotRecognizesAllThreeLegendarySpirits()
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
+            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Catalog(), new Seasons(.55),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        using var frame = LoadFixture("legendary-list-season4.png");
+        List<string> texts = [];
+        var screen = await recognizer.ReadAsync(frame, 1, 44, 2048, 1152, CancellationToken.None,
+            (_, text) => texts.Add(text), legendary: true);
+        Assert.AreEqual(ManualChallengeScene.LegendaryList, screen.Scene);
+        CollectionAssert.AreEqual(new[] { "圣羽翼王", "龙息帕尔", "银月狼王" },
+            screen.Rows.Select(row => row.Name).ToArray(), string.Join(" | ", texts));
+    }
+
+    [TestMethod]
+    public async Task LegendaryNamesUseCatalogCorrectionAndKeepUnknownOcrOnListAndMap()
+    {
+        var catalog = new Catalog();
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
+            new NameOcr("银月狼玉", "全新精灵"), catalog, new Seasons(.70),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        using var list = LoadFixture("legendary-list.png", 1280, 720);
+        var screen = await recognizer.ReadAsync(list, 0, 0, 1280, 720, CancellationToken.None, legendary: true);
+        CollectionAssert.AreEqual(new[] { "银月狼王", "全新精灵" }, screen.Rows.Select(row => row.Name).ToArray());
+        CollectionAssert.AreEqual(new[] { .70, .70 }, catalog.Thresholds);
+
+        using var map = LoadFixture("legendary-map.png", 1280, 720);
+        foreach (var (raw, expected) in new[] { ("银月狼玉", "银月狼王"), ("全 新精灵！", "全新精灵") })
+        {
+            recognizer = new(new ImageMatchingService(), new NameOcr(raw), catalog, new Seasons(.70),
+                NullLogger<ManualChallengeScreenRecognizer>.Instance);
+            screen = await recognizer.ReadAsync(map, 0, 0, 1280, 720, CancellationToken.None, legendary: true);
+            Assert.AreEqual(expected, screen.Text);
+        }
+    }
+
+    [TestMethod]
     [DataRow("manual", nameof(ManualChallengeScene.Manual))]
     [DataRow("list", nameof(ManualChallengeScene.LegendaryList))]
     [DataRow("map", nameof(ManualChallengeScene.Map))]
@@ -53,7 +105,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, null!, null!,
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.55),
             NullLogger<ManualChallengeScreenRecognizer>.Instance);
         foreach (var (width, height) in new[] { (2048, 1152), (1280, 720) })
         {
@@ -846,18 +898,19 @@ public sealed class FlowerSeedScreenRecognizerTests
         }
     }
 
-    private sealed class Seasons(double threshold) : IEncounterSeasonConfigService
+    internal sealed class Seasons(double threshold) : IEncounterSeasonConfigService
     {
         public EncounterSeasonConfig Configuration { get; } = new() { SpiritNameMatchThreshold = threshold };
         public EncounterSeasonConfig Load() => Configuration;
         public EncounterSeasonDefinition? GetCurrentSeason() => null;
     }
 
-    private sealed class Catalog : ISpiritCatalogService
+    internal sealed class Catalog : ISpiritCatalogService
     {
         private readonly SpiritCatalogIndex _index = new(new SpiritCatalogDocument
         {
-            Spirits = [new() { Name = "友爱星飞" }, new() { Name = "小皮球" }]
+            Spirits = [new() { Name = "友爱星飞" }, new() { Name = "小皮球" },
+                new() { Name = "圣羽翼王" }, new() { Name = "龙息帕尔" }, new() { Name = "银月狼王" }]
         });
         public List<double> Thresholds { get; } = [];
         public Task<string> MatchSpiritNameAsync(string recognizedText, double minimumSimilarity,

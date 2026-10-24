@@ -7,5 +7,6 @@ public enum IndependentTaskKind
 {
     LegendaryChallenge,
     FlowerSeedChallenge,
-    FlowerSeedScan
+    FlowerSeedScan,
+    LegendaryScan
 }

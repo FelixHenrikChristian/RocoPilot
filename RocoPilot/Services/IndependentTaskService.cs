@@ -23,6 +23,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private readonly SemaphoreSlim _settingsSaveLock = new(1, 1);
     private IndependentTaskSettings _settings = IndependentTaskSettings.CreateDefault();
+    private IReadOnlyList<string>? _legendaryTargets;
+    private string? _savedLegendaryTarget;
     private bool _hasLoadedSettings;
     private IndependentTaskKind? _runningTaskKind;
     private CancellationTokenSource? _taskCts;
@@ -35,6 +37,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
     public IndependentTaskKind? RunningTaskKind => _runningTaskKind;
 
     public IndependentTaskSettings Settings => _settings.Clone();
+
+    public IReadOnlyList<string> LegendaryTargets => _legendaryTargets ?? IndependentTaskSettings.LegendaryTargets;
 
     public IndependentTaskService(
         IRuntimeSessionControl runtimeTaskService,
@@ -78,7 +82,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
     public void SetSettings(IndependentTaskSettings settings)
     {
-        _settings = (settings ?? IndependentTaskSettings.CreateDefault()).Normalize();
+        _settings = (settings ?? IndependentTaskSettings.CreateDefault()).Normalize(_legendaryTargets);
         _ = SaveSettingsAsync(_settings.Clone());
     }
 
@@ -109,6 +113,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
             {
                 return IndependentTaskStartResult.Failed("请先扫描并选择目标花种。");
             }
+
+            if (kind == IndependentTaskKind.LegendaryChallenge && !LegendaryTargets.Contains(_settings.LegendaryTargetName))
+                return IndependentTaskStartResult.Failed("请先选择目标传说精灵。");
 
             if (kind == IndependentTaskKind.FlowerSeedScan)
             {
@@ -199,6 +206,26 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
             switch (kind)
             {
+                case IndependentTaskKind.LegendaryScan:
+                    var names = await _challengeRunner.ScanLegendaryAsync(state, UpdateProgress, taskCts.Token);
+                    taskCts.Token.ThrowIfCancellationRequested();
+                    if (names.Count == 0)
+                        throw new InvalidOperationException("未识别到传说精灵，已保留原有名单和选择。");
+                    await _stateLock.WaitAsync(taskCts.Token);
+                    try
+                    {
+                        // 首次刷新前的选择用于持久化；后续刷新和选择只影响本次启动。
+                        _savedLegendaryTarget ??= _settings.LegendaryTargetName;
+                        _legendaryTargets = Array.AsReadOnly(names.ToArray());
+                        _settings = _settings.Normalize(_legendaryTargets);
+                    }
+                    finally
+                    {
+                        _stateLock.Release();
+                    }
+                    NotifyStateChanged();
+                    _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {names.Count} 个传说精灵", "名单和选择仅本次启动有效，重启后恢复本地设置");
+                    break;
                 case IndependentTaskKind.LegendaryChallenge:
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
                         settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
@@ -290,6 +317,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
     private async Task SaveSettingsAsync(IndependentTaskSettings settings)
     {
+        if (_savedLegendaryTarget is not null) settings.LegendaryTargetName = _savedLegendaryTarget;
         await _settingsSaveLock.WaitAsync();
         try
         {
@@ -317,6 +345,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
             IndependentTaskKind.LegendaryChallenge => "传说精灵挑战",
             IndependentTaskKind.FlowerSeedChallenge => "花种挑战",
             IndependentTaskKind.FlowerSeedScan => "扫描花种",
+            IndependentTaskKind.LegendaryScan => "扫描传说精灵",
             _ => "独立"
         };
     }

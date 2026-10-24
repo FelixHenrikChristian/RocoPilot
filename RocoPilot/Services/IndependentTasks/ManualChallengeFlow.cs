@@ -12,13 +12,13 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
     bool useLegendaryMark = true, int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty)
 {
     private enum ChallengePhase { Navigation, Starting, Battle, Settlement, Result }
+    private enum TargetStage { None, Selected, MapOpened, Confirmed }
 
     private readonly List<FlowerSeedOption> _options = [];
     private (string Name, double Y)[]? _beforeScroll;
     private int _unchangedScrolls;
     private bool _topConfirmed;
-    private bool _targetRowSeen;
-    private bool _targetMapSeen;
+    private TargetStage _targetStage;
     private ChallengePhase _challengePhase;
     private bool _rewardsSeen;
     private bool _captureSeen;
@@ -58,22 +58,28 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
         }
         if ((target is not null || legendaryTarget is not null) && CompletedCount >= runCount && screen.Scene != ManualChallengeScene.Result) return default;
 
+        // 传说列表可直接传送到挑战场景；若实际打开了地图，仍须核对地图目标。
+        if (legendaryTarget is not null && _targetStage == TargetStage.Selected
+            && _challengePhase == ChallengePhase.Navigation
+            && screen.Scene is ManualChallengeScene.World or ManualChallengeScene.Interaction)
+            _targetStage = TargetStage.Confirmed;
+
         switch (screen.Scene)
         {
             case ManualChallengeScene.SkippableAnimation:
                 return new(ManualChallengeAction.Escape);
             case ManualChallengeScene.World when _challengePhase == ChallengePhase.Navigation:
-                return new(_targetMapSeen ? ManualChallengeAction.Approach : ManualChallengeAction.OpenManual);
+                return new(_targetStage == TargetStage.Confirmed ? ManualChallengeAction.Approach : ManualChallengeAction.OpenManual);
             case ManualChallengeScene.Manual when _challengePhase == ChallengePhase.Navigation:
             case ManualChallengeScene.ChallengePage when _challengePhase == ChallengePhase.Navigation:
-            case ManualChallengeScene.Confirmation when _targetMapSeen && _challengePhase == ChallengePhase.Navigation:
+            case ManualChallengeScene.Confirmation when _targetStage == TargetStage.Confirmed && _challengePhase == ChallengePhase.Navigation:
                 return Click(screen.Button);
-            case ManualChallengeScene.LegendaryConfirmation when _targetMapSeen
+            case ManualChallengeScene.LegendaryConfirmation when _targetStage == TargetStage.Confirmed
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Result:
                 if (screen.Difficulty == 0) return default;
                 return Click(screen.Difficulty == legendaryDifficulty ? screen.Button
                     : screen.Rows.FirstOrDefault(row => row.Number == legendaryDifficulty)?.Button);
-            case ManualChallengeScene.InsufficientContractMark when _targetMapSeen
+            case ManualChallengeScene.InsufficientContractMark when _targetStage == TargetStage.Confirmed
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
                 if (useLegendaryMark)
                 {
@@ -82,13 +88,14 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 }
                 StopReason = "契约印记或本周捕捉次数不足，已按配置停止。";
                 return Click(screen.ExitButton);
-            case ManualChallengeScene.LegendaryList when legendaryTarget is not null && _challengePhase == ChallengePhase.Navigation:
-                var legendary = screen.Rows.FirstOrDefault(row => row.Name == legendaryTarget);
-                if (legendary is null) return default;
-                _targetRowSeen = true;
-                return Click(legendary.Button);
+            case ManualChallengeScene.LegendaryList when _challengePhase == ChallengePhase.Navigation:
             case ManualChallengeScene.FlowerList when _challengePhase == ChallengePhase.Navigation:
                 if (screen.Rows.Count == 0) return default;
+                if (legendaryTarget is not null && screen.Rows.FirstOrDefault(row => row.Name == legendaryTarget) is { } legendary)
+                {
+                    _targetStage = TargetStage.Selected;
+                    return Click(legendary.Button);
+                }
                 var rows = ReadPositions(screen.Rows, clientHeight);
                 if (_beforeScroll is { } previous)
                 {
@@ -104,25 +111,28 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 UpdateRowIdentities(screen.Rows, clientHeight);
                 if (target is not null && screen.Rows.FirstOrDefault(row => row.Number == target.Number) is { } targetRow)
                 {
-                    _targetRowSeen = true;
+                    _targetStage = TargetStage.Selected;
                     return Click(targetRow.Button);
                 }
                 if (_unchangedScrolls < 2) return new(ManualChallengeAction.ScrollDown);
                 if (target is not null)
                     throw new InvalidOperationException($"当前花种列表中未找到：{target.DisplayName}。");
+                if (legendaryTarget is not null)
+                    throw new InvalidOperationException($"当前传说精灵列表中未找到：{legendaryTarget}。");
                 return new(ManualChallengeAction.Complete);
             case ManualChallengeScene.Map when _challengePhase == ChallengePhase.Navigation:
-                if (!_targetRowSeen) return default;
+                if (_targetStage == TargetStage.None) return default;
+                _targetStage = TargetStage.MapOpened;
                 if (legendaryTarget is not null && screen.Text != legendaryTarget) return default;
-                _targetMapSeen = true;
+                _targetStage = TargetStage.Confirmed;
                 return Click(screen.Button);
             case ManualChallengeScene.Interaction when _challengePhase == ChallengePhase.Navigation:
-                if (!_targetMapSeen) return new(ManualChallengeAction.OpenManual);
+                if (_targetStage != TargetStage.Confirmed) return new(ManualChallengeAction.OpenManual);
                 if (string.IsNullOrWhiteSpace(screen.Text)) return default;
                 return new(ManualChallengeScreenRecognizer.Normalize(screen.Text) == "挑战"
                     ? ManualChallengeAction.Interact
                     : screen.HasChallengeOption ? ManualChallengeAction.SelectChallenge : ManualChallengeAction.Approach);
-            case ManualChallengeScene.Preparation when _targetMapSeen
+            case ManualChallengeScene.Preparation when _targetStage == TargetStage.Confirmed
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
                 if (screen.Button is not { IsMatch: true }) return default;
                 _challengePhase = ChallengePhase.Starting;

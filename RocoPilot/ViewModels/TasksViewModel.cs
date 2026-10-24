@@ -48,11 +48,18 @@ public partial class TasksViewModel : ObservableRecipient
     public partial bool IsFlowerSeedScanning { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LegendaryScanButtonLabel))]
+    [NotifyPropertyChangedFor(nameof(LegendaryScanButtonGlyph))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
+    public partial bool IsLegendaryScanning { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedConfigurationEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedScanButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeConfigurationEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeButtonEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
     public partial bool IsIndependentTaskRunning { get; set; }
 
     [ObservableProperty]
@@ -61,7 +68,7 @@ public partial class TasksViewModel : ObservableRecipient
     [ObservableProperty]
     public partial bool UseLegendaryMarkWhenInsufficient { get; set; }
 
-    public IReadOnlyList<string> LegendaryTargets => IndependentTaskSettings.LegendaryTargets;
+    public ObservableCollection<string> LegendaryTargets { get; } = new(IndependentTaskSettings.LegendaryTargets);
     public IReadOnlyList<string> LegendaryDifficulties { get; } = ["难度I", "难度II", "难度III"];
 
     [ObservableProperty]
@@ -113,6 +120,12 @@ public partial class TasksViewModel : ObservableRecipient
 
     public bool IsFlowerSeedScanButtonEnabled => IsFlowerSeedScanning || !IsIndependentTaskRunning;
 
+    public string LegendaryScanButtonLabel => IsLegendaryScanning ? "停止扫描" : "刷新传说精灵（仅本次启动有效）";
+
+    public string LegendaryScanButtonGlyph => IsLegendaryScanning ? StopButtonGlyph : "\uE72C";
+
+    public bool IsLegendaryScanButtonEnabled => IsLegendaryScanning || !IsIndependentTaskRunning;
+
     public TasksViewModel(
         IIndependentTaskService independentTaskService,
         ILogger<TasksViewModel> logger)
@@ -155,6 +168,12 @@ public partial class TasksViewModel : ObservableRecipient
     private Task ToggleFlowerSeedScanAsync()
     {
         return ToggleTaskAsync(IndependentTaskKind.FlowerSeedScan);
+    }
+
+    [RelayCommand]
+    private Task ToggleLegendaryScanAsync()
+    {
+        return ToggleTaskAsync(IndependentTaskKind.LegendaryScan);
     }
 
     private async Task ToggleTaskAsync(IndependentTaskKind kind)
@@ -231,7 +250,7 @@ public partial class TasksViewModel : ObservableRecipient
                 IndependentTaskSettings.DefaultFlowerSeedRunCount),
             FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
             FlowerSeedOptions = [.. FlowerSeedOptions]
-        }.Normalize();
+        };
     }
 
     private void ApplySettings(IndependentTaskSettings settings)
@@ -240,6 +259,11 @@ public partial class TasksViewModel : ObservableRecipient
         try
         {
             LegendaryChallengeRunCount = settings.LegendaryChallengeRunCount;
+            if (!LegendaryTargets.SequenceEqual(_independentTaskService.LegendaryTargets))
+            {
+                LegendaryTargets.Clear();
+                foreach (var name in _independentTaskService.LegendaryTargets) LegendaryTargets.Add(name);
+            }
             SelectedLegendaryTarget = settings.LegendaryTargetName;
             SelectedLegendaryDifficultyIndex = settings.LegendaryDifficulty - 1;
             UseLegendaryMarkWhenInsufficient = settings.UseLegendaryMarkWhenInsufficient;
@@ -279,6 +303,7 @@ public partial class TasksViewModel : ObservableRecipient
         IsLegendaryChallengeRunning = runningTaskKind == IndependentTaskKind.LegendaryChallenge;
         IsFlowerSeedChallengeRunning = runningTaskKind == IndependentTaskKind.FlowerSeedChallenge;
         IsFlowerSeedScanning = runningTaskKind == IndependentTaskKind.FlowerSeedScan;
+        IsLegendaryScanning = runningTaskKind == IndependentTaskKind.LegendaryScan;
         IsIndependentTaskRunning = _independentTaskService.IsRunning;
         ApplySettings(_independentTaskService.Settings);
     }

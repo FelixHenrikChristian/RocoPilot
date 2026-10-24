@@ -20,6 +20,7 @@ public class PageService : IPageService
         Configure<StatisticsViewModel, StatisticsPage>();
         Configure<LogViewModel, LogPage>();
         Configure<HotkeyViewModel, HotkeyPage>();
+        Configure<NotificationSettingsViewModel, NotificationSettingsPage>();
 #if DEBUG
         Configure<TestViewModel, TestPage>();
 #endif

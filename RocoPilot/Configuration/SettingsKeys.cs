@@ -2,6 +2,10 @@ namespace RocoPilot.Configuration;
 
 internal static class SettingsKeys
 {
+    public const string NotificationEnabled = "NotificationEnabled";
+
+    public const string NotificationSoundEnabled = "NotificationSoundEnabled";
+
     public const string StatisticsData = "StatisticsData";
 
     public const string StatisticsSyncSettings = "StatisticsSyncSettings";

@@ -1,5 +1,4 @@
-using Microsoft.Extensions.Logging;
-using System.Xml.Linq;
+﻿using Microsoft.Extensions.Logging;
 
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
@@ -203,14 +202,16 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 case IndependentTaskKind.LegendaryChallenge:
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
                         settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
-                    _runtimeTaskService.ShowIndependentTaskResult($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
+                    taskCts.Token.ThrowIfCancellationRequested();
+                    await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:
                     await _challengeRunner.RunAsync(state,
                         settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
                         settings.FlowerSeedRunCount, battleSettings,
                         UpdateProgress, taskCts.Token);
-                    _runtimeTaskService.ShowIndependentTaskResult($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
+                    taskCts.Token.ThrowIfCancellationRequested();
+                    await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
                     var options = await _challengeRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
@@ -229,6 +230,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
                     _logger.LogInformation("花种扫描完成：{Count} 个花种", _settings.FlowerSeedOptions.Count);
                     NotifyStateChanged();
+                    taskCts.Token.ThrowIfCancellationRequested();
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {_settings.FlowerSeedOptions.Count} 个花种", "花种选项已更新");
                     break;
             }
@@ -240,16 +242,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         {
             _logger.LogError(ex, "独立任务异常终止：{TaskName}", GetTaskDisplayName(kind));
             UpdateProgress(new("任务失败", ex.Message));
-            if (kind is IndependentTaskKind.FlowerSeedChallenge or IndependentTaskKind.LegendaryChallenge)
-            {
-                var title = $"{taskName}已停止";
-                _runtimeTaskService.ShowIndependentTaskResult(title, ex.Message);
-                var payload = new XElement("toast", new XElement("visual",
-                    new XElement("binding", new XAttribute("template", "ToastGeneric"),
-                        new XElement("text", title), new XElement("text", ex.Message))));
-                if (!_notifications.Show(payload.ToString(SaveOptions.DisableFormatting)))
-                    _logger.LogWarning("挑战停止通知未显示：{Message}", ex.Message);
-            }
+            await ReportResultAsync($"{taskName}已停止", ex.Message);
         }
         finally
         {
@@ -286,6 +279,13 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
         void UpdateProgress(IndependentTaskProgress progress)
             => _runtimeTaskService.UpdateIndependentTaskStatus(taskName, progress);
+
+        async Task ReportResultAsync(string title, string message)
+        {
+            _runtimeTaskService.ShowIndependentTaskResult(title, message);
+            if (_notifications.IsEnabled && !await _notifications.ShowAsync(title, message))
+                _logger.LogWarning("任务结果通知未显示：{Title}，{Message}", title, message);
+        }
     }
 
     private async Task SaveSettingsAsync(IndependentTaskSettings settings)

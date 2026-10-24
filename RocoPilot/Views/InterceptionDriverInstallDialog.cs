@@ -137,7 +137,7 @@ public static class InterceptionDriverInstallDialog
     internal static AppContentDialog CreateInstallPromptDialog(XamlRoot xamlRoot)
     {
         var dialog = CreateDialog(xamlRoot, "安装键盘驱动", "Interception", "系统级键盘输入驱动",
-            "RocoPilot 将下载官方安装包并执行安装命令，安装过程需要管理员权限。",
+            "RocoPilot 将下载官方安装包并执行安装命令，\n安装过程需要管理员权限。",
             "\uE765", "AccentTextFillColorPrimaryBrush",
             "安装完成后需要重启电脑，驱动才会生效。", "\uE783", "SystemFillColorCautionBrush");
         dialog.PrimaryButtonText = "下载并安装";
@@ -200,7 +200,7 @@ public static class InterceptionDriverInstallDialog
     internal static AppContentDialog CreateRestartFailedDialog(XamlRoot xamlRoot)
     {
         var dialog = CreateDialog(xamlRoot, "无法自动重启", "需要手动重启", "Windows 重启命令未启动",
-            "请保存正在进行的工作，然后手动重启电脑，让 Interception 驱动生效。",
+            "请保存正在进行的工作，\n然后手动重启电脑，让 Interception 驱动生效。",
             "\uE783", "SystemFillColorCautionBrush");
         dialog.CloseButtonText = "知道了";
         dialog.DefaultButton = ContentDialogButton.Close;

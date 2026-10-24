@@ -159,8 +159,8 @@ public static class StatisticsUidConfirmationDialog
         if (!request.RecognitionSucceeded)
         {
             return string.IsNullOrWhiteSpace(request.SuggestedUid)
-                ? $"{request.Message?.Trim()} 手动输入账号，或重新识别。".Trim()
-                : "已填入当前统计账号，请核对后使用，也可修改或重新识别。";
+                ? $"{request.Message?.Trim()}\n手动输入账号，或重新识别。".Trim()
+                : "已填入当前统计账号，请核对后使用，\n也可修改或重新识别。";
         }
 
         return "请核对本次统计账号，如有错误可直接修改。";

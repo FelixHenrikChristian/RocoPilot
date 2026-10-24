@@ -92,12 +92,12 @@
                               Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                     <TextBlock Grid.Column="1" FontSize="12" LineHeight="18" TextWrapping="Wrap"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               Text="两端内容冲突时，采用整个云端账号版本，本机独有的修改可能丢失。" />
+                               Text="两端内容冲突时，采用整个云端账号版本，&#x0A;本机独有的修改可能丢失。" />
                 </Grid>
             </Border>
             <TextBlock FontSize="12" LineHeight="18" TextWrapping="Wrap"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       Text="首次同步没有历史基准时，按记录合并；同名精灵的奇遇次数取较大值，不会相加。" />
+                       Text="首次同步没有历史基准时，按记录合并；&#x0A;同名精灵的奇遇次数取较大值，不会相加。" />
         </StackPanel>
     </ScrollViewer>
 </controls:AppContentDialog>

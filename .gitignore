@@ -382,3 +382,6 @@ Agents.md
 
 # Local screenshot replay samples (not application recognition templates)
 /RocoPilot.Tests/Fixtures/legendary-local/
+
+# Original user screenshots, indexed in RocoPilot.Tests/SCREENSHOT_CATALOG.md
+/RocoPilot.Tests/LocalScreenshots/

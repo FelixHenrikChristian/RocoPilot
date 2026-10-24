@@ -124,6 +124,9 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             _item.Closed += Item_Closed;
 
             _session = _framePool.CreateCaptureSession(_item);
+            // 点击后光标可能停在下一步按钮上；识别帧不应包含遮挡文字的系统光标。
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+                _session.IsCursorCaptureEnabled = false;
             TryDisableCaptureBorder(_session);
             _session.StartCapture();
         }

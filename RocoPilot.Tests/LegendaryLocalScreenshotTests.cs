@@ -10,6 +10,26 @@ namespace RocoPilot.Tests;
 public sealed class LegendaryLocalScreenshotTests
 {
     [TestMethod]
+    [DataRow(2048, 1152)]
+    [DataRow(1280, 720)]
+    public async Task PreparationStartIsRecognizedWithoutCursor(int width, int height)
+    {
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/preparation-start-stalled.png",
+            width, height, 12, 30);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.Preparation, screen.Scene);
+        Assert.IsNotNull(screen.Button);
+        Assert.IsTrue(screen.Button.IsMatch);
+        var centerX = (screen.Button.X + screen.Button.Width / 2d - 12) / width;
+        var centerY = (screen.Button.Y + screen.Button.Height / 2d - 30) / height;
+        Assert.IsTrue(centerX is > .55 and < .61 && centerY is > .79 and < .85);
+        Assert.AreEqual(screen.Button, await recognizer.FindClickTargetAsync(frame, screen.Scene,
+            screen.Button.TemplatePath, 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+    }
+
+    [TestMethod]
     [DataRow("wolf-contract", false)]
     [DataRow("wolf-mark", true)]
     [DataRow("arena-contract", false)]

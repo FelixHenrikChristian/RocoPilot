@@ -379,3 +379,6 @@ FodyWeavers.xsd
 
 # Agents documentation
 Agents.md
+
+# Local screenshot replay samples (not application recognition templates)
+/RocoPilot.Tests/Fixtures/legendary-local/

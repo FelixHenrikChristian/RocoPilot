@@ -185,6 +185,8 @@ public sealed class ManualChallengeRunner(
                 };
                 var operation = flow.StopReason is not null ? "退出并停止：" + flow.StopReason : decision.Action switch
                 {
+                    ManualChallengeAction.None when screen.Scene == ManualChallengeScene.CaptureConfirmation
+                        && screen.Marks is null => "等待识别捕捉方式",
                     ManualChallengeAction.None => lastProgress.Operation,
                     ManualChallengeAction.Complete when scanning && legendary => "传说精灵扫描完成",
                     ManualChallengeAction.Complete when scanning => $"扫描完成，共{flow.Options.Count}个花种",
@@ -400,8 +402,10 @@ public sealed class ManualChallengeRunner(
                 token.ThrowIfCancellationRequested();
                 if (timer.Elapsed >= TimeSpan.FromSeconds(10))
                     throw new TimeoutException($"{operation}：输入 {attempts} 次后目标仍未消失（{initial.TemplatePath}）。");
+                if (!button.IsMatch) Publish(lastProgress with { Operation = operation + "（等待识别选中状态）" });
                 // F3 是开关按键，只发一次；鼠标点击可以在原目标仍存在时重试。
-                if (keyboard.IsWindowForeground(window.Hwnd) && (action == ManualChallengeAction.Click || attempts == 0))
+                // 非空但未匹配表示动作结果尚不明确，只复查画面，不点击未确认的位置。
+                if (button.IsMatch && keyboard.IsWindowForeground(window.Hwnd) && (action == ManualChallengeAction.Click || attempts == 0))
                 {
                     Publish(lastProgress with { Operation = operation });
                     if (action == ManualChallengeAction.OpenManual)

@@ -22,5 +22,6 @@
     <Content Include="Fixtures\flower-seed-*.png;Fixtures\legendary-*.png" CopyToOutputDirectory="PreserveNewest">
       <TargetPath>Fixtures\%(Filename)%(Extension)</TargetPath>
     </Content>
+    <Content Include="Fixtures\legendary-local\*.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

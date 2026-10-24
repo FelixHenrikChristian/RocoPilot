@@ -276,9 +276,13 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (scene == ManualChallengeScene.CaptureConfirmation)
         {
             var current = await ReadCaptureConfirmationAsync(frame, clientX, clientY, width, height, token);
-            if (current?.Marks is not { } marks) return null;
+            var selecting = templatePath is "legendary-select-contract" or "legendary-select-mark";
+            if (current is null && !selecting) return null;
+            // 未识别到选中状态时继续等待，不能将识别失败当成切换成功。
+            if (current?.Marks is not { } marks) return ImageMatchResult.NoMatch(0, templatePath);
             if (templatePath == "legendary-select-contract") return marks.LegendarySelected ? marks.ContractButton : null;
             if (templatePath == "legendary-select-mark") return marks.LegendarySelected ? null : marks.LegendaryButton;
+            return current.Button;
         }
         if (scene == ManualChallengeScene.ChallengePage)
         {
@@ -326,13 +330,14 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var contractArea = CreateArea(x, y, width, height, .42, .45, .50, .56);
         var markArea = CreateArea(x, y, width, height, .50, .45, .58, .56);
         var contract = await images.MatchAsync(frame, contractArea, TemplatePath("legendary-contract-selected"), options, token);
-        var mark = await images.MatchAsync(frame, markArea, TemplatePath("legendary-mark-selected"), options, token);
-        if (!contract.IsMatch && !mark.IsMatch) return new(ManualChallengeScene.Unknown, []);
+        var unselected = await images.MatchAsync(frame, contractArea, TemplatePath("legendary-contract-unselected"), options, token);
+        // 二选一界面只识别左侧固定卡片的两种外观，避免依赖各赛季专属印记图案。
+        var known = contract.IsMatch != unselected.IsMatch;
         return new(ManualChallengeScene.CaptureConfirmation, [],
             await MatchButtonAsync(frame, "legendary-confirm", x, y, width, height, token),
-            Marks: new(mark.IsMatch,
+            Marks: known ? new(unselected.IsMatch,
                 new(true, 1, contractArea.X, contractArea.Y, contractArea.Width, contractArea.Height, "legendary-select-contract"),
-                new(true, 1, markArea.X, markArea.Y, markArea.Width, markArea.Height, "legendary-select-mark")));
+                new(true, 1, markArea.X, markArea.Y, markArea.Width, markArea.Height, "legendary-select-mark")) : null);
     }
 
     // F3 的完成确认只复查原 HUD，避免全界面识别耗时影响开关按键的等待。

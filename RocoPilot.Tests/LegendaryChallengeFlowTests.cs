@@ -159,6 +159,15 @@ public sealed class LegendaryChallengeFlowTests
     }
 
     [TestMethod]
+    public void CaptureConfirmationWaitsUntilSelectionIsKnown()
+    {
+        var flow = StartBattle(true);
+        Assert.AreEqual(ManualChallengeAction.None,
+            flow.Next(new(ManualChallengeScene.CaptureConfirmation, [], Confirm), 1152).Action);
+        Assert.AreEqual(Confirm, Next(flow, ManualChallengeScene.CaptureConfirmation).Button);
+    }
+
+    [TestMethod]
     public void SwitchesToLegendaryMarkOnlyAfterConfirmedShortage()
     {
         var flow = Navigate(true);

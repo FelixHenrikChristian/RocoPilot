@@ -141,6 +141,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("pet-confirmation", nameof(ManualChallengeScene.Battle))]
     [DataRow("capture-contract", nameof(ManualChallengeScene.CaptureConfirmation))]
     [DataRow("capture-legendary", nameof(ManualChallengeScene.CaptureConfirmation))]
+    [DataRow("local/capture-wolf", nameof(ManualChallengeScene.CaptureConfirmation))]
     [DataRow("rewards", nameof(ManualChallengeScene.LegendaryRewards))]
     [DataRow("capture", nameof(ManualChallengeScene.Capture))]
     [DataRow("result", nameof(ManualChallengeScene.Result))]
@@ -187,7 +188,7 @@ public sealed class FlowerSeedScreenRecognizerTests
             if (screen.Marks is { } marks)
             {
                 Assert.HasCount(0, texts, diagnostic);
-                Assert.AreEqual(fixture == "capture-legendary", marks.LegendarySelected, diagnostic);
+                Assert.AreEqual(fixture != "capture-contract", marks.LegendarySelected, diagnostic);
             }
             if (screen.Scene == ManualChallengeScene.InsufficientContractMark)
             {
@@ -203,6 +204,59 @@ public sealed class FlowerSeedScreenRecognizerTests
                 Assert.IsNotNull(rechecked, diagnostic);
                 Assert.AreEqual((screen.Button.X, screen.Button.Y), (rechecked.X, rechecked.Y), diagnostic);
             }
+        }
+    }
+
+    [TestMethod]
+    [DataRow("capture-contract", false, 2048, 1152)]
+    [DataRow("capture-legendary", true, 2048, 1152)]
+    [DataRow("local/capture-wolf", true, 2048, 1152)]
+    [DataRow("capture-contract", false, 1280, 720)]
+    [DataRow("capture-legendary", true, 1280, 720)]
+    [DataRow("local/capture-wolf", true, 1280, 720)]
+    public async Task CaptureSelectionIgnoresRightHandArtworkAndResourceCounts(
+        string fixture, bool selected, int width, int height)
+    {
+        using var frame = LoadFixture($"legendary-{fixture}.png", width, height, 12, 30, source =>
+        {
+            Cv2.Rectangle(source, new Rect(1025, 520, 160, 155), Scalar.Black, -1);
+            Cv2.Rectangle(source, new Rect(880, 632, 130, 30), Scalar.Black, -1);
+        });
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.CaptureConfirmation, screen.Scene);
+        Assert.IsNotNull(screen.Marks);
+        Assert.AreEqual(selected, screen.Marks.LegendarySelected);
+        Assert.IsNotNull(screen.Button);
+        foreach (var (target, completed) in new[] { ("legendary-select-mark", selected), ("legendary-select-contract", !selected) })
+        {
+            var button = await recognizer.FindClickTargetAsync(frame, screen.Scene, target, 0,
+                12, 30, width, height, CancellationToken.None, legendary: true);
+            if (completed) Assert.IsNull(button);
+            else Assert.IsTrue(button?.IsMatch);
+        }
+    }
+
+    [TestMethod]
+    [DataRow("capture-contract")]
+    [DataRow("local/capture-wolf")]
+    public async Task UnreadableLeftCardDoesNotCompleteSelectionOrConfirm(string fixture)
+    {
+        using var frame = LoadFixture($"legendary-{fixture}.png", transform: source =>
+            Cv2.Rectangle(source, new Rect(860, 515, 165, 160), Scalar.Black, -1));
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 0, 0, 2048, 1152, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.CaptureConfirmation, screen.Scene);
+        Assert.IsNull(screen.Marks);
+        Assert.IsNotNull(screen.Button);
+        foreach (var target in new[] { "legendary-select-mark", "legendary-select-contract", screen.Button.TemplatePath })
+        {
+            var result = await recognizer.FindClickTargetAsync(frame, screen.Scene, target, 0,
+                0, 0, 2048, 1152, CancellationToken.None, legendary: true);
+            Assert.IsNotNull(result, "识别不明确不能视为切换成功。");
+            Assert.IsFalse(result.IsMatch, "不能点击未确认的目标。");
         }
     }
 
@@ -866,7 +920,10 @@ public sealed class FlowerSeedScreenRecognizerTests
     internal static CapturedFrame LoadFixture(string fileName, int width = 0, int height = 0, int clientX = 0, int clientY = 0,
         Action<Mat>? transform = null)
     {
-        using var source = Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName), ImreadModes.Color);
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName);
+        if (fileName.StartsWith("legendary-local/", StringComparison.Ordinal) && !File.Exists(path))
+            Assert.Inconclusive($"缺少本地截图素材：{fileName}，请按 LOCAL_FIXTURES.md 放置素材后重新构建。");
+        using var source = Cv2.ImRead(path, ImreadModes.Color);
         Assert.IsFalse(source.Empty(), $"未读取到测试样本：{fileName}");
         transform?.Invoke(source);
         if (width > 0 && height > 0) Cv2.Resize(source, source, new Size(width, height), interpolation: InterpolationFlags.Area);

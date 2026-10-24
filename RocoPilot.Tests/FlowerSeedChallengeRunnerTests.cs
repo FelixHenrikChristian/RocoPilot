@@ -96,6 +96,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             CollectionAssert.AreEqual(directTeleport ? expected.Skip(1).ToArray() : expected,
                 keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(2, capture.Captures);
+            if (directTeleport) Assert.IsTrue(updates.Any(update => update.Operation.Contains("等待识别选中状态")));
             Assert.IsTrue(updates.Any(update => update.Operation == "按Esc跳过动画"));
             Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
         }
@@ -117,6 +118,8 @@ public sealed class FlowerSeedChallengeRunnerTests
     {
         private string _selectedSlot = "";
         private int _confirmAttempts;
+        private int _uncertainFrames;
+        private bool _lastFrameUncertain;
         private readonly Dictionary<string, byte[]> _pixels = [];
         public string Scene = "list";
         public int Captures;
@@ -127,6 +130,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             if (!_pixels.TryGetValue(Scene, out var pixels))
             {
                 var fixture = Scene == "insufficient" ? shortage
+                    : directTeleport && Scene == "capture-legendary" ? "local/capture-wolf"
                     : directTeleport && Scene == "list" ? "list-season4" : Scene;
                 using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{fixture}.png", 1280, 720,
                     transform: source =>
@@ -137,6 +141,14 @@ public sealed class FlowerSeedChallengeRunnerTests
                         client.CopyTo(source);
                     });
                 _pixels[Scene] = pixels = frame.Pixels;
+            }
+            _lastFrameUncertain = _uncertainFrames > 0;
+            if (_lastFrameUncertain)
+            {
+                _uncertainFrames--;
+                pixels = (byte[])pixels.Clone();
+                // 切换后短暂无法识别左侧卡片，不能提前确认或点击无效坐标。
+                for (var y = 322; y < 422; y++) Array.Clear(pixels, (y * 1280 + 537) * 4, 104 * 4);
             }
             return new(1280, 720, pixels);
         }
@@ -175,6 +187,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         }
         public void OnClick(int x, int y)
         {
+            Assert.IsFalse(_lastFrameUncertain, "选中状态不明确时必须等待，不能点击。");
             if (Scene == "insufficient" && shortage == "missing-mark")
             {
                 Assert.IsTrue(x < 650, "无法捕捉时只能点击取消。");
@@ -203,6 +216,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 "result" when Captures == 2 && x < 650 => "world",
                 _ => throw new AssertFailedException($"{Scene} 收到未预期点击：{x},{y}")
             };
+            if (directTeleport && Scene == "capture-legendary") _uncertainFrames = 2;
         }
         public void Release(CaptureTargetWindow targetWindow, CaptureMethod method) { }
     }

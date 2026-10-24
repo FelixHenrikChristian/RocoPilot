@@ -23,6 +23,8 @@ public sealed class IndependentTaskServiceTests
     [DataRow(IndependentTaskKind.LegendaryChallenge, true)]
     [DataRow(IndependentTaskKind.FlowerSeedScan, false)]
     [DataRow(IndependentTaskKind.FlowerSeedScan, true)]
+    [DataRow(IndependentTaskKind.LegendaryScan, false)]
+    [DataRow(IndependentTaskKind.LegendaryScan, true)]
     public async Task TaskResultsRespectNotificationSettingsAndSkipSuccessfulScans(IndependentTaskKind kind, bool fails)
     {
         foreach (var enabled in new[] { true, false })
@@ -35,7 +37,7 @@ public sealed class IndependentTaskServiceTests
 
             await WaitStoppedAsync(fixture.Service);
 
-            var shouldNotify = enabled && (kind != IndependentTaskKind.FlowerSeedScan || fails);
+            var shouldNotify = enabled && (kind is not (IndependentTaskKind.FlowerSeedScan or IndependentTaskKind.LegendaryScan) || fails);
             Assert.AreEqual(shouldNotify ? 1 : 0, fixture.Notifications.Payloads.Count);
             if (shouldNotify)
             {
@@ -95,6 +97,71 @@ public sealed class IndependentTaskServiceTests
         Assert.IsFalse(fixture.Runner.UseLegendaryMark);
         Assert.AreEqual(1, fixture.Runtime.Resumes);
         Assert.IsTrue(fixture.Runtime.Results.Any(result => result.Title == "传说精灵挑战完成，成功 5 次"));
+    }
+
+    [TestMethod]
+    public async Task LegendaryScanAndSelectionAreTemporaryWhileOtherSettingsStillPersist()
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        CollectionAssert.AreEqual(new[] { "圣羽翼王", "龙息帕尔", "银月狼王" }, fixture.Service.LegendaryTargets.ToArray());
+        var settings = fixture.Service.Settings;
+        settings.LegendaryTargetName = "龙息帕尔";
+        fixture.Service.SetSettings(settings);
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryScan)).Success);
+        await WaitStoppedAsync(fixture.Service);
+
+        CollectionAssert.AreEqual(fixture.Runner.LegendaryNames.ToArray(), fixture.Service.LegendaryTargets.ToArray());
+        Assert.AreEqual(string.Empty, fixture.Service.Settings.LegendaryTargetName);
+        Assert.IsFalse((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryChallenge)).Success);
+        settings = fixture.Service.Settings;
+        settings.LegendaryTargetName = "新传说精灵";
+        settings.LegendaryDifficulty = 1;
+        settings.LegendaryChallengeRunCount = 7;
+        fixture.Service.SetSettings(settings);
+        // 页面重新加载、再次扫描以及花种扫描的保存路径均不能持久化临时选择。
+        await fixture.Service.LoadSettingsAsync();
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryScan)).Success);
+        await WaitStoppedAsync(fixture.Service);
+        Assert.AreEqual("新传说精灵", fixture.Service.Settings.LegendaryTargetName);
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.FlowerSeedScan)).Success);
+        await WaitStoppedAsync(fixture.Service);
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryChallenge)).Success);
+        await WaitStoppedAsync(fixture.Service);
+        Assert.AreEqual("新传说精灵", fixture.Runner.Target!.Name);
+
+        var restarted = new IndependentTaskService(fixture.Runtime, fixture.Store, fixture.Runner,
+            fixture.Notifications, fixture.Window, NullLogger<IndependentTaskService>.Instance);
+        await restarted.LoadSettingsAsync();
+        CollectionAssert.AreEqual(IndependentTaskSettings.LegendaryTargets.ToArray(), restarted.LegendaryTargets.ToArray());
+        Assert.AreEqual("龙息帕尔", restarted.Settings.LegendaryTargetName);
+        Assert.AreEqual(1, restarted.Settings.LegendaryDifficulty);
+        Assert.AreEqual(7, restarted.Settings.LegendaryChallengeRunCount);
+    }
+
+    [TestMethod]
+    [DataRow("empty")]
+    [DataRow("failure")]
+    [DataRow("cancel")]
+    public async Task UnsuccessfulLegendaryRefreshPreservesPreviousScanAndSelection(string outcome)
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryScan)).Success);
+        await WaitStoppedAsync(fixture.Service);
+        var original = fixture.Service.LegendaryTargets.ToArray();
+        var settings = fixture.Service.Settings;
+        settings.LegendaryTargetName = "新传说精灵";
+        fixture.Service.SetSettings(settings);
+        fixture.Runner.LegendaryNames = [];
+        fixture.Runner.Failure = outcome == "failure" ? "识别失败" : null;
+        fixture.Runner.Hold = outcome == "cancel";
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryScan)).Success);
+        if (outcome == "cancel") await fixture.Service.StopAsync();
+        else await WaitStoppedAsync(fixture.Service);
+        CollectionAssert.AreEqual(original, fixture.Service.LegendaryTargets.ToArray());
+        Assert.AreEqual("新传说精灵", fixture.Service.Settings.LegendaryTargetName);
+        Assert.AreEqual("圣羽翼王", fixture.Store.ReadSaved<IndependentTaskSettings>(SettingsKeys.IndependentTaskSettings)!.LegendaryTargetName);
     }
 
     [TestMethod]
@@ -558,6 +625,15 @@ public sealed class IndependentTaskServiceTests
 
     private sealed class RunnerStub(RuntimeStub runtime) : IManualChallengeRunner
     {
+        public IReadOnlyList<string> LegendaryNames = ["圣羽翼王", "银月狼王", "新传说精灵"];
+
+        public async Task<IReadOnlyList<string>> ScanLegendaryAsync(RuntimeTaskState state,
+            Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
+        {
+            await ScanAsync(state, progress, cancellationToken);
+            return LegendaryNames;
+        }
+
         public Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
             int difficulty, bool useLegendaryMark, AutoBattleSettings battleSettings,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)

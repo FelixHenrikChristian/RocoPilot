@@ -25,6 +25,8 @@ public interface IIndependentTaskService
 
     void SetSettings(IndependentTaskSettings settings);
 
+    IReadOnlyList<string> LegendaryTargets { get; }
+
     Task<IndependentTaskStartResult> StartAsync(
         IndependentTaskKind kind,
         CancellationToken cancellationToken = default);

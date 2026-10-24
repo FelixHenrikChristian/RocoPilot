@@ -247,16 +247,32 @@
                                     Margin="0,2,0,0"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="选择要挑战的传说精灵。"
+                                    Text="可刷新游戏中的名单，刷新后的名单和选择仅本次启动有效。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
-                            <ComboBox
+                            <StackPanel
                                 Grid.Column="2"
-                                Width="160"
                                 VerticalAlignment="Center"
-                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
-                                ItemsSource="{x:Bind ViewModel.LegendaryTargets}"
-                                SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
+                                Orientation="Horizontal"
+                                Spacing="8">
+                                <ComboBox
+                                    Width="160"
+                                    VerticalAlignment="Center"
+                                    PlaceholderText="请选择传说精灵"
+                                    IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                    ItemsSource="{x:Bind ViewModel.LegendaryTargets}"
+                                    SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
+                                <Button
+                                    VerticalAlignment="Center"
+                                    Width="32" Height="32" Padding="0"
+                                    AutomationProperties.Name="{x:Bind ViewModel.LegendaryScanButtonLabel, Mode=OneWay}"
+                                    ToolTipService.ToolTip="{x:Bind ViewModel.LegendaryScanButtonLabel, Mode=OneWay}"
+                                    Command="{x:Bind ViewModel.ToggleLegendaryScanCommand}"
+                                    IsEnabled="{x:Bind ViewModel.IsLegendaryScanButtonEnabled, Mode=OneWay}">
+                                    <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14"
+                                        Glyph="{x:Bind ViewModel.LegendaryScanButtonGlyph, Mode=OneWay}" />
+                                </Button>
+                            </StackPanel>
                         </Grid>
 
                         <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" />

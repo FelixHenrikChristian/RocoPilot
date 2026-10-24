@@ -36,13 +36,18 @@ public sealed class ManualChallengeRunner(
         CancellationToken cancellationToken)
         => RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken);
 
+    public async Task<IReadOnlyList<string>> ScanLegendaryAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
+        CancellationToken cancellationToken)
+        => (await RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken, legendary: true))
+            .Select(option => option.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
+
     private async Task<IReadOnlyList<FlowerSeedOption>> RunCoreAsync(RuntimeTaskState state, FlowerSeedOption? target,
         int runCount, AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress, CancellationToken token, string? legendaryTarget = null, bool useLegendaryMark = true,
-        int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty)
+        int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty, bool legendary = false)
     {
-        var legendary = legendaryTarget is not null;
-        var scanning = target is null && !legendary;
+        legendary |= legendaryTarget is not null;
+        var scanning = target is null && legendaryTarget is null;
         var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark, legendaryDifficulty);
         var settings = AutoBattleSettingsRules.Normalize(battleSettings);
         if (!scanning)
@@ -66,7 +71,8 @@ public sealed class ManualChallengeRunner(
         var lastFrameTime = DateTimeOffset.MinValue;
         var minimumFrameAt = DateTimeOffset.UtcNow;
         CapturedFrame? pendingFrame = null;
-        logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", legendaryTarget ?? target?.DisplayName ?? "扫描全部花种", inputMethod);
+        logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", legendaryTarget ?? target?.DisplayName
+            ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);
 
         try
         {
@@ -180,8 +186,9 @@ public sealed class ManualChallengeRunner(
                 var operation = flow.StopReason is not null ? "退出并停止：" + flow.StopReason : decision.Action switch
                 {
                     ManualChallengeAction.None => lastProgress.Operation,
-                    ManualChallengeAction.Complete => scanning
-                        ? $"扫描完成，共{flow.Options.Count}个花种" : $"挑战完成，成功{flow.CompletedCount}次，已返回大世界",
+                    ManualChallengeAction.Complete when scanning && legendary => "传说精灵扫描完成",
+                    ManualChallengeAction.Complete when scanning => $"扫描完成，共{flow.Options.Count}个花种",
+                    ManualChallengeAction.Complete => $"挑战完成，成功{flow.CompletedCount}次，已返回大世界",
                     ManualChallengeAction.Battle when switchingPet => "切换精灵",
                     ManualChallengeAction.Battle => plan is not null ? InfoOverlayIslandPresentation.BattleInputTitle(plan)
                         : screen.BattleScreen != BattleScreen.SkillSelection ? "等待行动"

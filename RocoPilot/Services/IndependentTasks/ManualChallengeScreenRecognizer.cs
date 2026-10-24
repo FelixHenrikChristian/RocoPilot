@@ -24,7 +24,7 @@ internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOn
     ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null,
     LegendaryCaptureMarks? Marks = null, bool HasChallengeOption = false, int Difficulty = 0);
 
-/// <summary>界面控件用模板定位，奖励标题和花种名称使用默认 OCR 确认。</summary>
+/// <summary>界面控件用模板定位，奖励标题和精灵名称使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
     ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<ManualChallengeScreenRecognizer> logger)
 {
@@ -75,7 +75,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             List<ManualChallengeRow> rows = [];
             foreach (var button in buttons.Matches.Where(button => button.IsMatch).OrderBy(button => button.Y))
             {
-                var region = Area(.305, 0, .45, .0434, $"花种名称 {rows.Count + 1}");
+                var region = Area(.305, 0, .45, .0434, $"{(legendary ? "传说精灵" : "花种")}名称 {rows.Count + 1}");
                 region.Y = (int)Math.Round(button.Y + button.Height / 2d - 72 * scale, MidpointRounding.AwayFromZero);
                 if (region.Y < clientY + height * .14 || region.Y + region.Height > clientY + height * .97) continue;
                 var name = await ReadName(region);
@@ -131,7 +131,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (map is not null)
         {
             var teleport = await Button("map-teleport");
-            var name = await ReadName(Area(.72, .184, .87, .2274, "地图花种名称"));
+            var name = await ReadName(Area(.72, .184, .87, .2274, legendary ? "地图传说精灵名称" : "地图花种名称"));
             return new(ManualChallengeScene.Map, [], teleport, name.Name);
         }
         var preparation = await Match("preparation", .3, .3, .65, .45);
@@ -245,14 +245,12 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         async Task<(string Name, string RawName)> ReadName(RecognitionRegion region)
         {
             var result = await ocr.RecognizeAsync(frame, region, TextRecognitionDefaults.Method, cancellationToken);
-            var name = legendary ? Models.Runtime.IndependentTaskSettings.LegendaryTargets.FirstOrDefault(
-                    candidate => candidate == Normalize(result.Text)) ?? string.Empty
-                : string.IsNullOrWhiteSpace(result.Text) ? string.Empty
+            var name = string.IsNullOrWhiteSpace(result.Text) ? string.Empty
                 : await catalog.MatchSpiritNameAsync(result.Text, seasons.Load().SpiritNameMatchThreshold, cancellationToken);
-            logger.LogDebug("花种名称识别：OCR={RawName}，图鉴={MatchedName}，区域=({X},{Y},{Width},{Height})",
+            logger.LogDebug("精灵名称识别：OCR={RawName}，图鉴={MatchedName}，区域=({X},{Y},{Width},{Height})",
                 result.Text, name, region.X, region.Y, region.Width, region.Height);
             reportOcr?.Invoke(region, $"OCR：{(string.IsNullOrWhiteSpace(result.Text) ? "无文本" : result.Text)} → 图鉴：{(string.IsNullOrEmpty(name) ? "未匹配" : name)}");
-            return (name, result.Text);
+            return (legendary && string.IsNullOrEmpty(name) ? Normalize(result.Text) : name, result.Text);
         }
     }
 

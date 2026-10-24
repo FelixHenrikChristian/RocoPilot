@@ -22,17 +22,46 @@ namespace RocoPilot.Tests;
 public sealed class FlowerSeedChallengeRunnerTests
 {
     [TestMethod]
-    [DataRow(true, false, 1, "insufficient")]
-    [DataRow(false, false, 2, "insufficient")]
-    [DataRow(true, true, 3, "insufficient")]
-    [DataRow(false, false, 1, "exhausted")]
-    [DataRow(true, false, 3, "exhausted")]
+    public async Task LegendaryScanReadsListWithoutStartingAChallenge()
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var capture = new LegendaryReplay();
+        var keyboard = new Keyboard();
+        var scrolls = 0;
+        var mouse = new Mouse { DuringScroll = () => scrolls++ };
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
+            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
+            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55),
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
+            new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
+            NullLogger<ManualChallengeRunner>.Instance);
+        var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
+            new RecognitionRegionConfig(), new RuntimeTaskStartOptions(), DateTimeOffset.Now);
+
+        var names = await runner.ScanLegendaryAsync(state, _ => { }, cancellation.Token);
+
+        CollectionAssert.AreEqual(new[] { "圣羽翼王", "龙息帕尔" }, names.ToArray());
+        Assert.AreEqual(4, scrolls);
+        Assert.AreEqual(0, mouse.Clicks);
+        Assert.HasCount(0, keyboard.Keys);
+    }
+
+    [TestMethod]
+    [DataRow(true, false, 1, "insufficient", false)]
+    [DataRow(false, false, 2, "insufficient", false)]
+    [DataRow(true, true, 3, "insufficient", false)]
+    [DataRow(false, false, 1, "exhausted", false)]
+    [DataRow(true, false, 3, "exhausted", false)]
+    [DataRow(true, false, 3, "insufficient", true)]
+    [DataRow(false, false, 3, "insufficient", true)]
     public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(
-        bool allowMarks, bool switchPet, int difficulty, string shortage)
+        bool allowMarks, bool switchPet, int difficulty, string shortage, bool directTeleport)
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var capture = new LegendaryReplay(switchPet, difficulty, shortage);
+        var capture = new LegendaryReplay(switchPet, difficulty, shortage, directTeleport);
         var keyboard = new Keyboard { DuringSequence = capture.OnKey };
         List<IndependentTaskProgress> updates = [];
         var mouse = new Mouse { DuringClick = (x, y) =>
@@ -42,7 +71,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             capture.OnClick(x, y);
         } };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), null!, null!,
+            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
+            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55),
             NullLogger<ManualChallengeScreenRecognizer>.Instance);
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
@@ -52,7 +82,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("2")];
         state.Options.AutoBattleSettings.LegendaryReleaseSequence =
             [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
-        var run = runner.RunLegendaryAsync(state, "圣羽翼王", 2, difficulty, allowMarks,
+        var run = runner.RunLegendaryAsync(state, directTeleport ? "银月狼王" : "圣羽翼王", 2, difficulty, allowMarks,
             state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
         if (allowMarks)
         {
@@ -61,7 +91,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 ? new[] { "W", "F", "Esc", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space",
                     "Esc", "4", "1", "Space", "2", "Space", "Space", "2", "Esc", "1, Space" }
                 : new[] { "W", "F", "Esc", "4", "Esc", "1, Space", "Esc", "4", "Esc", "1, Space" };
-            CollectionAssert.AreEqual(expected,
+            CollectionAssert.AreEqual(directTeleport ? expected.Skip(1).ToArray() : expected,
                 keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(2, capture.Captures);
             Assert.IsTrue(updates.Any(update => update.Operation == "按Esc跳过动画"));
@@ -71,14 +101,16 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             var error = await Assert.ThrowsAsync<InvalidOperationException>(() => run);
             StringAssert.Contains(error.Message, "契约印记");
-            CollectionAssert.AreEqual(new[] { "W", "F", "Esc" }, keyboard.Keys.Select(key => key.Key).ToArray());
+            CollectionAssert.AreEqual(directTeleport ? new[] { "F", "Esc" } : new[] { "W", "F", "Esc" },
+                keyboard.Keys.Select(key => key.Key).ToArray());
             Assert.AreEqual(0, capture.Captures);
         }
         Assert.AreEqual("world", capture.Scene);
         Assert.AreEqual(difficulty == 3 ? 0 : 2, capture.DifficultyClicks);
     }
 
-    private sealed class LegendaryReplay(bool switchPet = false, int difficulty = 3, string shortage = "insufficient") : IScreenCaptureService
+    private sealed class LegendaryReplay(bool switchPet = false, int difficulty = 3, string shortage = "insufficient",
+        bool directTeleport = false) : IScreenCaptureService
     {
         private string _selectedSlot = "";
         private int _confirmAttempts;
@@ -90,8 +122,16 @@ public sealed class FlowerSeedChallengeRunnerTests
         {
             if (!_pixels.TryGetValue(Scene, out var pixels))
             {
-                var fixture = Scene == "insufficient" ? shortage : Scene;
-                using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{fixture}.png", 1280, 720);
+                var fixture = Scene == "insufficient" ? shortage
+                    : directTeleport && Scene == "list" ? "list-season4" : Scene;
+                using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{fixture}.png", 1280, 720,
+                    transform: source =>
+                    {
+                        if (fixture is not ("list-season4" or "wolf-interaction")) return;
+                        // 用户截图包含窗口边框；回放使用实际客户区。
+                        using var client = new OpenCvSharp.Mat(source, new OpenCvSharp.Rect(1, 44, 2048, 1152)).Clone();
+                        client.CopyTo(source);
+                    });
                 _pixels[Scene] = pixels = frame.Pixels;
             }
             return new(1280, 720, pixels);
@@ -119,6 +159,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             {
                 ("message", "W") => "interaction-gold",
                 ("interaction-gold", "F") => "confirmation",
+                ("wolf-interaction", "F") => "confirmation",
                 ("skip", "Esc") => "battle",
                 ("confirmation" or "difficulty-1" or "difficulty-2", "Esc") => "world",
                 ("battle", "4") => switchPet ? "pet-switching" : "capture-contract",
@@ -139,7 +180,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             }
             Scene = Scene switch
             {
-                "list" => "map",
+                "list" => directTeleport ? "wolf-interaction" : "map",
                 "map" => "message",
                 "confirmation" when difficulty == 3 => "insufficient",
                 "difficulty-1" or "difficulty-2" => "insufficient",

@@ -4,6 +4,11 @@ namespace RocoPilot.Contracts.Services;
 
 public interface IManualChallengeRunner
 {
+    Task<IReadOnlyList<string>> ScanLegendaryAsync(
+        RuntimeTaskState state,
+        Action<IndependentTaskProgress> progress,
+        CancellationToken cancellationToken);
+
     Task RunLegendaryAsync(
         RuntimeTaskState state,
         string targetName,

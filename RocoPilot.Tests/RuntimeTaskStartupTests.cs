@@ -283,7 +283,9 @@ public sealed class RuntimeTaskStartupTests
                 new AutoBattleInputExecutor(Keyboard, NullLogger<AutoBattleInputExecutor>.Instance), debug,
                 new StatisticsSeasonConfigStub(), new StatisticsSpiritCatalogStub(),
                 new StatisticsService(settings, NullLogger<StatisticsService>.Instance), settings,
-                new HotkeyStub(), Overlay, Overlay, NullLogger<RuntimeTaskService>.Instance);
+                new HotkeyStub(), Overlay, Overlay,
+                new ShinyEncounterNotification(new AppNotificationStub(), NullLogger<ShinyEncounterNotification>.Instance),
+                NullLogger<RuntimeTaskService>.Instance);
             Capture.BeforeCapture = () =>
             {
                 Assert.AreEqual(0, Overlay.Shows, "启动前截图必须发生在创建遮罩之前。");

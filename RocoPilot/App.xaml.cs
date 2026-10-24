@@ -87,6 +87,7 @@ public partial class App : Application
 
             // Services
             services.AddSingleton<IAppNotificationService, AppNotificationService>();
+            services.AddSingleton<ShinyEncounterNotification>();
             services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
             services.AddSingleton<IThemeSelectorService, ThemeSelectorService>();
             services.AddTransient<INavigationViewService, NavigationViewService>();

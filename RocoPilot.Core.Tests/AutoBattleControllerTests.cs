@@ -121,11 +121,13 @@ public sealed class AutoBattleControllerTests
         var turn = battle.BeginSkillSelection(settings, Now);
         battle.ConfirmSelectionReady(turn.Id);
         Assert.IsTrue(battle.ObserveShiny(battle.BattleId));
+        Assert.IsFalse(battle.ObserveShiny(battle.BattleId)); // Repeated frames must not notify again.
         Assert.IsFalse(battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now));
         Assert.IsFalse(battle.CanAct(settings, Now.AddSeconds(10)));
         battle.ResetBattle();
         Assert.IsFalse(battle.IsSuspendedForShiny);
         Assert.AreEqual("1", battle.BeginSkillSelection(settings, Now).ReleaseStep.SkillKey);
+        Assert.IsTrue(battle.ObserveShiny(battle.BattleId)); // A new encounter can notify again.
     }
 
     [TestMethod]

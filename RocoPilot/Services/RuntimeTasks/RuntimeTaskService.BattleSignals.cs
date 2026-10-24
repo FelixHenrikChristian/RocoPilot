@@ -35,7 +35,7 @@ public sealed partial class RuntimeTaskService
 
     private bool ApplyAutoBattleShinySuspension(string tipText, string source, long battleId)
     {
-        if (!_battle.ObserveShiny(battleId)) return _battle.IsSuspendedForShiny;
+        if (!_battle.ObserveShiny(battleId)) return false;
         if (CurrentState is not null && _scene == GameScene.Battle)
             _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("战斗中 - 异色保护", DateTimeOffset.Now));
         _logger.LogInformation(

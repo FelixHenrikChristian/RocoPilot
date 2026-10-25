@@ -17,6 +17,35 @@ public sealed class StatisticsServiceTests
     private static readonly EncounterSeasonDefinition Season = new() { Id = "S3", Name = "S3赛季" };
 
     [TestMethod]
+    public async Task UnchangedUpdatesDoNotWriteOrNotifyAndReturnDetachedSnapshots()
+    {
+        var (service, store) = await CreateServiceAsync();
+        var notifications = 0;
+        service.DocumentChanged += (_, _) => notifications++;
+        var saves = store.SaveCount;
+
+        Assert.AreEqual(0, await service.RematchPendingEncountersAsync(new(), 0.8));
+        await service.AddAccountAsync("100");
+        await service.DeleteShinyCaptureAsync("100", "missing");
+        await service.EditEncounterAsync("100", "S3", "精灵", "精灵", 1, Now);
+        service.RequireActiveAccountSelection();
+        await service.RecordEncounterAsync(Season, "精灵", Now);
+        var unchanged = await service.ReplaceAsync(service.CurrentDocument);
+        unchanged.Accounts.Clear();
+
+        Assert.AreEqual(saves, store.SaveCount);
+        Assert.AreEqual(0, notifications);
+        Assert.AreEqual(1, Count(service.CurrentDocument));
+        Assert.IsTrue(service.IsActiveAccountSelectionRequired);
+
+        service.SetActiveAccountUid("100");
+        await service.RecordEncounterAsync(Season, "精灵", Now);
+        Assert.AreEqual(saves + 1, store.SaveCount);
+        Assert.AreEqual(1, notifications);
+        Assert.AreEqual(2, Count(service.CurrentDocument));
+    }
+
+    [TestMethod]
     public async Task FailedRecordDoesNotBecomeVisibleOrCountTwiceWhenRetried()
     {
         var (service, store) = await CreateServiceAsync();
@@ -187,11 +216,11 @@ public sealed class StatisticsServiceTests
         await service.AddAccountAsync("200");
         service.SetSelectedAccountUid("200");
         await service.UpsertEncounterAsync("S3", "手动精灵", 3, Now);
-        await service.EditEncounterAsync("S3", "手动精灵", "改名", 4, Now);
+        await service.EditEncounterAsync("200", "S3", "手动精灵", "改名", 4, Now);
         await service.RecordEncounterAsync(Season, "精灵", Now);
         Assert.AreEqual(2, Count(service.CurrentDocument));
         Assert.AreEqual(4, service.CurrentDocument.Accounts.Single(a => a.Uid == "200").Seasons.Single().Encounters.Single().Count);
-        await service.DeleteEncounterAsync("S3", "改名");
+        await service.DeleteEncounterAsync("200", "S3", "改名");
         Assert.AreEqual(0, service.CurrentDocument.Accounts.Single(a => a.Uid == "200").Seasons.Single().Encounters.Count);
     }
 
@@ -204,11 +233,13 @@ public sealed class StatisticsServiceTests
         await service.ConfirmPendingShinyCaptureAsync(pending.Id, "异色精灵", 8, Now);
         Assert.AreEqual(0, service.GetSelectedAccountPendingShinyCaptures().Count);
         var capture = service.CurrentDocument.Accounts.Single().Seasons.Single().ShinyCaptures.Single();
-        await service.EditShinyCaptureAsync(capture.Id, "改名", 9, Now);
+        await service.EditShinyCaptureAsync("100", capture.Id, "改名", 9, Now);
         Assert.AreEqual(9, service.CurrentDocument.Accounts.Single().Seasons.Single().ShinyCaptures.Single().EncounterCountBeforeCapture);
-        await service.DeleteShinyCaptureAsync(capture.Id);
+        await service.DeleteShinyCaptureAsync("100", capture.Id);
         await service.AddShinyCapturesAsync("S3", "批量", 2, Now);
-        await service.DeleteShinyCapturesAsync("S3", "批量");
+        var captures = service.CurrentDocument.Accounts.Single().Seasons.Single().ShinyCaptures;
+        Assert.AreEqual(2, captures.Count);
+        foreach (var item in captures) await service.DeleteShinyCaptureAsync("100", item.Id);
         Assert.AreEqual(0, service.CurrentDocument.Accounts.Single().Seasons.Single().ShinyCaptures.Count);
         await service.AddPendingShinyCaptureAsync(Season, "放弃", Now);
         await service.DiscardPendingShinyCaptureAsync(service.GetSelectedAccountPendingShinyCaptures().Single().Id);

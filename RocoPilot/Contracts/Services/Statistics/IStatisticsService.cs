@@ -59,6 +59,7 @@ public interface IStatisticsService
         DateTimeOffset countedAt);
 
     Task<StatisticsDocument> EditEncounterAsync(
+        string accountUid,
         string seasonId,
         string originalName,
         string nextName,
@@ -66,6 +67,7 @@ public interface IStatisticsService
         DateTimeOffset editedAt);
 
     Task<StatisticsDocument> DeleteEncounterAsync(
+        string accountUid,
         string seasonId,
         string spiritName);
 
@@ -77,17 +79,15 @@ public interface IStatisticsService
         bool resetEncounterCount = false,
         int? encounterCountBeforeCapture = null);
 
-    Task<StatisticsDocument> DeleteShinyCapturesAsync(
-        string? seasonId,
-        string spiritName);
-
     Task<StatisticsDocument> EditShinyCaptureAsync(
+        string accountUid,
         string captureId,
         string nextName,
         int encounterCountBeforeCapture,
         DateTimeOffset capturedAt);
 
     Task<StatisticsDocument> DeleteShinyCaptureAsync(
+        string accountUid,
         string captureId);
 
     Task<StatisticsDocument> AddPendingShinyCaptureAsync(

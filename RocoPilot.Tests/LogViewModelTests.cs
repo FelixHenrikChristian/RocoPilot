@@ -11,6 +11,56 @@ namespace RocoPilot.Tests;
 public sealed class LogViewModelTests
 {
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void FilterRefreshAndIncomingLogDisplayEachEntryOnce(bool filterFirst)
+    {
+        var fixture = new LogFixture();
+        fixture.ViewModel.Attach(fixture.Pending.Enqueue);
+        if (filterFirst) fixture.ViewModel.ShowDebug = true;
+        Emit(fixture.Buffer, "new");
+        if (!filterFirst) fixture.ViewModel.ShowDebug = true;
+        fixture.Drain();
+
+        Assert.HasCount(1, fixture.ViewModel.Entries);
+        Assert.AreSame(fixture.Buffer.Snapshot().Single(), fixture.ViewModel.Entries.Single());
+        fixture.ViewModel.Detach();
+    }
+
+    [TestMethod]
+    public void ReenteringPageDoesNotAppendPreviouslyQueuedLogsAgain()
+    {
+        var fixture = new LogFixture();
+        fixture.ViewModel.Attach(fixture.Pending.Enqueue);
+        Emit(fixture.Buffer, "queued");
+        fixture.ViewModel.Detach();
+        fixture.ViewModel.Attach(fixture.Pending.Enqueue);
+        fixture.Drain();
+
+        Assert.HasCount(1, fixture.ViewModel.Entries);
+        fixture.ViewModel.Detach();
+    }
+
+    [TestMethod]
+    public void LogBurstSharesOneRefreshAndPreservesExistingRows()
+    {
+        var fixture = new LogFixture();
+        Emit(fixture.Buffer, "existing");
+        fixture.ViewModel.Attach(fixture.Pending.Enqueue);
+        var changes = new List<System.Collections.Specialized.NotifyCollectionChangedAction>();
+        fixture.ViewModel.Entries.CollectionChanged += (_, e) => changes.Add(e.Action);
+        Emit(fixture.Buffer, "first");
+        Emit(fixture.Buffer, "second");
+
+        Assert.HasCount(1, fixture.Pending);
+        fixture.Drain();
+        CollectionAssert.AreEqual(new[] { "existing", "first", "second" },
+            fixture.ViewModel.Entries.Select(entry => entry.Message).ToArray());
+        Assert.IsTrue(changes.All(action => action == System.Collections.Specialized.NotifyCollectionChangedAction.Add));
+        fixture.ViewModel.Detach();
+    }
+
+    [TestMethod]
     public void ClearRemovesVisibleAndFilteredLogsFromBuffer()
     {
         var fixture = new LogFixture();
@@ -29,6 +79,30 @@ public sealed class LogViewModelTests
         Assert.AreEqual(0, fixture.Buffer.Snapshot().Count);
         Assert.AreEqual(0, fixture.ViewModel.Entries.Count);
         fixture.ViewModel.Detach();
+    }
+
+    [TestMethod]
+    public void RefreshDropsEvictedEntriesAndAppliesLatestFilter()
+    {
+        var buffer = new InMemoryLogSink(3);
+        var queue = new Queue<Action>();
+        var viewModel = new LogViewModel(NullLogger<LogViewModel>.Instance, buffer);
+        Emit(buffer, "old");
+        Emit(buffer, "keep");
+        viewModel.Attach(queue.Enqueue);
+        Emit(buffer, "debug", LogEventLevel.Debug);
+        Emit(buffer, "last");
+        while (queue.TryDequeue(out var refresh)) refresh();
+        CollectionAssert.AreEqual(new[] { "keep", "last" }, viewModel.Entries.Select(e => e.Message).ToArray());
+
+        viewModel.ShowDebug = true;
+        viewModel.SearchText = "debug";
+        while (queue.TryDequeue(out var refresh)) refresh();
+        Assert.AreEqual("debug", viewModel.Entries.Single().Message);
+        viewModel.SearchText = string.Empty;
+        while (queue.TryDequeue(out var refresh)) refresh();
+        CollectionAssert.AreEqual(new[] { "keep", "debug", "last" }, viewModel.Entries.Select(e => e.Message).ToArray());
+        viewModel.Detach();
     }
 
     [TestMethod]

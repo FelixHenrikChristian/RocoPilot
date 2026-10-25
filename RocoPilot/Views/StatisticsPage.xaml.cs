@@ -298,7 +298,7 @@ public sealed partial class StatisticsPage : Page
         await ViewModel.AddEncounterAsync(seasonId, input.Name, input.Count);
     }
 
-    private async Task EditEncounterAsync(string seasonId, SpiritCountItem item)
+    private async Task EditEncounterAsync(string accountUid, string seasonId, SpiritCountItem item)
     {
         var input = await StatisticsEntryDialogs.ShowStatisticEntryAsync(
             XamlRoot,
@@ -311,14 +311,14 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        await ViewModel.EditEncounterAsync(seasonId, item, input.Name, input.Count);
+        await ViewModel.EditEncounterAsync(accountUid, seasonId, item, input.Name, input.Count);
     }
 
-    private async Task DeleteEncounterAsync(string seasonId, SpiritCountItem item)
+    private async Task DeleteEncounterAsync(string accountUid, string seasonId, SpiritCountItem item)
     {
         if (await ConfirmDeleteEncounterAsync(seasonId, item))
         {
-            await ViewModel.DeleteEncounterAsync(seasonId, item);
+            await ViewModel.DeleteEncounterAsync(accountUid, seasonId, item);
         }
     }
 
@@ -339,7 +339,7 @@ public sealed partial class StatisticsPage : Page
     private async Task ShowEncounterDetailsAsync(string seasonId, SpiritCountItem item)
     {
         var xamlRoot = XamlRoot;
-        if (xamlRoot is null)
+        if (xamlRoot is null || ViewModel.Overview.SelectedAccount is not { } account)
         {
             return;
         }
@@ -439,13 +439,16 @@ public sealed partial class StatisticsPage : Page
         detailWindow = new StatisticsDetailWindow("奇遇详情", content, App.MainWindow);
         await detailWindow.ShowAsync();
 
-        if (action == StatisticDetailAction.Edit)
+        try
         {
-            await EditEncounterAsync(seasonId, item);
+            if (action == StatisticDetailAction.Edit)
+                await EditEncounterAsync(account.Uid, seasonId, item);
+            else if (action == StatisticDetailAction.Delete)
+                await DeleteEncounterAsync(account.Uid, seasonId, item);
         }
-        else if (action == StatisticDetailAction.Delete)
+        catch (Exception ex)
         {
-            await DeleteEncounterAsync(seasonId, item);
+            ViewModel.ShowOperationFailed("奇遇操作失败", ex);
         }
     }
 
@@ -469,7 +472,7 @@ public sealed partial class StatisticsPage : Page
     private async Task ShowShinyDetailsAsync(SpiritCountItem item)
     {
         var xamlRoot = XamlRoot;
-        if (xamlRoot is null)
+        if (xamlRoot is null || ViewModel.Overview.SelectedAccount is not { } account)
         {
             return;
         }
@@ -536,13 +539,16 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        if (action == StatisticDetailAction.Edit)
+        try
         {
-            await EditShinyCaptureAsync(selectedDetail);
+            if (action == StatisticDetailAction.Edit)
+                await EditShinyCaptureAsync(account.Uid, selectedDetail);
+            else if (action == StatisticDetailAction.Delete)
+                await DeleteShinyCaptureAsync(account.Uid, selectedDetail);
         }
-        else if (action == StatisticDetailAction.Delete)
+        catch (Exception ex)
         {
-            await DeleteShinyCaptureAsync(selectedDetail);
+            ViewModel.ShowOperationFailed("异色操作失败", ex);
         }
     }
 
@@ -568,7 +574,7 @@ public sealed partial class StatisticsPage : Page
         _activeShinyDetailWindow?.Close();
     }
 
-    private async Task EditShinyCaptureAsync(ShinyCaptureDetailItem item)
+    private async Task EditShinyCaptureAsync(string accountUid, ShinyCaptureDetailItem item)
     {
         var input = await StatisticsEntryDialogs.ShowShinyCaptureEditAsync(XamlRoot, item);
         if (input is null)
@@ -577,17 +583,18 @@ public sealed partial class StatisticsPage : Page
         }
 
         await ViewModel.EditShinyCaptureAsync(
+            accountUid,
             item,
             input.Name,
             input.EncounterCountBeforeCapture,
             input.CapturedAt);
     }
 
-    private async Task DeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
+    private async Task DeleteShinyCaptureAsync(string accountUid, ShinyCaptureDetailItem item)
     {
         if (await ConfirmDeleteShinyCaptureAsync(item))
         {
-            await ViewModel.DeleteShinyCaptureAsync(item);
+            await ViewModel.DeleteShinyCaptureAsync(accountUid, item);
         }
     }
 

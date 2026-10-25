@@ -29,6 +29,9 @@
     <Compile Remove="ViewModels\TestViewModel.cs" />
     <Compile Remove="Views\TestPage.xaml.cs" />
     <Compile Remove="Views\Test\**\*.xaml.cs" />
+    <Compile Remove="Services\TextRecognition\Backends\PaddleOcrV5TextRecognitionBackend.cs" />
+    <Compile Remove="Services\TextRecognition\Backends\TesseractTextRecognitionBackend.cs" />
+    <Compile Remove="Services\TextRecognition\Backends\WindowsOcrTextRecognitionBackend.cs" />
     <Page Remove="Views\TestPage.xaml" />
     <Page Remove="Views\Test\**\*.xaml" />
   </ItemGroup>
@@ -44,15 +47,22 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260602" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260602" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="WinUIEx" Version="2.9.1" />
+  </ItemGroup>
+
+  <!-- Alternate OCR engines are only used by the Debug comparison page. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Debug'">
     <PackageReference Include="Sdcb.PaddleInference.runtime.win64.openblas" Version="3.3.1.70" />
     <PackageReference Include="Sdcb.PaddleOCR" Version="3.3.1" />
     <PackageReference Include="Sdcb.PaddleOCR.Models.Local" Version="3.3.1" />
     <PackageReference Include="Sdcb.PaddleOCR.Models.LocalV5" Version="3.3.1" />
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
-    <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
-    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
-    <PackageReference Include="WinUIEx" Version="2.9.1" />
+    <Content Include="Assets\Models\OCR\TesseractOCR\*.traineddata">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -112,9 +122,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Configuration\RecognitionAssets\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-    <Content Include="Assets\Models\OCR\TesseractOCR\*.traineddata">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="Assets\Models\OCR\Onnx\PaddleOcrV5\*">

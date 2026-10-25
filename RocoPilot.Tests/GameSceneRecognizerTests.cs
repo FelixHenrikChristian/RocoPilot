@@ -203,7 +203,6 @@ public sealed class GameSceneRecognizerTests
         public ImageMatchOptions? CollectionOptions;
         public List<(string Template, string Region)> SingleMatches { get; } = [];
 
-        public IReadOnlyList<string> ListTemplatePaths() => [];
 
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)

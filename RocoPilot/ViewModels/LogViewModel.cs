@@ -26,6 +26,7 @@ public partial class LogViewModel : ObservableRecipient
 
     private Action<Action>? _enqueue;
     private bool _subscribed;
+    private int _refreshQueued;
 
     public LogViewModel(ILogger<LogViewModel> logger)
         : this(logger, LoggingHelper.LogBuffer)
@@ -66,20 +67,12 @@ public partial class LogViewModel : ObservableRecipient
     {
         _enqueue = enqueue;
 
-        Entries.Clear();
-        foreach (var entry in _logBuffer.Snapshot())
-        {
-            if (PassesFilter(entry))
-            {
-                Entries.Add(entry);
-            }
-        }
-
         if (!_subscribed)
         {
             _logBuffer.EntryWritten += OnEntryWritten;
             _subscribed = true;
         }
+        RefreshEntries();
     }
 
     public void Detach()
@@ -93,29 +86,7 @@ public partial class LogViewModel : ObservableRecipient
         _enqueue = null;
     }
 
-    private void OnEntryWritten(LogEntry entry)
-    {
-        var enqueue = _enqueue;
-        if (enqueue == null)
-        {
-            return;
-        }
-
-        enqueue(() =>
-        {
-            // 清空前已排队或延迟送达的通知不能重新加入列表。
-            if (!_logBuffer.IsCurrent(entry) || !PassesFilter(entry))
-            {
-                return;
-            }
-
-            Entries.Add(entry);
-            while (Entries.Count > MaxDisplayEntries)
-            {
-                Entries.RemoveAt(0);
-            }
-        });
-    }
+    private void OnEntryWritten(LogEntry entry) => RequestRefresh();
 
     private bool PassesFilter(LogEntry entry)
     {
@@ -148,35 +119,38 @@ public partial class LogViewModel : ObservableRecipient
         _ => true,
     };
 
-    partial void OnShowDebugChanged(bool value) => RebuildFromBuffer();
-    partial void OnShowInformationChanged(bool value) => RebuildFromBuffer();
-    partial void OnShowWarningChanged(bool value) => RebuildFromBuffer();
-    partial void OnShowErrorChanged(bool value) => RebuildFromBuffer();
-    partial void OnSearchTextChanged(string value) => RebuildFromBuffer();
+    partial void OnShowDebugChanged(bool value) => RequestRefresh();
+    partial void OnShowInformationChanged(bool value) => RequestRefresh();
+    partial void OnShowWarningChanged(bool value) => RequestRefresh();
+    partial void OnShowErrorChanged(bool value) => RequestRefresh();
+    partial void OnSearchTextChanged(string value) => RequestRefresh();
 
-    private void RebuildFromBuffer()
+    private void RequestRefresh()
     {
         var enqueue = _enqueue;
-        if (enqueue == null)
-        {
-            return;
-        }
+        if (enqueue is null || Interlocked.Exchange(ref _refreshQueued, 1) != 0) return;
 
         enqueue(() =>
         {
-            Entries.Clear();
-            foreach (var entry in _logBuffer.Snapshot())
-            {
-                if (PassesFilter(entry))
-                {
-                    Entries.Add(entry);
-                    if (Entries.Count >= MaxDisplayEntries)
-                    {
-                        break;
-                    }
-                }
-            }
+            Volatile.Write(ref _refreshQueued, 0);
+            if (_enqueue is not null) RefreshEntries();
         });
+    }
+
+    private void RefreshEntries()
+    {
+        // 通知只请求刷新，始终消费当前缓存，避免筛选、清空和重新进入时重复追加旧事件。
+        var snapshot = _logBuffer.Snapshot().Where(PassesFilter).TakeLast(MaxDisplayEntries).ToArray();
+        var removedPrefix = snapshot.Length == 0 ? -1 : Entries.IndexOf(snapshot[0]);
+        if (removedPrefix < 0) Entries.Clear();
+        else while (removedPrefix-- > 0) Entries.RemoveAt(0);
+
+        // 普通新日志只追加，保留已有行及滚动位置；筛选变化时替换不同的部分。
+        var shared = 0;
+        while (shared < Entries.Count && shared < snapshot.Length && ReferenceEquals(Entries[shared], snapshot[shared]))
+            shared++;
+        while (Entries.Count > shared) Entries.RemoveAt(Entries.Count - 1);
+        foreach (var entry in snapshot.Skip(shared)) Entries.Add(entry);
     }
 
     [RelayCommand]

@@ -16,17 +16,6 @@ namespace RocoPilot.Services.ImageMatching;
 
 public sealed class ImageMatchingService : IImageMatchingService
 {
-    private static readonly string[] TemplateExtensions =
-    [
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".bmp",
-        ".gif",
-        ".tif",
-        ".tiff"
-    ];
-
     private readonly ConcurrentDictionary<TemplateCacheKey, Lazy<Task<ImageTemplate>>> _templateCache = new();
 
     // 当前模板匹配算法，用于诊断日志。
@@ -36,20 +25,6 @@ public sealed class ImageMatchingService : IImageMatchingService
     {
         get;
     } = Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionAssets", "ImageMatching");
-
-    public IReadOnlyList<string> ListTemplatePaths()
-    {
-        if (!Directory.Exists(TemplateDirectory))
-        {
-            return [];
-        }
-
-        return Directory
-            .EnumerateFiles(TemplateDirectory, "*.*", SearchOption.AllDirectories)
-            .Where(path => TemplateExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase))
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-    }
 
     public async Task<ImageMatchResult> MatchAsync(
         CapturedFrame frame,

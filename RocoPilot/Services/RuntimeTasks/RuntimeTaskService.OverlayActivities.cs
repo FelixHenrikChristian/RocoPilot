@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using RocoPilot.Models.Capture;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
 
@@ -11,6 +12,19 @@ public sealed partial class RuntimeTaskService
     private long _infoOverlayRevision;
     private sealed record IndependentTaskOverlay(string Name, IndependentTaskProgress Progress);
     private IndependentTaskOverlay? _independentTaskOverlay;
+
+    // 名称只补充展示，在现有后台 OCR 循环中执行，不参与战斗放行。
+    private async Task UpdateRuntimeSpiritNameAsync(RuntimeTaskState state, CapturedFrame frame,
+        long battleId, CancellationToken cancellationToken)
+    {
+        if (!state.Options.InfoOverlayEnabled) return;
+        var turnId = _battle.CurrentTurn?.Id;
+        var rawText = await _frameRecognizer.RecognizeRegionTextAsync(
+            state, frame, BattleEnemyNameRegionIds, cancellationToken, "战斗精灵名");
+        var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
+        if (battleId != _battle.BattleId) return;
+        RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(battleId, turnId, name, DateTimeOffset.Now));
+    }
 
     public void UpdateIndependentTaskStatus(string? taskName, IndependentTaskProgress? progress = null)
     {

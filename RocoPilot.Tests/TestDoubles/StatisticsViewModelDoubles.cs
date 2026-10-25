@@ -51,6 +51,7 @@ internal sealed class StatisticsSyncStub : IStatisticsSyncService
 internal sealed class StatisticsSpiritCatalogStub : ISpiritCatalogService
 {
     public SpiritCatalogDocument Document { get; set; } = new();
+    public Func<string, double, string>? MatchName { get; set; }
     public Func<Task>? BeforeLoad { get; set; }
     public int LoadCount { get; private set; }
     public async Task<SpiritCatalogDocument> LoadAsync(CancellationToken cancellationToken = default)
@@ -65,6 +66,7 @@ internal sealed class StatisticsSpiritCatalogStub : ISpiritCatalogService
     public Task<SpiritCatalogDocument> SyncAsync(IProgress<SpiritCatalogSyncProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<SpiritCatalogDocument> SyncAsync(string sourceId, IProgress<SpiritCatalogSyncProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<string> MatchSpiritNameAsync(string recognizedText, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<string> MatchSpiritNameAsync(string recognizedText, double minimumSimilarity, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<string> MatchSpiritNameAsync(string recognizedText, double minimumSimilarity, CancellationToken cancellationToken = default)
+        => Task.FromResult(MatchName?.Invoke(recognizedText, minimumSimilarity) ?? throw new NotSupportedException());
     public Task<string> ResolveEvolutionRecordNameAsync(string spiritName, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }

@@ -1,11 +1,13 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using RocoPilot.Configuration;
 using RocoPilot.Core.Battle;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Recognition;
+using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Hotkeys;
 using RocoPilot.Models.ImageMatching;
@@ -14,8 +16,11 @@ using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.Statistics;
+using RocoPilot.Models.TextRecognition;
 using RocoPilot.Services;
+using RocoPilot.Services.Encounters;
 using RocoPilot.Services.RuntimeTasks;
+using RocoPilot.Services.Spirits;
 using RocoPilot.Services.Statistics;
 using RocoPilot.Tests.TestDoubles;
 
@@ -342,6 +347,128 @@ public sealed class RuntimeTaskStartupTests
         finally { await fixture.Runtime.StopAsync(); }
     }
 
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("图鉴未收录的新精灵")]
+    public async Task MissingCatalogNameOrBlankOcrDoesNotBlockOrdinaryBattle(string rawName)
+    {
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true);
+        fixture.Ocr.ReadName = () => Task.FromResult(rawName);
+        try
+        {
+            await fixture.StartBattleAsync();
+            await fixture.ProcessFrameAsync();
+            await fixture.ScanOcrAsync();
+            Assert.AreEqual(1, fixture.Ocr.NameCalls);
+            Assert.AreEqual(string.Empty, fixture.Overlay.Snapshot!.BattleCreatureName);
+
+            await fixture.ProcessFrameAsync();
+            CollectionAssert.AreEqual(new[] { "1" }, fixture.Keyboard.Sequences);
+            Assert.AreEqual(AutoBattleAction.Skill, fixture.Battle.CurrentTurn!.Action);
+        }
+        finally { await fixture.Runtime.StopAsync(); }
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task PendingNameOcrDoesNotBlockBattleAndLateDisplayCannotEnterNextBattle(bool endBattle)
+    {
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true);
+        var name = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Ocr.ReadName = () => name.Task;
+        fixture.Catalog.Document.Spirits.Add(new() { Id = "1", Name = "小火苗" });
+        Task? scan = null;
+        try
+        {
+            await fixture.StartBattleAsync();
+            await fixture.ProcessFrameAsync();
+            scan = fixture.ScanOcrAsync();
+            Assert.AreEqual(1, fixture.Ocr.NameCalls);
+            Assert.IsFalse(scan.IsCompleted);
+            await fixture.ProcessFrameAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            CollectionAssert.AreEqual(new[] { "1" }, fixture.Keyboard.Sequences);
+
+            if (endBattle)
+            {
+                fixture.Matching.MatchedTemplate = null;
+                fixture.Matching.MagicPoints = 4;
+                await fixture.ProcessFrameAsync();
+            }
+            name.SetResult("小火苗");
+            await scan.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(endBattle ? "" : "小火苗", fixture.Overlay.Snapshot!.BattleCreatureName);
+        }
+        finally
+        {
+            name.TrySetResult("");
+            if (scan is not null) await scan.WaitAsync(TimeSpan.FromSeconds(5));
+            await fixture.Runtime.StopAsync();
+        }
+    }
+
+    [TestMethod]
+    public async Task ShinyTipStopsBattleEvenWhileNameOcrIsPending()
+    {
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true);
+        await fixture.Notifications.SetEnabledAsync(false);
+        var name = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Ocr.ReadName = () => name.Task;
+        fixture.Ocr.ShinyText = "发现异色精灵";
+        Task? scan = null;
+        try
+        {
+            await fixture.StartBattleAsync();
+            await fixture.ProcessFrameAsync();
+            scan = fixture.ScanOcrAsync();
+            Assert.IsFalse(scan.IsCompleted);
+            Assert.IsTrue(fixture.Battle.IsSuspendedForShiny);
+            await fixture.ProcessFrameAsync();
+            await fixture.ProcessFrameAsync();
+            Assert.AreEqual(0, fixture.Keyboard.Sends);
+            Assert.IsTrue(fixture.Overlay.Snapshot!.IsShinyProtectionActive);
+            name.SetResult("");
+            await scan;
+            Assert.IsTrue(fixture.Battle.IsSuspendedForShiny);
+        }
+        finally
+        {
+            name.TrySetResult("");
+            if (scan is not null) await scan.WaitAsync(TimeSpan.FromSeconds(5));
+            await fixture.Runtime.StopAsync();
+        }
+    }
+
+    [TestMethod]
+    [DataRow(AutoBattleEncounterRelievedAction.NoAction, true, "")]
+    [DataRow(AutoBattleEncounterRelievedAction.RecoverEnergy, true, "X")]
+    [DataRow(AutoBattleEncounterRelievedAction.ReleaseSkill, true, "1")]
+    [DataRow(AutoBattleEncounterRelievedAction.Capture, true, "W, 1, Space")]
+    [DataRow(AutoBattleEncounterRelievedAction.Capture, false, "1")]
+    public async Task CaptureButtonReliefUsesConfiguredActionAndBloodlineWithoutSpiritName(
+        AutoBattleEncounterRelievedAction action, bool captureQiYi, string expectedSequence)
+    {
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true);
+        fixture.Ocr.BloodlineText = "奇异血脉";
+        try
+        {
+            await fixture.StartBattleAsync(action, captureQiYi);
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Disabled;
+            await fixture.ProcessFrameAsync();
+            await fixture.ScanOcrAsync();
+            Assert.AreEqual(EncounterBloodlineKind.QiYi, fixture.Battle.Bloodline);
+
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Enabled;
+            await fixture.ProcessFrameAsync();
+            Assert.AreEqual(0, fixture.Keyboard.Sends, "捕捉按钮仅一帧可用时，仍须等待解除确认。");
+            await fixture.ProcessFrameAsync();
+            Assert.AreEqual(action != AutoBattleEncounterRelievedAction.ReleaseSkill, fixture.Battle.IsEncounterRelieved);
+            CollectionAssert.AreEqual(expectedSequence.Length == 0 ? Array.Empty<string>() : new[] { expectedSequence },
+                fixture.Keyboard.Sequences);
+        }
+        finally { await fixture.Runtime.StopAsync(); }
+    }
+
     private static RuntimeTaskStartOptions Options(bool enabled = true,
         KeyboardInputMethod method = KeyboardInputMethod.Interception) => new()
     {
@@ -361,30 +488,53 @@ public sealed class RuntimeTaskStartupTests
         public StatisticsUidCoordinatorTests.DetectionStub Detection { get; } = new();
         public StatisticsUidCoordinatorTests.NoticeStub Notice { get; } = new();
         public HotkeyStub Hotkeys { get; } = new();
+        public TextRecognitionStub Ocr { get; } = new();
+        public StatisticsSpiritCatalogStub Catalog { get; } = new();
+        public AppNotificationStub Notifications { get; } = new();
         public AutoBattleController Battle => (AutoBattleController)GetField("_battle")!;
 
-        public StartupFixture(bool sceneRecognition = false)
+        public StartupFixture(bool sceneRecognition = false, bool battleRecognition = false)
         {
             var settings = new ControlledSettingsStore();
             Statistics = new(settings, NullLogger<StatisticsService>.Instance);
             Uid = new(Detection, Statistics, Notice, NullLogger<StatisticsUidCoordinatorService>.Instance);
             Matching = new(sceneRecognition);
             var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
-            // 仅配置场景识别区域，测试不执行文字识别。
-            var recognizer = new RuntimeFrameRecognizer(Matching, null!, Overlay, debug);
+            Catalog.MatchName = (text, threshold) => new SpiritCatalogIndex(Catalog.Document).Match(text, threshold);
+            var recognizer = new RuntimeFrameRecognizer(Matching, Ocr, Overlay, debug);
             var battleScreen = new BattleScreenRecognizer(recognizer);
-            Runtime = new(Window, Keyboard, Capture, new RegionConfigStub(), Matching, recognizer,
+            Runtime = new(Window, Keyboard, Capture, new RegionConfigStub(battleRecognition), Matching, recognizer,
                 new GameSceneRecognizer(recognizer, Matching, Overlay, debug, battleScreen), battleScreen,
                 new AutoBattleInputExecutor(Keyboard, NullLogger<AutoBattleInputExecutor>.Instance), debug,
-                new StatisticsSeasonConfigStub(), new StatisticsSpiritCatalogStub(),
+                battleRecognition ? new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance)
+                    : new StatisticsSeasonConfigStub(), Catalog,
                 Statistics, Uid, settings,
                 Hotkeys, Overlay, Overlay,
-                new ShinyEncounterNotification(new AppNotificationStub(), NullLogger<ShinyEncounterNotification>.Instance),
+                new ShinyEncounterNotification(Notifications, NullLogger<ShinyEncounterNotification>.Instance),
                 NullLogger<RuntimeTaskService>.Instance);
             Capture.BeforeCapture = () =>
             {
                 Assert.AreEqual(0, Overlay.Shows, "启动前截图必须发生在创建遮罩之前。");
             };
+        }
+
+        public async Task StartBattleAsync(AutoBattleEncounterRelievedAction action = AutoBattleEncounterRelievedAction.RecoverEnergy,
+            bool captureQiYi = true)
+        {
+            var options = Options();
+            options.InfoOverlayEnabled = true;
+            options.AutoBattleSettings.SkillSelectionActionDelayMs = 0;
+            options.AutoBattleSettings.EncounterRelievedAction = action;
+            options.AutoBattleSettings.BloodlineCaptureFilter.CaptureQiYi = captureQiYi;
+            Assert.IsTrue((await Runtime.StartAsync(options)).Success);
+            Matching.MatchedTemplate = "battle-button-skill.png";
+        }
+
+        public async Task ScanOcrAsync()
+        {
+            using var frame = CapturedFrame.RentBgra32(16, 9);
+            var scan = typeof(RuntimeTaskService).GetMethod("UpdateRuntimeEncounterOcrSignalsAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            await (Task)scan.Invoke(Runtime, [Runtime.CurrentState!, frame, Battle.BattleId, CancellationToken.None])!;
         }
 
         public async Task ProcessFrameAsync()
@@ -432,6 +582,7 @@ public sealed class RuntimeTaskStartupTests
         public Action? OnCheck;
         public List<KeyboardInputMethod> CheckedMethods = [];
         public int Sends;
+        public List<string> Sequences { get; } = [];
         public void EnsureReady(KeyboardInputMethod method)
         {
             CheckedMethods.Add(method);
@@ -442,11 +593,15 @@ public sealed class RuntimeTaskStartupTests
         public bool IsWindowForeground(nint hwnd) => true;
         public bool RequiresForeground(KeyboardInputMethod method) => method != KeyboardInputMethod.PostMessage;
         public bool TryParseSequence(string sequence, out IReadOnlyList<KeyStroke> keyStrokes, out string error)
-        { keyStrokes = []; error = ""; return true; }
+        {
+            keyStrokes = sequence.Split(',').Select(key => new KeyStroke([], KeyCatalog.DefinitionsByName[key.Trim()])).ToArray();
+            error = "";
+            return true;
+        }
         public Task SendSequenceAsync(nint hwnd, string sequence, KeyboardInputOptions? options = null, CancellationToken cancellationToken = default)
-        { Sends++; return Task.CompletedTask; }
+        { Sends++; Sequences.Add(sequence); return Task.CompletedTask; }
         public Task SendSequenceAsync(nint hwnd, IReadOnlyList<KeyStroke> keyStrokes, KeyboardInputOptions? options = null, CancellationToken cancellationToken = default)
-        { Sends++; return Task.CompletedTask; }
+        { Sends++; Sequences.Add(string.Join(", ", keyStrokes.Select(stroke => stroke.DisplayText))); return Task.CompletedTask; }
     }
 
     private sealed class CaptureStub : IScreenCaptureService
@@ -469,7 +624,7 @@ public sealed class RuntimeTaskStartupTests
         public void Release(CaptureTargetWindow window, CaptureMethod method) => Releases++;
     }
 
-    private sealed class RegionConfigStub : IRecognitionRegionConfigService
+    private sealed class RegionConfigStub(bool includeOcr = false) : IRecognitionRegionConfigService
     {
         public IReadOnlyList<string> ListConfigPaths() => [];
         public bool TryResolveConfigResolution(int width, int height, out int configWidth, out int configHeight)
@@ -478,6 +633,8 @@ public sealed class RuntimeTaskStartupTests
         {
             LoadedFromFile = true, ResolutionWidth = width, ResolutionHeight = height,
             Regions = new[] { "magic-point", "battle-button-chat", "battle-button-skill", "battle-button-change", "battle-button-capture" }
+                .Concat(includeOcr ? new[] { RecognitionRegionIds.BattleEnemyName, RecognitionRegionIds.BattleMessageTip,
+                    RecognitionRegionIds.BattleShinyTip, RecognitionRegionIds.BattleBloodlineTip } : [])
                 .Select(id => new RecognitionRegion { Id = id, Width = width, Height = height }).ToList()
         };
         public RecognitionRegionConfig LoadFromPath(string path) => throw new NotSupportedException();
@@ -492,6 +649,7 @@ public sealed class RuntimeTaskStartupTests
         public string TemplateDirectory { get; }
         public volatile string? MatchedTemplate;
         public volatile int MagicPoints;
+        public EncounterCaptureButtonState CaptureButtonState;
         public MatchingStub(bool temporaryTemplates = false)
         {
             _temporaryTemplates = temporaryTemplates;
@@ -499,12 +657,20 @@ public sealed class RuntimeTaskStartupTests
             if (!temporaryTemplates) return;
             var resolutionDirectory = Path.Combine(TemplateDirectory, "16x9");
             Directory.CreateDirectory(resolutionDirectory);
-            foreach (var template in new[] { "magic-point.png", "battle-chat.png", "battle-button-skill.png", "battle-button-change.png" })
+            foreach (var template in new[] { "magic-point.png", "battle-chat.png", "battle-button-skill.png", "battle-button-change.png",
+                "battle-button-capture.png", "battle-button-capture-disabled.png", "battle-button-capture-disabled-marker.png" })
                 File.WriteAllBytes(Path.Combine(resolutionDirectory, template), []);
         }
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
         {
+            if (Path.GetFileName(templatePath).StartsWith("battle-button-capture", StringComparison.Ordinal))
+            {
+                var marker = templatePath.EndsWith("-marker.png", StringComparison.Ordinal);
+                var score = (marker ? CaptureButtonState == EncounterCaptureButtonState.Disabled
+                    : CaptureButtonState != EncounterCaptureButtonState.Unknown) ? 0.99 : 0.1;
+                return Task.FromResult(new ImageMatchResult(score >= 0.85, score, 0, 0, 1, 1, templatePath));
+            }
             var matched = Path.GetFileName(templatePath) == MatchedTemplate;
             return Task.FromResult(new ImageMatchResult(matched, matched ? 0.99 : 0.1, 0, 0, 1, 1, templatePath));
         }
@@ -516,6 +682,31 @@ public sealed class RuntimeTaskStartupTests
         public void Dispose()
         {
             if (_temporaryTemplates) Directory.Delete(TemplateDirectory, recursive: true);
+        }
+    }
+
+    private sealed class TextRecognitionStub : ITextRecognitionService
+    {
+        public Func<Task<string>> ReadName { get; set; } = () => Task.FromResult(string.Empty);
+        public string ShinyText { get; set; } = "";
+        public string BloodlineText { get; set; } = "";
+        public int NameCalls { get; private set; }
+        public IReadOnlyList<TextRecognitionMethodOption> GetMethods() => [GetDefaultMethod()];
+        public TextRecognitionMethodOption GetDefaultMethod() => new(default, "test", "", true);
+        public Task<TextRecognitionResult> RecognizeAsync(byte[] imageBytes, TextRecognitionMethod method,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public async Task<TextRecognitionResult> RecognizeAsync(CapturedFrame frame, RecognitionRegion region,
+            TextRecognitionMethod method, CancellationToken cancellationToken = default)
+        {
+            var text = "";
+            if (region.Id == RecognitionRegionIds.BattleEnemyName)
+            {
+                NameCalls++;
+                text = await ReadName();
+            }
+            else if (region.Id == RecognitionRegionIds.BattleShinyTip) text = ShinyText;
+            else if (region.Id == RecognitionRegionIds.BattleBloodlineTip) text = BloodlineText;
+            return new(method, "test", null, [text], text.Length);
         }
     }
 

@@ -543,6 +543,12 @@ public partial class StatisticsViewModel : ObservableRecipient
         ShowNotification(InfoBarSeverity.Error, title, exception.Message);
     }
 
+    public async Task RunOperationAsync(string failureTitle, Func<Task> operation)
+    {
+        try { await operation(); }
+        catch (Exception ex) { ShowOperationFailed(failureTitle, ex); }
+    }
+
     private void StatisticsSyncService_StatusChanged(object? sender, StatisticsSyncStatusChangedEventArgs e)
     {
         _dispatch(() => ApplySyncStatus(_statisticsSyncService.CurrentStatus));

@@ -15,7 +15,9 @@ public sealed class StatisticsUidCoordinatorService :
     private readonly IStatisticsService _statisticsService;
     private readonly IInfoOverlayNotificationService _infoOverlayNotificationService;
     private readonly ILogger<StatisticsUidCoordinatorService> _logger;
+    private readonly object _stateGate = new();
     private StatisticsUidConfirmationRequest? _pendingConfirmation;
+    private int _version;
 
     public StatisticsUidCoordinatorService(
         IStatisticsUidDetectionService statisticsUidDetectionService,
@@ -35,13 +37,21 @@ public sealed class StatisticsUidCoordinatorService :
 
     internal async Task<StatisticsUidPreparation?> PrepareStartAsync(RuntimeTaskStartOptions options, CancellationToken cancellationToken)
     {
-        Clear();
-        if (!options.EncounterStatisticsEnabled) return null;
-        var selectedAccountUid = await ResolveSelectedAccountUidAsync();
-        _statisticsService.RequireActiveAccountSelection();
+        int version;
+        lock (_stateGate)
+        {
+            Clear();
+            if (!options.EncounterStatisticsEnabled) return null;
+            version = _version;
+            // 在第一次等待前暂停自动计数，避免运行中开启统计时沿用上次会话的账号。
+            _statisticsService.RequireActiveAccountSelection();
+        }
         try
         {
-            return await PrepareStatisticsUidAsync(options, selectedAccountUid, cancellationToken);
+            var selectedAccountUid = await ResolveSelectedAccountUidAsync();
+            lock (_stateGate)
+                if (version != _version) return null;
+            return await PrepareStatisticsUidAsync(options, selectedAccountUid, version, cancellationToken);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -50,39 +60,65 @@ public sealed class StatisticsUidCoordinatorService :
             return new StatisticsUidPreparation(
                 StatisticsUidDetectionResult.Failed("UID 识别准备失败。"),
                 new StatisticsUidSelectionDecision(StatisticsUidSelectionAction.RequireConfirmation, null, "UID 识别准备失败。"),
-                options.CaptureMethod, options.TextRecognitionMethod);
+                options.CaptureMethod, options.TextRecognitionMethod, version);
         }
     }
 
     internal string CompleteStart(StatisticsUidPreparation? preparation)
     {
-        return preparation is null ? string.Empty : CompleteStatisticsUidSelection(preparation);
+        lock (_stateGate)
+            return preparation is null || preparation.Version != _version
+                ? string.Empty : CompleteStatisticsUidSelection(preparation);
+    }
+
+    internal async Task PrepareEnabledStatisticsAsync(RuntimeTaskStartOptions options)
+    {
+        try
+        {
+            var preparation = await PrepareStartAsync(new RuntimeTaskStartOptions
+            {
+                CaptureMethod = options.CaptureMethod,
+                EncounterStatisticsEnabled = true
+            }, CancellationToken.None);
+            CompleteStart(preparation);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "开启统计时准备账号 UID 失败。");
+        }
     }
 
     internal void Clear()
     {
-        ClearPendingConfirmation();
-        _infoOverlayNotificationService.UpdateUidNotice(null);
+        lock (_stateGate)
+        {
+            _version++;
+            ClearPendingConfirmation();
+            _infoOverlayNotificationService.UpdateUidNotice(null);
+        }
     }
 
     public void MarkPendingConfirmationPresented()
     {
-        var pending = PendingConfirmation;
-        if (pending is null || pending.WasPresented)
+        lock (_stateGate)
         {
-            return;
+            var pending = PendingConfirmation;
+            if (pending is null || pending.WasPresented) return;
+            SetPendingConfirmation(pending with { WasPresented = true });
         }
-
-        SetPendingConfirmation(pending with { WasPresented = true });
     }
 
     public async Task<StatisticsUidDetectionResult> RetryDetectionAsync(
         CancellationToken cancellationToken = default)
     {
-        var pending = PendingConfirmation;
-        if (pending is null)
+        StatisticsUidConfirmationRequest pending;
+        int version;
+        lock (_stateGate)
         {
-            return StatisticsUidDetectionResult.Failed("当前没有待确认的统计账号。");
+            if (_pendingConfirmation is not { } current)
+                return StatisticsUidDetectionResult.Failed("当前没有待确认的统计账号。");
+            pending = current;
+            version = ++_version;
         }
 
         StatisticsUidDetectionResult result;
@@ -103,15 +139,20 @@ public sealed class StatisticsUidCoordinatorService :
             result = StatisticsUidDetectionResult.Failed("重新识别 UID 时发生异常。");
         }
 
-        var suggestedUid = result.Success ? result.Uid : null;
-        SetPendingConfirmation(pending with
+        lock (_stateGate)
         {
-            SuggestedUid = suggestedUid ?? _statisticsService.SelectedAccountUid,
-            Message = result.Message,
-            RecognitionSucceeded = result.Success,
-            WasPresented = true
-        });
-        UpdatePendingOverlay(result);
+            // 停止、确认或新请求已替换原提示时，旧 OCR 结果不能恢复它。
+            if (version != _version) return result;
+            var suggestedUid = result.Success ? result.Uid : null;
+            SetPendingConfirmation(pending with
+            {
+                SuggestedUid = suggestedUid ?? _statisticsService.SelectedAccountUid,
+                Message = result.Message,
+                RecognitionSucceeded = result.Success,
+                WasPresented = true
+            });
+            UpdatePendingOverlay(result);
+        }
         return result;
     }
 
@@ -120,6 +161,8 @@ public sealed class StatisticsUidCoordinatorService :
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        int version;
+        lock (_stateGate) version = _version;
         if (!StatisticsUidRules.TryNormalize(uid, out var confirmedUid))
         {
             throw new ArgumentException("UID 中没有可用的数字。", nameof(uid));
@@ -133,15 +176,20 @@ public sealed class StatisticsUidCoordinatorService :
             await _statisticsService.AddAccountAsync(confirmedUid);
         }
 
-        SelectActiveStatisticsAccount(confirmedUid);
-        ClearPendingConfirmation();
-        _infoOverlayNotificationService.UpdateUidNotice(null);
+        lock (_stateGate)
+        {
+            if (version != _version)
+                throw new InvalidOperationException("本次统计账号确认已结束，请重新选择账号。");
+            SelectActiveStatisticsAccount(confirmedUid);
+            Clear();
+        }
         return confirmedUid;
     }
 
     private async Task<StatisticsUidPreparation> PrepareStatisticsUidAsync(
         RuntimeTaskStartOptions options,
         string? selectedAccountUid,
+        int version,
         CancellationToken cancellationToken)
     {
         StatisticsUidDetectionResult detectionResult;
@@ -163,11 +211,13 @@ public sealed class StatisticsUidCoordinatorService :
         }
 
         var decision = StatisticsUidSelectionRules.Decide(detectionResult, selectedAccountUid);
+        decision = decision with { SuggestedUid = decision.SuggestedUid ?? selectedAccountUid };
         return new StatisticsUidPreparation(
             detectionResult,
             decision,
             options.CaptureMethod,
-            options.TextRecognitionMethod);
+            options.TextRecognitionMethod,
+            version);
     }
 
     private string CompleteStatisticsUidSelection(StatisticsUidPreparation preparation)
@@ -176,8 +226,7 @@ public sealed class StatisticsUidCoordinatorService :
             && preparation.Decision.SuggestedUid is { } matchedUid)
         {
             SelectActiveStatisticsAccount(matchedUid);
-            ClearPendingConfirmation();
-            _infoOverlayNotificationService.UpdateUidNotice(null);
+            Clear();
             return $"已识别统计账号 UID {matchedUid}。";
         }
 
@@ -212,11 +261,6 @@ public sealed class StatisticsUidCoordinatorService :
         }
 
         selectedUid = document.Accounts.FirstOrDefault()?.Uid;
-        if (!string.IsNullOrWhiteSpace(selectedUid))
-        {
-            _statisticsService.SetSelectedAccountUid(selectedUid);
-        }
-
         return selectedUid;
     }
 
@@ -252,5 +296,6 @@ public sealed class StatisticsUidCoordinatorService :
         StatisticsUidDetectionResult DetectionResult,
         StatisticsUidSelectionDecision Decision,
         Models.Capture.CaptureMethod CaptureMethod,
-        Models.TextRecognition.TextRecognitionMethod TextRecognitionMethod);
+        Models.TextRecognition.TextRecognitionMethod TextRecognitionMethod,
+        int Version);
 }

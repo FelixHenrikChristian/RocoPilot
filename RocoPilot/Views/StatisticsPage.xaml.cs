@@ -73,16 +73,14 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        if (ViewModel.PendingUidConfirmation is not null)
+        await ViewModel.RunOperationAsync("统计账号确认失败", async () =>
         {
-            await ViewModel.ConfirmUidAsync(account.Uid);
-        }
-        else
-        {
-            ViewModel.SelectAccount(account);
-        }
-
-        AccountSelectorFlyout.Hide();
+            if (ViewModel.PendingUidConfirmation is not null)
+                await ViewModel.ConfirmUidAsync(account.Uid);
+            else
+                ViewModel.SelectAccount(account);
+            AccountSelectorFlyout.Hide();
+        });
     }
 
     private void UidWarningButton_PointerEntered(
@@ -175,15 +173,16 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        if (await ViewModel.AddAccountAsync(dialog.Uid))
+        await ViewModel.RunOperationAsync("添加账号失败", async () =>
         {
-            if (ViewModel.PendingUidConfirmation is not null)
+            if (await ViewModel.AddAccountAsync(dialog.Uid))
             {
-                await ViewModel.ConfirmUidAsync(dialog.Uid);
-            }
+                if (ViewModel.PendingUidConfirmation is not null)
+                    await ViewModel.ConfirmUidAsync(dialog.Uid);
 
-            AccountSelectorFlyout.Hide();
-        }
+                AccountSelectorFlyout.Hide();
+            }
+        });
     }
 
     private void AccountItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
@@ -221,8 +220,11 @@ public sealed partial class StatisticsPage : Page
 
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
-            await ViewModel.DeleteAccountAsync(account.Uid);
-            AccountSelectorFlyout.Hide();
+            await ViewModel.RunOperationAsync("删除账号失败", async () =>
+            {
+                await ViewModel.DeleteAccountAsync(account.Uid);
+                AccountSelectorFlyout.Hide();
+            });
         }
     }
 
@@ -274,13 +276,13 @@ public sealed partial class StatisticsPage : Page
         e.Handled = true;
     }
 
-    private static MenuFlyout CreateAddStatisticMenu(Func<Task> addHandler)
+    private MenuFlyout CreateAddStatisticMenu(Func<Task> addHandler)
     {
         var addItem = new MenuFlyoutItem
         {
             Text = "新增条目"
         };
-        addItem.Click += async (_, _) => await addHandler();
+        addItem.Click += async (_, _) => await ViewModel.RunOperationAsync("新增条目失败", addHandler);
 
         var flyout = new MenuFlyout();
         flyout.Items.Add(addItem);
@@ -736,12 +738,12 @@ public sealed partial class StatisticsPage : Page
 
     private async void ConfirmPendingShinyButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.ConfirmLatestPendingShinyAsync();
+        await ViewModel.RunOperationAsync("确认异色失败", ViewModel.ConfirmLatestPendingShinyAsync);
     }
 
     private async void DiscardPendingShinyButton_Click(object sender, RoutedEventArgs e)
     {
-        await ViewModel.DiscardLatestPendingShinyAsync();
+        await ViewModel.RunOperationAsync("忽略异色失败", ViewModel.DiscardLatestPendingShinyAsync);
     }
 
     private async void ImportStatisticsMenuFlyoutItem_Click(object sender, RoutedEventArgs e)
@@ -840,7 +842,7 @@ public sealed partial class StatisticsPage : Page
 
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
-            await ViewModel.ClearAllAsync();
+            await ViewModel.RunOperationAsync("清空统计失败", ViewModel.ClearAllAsync);
         }
     }
 

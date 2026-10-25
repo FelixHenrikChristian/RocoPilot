@@ -66,7 +66,6 @@ public sealed class RuntimeCoordinator(
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
         runtime.SetEncounterStatisticsEnabled(isEnabled);
-        if (!isEnabled) uidCoordinator.Clear();
     }
     public void SetRecognitionOverlayEnabled(bool isEnabled) => runtime.SetRecognitionOverlayEnabled(isEnabled);
     public void SetInfoOverlayEnabled(bool isEnabled) => runtime.SetInfoOverlayEnabled(isEnabled);

@@ -36,6 +36,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly IStatisticsService _statisticsService;
+    private readonly StatisticsUidCoordinatorService _statisticsUidCoordinator;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly IHotkeyService _hotkeyService;
     private readonly IRecognitionOverlayService _recognitionOverlayService;
@@ -120,6 +121,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         IStatisticsService statisticsService,
+        StatisticsUidCoordinatorService statisticsUidCoordinator,
         ILocalSettingsService localSettingsService,
         IHotkeyService hotkeyService,
         IRecognitionOverlayService recognitionOverlayService,
@@ -140,6 +142,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _statisticsService = statisticsService;
+        _statisticsUidCoordinator = statisticsUidCoordinator;
         _localSettingsService = localSettingsService;
         _hotkeyService = hotkeyService;
         _hotkeyService.HotkeyTriggered += HotkeyService_HotkeyTriggered;
@@ -384,6 +387,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
 
     private async Task StopSessionCoreAsync()
     {
+        _statisticsUidCoordinator.Clear();
         var session = _session;
         if (session is null) return;
         try
@@ -401,6 +405,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         finally
         {
             _session = null;
+            // 等待后台任务退出期间仍可能收到开关热键，收尾时一并使其 UID 请求失效。
+            _statisticsUidCoordinator.Clear();
             ResetAutoBattleBattleState();
             _overlayActivities.Clear();
             _logger.LogInformation("实时任务：已停止");

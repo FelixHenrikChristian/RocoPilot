@@ -117,12 +117,9 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
                         return StatisticsUidDetectionResult.Failed("UID 识别区域不在当前截图范围内。");
                     }
 
-                    var imageBytes = await RecognitionRegionImageHelper.EncodePngAsync(
+                    var result = await _textRecognitionService.RecognizeAsync(
                         frame,
                         frameRegion,
-                        cancellationToken);
-                    var result = await _textRecognitionService.RecognizeAsync(
-                        imageBytes,
                         recognitionMethod.Method,
                         cancellationToken);
                     attemptedOcr = true;

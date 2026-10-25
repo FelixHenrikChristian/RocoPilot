@@ -123,10 +123,7 @@ public sealed class ManualChallengeRunner(
                 {
                     var now = DateTimeOffset.UtcNow;
                     if (battle.Phase != AutoBattlePhase.SkillSelection)
-                    {
-                        var turn = battle.BeginSkillSelection(settings, now);
-                        battle.ConfirmSelectionReady(turn.Id);
-                    }
+                        battle.BeginSkillSelection(settings, now);
                     if (battle.ShouldRecoverAfterSkillFailure(settings, now))
                         plan = new(AutoBattleAction.EnergyRecovery, "X", "技能未离开选择界面，回能 X，原技能延后", "X");
                     else if (battle.CanAct(settings, now))

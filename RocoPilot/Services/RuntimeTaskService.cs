@@ -682,7 +682,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             case BattleScreen.SkillSelection:
                 var recovered = !_battle.IsSuspendedForShiny
                     && await TryHandleAutoBattleSkillReleaseFailureAsync(state, frame, cancellationToken);
-                if (!recovered) await HandleAutoBattleSkillSelectionAsync(state, frame, cancellationToken);
+                if (!recovered) await HandleAutoBattleSkillSelectionAsync(state, cancellationToken);
                 break;
             case BattleScreen.PetSwitching:
                 CompleteAutoBattleSkillSelectionState();

@@ -25,14 +25,6 @@ internal sealed class RuntimeSession(RuntimeTaskState state, IScreenCaptureServi
         _loops = [Task.Run(() => captureLoop(this, token)), Task.Run(() => ocrLoop(this, token))];
     }
 
-    public Task<T> RunBackground<T>(Func<Task<T>> work)
-    {
-        // 不向 Task.Run 传入取消令牌，确保委托中的帧引用释放逻辑一定执行。
-        var task = Task.Run(work);
-        Track(task);
-        return task;
-    }
-
     public void Track(Task task)
     {
         lock (_gate)

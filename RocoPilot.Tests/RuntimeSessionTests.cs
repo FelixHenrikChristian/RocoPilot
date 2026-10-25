@@ -20,12 +20,12 @@ public sealed class RuntimeSessionTests
         var loopCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         session.Start(async (current, token) =>
         {
-            _ = current.RunBackground(async () =>
+            var worker = Task.Run(async () =>
             {
                 workerStarted.SetResult();
                 await workerFinish.Task;
-                return true;
             });
+            current.Track(worker);
             try { await Task.Delay(Timeout.Infinite, token); }
             finally { loopCancelled.SetResult(); }
         }, (_, token) => Task.Delay(Timeout.Infinite, token));

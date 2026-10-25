@@ -177,6 +177,7 @@ public sealed partial class RuntimeTaskService
             battleId,
             cancellationToken);
         await TryCompletePendingShinyNameAsync(state, frame, battleId, cancellationToken);
+        await UpdateRuntimeSpiritNameAsync(state, frame, battleId, cancellationToken);
     }
 
     private async Task TryLogBattleTipAsync(

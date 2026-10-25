@@ -9,17 +9,17 @@ public sealed class AutoBattleControllerTests
     private static readonly DateTimeOffset Now = new(2026, 9, 11, 0, 0, 0, TimeSpan.Zero);
 
     [TestMethod]
-    public void WaitsForActionDelayAndSelectionReadinessBeforeFirstAction()
+    [DataRow(0)]
+    [DataRow(500)]
+    [DataRow(2000)]
+    public void FirstActionOnlyWaitsForConfiguredActionDelay(int actionDelay)
     {
         var settings = Settings();
+        settings.SkillSelectionActionDelayMs = actionDelay;
         var battle = new AutoBattleController();
-        var turn = battle.BeginSkillSelection(settings, Now);
-        Assert.IsFalse(battle.IsSelectionPreparationDue(settings, Now.AddMilliseconds(499)));
-        Assert.IsTrue(battle.IsSelectionPreparationDue(settings, Now.AddMilliseconds(500)));
-        Assert.IsFalse(battle.CanAct(settings, Now.AddSeconds(1)));
-        battle.ConfirmSelectionReady(turn.Id);
-        Assert.IsFalse(battle.CanAct(settings, Now.AddMilliseconds(499)));
-        Assert.IsTrue(battle.CanAct(settings, Now.AddMilliseconds(500)));
+        battle.BeginSkillSelection(settings, Now);
+        Assert.IsFalse(battle.CanAct(settings, Now.AddMilliseconds(actionDelay - 1)));
+        Assert.IsTrue(battle.CanAct(settings, Now.AddMilliseconds(actionDelay)));
     }
 
     [TestMethod]
@@ -42,7 +42,6 @@ public sealed class AutoBattleControllerTests
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmSelectionReady(turn.Id);
         battle.CompleteSkillSelection();
         Assert.IsFalse(battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now));
         Assert.AreEqual("1", battle.BeginSkillSelection(settings, Now.AddSeconds(1)).ReleaseStep.SkillKey);
@@ -59,7 +58,6 @@ public sealed class AutoBattleControllerTests
         settings.SkillSelectionRetryDelayMs = retryDelay;
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmSelectionReady(turn.Id);
         battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now);
         Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(500)));
         Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddMilliseconds(retryDelay - 1)));
@@ -119,7 +117,6 @@ public sealed class AutoBattleControllerTests
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmSelectionReady(turn.Id);
         Assert.IsTrue(battle.ObserveShiny(battle.BattleId));
         Assert.IsFalse(battle.ObserveShiny(battle.BattleId)); // Repeated frames must not notify again.
         Assert.IsFalse(battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now));
@@ -140,7 +137,6 @@ public sealed class AutoBattleControllerTests
         battle.ResetBattle();
         var next = battle.BeginSkillSelection(settings, Now);
         Assert.AreNotEqual(oldTurn.Id, next.Id);
-        Assert.IsFalse(battle.ConfirmSelectionReady(oldTurn.Id));
         Assert.IsFalse(battle.RecordAction(oldTurn.Id, AutoBattleAction.Skill, Now));
         Assert.IsFalse(battle.ObserveShiny(oldBattle));
         battle.ObserveBloodline(oldBattle, EncounterBloodlineKind.Normal);
@@ -194,7 +190,6 @@ public sealed class AutoBattleControllerTests
         var settings = Settings();
         var battle = new AutoBattleController();
         var turn = battle.BeginSkillSelection(settings, Now);
-        battle.ConfirmSelectionReady(turn.Id);
         battle.RecordAction(turn.Id, AutoBattleAction.Skill, Now);
         settings.IsEnabled = false;
         Assert.IsFalse(battle.CanAct(settings, Now.AddSeconds(10)));

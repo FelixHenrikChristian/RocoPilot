@@ -10,7 +10,6 @@ public sealed record AutoBattleTurn(
     int Number,
     DateTimeOffset StartedAt,
     AutoBattleReleaseStep ReleaseStep,
-    bool SelectionReady = false,
     AutoBattleAction Action = AutoBattleAction.None,
     DateTimeOffset? LastActionAt = null);
 
@@ -70,28 +69,11 @@ public sealed class AutoBattleController
         }
     }
 
-    public bool IsSelectionPreparationDue(AutoBattleSettings settings, DateTimeOffset now)
-    {
-        lock (_gate)
-            return _turn is { SelectionReady: false } turn
-                && now - turn.StartedAt >= TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs);
-    }
-
-    public bool ConfirmSelectionReady(long turnId)
-    {
-        lock (_gate)
-        {
-            if (_turn is null || _turn.Id != turnId) return false;
-            _turn = _turn with { SelectionReady = true };
-            return true;
-        }
-    }
-
     public bool CanAct(AutoBattleSettings settings, DateTimeOffset now)
     {
         lock (_gate)
             return settings.IsEnabled && !_suspendedForShiny
-                && _turn is { SelectionReady: true } turn
+                && _turn is { } turn
                 && now - turn.StartedAt >= TimeSpan.FromMilliseconds(settings.SkillSelectionActionDelayMs)
                 && (turn.LastActionAt is null
                     || now - turn.LastActionAt.Value >= TimeSpan.FromMilliseconds(settings.SkillSelectionRetryDelayMs));

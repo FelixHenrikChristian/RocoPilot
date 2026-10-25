@@ -85,7 +85,7 @@
                                     <TextBlock Style="{StaticResource DialogFieldTitleStyle}" Text="技能选择基础等待" />
                                     <TextBlock
                                         Style="{StaticResource DialogDescriptionTextStyle}"
-                                        Text="进入技能界面后，识别与按键前的等待" />
+                                        Text="进入技能界面后，执行操作前的等待" />
                                 </StackPanel>
                                 <StackPanel
                                     Grid.Column="1"

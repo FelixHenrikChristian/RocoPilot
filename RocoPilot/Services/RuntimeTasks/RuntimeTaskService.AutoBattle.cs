@@ -1,12 +1,9 @@
 using Microsoft.Extensions.Logging;
 using RocoPilot.Configuration;
 using RocoPilot.Models.Capture;
-using RocoPilot.Models.Encounters;
-using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
 using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
-using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
 
@@ -21,8 +18,6 @@ public sealed partial class RuntimeTaskService
     private bool _hasLoggedCurrentAutoBattleTurnAction;
     private bool _hasLoggedCurrentAutoBattleCaptureButtonObservation;
     private bool _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction;
-    private Task<AutoBattleSkillSelectionEnemyNameResult>? _autoBattleSkillSelectionEnemyNameTask;
-    private long _autoBattleSkillSelectionEnemyNameTaskTurnId;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
@@ -57,7 +52,7 @@ public sealed partial class RuntimeTaskService
     }
 
     private async Task HandleAutoBattleSkillSelectionAsync(
-        RuntimeTaskState state, CapturedFrame frame, CancellationToken cancellationToken)
+        RuntimeTaskState state, CancellationToken cancellationToken)
     {
         if (_isSuspended) return;
         var now = DateTimeOffset.Now;
@@ -68,8 +63,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        if (!await EnsureAutoBattleSkillSelectionEnemyNameResultAsync(state, frame, settings, now, cancellationToken)
-            || !_battle.CanAct(settings, now)
+        if (!_battle.CanAct(settings, now)
             || !await _autoBattleActionLock.WaitAsync(0, cancellationToken)) return;
 
         try
@@ -240,150 +234,6 @@ public sealed partial class RuntimeTaskService
             AutoBattleSettingsRules.GetReleaseStepDisplay(turn.ReleaseStep), _battle.RoundIndex);
     }
 
-    private async Task<bool> EnsureAutoBattleSkillSelectionEnemyNameResultAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        AutoBattleSettings settings,
-        DateTimeOffset now,
-        CancellationToken cancellationToken)
-    {
-        if (_isSuspended) return false;
-        var turn = _battle.CurrentTurn;
-        if (turn is null) return false;
-        if (turn.SelectionReady) return true;
-        if (!_battle.IsSelectionPreparationDue(settings, now)) return false;
-
-        if (_autoBattleSkillSelectionEnemyNameTask is null
-            || _autoBattleSkillSelectionEnemyNameTaskTurnId != turn.Id)
-        {
-            _autoBattleSkillSelectionEnemyNameTask = StartAutoBattleSkillSelectionEnemyNameRecognitionAsync(
-                state,
-                frame,
-                cancellationToken);
-            _autoBattleSkillSelectionEnemyNameTaskTurnId = turn.Id;
-            return false;
-        }
-
-        if (!_autoBattleSkillSelectionEnemyNameTask.IsCompleted)
-        {
-            return false;
-        }
-
-        AutoBattleSkillSelectionEnemyNameResult result;
-        try
-        {
-            result = await _autoBattleSkillSelectionEnemyNameTask;
-        }
-        catch (OperationCanceledException)
-        {
-            return false;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "自动战斗技能选择精灵名 OCR 失败，将在下一轮重试。");
-            ResetAutoBattleSkillSelectionEnemyNameTask();
-            return false;
-        }
-
-        if (_battle.CurrentTurn?.Id != turn.Id) return false;
-        var season = _encounterSeasonConfigService.GetCurrentSeason();
-        if (season is null)
-        {
-            _battle.ConfirmSelectionReady(turn.Id);
-            return true;
-        }
-
-        if (string.IsNullOrWhiteSpace(result.MatchedName))
-        {
-            if (_encounterCaptureButtonStateTracker.HasSeenDisabled)
-            {
-                _battle.ConfirmSelectionReady(turn.Id);
-                _logger.LogDebug(
-                    "自动战斗：捕捉按钮处于禁用阶段，按奇遇第一形态继续普通战斗。EnemyNameRaw={EnemyNameRaw}",
-                    FormatLogText(result.RawText));
-                return true;
-            }
-
-            _debugLog.Write(
-                CreateDebugLogKey("auto-battle-skill-selection-enemy-missing", season.Id),
-                CreateTextDebugFingerprint(result.RawText),
-                "自动战斗技能选择精灵名筛选：EnemyNameRaw={EnemyNameRaw}, 未匹配到有效精灵名，等待下一轮 OCR。",
-                FormatLogText(result.RawText));
-            ResetAutoBattleSkillSelectionEnemyNameTask();
-            return false;
-        }
-
-        LogAutoBattleSkillSelectionEnemyNameResult(season, result);
-        if (_battle.ConfirmSelectionReady(turn.Id))
-            RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(_battle.BattleId, turn.Id, result.MatchedName, DateTimeOffset.Now));
-        return true;
-    }
-
-    private Task<AutoBattleSkillSelectionEnemyNameResult> StartAutoBattleSkillSelectionEnemyNameRecognitionAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        CancellationToken cancellationToken)
-    {
-        CapturedFrame frameReference;
-        try
-        {
-            frameReference = frame.AddReference();
-        }
-        catch (ObjectDisposedException)
-        {
-            return Task.FromResult(new AutoBattleSkillSelectionEnemyNameResult(
-                string.Empty,
-                string.Empty));
-        }
-
-        var session = _session ?? throw new InvalidOperationException("运行会话已结束。");
-        return session.RunBackground(
-            async () =>
-            {
-                using (frameReference)
-                {
-                    var rawText = await _frameRecognizer.RecognizeRegionTextAsync(
-                        state,
-                        frameReference,
-                        BattleEnemyNameRegionIds,
-                        cancellationToken,
-                        "自动战斗技能选择");
-                    var season = _encounterSeasonConfigService.GetCurrentSeason();
-                    var matchedName = season is null
-                        ? string.Empty
-                        : await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
-                    return new AutoBattleSkillSelectionEnemyNameResult(
-                        rawText,
-                        matchedName);
-                }
-            });
-    }
-
-    private void LogAutoBattleSkillSelectionEnemyNameResult(
-        EncounterSeasonDefinition season,
-        AutoBattleSkillSelectionEnemyNameResult result)
-    {
-        var matchedName = result.MatchedName;
-        var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
-        _debugLog.Write(
-            CreateDebugLogKey("auto-battle-skill-selection-enemy", season.Id),
-            string.Join(
-                "|",
-                CreateTextDebugFingerprint(result.RawText),
-                CreateTextDebugFingerprint(matchedName)),
-            "自动战斗技能选择精灵名筛选：EnemyNameRaw={EnemyNameRaw}, Matched={SpiritName}, MatchThreshold={MatchThreshold:P1}",
-            FormatLogText(result.RawText),
-            matchedName,
-            spiritNameMatchThreshold);
-
-    }
-
-    private void ResetAutoBattleSkillSelectionEnemyNameTask()
-    {
-        _autoBattleSkillSelectionEnemyNameTask = null;
-        _autoBattleSkillSelectionEnemyNameTaskTurnId = 0;
-    }
-
     private void BeginAutoBattlePetSwitchingTurn(AutoBattleSettings settings)
     {
         var step = _battle.BeginPetSwitching(settings);
@@ -551,13 +401,8 @@ public sealed partial class RuntimeTaskService
 
     private void ClearAutoBattleTurnWork()
     {
-        ResetAutoBattleSkillSelectionEnemyNameTask();
         _hasLoggedCurrentAutoBattleTurnAction = false;
         _hasLoggedCurrentAutoBattleCaptureButtonObservation = false;
         _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
     }
-
-    private sealed record AutoBattleSkillSelectionEnemyNameResult(
-        string RawText,
-        string MatchedName);
 }

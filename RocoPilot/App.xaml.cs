@@ -138,9 +138,11 @@ public partial class App : Application
             services.AddSingleton<ICaptureBackend, WindowsGraphicsCaptureBackend>();
             services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
             services.AddSingleton<IImageMatchingService, ImageMatchingService>();
+#if DEBUG
             services.AddSingleton<ITextRecognitionBackend, PaddleOcrV5TextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, WindowsOcrTextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, TesseractTextRecognitionBackend>();
+#endif
             services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, OnnxOcrV5TextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionService, TextRecognitionService>();

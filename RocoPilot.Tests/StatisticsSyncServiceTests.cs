@@ -72,12 +72,35 @@ public sealed class StatisticsSyncServiceTests
     {
         var (sync, statistics, remote, store) = await CreateAsync();
         await using var lifetime = sync;
-        remote.OnDownload = (_, _) => Task.FromResult(new StatisticsRemoteDownload(new StatisticsDocument(),
+        var remoteDocument = statistics.CurrentDocument;
+        remoteDocument.Accounts.Add(new AccountStatisticsData { Uid = "300" });
+        remote.OnDownload = (_, _) => Task.FromResult(new StatisticsRemoteDownload(remoteDocument,
             new StatisticsSyncRemoteInfo { Exists = true, EntityTag = "remote" }));
         store.BeforeSave = key => key == SettingsKeys.StatisticsData ? throw new IOException("save failed") : Task.CompletedTask;
         await Assert.ThrowsExactlyAsync<IOException>(() => sync.DownloadAsync());
         Assert.AreEqual(2, statistics.CurrentDocument.Accounts.Count);
         Assert.IsNull((await sync.LoadSettingsAsync()).LastDownloadedAt);
+    }
+
+    [TestMethod]
+    public async Task UnchangedDownloadUpdatesBaselineWithoutWritingStatistics()
+    {
+        var (sync, statistics, remote, store) = await CreateAsync();
+        await using var lifetime = sync;
+        remote.OnDownload = (_, _) => Task.FromResult(new StatisticsRemoteDownload(statistics.CurrentDocument,
+            new StatisticsSyncRemoteInfo { Exists = true, EntityTag = "unchanged" }));
+        store.BeforeSave = key => key == SettingsKeys.StatisticsData
+            ? throw new IOException("Unchanged statistics must not be saved.") : Task.CompletedTask;
+        var notifications = 0;
+        statistics.DocumentChanged += (_, _) => notifications++;
+
+        await sync.DownloadAsync();
+
+        var settings = await sync.LoadSettingsAsync();
+        Assert.AreEqual("unchanged", settings.LastSyncedRemoteEntityTag);
+        Assert.IsNotNull(settings.LastDownloadedAt);
+        Assert.AreEqual(0, notifications);
+        Assert.AreEqual(2, statistics.CurrentDocument.Accounts.Count);
     }
 
     [TestMethod]

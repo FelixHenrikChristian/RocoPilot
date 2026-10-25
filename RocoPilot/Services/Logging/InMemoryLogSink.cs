@@ -14,7 +14,6 @@ public sealed class InMemoryLogSink : ILogEventSink
     private readonly object _gate = new();
     private readonly Queue<LogEntry> _buffer;
     private readonly int _capacity;
-    private long _generation;
 
     public event Action<LogEntry>? EntryWritten;
 
@@ -35,7 +34,6 @@ public sealed class InMemoryLogSink : ILogEventSink
 
         lock (_gate)
         {
-            entry.BufferGeneration = _generation;
             if (_buffer.Count >= _capacity)
             {
                 _buffer.Dequeue();
@@ -59,16 +57,7 @@ public sealed class InMemoryLogSink : ILogEventSink
     {
         lock (_gate)
         {
-            _generation++;
             _buffer.Clear();
-        }
-    }
-
-    internal bool IsCurrent(LogEntry entry)
-    {
-        lock (_gate)
-        {
-            return entry.BufferGeneration == _generation;
         }
     }
 

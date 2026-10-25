@@ -247,6 +247,32 @@ public sealed class SeasonTransitionStatisticsTests
     }
 
     [TestMethod]
+    public async Task OtherwiseUnchangedUpdateStillPersistsSeasonMigration()
+    {
+        var config = Config(S3);
+        var store = new ControlledSettingsStore();
+        var service = new StatisticsService(store, NullLogger<StatisticsService>.Instance, config);
+        await service.AddAccountAsync("100");
+        service.SetActiveAccountUid("100");
+        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
+        config.Load().Seasons.Add(S4);
+        var saves = store.SaveCount;
+        var notifications = 0;
+        service.DocumentChanged += (_, _) => notifications++;
+
+        await service.AddAccountAsync("100");
+
+        Assert.AreEqual(1, Count(service, "S4"));
+        Assert.AreEqual(saves + 1, store.SaveCount);
+        Assert.AreEqual(1, notifications);
+        Assert.IsNotNull(store.ReadSaved<StatisticsDocument>(SettingsKeys.StatisticsData)!
+            .Accounts.Single().PendingEncounters.Single().HandledAt);
+        await service.AddAccountAsync("100");
+        Assert.AreEqual(saves + 1, store.SaveCount);
+        Assert.AreEqual(1, notifications);
+    }
+
+    [TestMethod]
     public async Task ImportAndCloudMergeUseCurrentSeasonConfigAndKeepMigrationIdempotent()
     {
         var (service, _) = await CreateAsync(S3);

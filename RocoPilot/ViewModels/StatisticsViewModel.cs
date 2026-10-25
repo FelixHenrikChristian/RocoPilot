@@ -305,7 +305,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     public async Task<bool> AddEncounterAsync(string seasonId, string name, int count)
     {
         name = CleanSpiritName(name);
-        if (!ValidateStatisticInput(seasonId, name, count))
+        if (!ValidateStatisticInput(Overview.SelectedAccount?.Uid, seasonId, name, count))
         {
             return false;
         }
@@ -315,15 +315,16 @@ public partial class StatisticsViewModel : ObservableRecipient
         return true;
     }
 
-    public async Task<bool> EditEncounterAsync(string seasonId, SpiritCountItem item, string nextName, int nextCount)
+    public async Task<bool> EditEncounterAsync(string accountUid, string seasonId, SpiritCountItem item, string nextName, int nextCount)
     {
         nextName = CleanSpiritName(nextName);
-        if (!ValidateStatisticInput(seasonId, nextName, nextCount))
+        if (!ValidateStatisticInput(accountUid, seasonId, nextName, nextCount))
         {
             return false;
         }
 
         await _statisticsService.EditEncounterAsync(
+            accountUid,
             seasonId,
             item.Name,
             nextName,
@@ -333,9 +334,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         return true;
     }
 
-    public async Task DeleteEncounterAsync(string seasonId, SpiritCountItem item)
+    public async Task DeleteEncounterAsync(string accountUid, string seasonId, SpiritCountItem item)
     {
-        await _statisticsService.DeleteEncounterAsync(seasonId, item.Name);
+        await _statisticsService.DeleteEncounterAsync(accountUid, seasonId, item.Name);
         ShowNotification(InfoBarSeverity.Success, "已删除奇遇", $"已删除 {item.Name}。");
     }
 
@@ -349,7 +350,7 @@ public partial class StatisticsViewModel : ObservableRecipient
     {
         seasonId = string.IsNullOrWhiteSpace(seasonId) ? Overview.DefaultShinyAddSeasonId : seasonId.Trim();
         name = CleanSpiritName(name);
-        if (!ValidateStatisticInput(seasonId, name, count))
+        if (!ValidateStatisticInput(Overview.SelectedAccount?.Uid, seasonId, name, count))
         {
             return false;
         }
@@ -369,18 +370,13 @@ public partial class StatisticsViewModel : ObservableRecipient
     }
 
     public async Task<bool> EditShinyCaptureAsync(
+        string accountUid,
         ShinyCaptureDetailItem item,
         string nextName,
         int encounterCountBeforeCapture,
         DateTimeOffset capturedAt)
     {
         nextName = CleanSpiritName(nextName);
-        if (Overview.SelectedAccount is null)
-        {
-            ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先添加或选择账号。");
-            return false;
-        }
-
         if (string.IsNullOrWhiteSpace(nextName))
         {
             ShowNotification(InfoBarSeverity.Warning, "操作失败", "精灵名不能为空。");
@@ -388,6 +384,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
 
         await _statisticsService.EditShinyCaptureAsync(
+            accountUid,
             item.Id,
             nextName,
             Math.Max(0, encounterCountBeforeCapture),
@@ -396,9 +393,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         return true;
     }
 
-    public async Task DeleteShinyCaptureAsync(ShinyCaptureDetailItem item)
+    public async Task DeleteShinyCaptureAsync(string accountUid, ShinyCaptureDetailItem item)
     {
-        await _statisticsService.DeleteShinyCaptureAsync(item.Id);
+        await _statisticsService.DeleteShinyCaptureAsync(accountUid, item.Id);
         ShowNotification(InfoBarSeverity.Success, "已删除异色", $"已删除 {item.Name}。");
     }
 
@@ -690,9 +687,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
     }
 
-    private bool ValidateStatisticInput(string? seasonId, string name, int count)
+    private bool ValidateStatisticInput(string? accountUid, string? seasonId, string name, int count)
     {
-        if (Overview.SelectedAccount is null)
+        if (string.IsNullOrWhiteSpace(accountUid))
         {
             ShowNotification(InfoBarSeverity.Warning, "操作失败", "请先添加或选择账号。");
             return false;

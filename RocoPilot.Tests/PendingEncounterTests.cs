@@ -162,7 +162,7 @@ public sealed class PendingEncounterTests
         await service.AddPendingShinyCaptureAsync(Season, "小火苗", OccurredAt.AddMinutes(1));
         var shiny = Account(service).PendingShinyCaptures.Single();
         await service.ConfirmPendingShinyCaptureAsync(shiny.Id, "小火苗", 20, OccurredAt.AddMinutes(2));
-        await service.DeleteShinyCaptureAsync(Account(service).Seasons.Single().ShinyCaptures.Single().Id);
+        await service.DeleteShinyCaptureAsync(Account(service).Uid, Account(service).Seasons.Single().ShinyCaptures.Single().Id);
         await service.AddPendingEncounterAsync("100", Season, "new", "小火苗", OccurredAt.AddMinutes(3));
         Assert.AreEqual(1, await service.RematchPendingEncountersAsync(Catalog(), 0.55));
         Assert.AreEqual(PendingEncounterConfirmationResult.BeforeReset,

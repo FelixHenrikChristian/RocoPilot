@@ -957,7 +957,6 @@ public sealed class FlowerSeedChallengeRunnerTests
         public int MapButtonX = 55;
         public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
         public string TemplateDirectory => "";
-        public IReadOnlyList<string> ListTemplatePaths() => [];
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
         {

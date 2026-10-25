@@ -16,8 +16,6 @@ public interface IImageMatchingService
         get;
     }
 
-    IReadOnlyList<string> ListTemplatePaths();
-
     Task<ImageMatchResult> MatchAsync(
         CapturedFrame frame,
         RecognitionRegion region,

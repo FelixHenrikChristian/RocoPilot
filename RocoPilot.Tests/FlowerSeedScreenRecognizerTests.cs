@@ -983,7 +983,6 @@ public sealed class FlowerSeedScreenRecognizerTests
                 clientY + (int)Math.Round(height * (.2625 + index * .2) - buttonHeight / 2d),
                 (int)Math.Round(width * .10), buttonHeight, "list-teleport")).ToArray();
         }
-        public IReadOnlyList<string> ListTemplatePaths() => [];
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
             => Task.FromResult(templatePath.EndsWith("/flower-tab.png", StringComparison.Ordinal)

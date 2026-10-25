@@ -406,7 +406,6 @@ public sealed class RuntimeTaskStartupTests
             foreach (var template in new[] { "magic-point.png", "battle-chat.png", "battle-button-skill.png", "battle-button-change.png" })
                 File.WriteAllBytes(Path.Combine(resolutionDirectory, template), []);
         }
-        public IReadOnlyList<string> ListTemplatePaths() => [];
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
             ImageMatchOptions? options = null, CancellationToken cancellationToken = default)
         {

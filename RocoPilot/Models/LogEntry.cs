@@ -6,8 +6,6 @@ namespace RocoPilot.Models;
 
 public sealed class LogEntry
 {
-    internal long BufferGeneration { get; set; }
-
     public DateTimeOffset Timestamp { get; init; }
     public LogEventLevel Level { get; init; }
     public string SourceContext { get; init; } = string.Empty;

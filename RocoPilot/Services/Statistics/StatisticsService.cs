@@ -257,12 +257,14 @@ public sealed class StatisticsService : IStatisticsService
     }
 
     public Task<StatisticsDocument> EditEncounterAsync(
+        string accountUid,
         string seasonId,
         string originalName,
         string nextName,
         int nextCount,
         DateTimeOffset editedAt)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
         seasonId = seasonId.Trim();
         originalName = originalName.Trim();
         nextName = nextName.Trim();
@@ -276,11 +278,13 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.EditEncounter(account, seasonId, originalName, nextName, nextCount, editedAt));
+            StatisticsMutationRules.EditEncounter(account, seasonId, originalName, nextName, nextCount, editedAt),
+            accountUid: accountUid);
     }
 
-    public Task<StatisticsDocument> DeleteEncounterAsync(string seasonId, string spiritName)
+    public Task<StatisticsDocument> DeleteEncounterAsync(string accountUid, string seasonId, string spiritName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
         seasonId = seasonId.Trim();
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(seasonId) || string.IsNullOrWhiteSpace(spiritName))
@@ -289,7 +293,7 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.DeleteEncounter(account, seasonId, spiritName));
+            StatisticsMutationRules.DeleteEncounter(account, seasonId, spiritName), accountUid: accountUid);
     }
 
     public Task<StatisticsDocument> AddShinyCapturesAsync(
@@ -321,25 +325,14 @@ public sealed class StatisticsService : IStatisticsService
                 encounterCountBeforeCapture));
     }
 
-    public Task<StatisticsDocument> DeleteShinyCapturesAsync(string? seasonId, string spiritName)
-    {
-        seasonId = string.IsNullOrWhiteSpace(seasonId) ? null : seasonId.Trim();
-        spiritName = spiritName.Trim();
-        if (string.IsNullOrWhiteSpace(spiritName))
-        {
-            return LoadAsync();
-        }
-
-        return UpdateAccountAsync(account =>
-            StatisticsMutationRules.DeleteShinyCaptures(account, seasonId, spiritName));
-    }
-
     public Task<StatisticsDocument> EditShinyCaptureAsync(
+        string accountUid,
         string captureId,
         string nextName,
         int encounterCountBeforeCapture,
         DateTimeOffset capturedAt)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
         captureId = captureId.Trim();
         nextName = nextName.Trim();
         encounterCountBeforeCapture = Math.Max(0, encounterCountBeforeCapture);
@@ -354,11 +347,12 @@ public sealed class StatisticsService : IStatisticsService
                 captureId,
                 nextName,
                 encounterCountBeforeCapture,
-                capturedAt));
+                capturedAt), accountUid: accountUid);
     }
 
-    public Task<StatisticsDocument> DeleteShinyCaptureAsync(string captureId)
+    public Task<StatisticsDocument> DeleteShinyCaptureAsync(string accountUid, string captureId)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
         captureId = captureId.Trim();
         if (string.IsNullOrWhiteSpace(captureId))
         {
@@ -366,7 +360,7 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.DeleteShinyCapture(account, captureId));
+            StatisticsMutationRules.DeleteShinyCapture(account, captureId), accountUid: accountUid);
     }
 
     public Task<StatisticsDocument> AddPendingShinyCaptureAsync(
@@ -572,16 +566,21 @@ public sealed class StatisticsService : IStatisticsService
             if (!_isLoaded) await LoadCoreAsync();
 
             // 已发布的文档只读。所有修改在副本上完成，持久化成功后再发布新快照。
-            var workingDocument = CloneDocument(_document);
+            var currentJson = JsonSerializer.Serialize(_document, JsonOptions);
+            var workingDocument = JsonSerializer.Deserialize<StatisticsDocument>(currentJson, JsonOptions)!;
             if (_seasonConfigService is not null) StatisticsSeasonMigration.Apply(workingDocument, _seasonConfigService.Load());
             var nextDocument = StatisticsDocumentNormalizer.Normalize(update(workingDocument));
             if (_seasonConfigService is not null && StatisticsSeasonMigration.Apply(nextDocument, _seasonConfigService.Load()))
                 nextDocument = StatisticsDocumentNormalizer.Normalize(nextDocument);
             cancellationToken.ThrowIfCancellationRequested();
+            // 复用快照序列化结果比较实际变化，空操作不写盘、不触发刷新或自动上传。
+            var nextJson = JsonSerializer.Serialize(nextDocument, JsonOptions);
+            if (string.Equals(currentJson, nextJson, StringComparison.Ordinal)) return nextDocument;
+
             await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, nextDocument);
             Volatile.Write(ref _document, nextDocument);
             selectionChanged = ReconcileAccountSelection(nextDocument);
-            changedDocument = CloneDocument(nextDocument);
+            changedDocument = JsonSerializer.Deserialize<StatisticsDocument>(nextJson, JsonOptions)!;
         }
         finally
         {

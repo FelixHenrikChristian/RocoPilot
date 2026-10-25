@@ -15,6 +15,80 @@ namespace RocoPilot.Tests;
 public sealed class StatisticsViewModelTests
 {
     [TestMethod]
+    [DataRow(false, false)]
+    [DataRow(false, true)]
+    [DataRow(true, false)]
+    [DataRow(true, true)]
+    public async Task DetailOperationKeepsOriginalAccountAfterSelectionChanges(bool shiny, bool delete)
+    {
+        var (service, _) = await CreateServiceAsync();
+        var document = service.CurrentDocument;
+        document.Accounts[1].Seasons.Add(new()
+        {
+            Id = "S1",
+            Encounters = [new() { Name = "精灵", Count = 8, Season = "S1" }]
+        });
+        foreach (var account in document.Accounts)
+            account.Seasons.Single(s => s.Id == "S1").ShinyCaptures.Add(new()
+            {
+                Id = "shared-id", Name = "精灵", Season = "S1", CapturedAt = DateTimeOffset.Now
+            });
+        await service.ReplaceAsync(document);
+        var viewModel = CreateViewModel(service);
+        var originalUid = viewModel.Overview.SelectedAccount!.Uid;
+        var encounter = viewModel.Overview.Seasons.Single(s => s.Id == "S1").PollutionCounts.Single();
+        var capture = new ShinyCaptureDetailItem("shared-id", "精灵", "S1", DateTimeOffset.Now, 0, 1, 1);
+        service.SetSelectedAccountUid("200");
+
+        if (shiny)
+        {
+            if (delete) await viewModel.DeleteShinyCaptureAsync(originalUid, capture);
+            else await viewModel.EditShinyCaptureAsync(originalUid, capture, "改名", 12, capture.CapturedAt);
+        }
+        else
+        {
+            if (delete) await viewModel.DeleteEncounterAsync(originalUid, "S1", encounter);
+            else await viewModel.EditEncounterAsync(originalUid, "S1", encounter, "改名", 12);
+        }
+
+        var accounts = service.CurrentDocument.Accounts;
+        var original = accounts.Single(a => a.Uid == "100").Seasons.Single(s => s.Id == "S1");
+        var selected = accounts.Single(a => a.Uid == "200").Seasons.Single(s => s.Id == "S1");
+        Assert.AreEqual("精灵", selected.Encounters.Single().Name);
+        Assert.AreEqual(8, selected.Encounters.Single().Count);
+        Assert.AreEqual("精灵", selected.ShinyCaptures.Single().Name);
+        if (shiny)
+        {
+            Assert.AreEqual(delete ? 0 : 1, original.ShinyCaptures.Count);
+            if (!delete) Assert.AreEqual("改名", original.ShinyCaptures.Single().Name);
+        }
+        else
+        {
+            Assert.AreEqual(delete ? 0 : 1, original.Encounters.Count);
+            if (!delete) Assert.AreEqual(12, original.Encounters.Single().Count);
+        }
+        Assert.AreEqual("200", viewModel.Overview.SelectedAccount!.Uid);
+    }
+
+    [TestMethod]
+    public async Task DetailOperationFailsIfOriginalAccountWasDeleted()
+    {
+        var (service, store) = await CreateServiceAsync();
+        var viewModel = CreateViewModel(service);
+        var uid = viewModel.Overview.SelectedAccount!.Uid;
+        var encounter = viewModel.Overview.Seasons.Single(s => s.Id == "S1").PollutionCounts.Single();
+        await service.DeleteAccountAsync(uid);
+        var saves = store.SaveCount;
+
+        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
+            viewModel.EditEncounterAsync(uid, "S1", encounter, "改名", 12));
+
+        Assert.AreEqual(saves, store.SaveCount);
+        Assert.AreEqual("200", service.CurrentDocument.Accounts.Single().Uid);
+        Assert.AreEqual(0, service.CurrentDocument.Accounts.Single().Seasons.Count);
+    }
+
+    [TestMethod]
     public async Task OldEventAndOperationResultCannotRollBackNewerDocument()
     {
         var (service, _) = await CreateServiceAsync();
@@ -24,7 +98,7 @@ public sealed class StatisticsViewModelTests
             if (nestedWrite) return;
             nestedWrite = true;
             // 第二次提交先于第一次通知送达 ViewModel。
-            service.EditEncounterAsync("S1", "精灵", "精灵", 25, DateTimeOffset.Now).GetAwaiter().GetResult();
+            service.EditEncounterAsync("100", "S1", "精灵", "精灵", 25, DateTimeOffset.Now).GetAwaiter().GetResult();
         };
         var viewModel = CreateViewModel(service);
 

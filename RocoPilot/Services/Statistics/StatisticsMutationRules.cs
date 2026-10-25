@@ -196,14 +196,6 @@ internal static class StatisticsMutationRules
         RememberEncounterReset(seasonData, spiritName, DateTimeOffset.Now);
     }
 
-    public static void DeleteShinyCaptures(AccountStatisticsData account, string? seasonId, string spiritName)
-    {
-        foreach (var capture in GetShinyCaptures(account, seasonId, spiritName).ToList())
-        {
-            RemoveShinyCapture(account, capture);
-        }
-    }
-
     public static void EditShinyCapture(
         AccountStatisticsData account,
         string captureId,
@@ -373,18 +365,6 @@ internal static class StatisticsMutationRules
         };
         account.Seasons.Add(seasonData);
         return seasonData;
-    }
-
-    private static IEnumerable<ShinySpiritCaptureRecord> GetShinyCaptures(
-        AccountStatisticsData account,
-        string? seasonId,
-        string spiritName)
-    {
-        return account.Seasons
-            .Where(season => string.IsNullOrWhiteSpace(seasonId)
-                || string.Equals(season.Id, seasonId, StringComparison.OrdinalIgnoreCase))
-            .SelectMany(season => season.ShinyCaptures)
-            .Where(capture => TextMatchingHelper.AreSameSpiritName(capture.Name, spiritName));
     }
 
     private static void RemoveShinyCapture(AccountStatisticsData account, ShinySpiritCaptureRecord capture)

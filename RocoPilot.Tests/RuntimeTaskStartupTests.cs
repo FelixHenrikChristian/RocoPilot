@@ -13,6 +13,7 @@ using RocoPilot.Models.Input;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.Statistics;
 using RocoPilot.Services;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.Statistics;
@@ -23,6 +24,93 @@ namespace RocoPilot.Tests;
 [TestClass]
 public sealed class RuntimeTaskStartupTests
 {
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task EnablingStatisticsPreparesUidThroughSettingsAndHotkeys(bool hotkey)
+    {
+        using var fixture = new StartupFixture();
+        await fixture.Statistics.AddAccountAsync("100");
+        fixture.Statistics.SetSelectedAccountUid("100");
+        fixture.Statistics.SetActiveAccountUid("100");
+        await fixture.Runtime.StartAsync(Options(enabled: false));
+        var detection = new TaskCompletionSource<StatisticsUidDetectionResult>();
+        fixture.Detection.Detect = () => detection.Task;
+        try
+        {
+            if (hotkey) fixture.Hotkeys.Trigger(HotkeyAction.ToggleEncounterStatistics);
+            else fixture.Runtime.SetEncounterStatisticsEnabled(true);
+
+            Assert.IsTrue(fixture.Runtime.EncounterStatisticsEnabled);
+            Assert.IsTrue(fixture.Statistics.IsActiveAccountSelectionRequired);
+            Assert.IsNull(fixture.Statistics.ActiveAccountUid);
+            Assert.AreEqual(1, fixture.Detection.Calls);
+            fixture.Runtime.SetEncounterStatisticsEnabled(true);
+            Assert.AreEqual(1, fixture.Detection.Calls, "相同开关值不重复识别。");
+
+            var confirmed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fixture.Uid.PendingConfirmationChanged += (_, _) =>
+            {
+                if (fixture.Uid.PendingConfirmation is not null) confirmed.TrySetResult();
+            };
+            detection.SetResult(StatisticsUidDetectionResult.Detected("200"));
+            await confirmed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual("200", fixture.Uid.PendingConfirmation?.SuggestedUid);
+            Assert.IsTrue(fixture.Statistics.IsActiveAccountSelectionRequired);
+            await fixture.Uid.ConfirmUidAsync("200");
+            Assert.AreEqual("200", fixture.Statistics.ActiveAccountUid);
+
+            fixture.Runtime.SetEncounterStatisticsEnabled(false);
+            fixture.Detection.Detect = () => Task.FromResult(StatisticsUidDetectionResult.Failed("unavailable"));
+            fixture.Runtime.SetEncounterStatisticsEnabled(true);
+            Assert.IsNotNull(fixture.Uid.PendingConfirmation, "重新开启时应恢复账号确认入口。");
+            Assert.IsTrue(fixture.Statistics.IsActiveAccountSelectionRequired);
+        }
+        finally { await fixture.Runtime.StopAsync(); }
+        Assert.IsNull(fixture.Uid.PendingConfirmation);
+    }
+
+    [TestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public async Task DisabledOrStoppedRuntimeIgnoresPendingUidPreparation(bool stop)
+    {
+        using var fixture = new StartupFixture();
+        await fixture.Runtime.StartAsync(Options(enabled: false));
+        var detection = new TaskCompletionSource<StatisticsUidDetectionResult>();
+        fixture.Detection.Detect = () => detection.Task;
+        var preparing = fixture.Uid.PrepareEnabledStatisticsAsync(fixture.Runtime.CurrentState!.Options);
+        if (stop)
+        {
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fixture.TrackBackground(release.Task);
+            var stopping = fixture.Runtime.StopAsync();
+            try
+            {
+                Assert.IsFalse(stopping.IsCompleted);
+                fixture.Detection.Detect = () => Task.FromResult(StatisticsUidDetectionResult.Failed("unavailable"));
+                fixture.Runtime.SetEncounterStatisticsEnabled(true);
+                Assert.IsNotNull(fixture.Uid.PendingConfirmation);
+            }
+            finally
+            {
+                release.TrySetResult();
+                await stopping;
+            }
+        }
+        else
+        {
+            fixture.Runtime.SetEncounterStatisticsEnabled(true);
+            fixture.Runtime.SetEncounterStatisticsEnabled(false);
+        }
+        detection.SetResult(StatisticsUidDetectionResult.Detected("200"));
+        await preparing;
+
+        Assert.IsNull(fixture.Uid.PendingConfirmation);
+        Assert.IsNull(fixture.Notice.Current);
+        await fixture.Runtime.StopAsync();
+    }
+
     [TestMethod]
     [DataRow("Interception 驱动未安装或尚未重启。")]
     [DataRow("Interception 初始化失败。")]
@@ -268,11 +356,18 @@ public sealed class RuntimeTaskStartupTests
         public OverlayStub Overlay { get; } = new();
         public MatchingStub Matching { get; }
         public RuntimeTaskService Runtime { get; }
+        public StatisticsService Statistics { get; }
+        public StatisticsUidCoordinatorService Uid { get; }
+        public StatisticsUidCoordinatorTests.DetectionStub Detection { get; } = new();
+        public StatisticsUidCoordinatorTests.NoticeStub Notice { get; } = new();
+        public HotkeyStub Hotkeys { get; } = new();
         public AutoBattleController Battle => (AutoBattleController)GetField("_battle")!;
 
         public StartupFixture(bool sceneRecognition = false)
         {
             var settings = new ControlledSettingsStore();
+            Statistics = new(settings, NullLogger<StatisticsService>.Instance);
+            Uid = new(Detection, Statistics, Notice, NullLogger<StatisticsUidCoordinatorService>.Instance);
             Matching = new(sceneRecognition);
             var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
             // 仅配置场景识别区域，测试不执行文字识别。
@@ -282,8 +377,8 @@ public sealed class RuntimeTaskStartupTests
                 new GameSceneRecognizer(recognizer, Matching, Overlay, debug, battleScreen), battleScreen,
                 new AutoBattleInputExecutor(Keyboard, NullLogger<AutoBattleInputExecutor>.Instance), debug,
                 new StatisticsSeasonConfigStub(), new StatisticsSpiritCatalogStub(),
-                new StatisticsService(settings, NullLogger<StatisticsService>.Instance), settings,
-                new HotkeyStub(), Overlay, Overlay,
+                Statistics, Uid, settings,
+                Hotkeys, Overlay, Overlay,
                 new ShinyEncounterNotification(new AppNotificationStub(), NullLogger<ShinyEncounterNotification>.Instance),
                 NullLogger<RuntimeTaskService>.Instance);
             Capture.BeforeCapture = () =>
@@ -316,6 +411,7 @@ public sealed class RuntimeTaskStartupTests
 
         public void SetField(string name, object? value) =>
             typeof(RuntimeTaskService).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(Runtime, value);
+        public void TrackBackground(Task task) => ((RuntimeSession)GetField("_session")!).Track(task);
         private object? GetField(string name) =>
             typeof(RuntimeTaskService).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(Runtime);
         public void Dispose() => Matching.Dispose();
@@ -426,7 +522,8 @@ public sealed class RuntimeTaskStartupTests
     private sealed class HotkeyStub : IHotkeyService
     {
         public event EventHandler? SettingsChanged { add { } remove { } }
-        public event EventHandler<HotkeyTriggeredEventArgs>? HotkeyTriggered { add { } remove { } }
+        public event EventHandler<HotkeyTriggeredEventArgs>? HotkeyTriggered;
+        public void Trigger(HotkeyAction action) => HotkeyTriggered?.Invoke(this, new(action));
         public HotkeySettings Settings => new();
         public Task LoadSettingsAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<HotkeyBindingUpdateResult> SetBindingAsync(HotkeyAction action, HotkeyBinding? binding,

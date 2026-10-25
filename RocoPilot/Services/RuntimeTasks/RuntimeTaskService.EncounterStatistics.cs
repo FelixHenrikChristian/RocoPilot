@@ -82,6 +82,12 @@ public sealed partial class RuntimeTaskService
 
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
+        if (_encounterStatisticsEnabled == isEnabled) return;
+        if (isEnabled && CurrentState is { } state)
+            _ = _statisticsUidCoordinator.PrepareEnabledStatisticsAsync(state.Options);
+        else if (!isEnabled)
+            _statisticsUidCoordinator.Clear();
+
         _encounterStatisticsEnabled = isEnabled;
         UpdateInfoOverlayTaskIndicators();
         NotifySettingsChanged();

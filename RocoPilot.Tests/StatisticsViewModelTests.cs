@@ -15,6 +15,51 @@ namespace RocoPilot.Tests;
 public sealed class StatisticsViewModelTests
 {
     [TestMethod]
+    [DataRow("add-account")]
+    [DataRow("delete-account")]
+    [DataRow("clear")]
+    [DataRow("add-encounter")]
+    [DataRow("add-shiny")]
+    [DataRow("confirm-shiny")]
+    [DataRow("discard-shiny")]
+    public async Task PageOperationsReportSaveFailuresAndCanBeRetried(string operation)
+    {
+        var (service, store) = await CreateServiceAsync();
+        var viewModel = CreateViewModel(service);
+        viewModel.Overview.PendingEditor.EncounterCount = 35;
+        var before = JsonSerializer.Serialize(service.CurrentDocument);
+        Func<Task> action = operation switch
+        {
+            "add-account" => async () => { await viewModel.AddAccountAsync("300"); },
+            "delete-account" => () => viewModel.DeleteAccountAsync("100"),
+            "clear" => viewModel.ClearAllAsync,
+            "add-encounter" => async () => { await viewModel.AddEncounterAsync("S1", "精灵", 1); },
+            "add-shiny" => async () => { await viewModel.AddShinyAsync("S1", "精灵", 1); },
+            "confirm-shiny" => viewModel.ConfirmLatestPendingShinyAsync,
+            "discard-shiny" => viewModel.DiscardLatestPendingShinyAsync,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation))
+        };
+        store.BeforeSave = _ => throw new IOException("save failed");
+
+        await viewModel.RunOperationAsync("操作失败", action);
+
+        Assert.IsTrue(viewModel.IsNotificationOpen);
+        Assert.AreEqual(Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error, viewModel.NotificationSeverity);
+        Assert.AreEqual("操作失败", viewModel.NotificationTitle);
+        Assert.AreEqual("save failed", viewModel.NotificationMessage);
+        Assert.AreEqual("100", service.SelectedAccountUid);
+        Assert.AreEqual(before, JsonSerializer.Serialize(service.CurrentDocument));
+        Assert.AreEqual(8, service.CurrentDocument.Accounts[0].Seasons.Single(s => s.Id == "S1").Encounters.Single().Count);
+        Assert.AreEqual(1, viewModel.Overview.PendingShinyCount);
+        Assert.AreEqual(35d, viewModel.Overview.PendingEditor.EncounterCount);
+
+        store.BeforeSave = null;
+        await viewModel.RunOperationAsync("操作失败", action);
+        Assert.AreNotEqual(Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error, viewModel.NotificationSeverity);
+        Assert.AreNotEqual(before, JsonSerializer.Serialize(service.CurrentDocument));
+    }
+
+    [TestMethod]
     [DataRow(false, false)]
     [DataRow(false, true)]
     [DataRow(true, false)]

@@ -76,6 +76,9 @@ public sealed partial class RuntimeTaskService
     private string? _lastRecordedEncounterName;
     private DateTimeOffset _lastRecordedEncounterAt;
     private RuntimePendingShinyCapture? _pendingShinyCapture;
+    private TemporaryEncounterRead? _temporaryEncounterRead;
+    private sealed record TemporaryEncounterRead(long BattleId, string AccountUid, string EventId,
+        string BucketId, DateTimeOffset DetectedAt);
     private EncounterCaptureButtonObservation? _latestEncounterCaptureButtonObservation;
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
@@ -447,19 +450,21 @@ public sealed partial class RuntimeTaskService
         long battleId,
         CancellationToken cancellationToken)
     {
+        var pendingRead = _temporaryEncounterRead;
         if (!EncounterStatisticsEnabled
             || !_encounterCaptureButtonStateTracker.IsRelieved
-            || HasActiveEncounterRecord()
+            || (HasActiveEncounterRecord() && pendingRead?.BattleId != battleId)
             || _statisticsService.IsActiveAccountSelectionRequired)
         {
             return;
         }
 
         // 在异步 OCR 前固定这次奇遇的账号和时间，避免切换账号后记到其他账号。
-        var accountUid = _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
+        var accountUid = pendingRead?.BattleId == battleId ? pendingRead.AccountUid
+            : _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
             ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
         if (accountUid is null) return;
-        var detectedAt = DateTimeOffset.Now;
+        var detectedAt = pendingRead?.BattleId == battleId ? pendingRead.DetectedAt : DateTimeOffset.Now;
         season = EncounterSeasonTimeline.ResolveForRecording(_encounterSeasonConfigService.Load(), detectedAt, season);
         var enemyNameText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
@@ -467,7 +472,8 @@ public sealed partial class RuntimeTaskService
             BattleEnemyNameRegionIds,
             cancellationToken,
             "奇遇解除精灵名");
-        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
+        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken,
+            season.Id == EncounterSeasonTimeline.PendingSeasonId || pendingRead?.BattleId == battleId);
         var spiritNameMatchThreshold = GetSpiritNameMatchThreshold();
         _debugLog.Write(
             CreateDebugLogKey("encounter-relieved-enemy-filter", season.Id),
@@ -485,6 +491,19 @@ public sealed partial class RuntimeTaskService
         {
             return;
         }
+
+        if (pendingRead is { } pending && pending.BattleId == battleId)
+        {
+            if (string.IsNullOrWhiteSpace(enemyNameText)) return;
+            if (enemyName.Length > 0) enemyName = await ResolveEncounterStatisticsRecordNameAsync(enemyName, cancellationToken);
+            if (battleId != _battle.BattleId) return;
+            await _statisticsService.RecordTemporaryEncounterAsync(pending.AccountUid, pending.EventId,
+                enemyNameText, enemyName, pending.DetectedAt, pending.BucketId);
+            _temporaryEncounterRead = null;
+            return;
+        }
+        // 正常赛季不创建新的暂存；识别失败时后续帧继续尝试，战斗操作不等待名称。
+        if (season.Id != EncounterSeasonTimeline.PendingSeasonId && string.IsNullOrWhiteSpace(enemyName)) return;
 
         RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(battleId, null, enemyName, DateTimeOffset.Now));
         await RecordEncounterAsync(
@@ -508,6 +527,7 @@ public sealed partial class RuntimeTaskService
             : _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
                 ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
         var detectedAt = DateTimeOffset.Now;
+        season = EncounterSeasonTimeline.ResolveForRecording(_encounterSeasonConfigService.Load(), detectedAt, season);
         var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
@@ -574,15 +594,12 @@ public sealed partial class RuntimeTaskService
 
         try
         {
-            if (season.Id == EncounterSeasonTimeline.PendingSeasonId || string.IsNullOrWhiteSpace(enemyName))
+            if (season.Id == EncounterSeasonTimeline.PendingSeasonId)
             {
-                await _statisticsService.AddPendingEncounterAsync(accountUid, season, recordId,
-                    string.IsNullOrWhiteSpace(enemyName) ? rawText : string.Empty, now, enemyName);
-                _logger.LogInformation(
-                    "奇遇统计：本次奇遇已暂存，等待补齐赛季或精灵名称后自动归档。Uid={Uid}, Season={SeasonId}, Spirit={SpiritName}, EnemyNameRaw={EnemyNameRaw}",
-                    accountUid, season.Id, enemyName, FormatLogText(rawText));
-                if (CurrentState is { } pendingState && !cancellationToken.IsCancellationRequested && !_isSuspended)
-                    RefreshOverlayActivity(pendingState, _overlayActivities.Record(enemyName, null, now, DateTimeOffset.Now));
+                var bucketId = await _statisticsService.RecordTemporaryEncounterAsync(accountUid, recordId, rawText, enemyName, now);
+                if (bucketId is not null && string.IsNullOrWhiteSpace(rawText))
+                    _temporaryEncounterRead = new(battleId, accountUid, recordId, bucketId, now);
+                _logger.LogInformation("新赛季奇遇已累计，等待用户确认归属。Uid={Uid}, Spirit={Spirit}, Raw={Raw}", accountUid, enemyName, rawText);
                 return;
             }
 
@@ -630,7 +647,7 @@ public sealed partial class RuntimeTaskService
             state, frame, BattleEnemyNameRegionIds, cancellationToken, "异色精灵名");
         if (battleId != _battle.BattleId) return;
         await capture.SaveAsync(_statisticsService, rawText);
-        var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
+        var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken, capture.IsTemporary);
         if (string.IsNullOrWhiteSpace(name)) return;
         name = await ResolveEncounterStatisticsRecordNameAsync(name, cancellationToken);
         if (battleId != _battle.BattleId) return;
@@ -683,6 +700,7 @@ public sealed partial class RuntimeTaskService
 
     private void ResetEncounterRecordSuppression()
     {
+        _temporaryEncounterRead = null;
         lock (_encounterRecordLock)
         {
             _hasActiveEncounterRecord = false;
@@ -709,13 +727,13 @@ public sealed partial class RuntimeTaskService
 
     private async Task<string> MatchRecognizedSpiritNameAsync(
         string recognizedText,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool exactOnly = false)
     {
         try
         {
             return await _spiritCatalogService.MatchSpiritNameAsync(
                 recognizedText,
-                GetSpiritNameMatchThreshold(),
+                exactOnly ? 1 : GetSpiritNameMatchThreshold(),
                 cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

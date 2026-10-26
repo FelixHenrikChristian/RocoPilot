@@ -222,9 +222,8 @@ public partial class RealtimeViewModel : ObservableRecipient
             SpiritCatalogSyncStatus = $"同步完成：{document.Count} 个图鉴编号 · {document.Source.Name}";
             try
             {
-                var count = await _statisticsService.RematchPendingEncountersAsync(
-                    document, _encounterSeasonConfigService.Load().SpiritNameMatchThreshold);
-                if (count > 0) SpiritCatalogSyncStatus += $" · 已补全 {count} 条奇遇的精灵名称";
+                var count = await _statisticsService.RefreshTemporaryNamesAsync(document);
+                if (count > 0) SpiritCatalogSyncStatus += $" · 已更新 {count} 组暂存名称，等待确认";
             }
             catch (Exception ex)
             {

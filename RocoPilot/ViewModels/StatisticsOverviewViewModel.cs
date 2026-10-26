@@ -32,11 +32,11 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
 
     public PendingShinyCaptureEditor PendingEditor { get; } = new();
 
-    public IReadOnlyList<PendingEncounterItem> PendingEncounters { get; private set; } = [];
+    public IReadOnlyList<TemporaryStatisticsItem> TemporaryItems { get; private set; } = [];
 
-    public int PendingEncounterCount => PendingEncounters.Count;
+    public int TemporaryGroupCount => TemporaryItems.Count;
 
-    public Visibility PendingEncounterVisibility => PendingEncounterCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility TemporaryReviewVisibility => TemporaryGroupCount > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public int SelectedSeasonIndex
     {
@@ -62,6 +62,8 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(SelectedShinyScopeSeasonId));
                 OnPropertyChanged(nameof(DefaultShinyAddSeasonId));
+                PendingEditor.Update(_account, LatestPendingShinyCapture);
+                NotifyPendingShinyChanged();
                 NotifySelectedShinyChanged();
             }
         }
@@ -89,12 +91,16 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
 
     public int PendingShinyCount => PendingShinyCaptures.Count;
 
-    public PendingShinyCaptureItem? LatestPendingShinyCapture => PendingShinyCaptures
-        .FirstOrDefault(item => item.Season != EncounterSeasonTimeline.PendingSeasonId);
+    public PendingShinyCaptureItem? LatestPendingShinyCapture => PendingShinyCaptures.FirstOrDefault(item =>
+        SelectedShinyScopeSeasonId is null || item.Season == SelectedShinyScopeSeasonId);
 
     public Visibility PendingShinyBadgeVisibility => PendingShinyCount > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     public Visibility PendingShinyConfirmationVisibility => LatestPendingShinyCapture is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public string PendingShinyConfirmationHint => LatestPendingShinyCapture?.Season == EncounterSeasonTimeline.PendingSeasonId
+        ? "确认捕获后记录在临时子页，并清空对应临时奇遇累计；更新后再确认正式赛季，届时不会再次清零。"
+        : "确认后计入异色统计，并清空该精灵的当前赛季奇遇计数。";
 
     public string PendingShinySeasonDisplay => LatestPendingShinyCapture?.SeasonDisplay ?? "--";
 
@@ -148,11 +154,7 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
             ShinyScopes = scopes;
             AllShinyCounts = shinyCounts;
             PendingShinyCaptures = pendingCaptures;
-            PendingEncounters = account?.PendingEncounters
-                .Where(item => item.HandledAt is null)
-                .OrderBy(item => item.DetectedAt)
-                .Select(item => new PendingEncounterItem(account.Uid, item.Id, item.RawText, item.Season, item.DetectedAt, item.Name))
-                .ToList() ?? [];
+            TemporaryItems = TemporaryStatisticsItem.Build(account, seasonConfig);
             _selectedSeasonIndex = Math.Max(0, FindSeasonIndex(seasons, seasonId));
             _selectedShinyScopeIndex = FindSeasonIndex(seasons, shinySeasonId) + 1;
             PendingEditor.Update(account, LatestPendingShinyCapture);
@@ -164,9 +166,9 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
             OnPropertyChanged(nameof(ShinyScopes));
             OnPropertyChanged(nameof(AllShinyCounts));
             OnPropertyChanged(nameof(PendingShinyCaptures));
-            OnPropertyChanged(nameof(PendingEncounters));
-            OnPropertyChanged(nameof(PendingEncounterCount));
-            OnPropertyChanged(nameof(PendingEncounterVisibility));
+            OnPropertyChanged(nameof(TemporaryItems));
+            OnPropertyChanged(nameof(TemporaryGroupCount));
+            OnPropertyChanged(nameof(TemporaryReviewVisibility));
             OnPropertyChanged(nameof(SelectedSeasonIndex));
             OnPropertyChanged(nameof(SelectedShinyScopeIndex));
             OnPropertyChanged(nameof(SelectedSeason));
@@ -205,6 +207,7 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
         OnPropertyChanged(nameof(PendingShinyBadgeVisibility));
         OnPropertyChanged(nameof(PendingShinyConfirmationVisibility));
         OnPropertyChanged(nameof(PendingShinySeasonDisplay));
+        OnPropertyChanged(nameof(PendingShinyConfirmationHint));
         OnPropertyChanged(nameof(PendingShinyDetectedAtDisplay));
         OnPropertyChanged(nameof(LatestPendingShinyAvatar));
         OnPropertyChanged(nameof(LatestPendingShinyAvatarVisibility));

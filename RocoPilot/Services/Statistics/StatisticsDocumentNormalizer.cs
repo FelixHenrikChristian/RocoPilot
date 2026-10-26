@@ -23,6 +23,11 @@ internal static class StatisticsDocumentNormalizer
             {
                 var account = group.First();
                 account.Uid = group.Key;
+                if (account.SyncVersion is { } version)
+                    version.Devices = version.Devices.OrderBy(x => x.Key, StringComparer.Ordinal)
+                        .ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
+                if (account.Temporary is { } temporary)
+                    temporary.Encounters = temporary.Encounters.OrderBy(x => x.Date).ThenBy(x => x.Id, StringComparer.Ordinal).ToList();
                 account.PendingEncounters = group
                     .SelectMany(item => item.PendingEncounters ?? [])
                     .Where(item => !string.IsNullOrWhiteSpace(item.Id) && !string.IsNullOrWhiteSpace(item.Season))

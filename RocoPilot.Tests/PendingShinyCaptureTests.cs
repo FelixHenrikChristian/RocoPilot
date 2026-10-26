@@ -54,9 +54,9 @@ public sealed class PendingShinyCaptureTests
         var capture = new RuntimePendingShinyCapture(1, "100", Season, DetectedAt);
         await capture.SaveAsync(service, "银月狼王");
         await service.UpsertEncounterAsync("S4", "诅咒狼灵", 8, DetectedAt.AddHours(1));
-        await service.AddPendingEncounterAsync("100", Season, "before", "银月狼王", DetectedAt.AddMinutes(-1));
-        await service.AddPendingEncounterAsync("100", Season, "after", "银月狼王", DetectedAt.AddMinutes(1));
-        Assert.AreEqual(2, await service.RematchPendingEncountersAsync(Catalog(), 0.9));
+        await service.RecordEncounterAsync(Season, "诅咒狼灵", DetectedAt.AddMinutes(-1));
+        await service.RecordEncounterAsync(Season, "诅咒狼灵", DetectedAt.AddMinutes(1));
+        Assert.AreEqual(1, await service.RefreshTemporaryNamesAsync(Catalog()));
         Assert.AreEqual("诅咒狼灵", service.GetSelectedAccountPendingShinyCaptures().Single().Name);
         Assert.AreEqual(0, Account(service).Seasons.Single().ShinyCaptures.Count);
 
@@ -66,7 +66,7 @@ public sealed class PendingShinyCaptureTests
         Assert.AreEqual(DetectedAt, season.ShinyCaptures.Single().CapturedAt);
         Assert.AreEqual(0, season.Encounters.Count);
         Assert.AreEqual(0, service.GetSelectedAccountPendingShinyCaptures().Count);
-        Assert.AreEqual(0, await service.RematchPendingEncountersAsync(Catalog(), 0.9));
+        Assert.AreEqual(0, await service.RefreshTemporaryNamesAsync(Catalog()));
 
         await service.RecordEncounterAsync(Season, "诅咒狼灵", DetectedAt.AddDays(2));
         await service.ConfirmPendingShinyCaptureAsync(capture.Id, "诅咒狼灵", null, DetectedAt.AddDays(2));
@@ -75,7 +75,7 @@ public sealed class PendingShinyCaptureTests
     }
 
     [TestMethod]
-    public async Task StartupResolvesBothSeasonAndShinyNameFromUpdatedBundledData()
+    public async Task StartupCompletesShinyNameButKeepsTemporarySeasonUntilUserArchives()
     {
         var (service, store) = await CreateAsync();
         var expired = new EncounterSeasonDefinition { Id = "S3", DateRange = "2026/7/16-2026/9/9" };
@@ -88,7 +88,7 @@ public sealed class PendingShinyCaptureTests
         var updated = new StatisticsService(store, NullLogger<StatisticsService>.Instance, new SeasonConfig(Season), catalog);
         await updated.LoadAsync();
         var pending = updated.GetSelectedAccountPendingShinyCaptures().Single();
-        Assert.AreEqual("S4", pending.Season);
+        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, pending.Season);
         Assert.AreEqual("诅咒狼灵", pending.Name);
         Assert.AreEqual(DetectedAt, pending.DetectedAt);
         Assert.AreEqual(1, catalog.LoadCount);
@@ -100,9 +100,9 @@ public sealed class PendingShinyCaptureTests
     {
         var (service, _) = await CreateAsync();
         await service.AddPendingShinyCaptureAsync(Season, string.Empty, DetectedAt, "unmatched", "银月狼王");
-        await service.RematchPendingEncountersAsync(new SpiritCatalogDocument(), 0.9);
+        await service.RefreshTemporaryNamesAsync(new SpiritCatalogDocument());
         Assert.AreEqual(string.Empty, service.GetSelectedAccountPendingShinyCaptures().Single().Name);
-        await service.RematchPendingEncountersAsync(Catalog(), 0.9);
+        await service.RefreshTemporaryNamesAsync(Catalog());
         Assert.AreEqual("诅咒狼灵", service.GetSelectedAccountPendingShinyCaptures().Single().Name);
     }
 
@@ -150,7 +150,7 @@ public sealed class PendingShinyCaptureTests
         await capture.SaveAsync(service, "银月狼王", "诅咒狼灵");
         await service.MergeRemoteAsync(oldCloud, null, false);
         Assert.AreEqual(0, service.GetSelectedAccountPendingShinyCaptures().Count);
-        Assert.IsNotNull(Account(service).PendingShinyCaptures.Single().HandledAt);
+        Assert.AreEqual(0, Account(service).PendingShinyCaptures.Count);
         Assert.AreEqual(confirm ? 1 : 0, Account(service).Seasons.Single().ShinyCaptures.Count);
     }
 
@@ -176,7 +176,7 @@ public sealed class PendingShinyCaptureTests
         StringAssert.Contains(overview.PendingShinyNameHint, "银月狼王");
         Assert.AreEqual(string.Empty, overview.PendingEditor.Name);
         await service.UpsertEncounterAsync("S4", "诅咒狼灵", 28, DetectedAt.AddHours(1));
-        await service.RematchPendingEncountersAsync(Catalog(), 0.9);
+        await service.RefreshTemporaryNamesAsync(Catalog());
         overview.ApplyDocument(service.CurrentDocument, "100", new EncounterSeasonConfig());
         Assert.AreEqual("诅咒狼灵", overview.PendingEditor.Name);
         Assert.AreEqual(28d, overview.PendingEditor.EncounterCount);

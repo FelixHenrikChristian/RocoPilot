@@ -24,7 +24,7 @@ public sealed class StatisticsServiceTests
         service.DocumentChanged += (_, _) => notifications++;
         var saves = store.SaveCount;
 
-        Assert.AreEqual(0, await service.RematchPendingEncountersAsync(new(), 0.8));
+        Assert.AreEqual(0, await service.RefreshTemporaryNamesAsync(new()));
         await service.AddAccountAsync("100");
         await service.DeleteShinyCaptureAsync("100", "missing");
         await service.EditEncounterAsync("100", "S3", "精灵", "精灵", 1, Now);
@@ -123,7 +123,7 @@ public sealed class StatisticsServiceTests
         store.BeforeRead = null;
         var loaded = await service.LoadAsync();
         Assert.AreEqual(7, Count(loaded));
-        Assert.AreEqual(2, store.ReadCount);
+        Assert.AreEqual(3, store.ReadCount);
     }
 
     [TestMethod]
@@ -206,7 +206,7 @@ public sealed class StatisticsServiceTests
         pause.Dispose();
         await recording;
         Assert.AreEqual(2, Count(service.CurrentDocument));
-        Assert.AreEqual(1, store.SaveCount);
+        Assert.AreEqual(2, store.SaveCount);
     }
 
     [TestMethod]

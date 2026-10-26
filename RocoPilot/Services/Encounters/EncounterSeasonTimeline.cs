@@ -6,7 +6,7 @@ namespace RocoPilot.Services.Encounters;
 internal static class EncounterSeasonTimeline
 {
     public const string PendingSeasonId = "__pending_season__";
-    public const string PendingSeasonName = "赛季待更新";
+    public const string PendingSeasonName = "新赛季";
 
     public static bool TryGetDates(string? dateRange, out DateOnly start, out DateOnly end)
     {

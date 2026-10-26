@@ -8,6 +8,8 @@ internal static class SettingsKeys
 
     public const string StatisticsData = "StatisticsData";
 
+    public const string StatisticsDeviceId = "StatisticsDeviceId";
+
     public const string StatisticsSyncSettings = "StatisticsSyncSettings";
 
     public const string EncounterStatisticsEnabled = "EncounterStatisticsEnabled";

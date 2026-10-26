@@ -27,6 +27,7 @@ public sealed class StatisticsSyncServiceTests
         var saved = await sync.LoadSettingsAsync();
         Assert.AreEqual(uploaded!["100"], saved.LastSyncedAccountFingerprints!["100"]);
         Assert.AreNotEqual(uploaded["100"], StatisticsDocumentMerger.ComputeAccountFingerprints(statistics.CurrentDocument)["100"]);
+        Assert.IsTrue(sync.CurrentStatus.HasPendingChanges);
     }
 
     [TestMethod]

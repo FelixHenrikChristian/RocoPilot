@@ -228,14 +228,6 @@ internal static class StatisticsSyncRules
         return !AreSameRemoteTimestamp(syncedModifiedAt.Value, remoteInfo.LastModifiedAt.Value);
     }
 
-    public static bool HasRecordedSyncVersion(StatisticsSyncSettings settings)
-    {
-        return !string.IsNullOrWhiteSpace(settings.LastSyncedRemoteEntityTag)
-            || settings.LastSyncedRemoteModifiedAt is not null
-            || settings.LastUploadedAt is not null
-            || settings.LastDownloadedAt is not null;
-    }
-
     public static DateTimeOffset? ResolveLegacySyncedRemoteModifiedAt(StatisticsSyncSettings settings)
     {
         var lastSyncAt = Max(settings.LastUploadedAt, settings.LastDownloadedAt);
@@ -332,6 +324,7 @@ internal static class StatisticsSyncRules
             IsEnabled = status.IsEnabled,
             IsBusy = status.IsBusy,
             HasError = status.HasError,
+            HasPendingChanges = status.HasPendingChanges,
             ErrorMessage = status.ErrorMessage,
             ProviderId = status.ProviderId,
             ProviderName = status.ProviderName,

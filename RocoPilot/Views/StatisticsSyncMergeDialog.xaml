@@ -32,13 +32,13 @@
                         <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
                             <TextBlock Text="按账号合并统计数据"
                                        Style="{StaticResource DialogSectionTitleStyle}" />
-                            <TextBlock Text="系统逐个账号自动判断，无需选择规则。" FontSize="12"
+                            <TextBlock Text="按账号版本判断先后，冲突时由你核对选择。" FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                    <TextBlock Text="以下变化均与上次同步时的数据比较：" FontSize="12"
+                    <TextBlock Text="清零、删除和新增都属于账号修改：" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                TextWrapping="Wrap" />
                     <Grid ColumnSpacing="12" RowSpacing="14">
@@ -75,7 +75,7 @@
                                   Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                         <StackPanel Grid.Column="1" Grid.Row="2" Spacing="3">
                             <TextBlock Text="两端都发生变化，且内容不同" Style="{StaticResource DialogFieldTitleStyle}" />
-                            <TextBlock Text="采用云端版本" FontSize="12"
+                            <TextBlock Text="保留双方数据，核对后选择" FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
@@ -92,12 +92,12 @@
                               Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                     <TextBlock Grid.Column="1" FontSize="12" LineHeight="18" TextWrapping="Wrap"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               Text="两端内容冲突时，采用整个云端账号版本，&#x0A;本机独有的修改可能丢失。" />
+                               Text="冲突处理以整个账号为单位。选择前请核对奇遇、异色及删除状态；取消会保留双方数据。" />
                 </Grid>
             </Border>
             <TextBlock FontSize="12" LineHeight="18" TextWrapping="Wrap"
                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       Text="首次同步没有历史基准时，按记录合并；&#x0A;同名精灵的奇遇次数取较大值，不会相加。" />
+                       Text="首次同步遇到无法判断先后的旧数据，也会提示核对。各设备请升级后再同步；换设备前确认上传成功。" />
         </StackPanel>
     </ScrollViewer>
 </controls:AppContentDialog>

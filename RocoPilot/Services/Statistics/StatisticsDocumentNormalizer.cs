@@ -15,6 +15,12 @@ internal static class StatisticsDocumentNormalizer
             ? "RocoPilot"
             : document.Info.ExportApp.Trim();
         document.Accounts ??= [];
+        document.DeletedAccounts = (document.DeletedAccounts ?? [])
+            .OrderBy(x => x.Key.Trim(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(x => x.Key.Trim(), x => x.Value, StringComparer.OrdinalIgnoreCase);
+        foreach (var version in document.DeletedAccounts.Values)
+            version.Devices = version.Devices.OrderBy(x => x.Key, StringComparer.Ordinal)
+                .ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal);
 
         document.Accounts = document.Accounts
             .Where(account => !string.IsNullOrWhiteSpace(account.Uid))
@@ -74,6 +80,8 @@ internal static class StatisticsDocumentNormalizer
             .OrderBy(account => account.Uid, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        if (document.Accounts.Any(x => document.DeletedAccounts.ContainsKey(x.Uid)))
+            throw new InvalidOperationException("统计文档中同一账号同时存在记录和删除标记，请检查导入文件。");
         return document;
     }
 

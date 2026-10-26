@@ -121,6 +121,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
             await SaveSettingsCoreAsync(normalizedSettings, cancellationToken);
             if (!normalizedSettings.IsEnabled) _autoUpload.CancelPending();
+            else if (HasLocalChanges(normalizedSettings)) _autoUpload.Request();
             ApplyStatusFromSettings(normalizedSettings, normalizedSettings.IsEnabled ? "云同步设置已保存" : "云同步未启用");
             return CurrentStatus;
         }
@@ -217,6 +218,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         await _operationGate.WaitAsync(cancellationToken);
         try
         {
+            await _statisticsService.LoadAsync();
             var settings = await LoadSettingsCoreAsync(cancellationToken);
             if (!settings.IsEnabled || !HasRequiredSettings(settings))
             {
@@ -224,6 +226,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
                 return false;
             }
 
+            if (HasLocalChanges(settings)) _autoUpload.Request();
             var (_, password) = await LoadConfiguredSettingsAsync(cancellationToken);
             SetBusy(true, "正在检查云端统计更新");
             var remoteInfo = await _remoteStore.ReadInfoAsync(settings, password, cancellationToken);
@@ -300,6 +303,38 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         }
     }
 
+    public async Task ResolveConflictAsync(StatisticsSyncConflictException conflict, bool useRemote,
+        CancellationToken cancellationToken = default)
+    {
+        using var operation = CreateOperationCancellation(cancellationToken);
+        cancellationToken = operation.Token;
+        await _operationGate.WaitAsync(cancellationToken);
+        try
+        {
+            var (settings, password) = await LoadConfiguredSettingsAsync(cancellationToken);
+            SetBusy(true, "正在核对并保存冲突处理结果");
+            var downloaded = await _remoteStore.DownloadAsync(settings, password, cancellationToken);
+            var remote = StatisticsDocumentMerger.Find(StatisticsDocumentMerger.Prepare(downloaded.Document, settings.LastSyncedAccountFingerprints), conflict.Remote.Uid);
+            if (StatisticsDocumentMerger.Fingerprint(remote) != StatisticsDocumentMerger.Fingerprint(conflict.Remote))
+                throw new InvalidOperationException("云端账号在核对期间发生了变化，请重新同步并核对最新内容。");
+            await _statisticsService.ResolveConflictAsync(conflict, useRemote, cancellationToken);
+            // 决议先落盘；后续上传失败或应用退出，也能继续上传这个包含双方版本的结果。
+            _autoUpload.Request();
+            ApplyStatusFromSettings(settings, "冲突已处理，结果保存在本地，等待上传");
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            SetFailureStatus("处理同步冲突失败", ex);
+            throw;
+        }
+        finally
+        {
+            SetBusy(false);
+            _operationGate.Release();
+        }
+    }
+
     private async Task<StatisticsSyncResult> DownloadAndMergeCoreAsync(
         StatisticsSyncSettings settings,
         string password,
@@ -307,22 +342,9 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         CancellationToken cancellationToken)
     {
         var downloaded = await _remoteStore.DownloadAsync(settings, password, cancellationToken);
-        var remoteDocument = downloaded.Document;
+        var remoteDocument = StatisticsDocumentMerger.Prepare(downloaded.Document, settings.LastSyncedAccountFingerprints);
         var downloadedRemoteInfo = downloaded.Info;
-        var mergeResult = await _statisticsService.MergeRemoteAsync(
-            remoteDocument,
-            settings.LastSyncedAccountFingerprints,
-            preferRemoteAccountsWithoutBaseline:
-                settings.LastSyncedAccountFingerprints is null
-                && HasRecordedSyncVersion(settings)
-                && HasRemoteChangedSinceLastSync(settings, downloadedRemoteInfo),
-            cancellationToken);
-        if (mergeResult.ConflictingAccountUids.Count > 0)
-        {
-            _logger.LogWarning(
-                "云同步检测到同一账号在本地和云端都发生变化，已采用云端版本：{AccountUids}",
-                string.Join(", ", mergeResult.ConflictingAccountUids));
-        }
+        await _statisticsService.MergeRemoteAsync(remoteDocument, cancellationToken);
 
         var completedAt = DateTimeOffset.Now;
         var result = new StatisticsSyncResult
@@ -340,6 +362,11 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         settings.LastSyncedRemoteModifiedAt = result.RemoteLastModifiedAt;
         settings.LastSyncedRemoteEntityTag = result.EntityTag;
         settings.LastSyncedAccountFingerprints = StatisticsDocumentMerger.ComputeAccountFingerprints(remoteDocument);
+        // 旧云端的缺失账号尚无真正的删除标记；上传新版前保留迁移依据，重复下载不能生成新的版本根。
+        if (downloaded.Document.Info?.Version != StatisticsDocumentFormats.CurrentVersion)
+            foreach (var (uid, version) in remoteDocument.DeletedAccounts)
+                if (!downloaded.Document.DeletedAccounts.ContainsKey(uid))
+                    settings.LastSyncedAccountFingerprints[uid] = version.LegacyFingerprint!;
         await SaveSettingsCoreAsync(settings, cancellationToken);
         ApplyStatusFromSettings(settings, successMessage);
         return result;
@@ -436,7 +463,15 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
 
     private void StatisticsService_DocumentChanged(object? sender, StatisticsDocumentChangedEventArgs e)
     {
-        if (e.Source == StatisticsDocumentChangeSource.Local) _autoUpload.Request();
+        if (e.Source != StatisticsDocumentChangeSource.Local) return;
+        StatisticsSyncStatus snapshot;
+        lock (_statusGate)
+        {
+            _status.HasPendingChanges = true;
+            snapshot = CloneStatus(_status);
+        }
+        StatusChanged?.Invoke(this, new StatisticsSyncStatusChangedEventArgs(snapshot));
+        _autoUpload.Request();
     }
 
     private async Task<(StatisticsSyncSettings Settings, string Password)> LoadConfiguredSettingsAsync(CancellationToken cancellationToken)
@@ -514,6 +549,14 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         await SaveSettingsCoreAsync(settings, cancellationToken);
     }
 
+    private bool HasLocalChanges(StatisticsSyncSettings settings)
+    {
+        var local = StatisticsDocumentMerger.ComputeAccountFingerprints(_statisticsService.CurrentDocument);
+        var synced = settings.LastSyncedAccountFingerprints;
+        return local.Count != (synced?.Count ?? 0)
+            || local.Any(x => synced?.GetValueOrDefault(x.Key) != x.Value);
+    }
+
     private void ApplyStatusFromSettings(StatisticsSyncSettings settings, string message, bool onlyWhenIdle = false)
     {
         StatisticsSyncStatus snapshot;
@@ -524,7 +567,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             var provider = ResolveProvider(settings.ProviderId);
             _status = new StatisticsSyncStatus
             {
-                IsConfigured = HasRequiredSettings(settings), IsEnabled = settings.IsEnabled,
+                IsConfigured = HasRequiredSettings(settings), IsEnabled = settings.IsEnabled, HasPendingChanges = HasLocalChanges(settings),
                 IsBusy = _status.IsBusy, ProviderId = settings.ProviderId, ProviderName = provider.Name,
                 Message = message, RemoteLastModifiedAt = settings.LastRemoteModifiedAt,
                 LastUploadedAt = settings.LastUploadedAt, LastDownloadedAt = settings.LastDownloadedAt,

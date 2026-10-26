@@ -7,6 +7,9 @@ public sealed class StatisticsDocument
     public StatisticsDocumentInfo Info { get; set; } = new();
 
     public List<AccountStatisticsData> Accounts { get; set; } = [];
+
+    // 删除后只保留账号和版本，防止离线设备恢复旧数据；不保存业务记录。
+    public Dictionary<string, StatisticsAccountVersion> DeletedAccounts { get; set; } = [];
 }
 
 public sealed class StatisticsDocumentInfo
@@ -24,7 +27,7 @@ public static class StatisticsDocumentFormats
 {
     public const string RocoPilotStatistics = "RocoPilot.Statistics";
 
-    public const string CurrentVersion = "2.0";
+    public const string CurrentVersion = "3.0";
 }
 
 public sealed class AccountStatisticsData

@@ -61,6 +61,8 @@ public sealed class StatisticsSyncStatus
 
     public bool HasError { get; set; }
 
+    public bool HasPendingChanges { get; set; }
+
     public string ErrorMessage { get; set; } = string.Empty;
 
     public string ProviderId { get; set; } = string.Empty;

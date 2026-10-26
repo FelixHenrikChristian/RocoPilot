@@ -84,38 +84,37 @@ public sealed class StatisticsService : IStatisticsService
 
     public Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document)
     {
-        var replacement = CloneDocument(document);
-        return UpdateAsync(current =>
-        {
-            // 用户导入是明确的数据选择，同时继承两份文档的版本，避免下次同步退回旧分支。
-            foreach (var account in replacement.Accounts)
-            {
-                var previous = current.Accounts.FirstOrDefault(x => x.Uid == account.Uid);
-                if (previous?.SyncVersion is not { } version) continue;
-                account.SyncVersion ??= new StatisticsAccountVersion { LegacyFingerprint = StatisticsDocumentMerger.ComputeAccountFingerprint(account) };
-                foreach (var (device, counter) in version.Devices)
-                    account.SyncVersion.Devices[device] = Math.Max(counter, account.SyncVersion.Devices.GetValueOrDefault(device));
-            }
-            return replacement;
-        });
+        var replacement = StatisticsDocumentMerger.Prepare(document);
+        return UpdateAsync(_ => replacement);
     }
 
-    public async Task<StatisticsDocumentMergeResult> MergeRemoteAsync(
-        StatisticsDocument remoteDocument,
-        IReadOnlyDictionary<string, string>? lastSyncedAccountFingerprints,
-        bool preferRemoteAccountsWithoutBaseline,
+    public Task<StatisticsDocument> MergeRemoteAsync(StatisticsDocument remoteDocument,
         CancellationToken cancellationToken = default)
     {
         var remote = CloneDocument(remoteDocument);
-        var baseline = lastSyncedAccountFingerprints?.ToDictionary(pair => pair.Key, pair => pair.Value);
-        IReadOnlyList<string> conflicts = [];
-        var changedDocument = await UpdateAsync(local =>
+        return UpdateAsync(local => StatisticsDocumentMerger.Merge(local, remote),
+            StatisticsDocumentChangeSource.CloudSync, cancellationToken);
+    }
+
+    public Task<StatisticsDocument> ResolveConflictAsync(StatisticsSyncConflictException conflict, bool useRemote,
+        CancellationToken cancellationToken = default)
+    {
+        // 在写锁内核对用户看到的快照；等待确认期间的新增不能被覆盖。
+        return UpdateAsync(document =>
         {
-            var result = StatisticsDocumentMerger.Merge(local, remote, baseline, preferRemoteAccountsWithoutBaseline);
-            conflicts = result.ConflictingAccountUids;
-            return result.Document;
+            var current = StatisticsDocumentMerger.Find(document, conflict.Local.Uid);
+            if (StatisticsDocumentMerger.Fingerprint(current) != StatisticsDocumentMerger.Fingerprint(conflict.Local))
+                throw new InvalidOperationException("本地账号在核对期间发生了变化，请重新同步并核对最新内容。");
+            // 深拷贝后修改，确保失败重试不会改变展示过的冲突快照。
+            var selected = JsonSerializer.Deserialize<StatisticsAccountSnapshot>(
+                JsonSerializer.Serialize(useRemote ? conflict.Remote : conflict.Local, JsonOptions), JsonOptions)!;
+            StatisticsAccountVersions.Include(selected.Version, conflict.Local.Version);
+            StatisticsAccountVersions.Include(selected.Version, conflict.Remote.Version);
+            selected.Version.LegacyFingerprint = conflict.Remote.Version.LegacyFingerprint;
+            StatisticsAccountVersions.Advance(selected.Version, _deviceId);
+            StatisticsDocumentMerger.Put(document, selected);
+            return document;
         }, StatisticsDocumentChangeSource.CloudSync, cancellationToken);
-        return new StatisticsDocumentMergeResult(changedDocument, conflicts);
     }
 
     public Task<StatisticsDocument> AddAccountAsync(string uid)
@@ -125,7 +124,8 @@ public sealed class StatisticsService : IStatisticsService
         {
             if (!document.Accounts.Any(account => string.Equals(account.Uid, uid, StringComparison.OrdinalIgnoreCase)))
             {
-                document.Accounts.Add(new AccountStatisticsData { Uid = uid });
+                document.Accounts.Add(new AccountStatisticsData { Uid = uid, SyncVersion = document.DeletedAccounts.GetValueOrDefault(uid) });
+                document.DeletedAccounts.Remove(uid);
             }
             return document;
         });
@@ -422,7 +422,6 @@ public sealed class StatisticsService : IStatisticsService
 
         return UpdateAccountAsync(account =>
         {
-            EnableVersion(account);
             StatisticsMutationRules.ConfirmPendingShinyCapture(
                 account,
                 pendingCaptureId,
@@ -442,7 +441,6 @@ public sealed class StatisticsService : IStatisticsService
 
         return UpdateAccountAsync(account =>
         {
-            EnableVersion(account);
             StatisticsMutationRules.DiscardPendingShinyCapture(account, pendingCaptureId);
         });
     }
@@ -580,15 +578,6 @@ public sealed class StatisticsService : IStatisticsService
         });
     }
 
-    private static void EnableVersion(AccountStatisticsData account, AccountStatisticsData? original = null)
-    {
-        if (account.SyncVersion is not null) return;
-        account.SyncVersion = new StatisticsAccountVersion
-        {
-            LegacyFingerprint = StatisticsDocumentMerger.ComputeAccountFingerprint(original ?? account)
-        };
-    }
-
     private async Task<StatisticsDocument> UpdateAsync(
         Func<StatisticsDocument, StatisticsDocument> update,
         StatisticsDocumentChangeSource source = StatisticsDocumentChangeSource.Local,
@@ -604,30 +593,28 @@ public sealed class StatisticsService : IStatisticsService
             // 已发布的文档只读。所有修改在副本上完成，持久化成功后再发布新快照。
             var currentJson = JsonSerializer.Serialize(_document, JsonOptions);
             var workingDocument = JsonSerializer.Deserialize<StatisticsDocument>(currentJson, JsonOptions)!;
-            StatisticsLegacyMigration.Apply(workingDocument);
-            var nextDocument = StatisticsDocumentNormalizer.Normalize(update(workingDocument));
-            if (StatisticsLegacyMigration.Apply(nextDocument))
-                nextDocument = StatisticsDocumentNormalizer.Normalize(nextDocument);
-            foreach (var account in nextDocument.Accounts)
+            var nextDocument = StatisticsDocumentMerger.Prepare(update(workingDocument));
+            if (source == StatisticsDocumentChangeSource.Local)
             {
-                var original = _document.Accounts.FirstOrDefault(x => x.Uid == account.Uid);
-                if (source != StatisticsDocumentChangeSource.Local)
+                // 导入、清空和删除共用一条路径，删除标记不会随备份替换而丢失。
+                foreach (var previous in StatisticsDocumentMerger.Snapshots(_document))
                 {
-                    if (account.SyncVersion is { Devices.Count: 0 } version)
+                    var next = StatisticsDocumentMerger.Find(nextDocument, previous.Uid);
+                    if (next is null)
                     {
-                        // 接收旧格式云端更新时继承本地版本，再记录本次迁移，避免退回升级前分支。
-                        foreach (var entry in original?.SyncVersion?.Devices ?? [])
-                            version.Devices[entry.Key] = entry.Value;
-                        StatisticsAccountVersions.Advance(account, _deviceId);
+                        var version = new StatisticsAccountVersion { LegacyFingerprint = previous.Version.LegacyFingerprint };
+                        StatisticsAccountVersions.Include(version, previous.Version);
+                        nextDocument.DeletedAccounts[previous.Uid] = version;
                     }
-                    continue;
+                    else StatisticsAccountVersions.Include(next.Version, previous.Version);
                 }
-                if (account.SyncVersion is null && (account.Temporary is not null
-                    || account.PendingShinyCaptures.Any(x => x.Season == EncounterSeasonTimeline.PendingSeasonId)))
-                    EnableVersion(account, original);
-                if (account.SyncVersion is not null && (original is null
-                    || StatisticsDocumentMerger.ComputeAccountFingerprint(account) != StatisticsDocumentMerger.ComputeAccountFingerprint(original)))
-                    StatisticsAccountVersions.Advance(account, _deviceId);
+                foreach (var next in StatisticsDocumentMerger.Snapshots(nextDocument))
+                {
+                    var previous = StatisticsDocumentMerger.Find(_document, next.Uid);
+                    if (StatisticsDocumentMerger.Fingerprint(next) != StatisticsDocumentMerger.Fingerprint(previous))
+                        StatisticsAccountVersions.Advance(next.Version, _deviceId);
+                }
+                StatisticsDocumentNormalizer.Normalize(nextDocument);
             }
             cancellationToken.ThrowIfCancellationRequested();
             // 复用快照序列化结果比较实际变化，空操作不写盘、不触发刷新或自动上传。
@@ -660,28 +647,23 @@ public sealed class StatisticsService : IStatisticsService
                 await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsDeviceId, _deviceId);
             }
             var savedDocument = await _localSettingsService.ReadSettingAsync<StatisticsDocument>(SettingsKeys.StatisticsData);
-            var document = savedDocument is null
-                ? StatisticsDocumentNormalizer.CreateDefault()
-                : StatisticsDocumentNormalizer.Normalize(CloneDocument(savedDocument));
-            var before = JsonSerializer.Serialize(document, JsonOptions);
+            var before = JsonSerializer.Serialize(savedDocument, JsonOptions);
+            var legacySettings = savedDocument is not null && savedDocument.Info?.Version != StatisticsDocumentFormats.CurrentVersion
+                ? await _localSettingsService.ReadSettingAsync<StatisticsSyncSettings>(SettingsKeys.StatisticsSyncSettings) : null;
+            var document = StatisticsDocumentMerger.Prepare(savedDocument ?? StatisticsDocumentNormalizer.CreateDefault(),
+                legacySettings?.LastSyncedAccountFingerprints);
             var fingerprints = StatisticsDocumentMerger.ComputeAccountFingerprints(document);
-            foreach (var account in document.Accounts.Where(x => x.SyncVersion is null && (x.Temporary is not null
-                || x.PendingShinyCaptures.Any(p => p.Season == EncounterSeasonTimeline.PendingSeasonId)
-                || x.Seasons.Any(p => p.Id == EncounterSeasonTimeline.PendingSeasonId))))
-                EnableVersion(account);
-            StatisticsLegacyMigration.Apply(document);
             if (_spiritCatalogService is not null && document.Accounts.Any(x => x.Temporary is not null || x.PendingShinyCaptures.Count > 0))
             {
                 try { MatchPendingNames(document, new SpiritCatalogIndex(await _spiritCatalogService.LoadAsync()), _seasonConfigService?.Load().SpiritNameMatchThreshold ?? 0.55); }
                 catch (Exception ex) { _logger.LogWarning(ex, "暂存名称刷新失败，保留数据等待重试。"); }
             }
-            if (before != JsonSerializer.Serialize(document, JsonOptions))
-            {
-                foreach (var account in document.Accounts.Where(x => x.SyncVersion is not null
-                    && fingerprints.GetValueOrDefault(x.Uid) != StatisticsDocumentMerger.ComputeAccountFingerprint(x)))
-                    StatisticsAccountVersions.Advance(account, _deviceId);
+            foreach (var account in document.Accounts.Where(x => fingerprints.GetValueOrDefault(x.Uid)
+                != StatisticsDocumentMerger.ComputeAccountFingerprint(x)))
+                StatisticsAccountVersions.Advance(account.SyncVersion!, _deviceId);
+            StatisticsDocumentNormalizer.Normalize(document);
+            if (savedDocument is not null && before != JsonSerializer.Serialize(document, JsonOptions))
                 await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, document);
-            }
             Volatile.Write(ref _document, document);
             _isLoaded = true;
         }

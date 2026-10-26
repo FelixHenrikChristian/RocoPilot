@@ -159,7 +159,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock FontSize="12" FontWeight="SemiBold" Text="合并云端数据" />
-                                <TextBlock Grid.Column="1" Style="{StaticResource TutorialBodyStyle}" Text="将云端统计合并到本地；同一账号在两台设备同时修改时采用云端版本。" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource TutorialBodyStyle}" Text="按账号版本同步，清零和删除也会同步；两端各自修改时先保留双方数据，由你核对选择。" />
                             </Grid>
                             <Grid ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>

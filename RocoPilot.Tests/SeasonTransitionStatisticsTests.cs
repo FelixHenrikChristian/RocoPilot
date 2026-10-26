@@ -77,7 +77,7 @@ public sealed class SeasonTransitionStatisticsTests
         Assert.AreEqual(2, account.Temporary!.Encounters.Count);
         Assert.AreEqual(2, account.Temporary.Encounters.Single(x => x.RawText == "原文").Count);
         Assert.AreEqual(0, account.Seasons.Sum(x => x.Encounters.Count));
-        await service.MergeRemoteAsync(old, null, false);
+        await service.MergeRemoteAsync(old);
         Assert.AreEqual(3, service.CurrentDocument.Accounts.Single().Temporary!.Encounters.Sum(x => x.Count));
         var restart = new StatisticsService(store, NullLogger<StatisticsService>.Instance, config); await restart.LoadAsync();
         Assert.AreEqual(3, restart.CurrentDocument.Accounts.Single().Temporary!.Encounters.Sum(x => x.Count));
@@ -133,7 +133,7 @@ public sealed class SeasonTransitionStatisticsTests
             new StatisticsSpiritCatalogStub { Document = Catalog });
         await service.LoadAsync();
         await service.ConfirmPendingShinyCaptureAsync("legacy-shiny", "小火苗", 15, Date);
-        await service.MergeRemoteAsync(old, null, false);
+        await service.MergeRemoteAsync(old);
         var account = service.CurrentDocument.Accounts.Single();
         Assert.AreEqual(0, account.PendingShinyCaptures.Count);
         Assert.AreEqual(15, account.Seasons.Single().ShinyCaptures.Single().EncounterCountBeforeCapture);

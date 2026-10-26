@@ -23,10 +23,10 @@ public interface IStatisticsService
     Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document);
 
     /// <summary>在同一次写入中读取最新本地数据、合并云端文档并持久化。</summary>
-    Task<StatisticsDocumentMergeResult> MergeRemoteAsync(
-        StatisticsDocument remoteDocument,
-        IReadOnlyDictionary<string, string>? lastSyncedAccountFingerprints,
-        bool preferRemoteAccountsWithoutBaseline,
+    Task<StatisticsDocument> MergeRemoteAsync(StatisticsDocument remoteDocument,
+        CancellationToken cancellationToken = default);
+
+    Task<StatisticsDocument> ResolveConflictAsync(StatisticsSyncConflictException conflict, bool useRemote,
         CancellationToken cancellationToken = default);
 
     Task<StatisticsDocument> AddAccountAsync(string uid);

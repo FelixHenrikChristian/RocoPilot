@@ -73,3 +73,33 @@
 - 用户确认后采用最小修复：Windows 10 2004（19041）及以上的 WGC 会话在 `StartCapture()` 前设置 `IsCursorCaptureEnabled = false`，不修改模板、阈值、鼠标点击或重试行为。版本判断遵循项目现有最低版本 17763，避免在旧系统调用不存在的接口。该配置只影响捕获的系统光标，不会消除游戏自己的悬停样式。
 - 客户区副本：`Fixtures/legendary-local/preparation-start-stalled.png`；回放入口为 `LegendaryLocalScreenshotTests.PreparationStartIsRecognizedWithoutCursor`，检查两种分辨率的开始按钮及复查位置。此测试验证无光标截图识别，真实悬停场景仍应在新会话中复测；已经运行的旧进程不会自动使用新代码。
 - 修复验证：8 项本地截图回放通过；补上版本判断后再次运行两种分辨率的准备界面测试通过。临时诊断使用新代码对实际游戏窗口创建 WGC 会话，取得 **2052×1199** 帧，并读取确认 `IsCursorCaptureEnabled=False`。诊断未发送鼠标／键盘输入，不等同于完整自动挑战验收；临时诊断代码已移除。
+
+	## 2026-10-25：普通提交触发发布工作流后跳过构建
+
+- 原图：[ordinary-commit-release-check-skipped.png](LocalScreenshots/2026-10-25/github-actions/ordinary-commit-release-check-skipped.png)，来源为本对话附件 `codex-clipboard-366f48db-c8aa-4ce3-8bb3-f45d8ebdd322.png`，尺寸 2549×1403；原样保存，未裁剪。SHA-256：`F8EBA74A72EF825A7C7781A7264DFAABC822380DA9F01B3146ACE7FC6FE6AD3F`。
+- 界面状态：GitHub 仓库首页提交 `be6ce5e` 的检查面板，Build release assets 显示成功（19 秒），Create GitHub release 显示跳过。
+- 测试用途：排查普通提交为何触发发布工作流，区分“工作流运行”与“实际构建／发布”；无需 OCR 或图像识别测试，未派生测试素材。
+- 对应证据：[Actions 40170468948](https://github.com/FelixHenrikChristian/RocoPilot/actions/runs/40170468948)。该提交调整主项目的 Debug OCR 依赖与模型，改动 `RocoPilot/RocoPilot.csproj`，命中既有 paths 过滤；日志确认 v0.4.4.0 标签已存在，SDK 安装、还原、打包、上传和 Release 创建均跳过。
+- 已知限制：截图仅展示检查摘要，无法单独判断步骤是否真正构建；上述执行结论来自对应 Actions 步骤与日志。当前 v0.4.4.0 Release 为草稿，目标为 `3502601`，不包含后续 `be6ce5e` 修改。
+
+## 2026-10-26：新赛季确认界面布局调整前
+
+- 来源：本侧对话用户提供的两张实际界面预览截图，原样保存并核对 SHA-256，未裁剪或覆盖历史素材。
+- [异色捕获确认](LocalScreenshots/2026-10-26/new-season-statistics/shiny-confirmation-before.png)：附件 `codex-clipboard-c9a4cf84-a361-4633-9d5d-2c9a65bf1ae9.png`。界面为“确认暂存异色”，示例精灵火花、异色前奇遇 55 次，赛季仍显示“新赛季（待更新）”。SHA-256：`E62461A0E255B429A6F108D746780B86E8A1112DC1F000CF393D630C04029133`。
+- [更新后确认归档](LocalScreenshots/2026-10-26/new-season-statistics/statistics-transfer-before.png)：附件 `codex-clipboard-524d5bb7-daeb-4a15-a51f-e4a1299fcb52.png`。每项为多行卡片，选择框标为“奇遇”，字段过宽，底部按钮为“确认计入并清理”。SHA-256：`FE447CD3DFB672E68AA29B039B62813DD2E25256AA1CBDC6223EBC35D3E5F289`。
+- 用途：作为名称、统一确认标题、单行列表和选择提示的修改前视觉依据；对应 `PendingShinyConfirmationPanel`、`TemporaryStatisticsDialog` 及赛季名称展示断言。未新增 OCR 派生样本。
+- 已知限制：截图来自独立示例预览，其窗口大小和主题与用户正式应用不同；画面中的赛季、日期、精灵和次数属于示例，不代表真实捕获记录，也不证明同步或入账成功。
+
+## 2026-10-26：普通调试版启动后的云同步冲突提示
+
+- [用户原图](LocalScreenshots/2026-10-26/new-season-statistics/debug-app-sync-conflict.png)：附件 `codex-clipboard-4e34ab8b-35e4-49dc-be01-3a63826244a9.png`，原样归档。SHA-256：`D53EE277828F598545E5707D85E92D6D672598B319EEC445C85D2B3104081E55`。
+- 界面：正式统计页面显示账号统计，云同步提示旧版数据与升级时快照不同，并提示未覆盖或重复入账。
+- 用途：记录普通调试版仍会走真实启动及同步流程的问题；界面预览改为独立入口，只使用内存示例数据，不初始化真实设置、统计服务或云同步。
+- 已知限制：截图中的“未覆盖或重复入账”是程序提示，不能单凭截图证明启动前后本地统计完全一致；本次未对真实记录执行恢复、导入或覆盖操作。未派生 OCR 测试样本。
+
+## 2026-10-26：独立归档预览的分组与焦点反馈
+
+- [用户原图](LocalScreenshots/2026-10-26/new-season-statistics/transfer-list-before-cards.png)：附件 `codex-clipboard-5bb41f9f-9442-4de8-ae78-add72bb90429.png`，原样归档。SHA-256：`143F800100B723A35942D4FA47570E4303F414BECF0A8EE94D6AFDB6811D5029`。
+- 界面：深色独立预览中的新赛季归档弹窗，单行输入布局、方形选择框、奇遇与异色仅用文字分组，已选 1 项，火花名称输入框处于编辑状态。
+- 用途：参考正式统计卡片，改为奇遇和异色两张卡片、圆角选择按钮。用户随后决定保留 WinUI 默认焦点行为，点击空白失焦的试验代码已撤回。
+- 已知限制：截图只展示单帧状态，不能单独证明焦点交互；布局及选择行为在独立示例程序中验证，不访问真实账号或同步服务。

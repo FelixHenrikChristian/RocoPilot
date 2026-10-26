@@ -33,6 +33,7 @@ public sealed class StatisticsService : IStatisticsService
 
     private StatisticsDocument _document = StatisticsDocumentNormalizer.CreateDefault();
     private bool _isLoaded;
+    private string _deviceId = string.Empty;
     private string? _selectedAccountUid;
     private string? _activeAccountUid;
     private bool _isActiveAccountSelectionRequired;
@@ -84,7 +85,19 @@ public sealed class StatisticsService : IStatisticsService
     public Task<StatisticsDocument> ReplaceAsync(StatisticsDocument document)
     {
         var replacement = CloneDocument(document);
-        return UpdateAsync(_ => replacement);
+        return UpdateAsync(current =>
+        {
+            // 用户导入是明确的数据选择，同时继承两份文档的版本，避免下次同步退回旧分支。
+            foreach (var account in replacement.Accounts)
+            {
+                var previous = current.Accounts.FirstOrDefault(x => x.Uid == account.Uid);
+                if (previous?.SyncVersion is not { } version) continue;
+                account.SyncVersion ??= new StatisticsAccountVersion { LegacyFingerprint = StatisticsDocumentMerger.ComputeAccountFingerprint(account) };
+                foreach (var (device, counter) in version.Devices)
+                    account.SyncVersion.Devices[device] = Math.Max(counter, account.SyncVersion.Devices.GetValueOrDefault(device));
+            }
+            return replacement;
+        });
     }
 
     public async Task<StatisticsDocumentMergeResult> MergeRemoteAsync(
@@ -150,8 +163,8 @@ public sealed class StatisticsService : IStatisticsService
 
         season = ResolveRecordingSeason(season, capturedAt);
         if (season.Id == EncounterSeasonTimeline.PendingSeasonId)
-            return UpdateAccountAsync(account => StatisticsMutationRules.AddPendingEncounter(
-                account, season, Guid.NewGuid().ToString("N"), string.Empty, capturedAt, spiritName),
+            return UpdateAccountAsync(account => TemporaryStatisticsRules.Record(
+                account, Guid.NewGuid().ToString("N"), spiritName, spiritName, capturedAt, null),
                 useActiveAccount: true, accountUid: accountUid);
 
         return UpdateAccountAsync(account =>
@@ -159,77 +172,82 @@ public sealed class StatisticsService : IStatisticsService
             useActiveAccount: true, accountUid: accountUid);
     }
 
-    public Task<StatisticsDocument> AddPendingEncounterAsync(
-        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt,
-        string? spiritName = null)
+    public async Task<string?> RecordTemporaryEncounterAsync(string accountUid, string eventId, string rawText,
+        string exactName, DateTimeOffset detectedAt, string? previousBucketId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
-        ArgumentException.ThrowIfNullOrWhiteSpace(season.Id);
-        ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        season = ResolveRecordingSeason(season, detectedAt);
-        return UpdateAccountAsync(account =>
-            StatisticsMutationRules.AddPendingEncounter(account, season, id, rawText, detectedAt, spiritName),
+        ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
+        if (previousBucketId is null && _seasonConfigService is not null
+            && !EncounterSeasonTimeline.IsExpired(_seasonConfigService.Load(), DateOnly.FromDateTime(detectedAt.DateTime)))
+            return null;
+        string? bucketId = null;
+        await UpdateAccountAsync(account => bucketId = TemporaryStatisticsRules.Record(
+            account, eventId, rawText, exactName, detectedAt, previousBucketId),
             useActiveAccount: true, accountUid: accountUid);
+        return bucketId;
     }
 
-    public async Task<PendingEncounterConfirmationResult> ConfirmPendingEncounterAsync(
-        string accountUid, string id, string spiritName)
+    public Task<StatisticsDocument> TransferTemporaryStatisticsAsync(IReadOnlyList<TemporaryStatisticsTransfer> transfers)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
-        ArgumentException.ThrowIfNullOrWhiteSpace(spiritName);
-        var result = PendingEncounterConfirmationResult.NotFound;
-        await UpdateAccountAsync(account =>
-            result = StatisticsMutationRules.ConfirmPendingEncounter(account, id, spiritName.Trim()),
-            accountUid: accountUid);
-        return result;
-    }
-
-    public Task<StatisticsDocument> DiscardPendingEncounterAsync(string accountUid, string id)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(accountUid);
-        return UpdateAccountAsync(account =>
+        var seasons = _seasonConfigService?.Load().Seasons ?? [];
+        return UpdateAsync(document =>
         {
-            var pending = account.PendingEncounters.FirstOrDefault(item => item.Id == id);
-            if (pending is { HandledAt: null }) pending.HandledAt = DateTimeOffset.Now;
-        }, accountUid: accountUid);
-    }
-
-    public async Task<int> RematchPendingEncountersAsync(SpiritCatalogDocument catalog, double minimumSimilarity)
-    {
-        var index = new SpiritCatalogIndex(catalog);
-        var matchedCount = 0;
-        await UpdateAsync(document =>
-        {
-            matchedCount = MatchPendingNames(document, index, minimumSimilarity, out _);
+            foreach (var transfer in transfers)
+            {
+                var season = seasons.FirstOrDefault(x => x.Id == transfer.SeasonId && x.Id != EncounterSeasonTimeline.PendingSeasonId)
+                    ?? throw new InvalidOperationException("请选择软件已配置的正式赛季。");
+                var account = document.Accounts.FirstOrDefault(x => x.Uid == transfer.AccountUid)
+                    ?? throw new InvalidOperationException("统计账号已不存在。");
+                TemporaryStatisticsRules.Transfer(account, transfer, season);
+            }
             return document;
         });
-        return matchedCount;
     }
 
-    private static int MatchPendingNames(StatisticsDocument document, SpiritCatalogIndex index, double minimumSimilarity, out bool changed)
+    public async Task<int> RefreshTemporaryNamesAsync(SpiritCatalogDocument catalog)
     {
-        changed = false;
-        var matchedCount = 0;
+        var index = new SpiritCatalogIndex(catalog);
+        var count = 0;
+        await UpdateAsync(document =>
+        {
+            count = MatchPendingNames(document, index, _seasonConfigService?.Load().SpiritNameMatchThreshold ?? 0.55);
+            return document;
+        });
+        return count;
+    }
+
+    private static int MatchPendingNames(StatisticsDocument document, SpiritCatalogIndex index, double normalThreshold)
+    {
+        var count = 0;
         foreach (var account in document.Accounts)
         {
-            foreach (var pending in account.PendingEncounters.Where(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name)))
+            foreach (var item in account.Temporary?.Encounters ?? [])
             {
-                var matchedName = index.Match(pending.RawText, minimumSimilarity);
-                if (string.IsNullOrWhiteSpace(matchedName)) continue;
-                changed = true;
-                var result = StatisticsMutationRules.ConfirmPendingEncounter(account, pending.Id, index.ResolveEvolutionRecordName(matchedName));
-                if (result is PendingEncounterConfirmationResult.Counted or PendingEncounterConfirmationResult.AwaitingSeason)
-                    matchedCount++;
+                if (item.RawText.Length == 0) continue;
+                var match = index.Match(item.RawText, 1);
+                var name = match.Length == 0 ? string.Empty : index.ResolveEvolutionRecordName(match);
+                if (item.Name == name) continue;
+                item.Name = name;
+                count++;
             }
-            foreach (var pending in account.PendingShinyCaptures.Where(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name)))
+            foreach (var capture in account.Seasons.Where(x => x.Id == EncounterSeasonTimeline.PendingSeasonId).SelectMany(x => x.ShinyCaptures))
             {
-                var matchedName = index.Match(pending.RawText, minimumSimilarity);
-                if (string.IsNullOrWhiteSpace(matchedName)) continue;
-                pending.Name = index.ResolveEvolutionRecordName(matchedName);
-                changed = true;
+                var match = index.Match(capture.Name, 1);
+                if (match.Length == 0) continue;
+                var name = index.ResolveEvolutionRecordName(match);
+                if (capture.Name == name) continue;
+                capture.Name = name;
+                count++;
+            }
+            foreach (var pending in account.PendingShinyCaptures.Where(x => x.HandledAt is null && x.Name.Length == 0))
+            {
+                var match = index.Match(pending.RawText, pending.Season == EncounterSeasonTimeline.PendingSeasonId ? 1 : normalThreshold);
+                if (match.Length == 0) continue;
+                pending.Name = index.ResolveEvolutionRecordName(match);
+                count++;
             }
         }
-        return matchedCount;
+        return count;
     }
 
     private EncounterSeasonDefinition ResolveRecordingSeason(EncounterSeasonDefinition fallback, DateTimeOffset occurredAt) =>
@@ -369,7 +387,7 @@ public sealed class StatisticsService : IStatisticsService
         DateTimeOffset detectedAt,
         string? id = null,
         string? rawText = null,
-        string? accountUid = null)
+        string? accountUid = null, bool updateOnly = false)
     {
         spiritName = spiritName.Trim();
         if (string.IsNullOrWhiteSpace(season.Id))
@@ -380,7 +398,10 @@ public sealed class StatisticsService : IStatisticsService
         season = ResolveRecordingSeason(season, detectedAt);
         var eventId = string.IsNullOrWhiteSpace(id) ? Guid.NewGuid().ToString("N") : id.Trim();
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt, eventId, rawText?.Trim() ?? string.Empty),
+        {
+            if (updateOnly && !account.PendingShinyCaptures.Any(x => x.Id == eventId)) return;
+            StatisticsMutationRules.AddPendingShinyCapture(account, season, spiritName, detectedAt, eventId, rawText?.Trim() ?? string.Empty);
+        },
             useActiveAccount: true, accountUid: accountUid);
     }
 
@@ -400,12 +421,15 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return UpdateAccountAsync(account =>
+        {
+            EnableVersion(account);
             StatisticsMutationRules.ConfirmPendingShinyCapture(
                 account,
                 pendingCaptureId,
                 spiritName,
                 encounterCount,
-                confirmedAt));
+                confirmedAt);
+        });
     }
 
     public Task<StatisticsDocument> DiscardPendingShinyCaptureAsync(string pendingCaptureId)
@@ -417,7 +441,10 @@ public sealed class StatisticsService : IStatisticsService
         }
 
         return UpdateAccountAsync(account =>
-            StatisticsMutationRules.DiscardPendingShinyCapture(account, pendingCaptureId));
+        {
+            EnableVersion(account);
+            StatisticsMutationRules.DiscardPendingShinyCapture(account, pendingCaptureId);
+        });
     }
 
     public void SetSelectedAccountUid(string? uid)
@@ -553,6 +580,15 @@ public sealed class StatisticsService : IStatisticsService
         });
     }
 
+    private static void EnableVersion(AccountStatisticsData account, AccountStatisticsData? original = null)
+    {
+        if (account.SyncVersion is not null) return;
+        account.SyncVersion = new StatisticsAccountVersion
+        {
+            LegacyFingerprint = StatisticsDocumentMerger.ComputeAccountFingerprint(original ?? account)
+        };
+    }
+
     private async Task<StatisticsDocument> UpdateAsync(
         Func<StatisticsDocument, StatisticsDocument> update,
         StatisticsDocumentChangeSource source = StatisticsDocumentChangeSource.Local,
@@ -568,10 +604,25 @@ public sealed class StatisticsService : IStatisticsService
             // 已发布的文档只读。所有修改在副本上完成，持久化成功后再发布新快照。
             var currentJson = JsonSerializer.Serialize(_document, JsonOptions);
             var workingDocument = JsonSerializer.Deserialize<StatisticsDocument>(currentJson, JsonOptions)!;
-            if (_seasonConfigService is not null) StatisticsSeasonMigration.Apply(workingDocument, _seasonConfigService.Load());
+            StatisticsLegacyMigration.Apply(workingDocument);
             var nextDocument = StatisticsDocumentNormalizer.Normalize(update(workingDocument));
-            if (_seasonConfigService is not null && StatisticsSeasonMigration.Apply(nextDocument, _seasonConfigService.Load()))
+            if (StatisticsLegacyMigration.Apply(nextDocument))
                 nextDocument = StatisticsDocumentNormalizer.Normalize(nextDocument);
+            foreach (var account in nextDocument.Accounts)
+            {
+                var original = _document.Accounts.FirstOrDefault(x => x.Uid == account.Uid);
+                if (source != StatisticsDocumentChangeSource.Local)
+                {
+                    if (account.SyncVersion is { Devices.Count: 0 }) StatisticsAccountVersions.Advance(account, _deviceId);
+                    continue;
+                }
+                if (account.SyncVersion is null && (account.Temporary is not null
+                    || account.PendingShinyCaptures.Any(x => x.Season == EncounterSeasonTimeline.PendingSeasonId)))
+                    EnableVersion(account, original);
+                if (account.SyncVersion is not null && (original is null
+                    || StatisticsDocumentMerger.ComputeAccountFingerprint(account) != StatisticsDocumentMerger.ComputeAccountFingerprint(original)))
+                    StatisticsAccountVersions.Advance(account, _deviceId);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             // 复用快照序列化结果比较实际变化，空操作不写盘、不触发刷新或自动上传。
             var nextJson = JsonSerializer.Serialize(nextDocument, JsonOptions);
@@ -596,35 +647,33 @@ public sealed class StatisticsService : IStatisticsService
     {
         try
         {
+            _deviceId = await _localSettingsService.ReadSettingAsync<string>(SettingsKeys.StatisticsDeviceId) ?? string.Empty;
+            if (_deviceId.Length == 0)
+            {
+                _deviceId = Guid.NewGuid().ToString("N");
+                await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsDeviceId, _deviceId);
+            }
             var savedDocument = await _localSettingsService.ReadSettingAsync<StatisticsDocument>(SettingsKeys.StatisticsData);
             var document = savedDocument is null
                 ? StatisticsDocumentNormalizer.CreateDefault()
                 : StatisticsDocumentNormalizer.Normalize(CloneDocument(savedDocument));
-            var changed = false;
-            if (_seasonConfigService is not null)
+            var before = JsonSerializer.Serialize(document, JsonOptions);
+            var fingerprints = StatisticsDocumentMerger.ComputeAccountFingerprints(document);
+            foreach (var account in document.Accounts.Where(x => x.SyncVersion is null && (x.Temporary is not null
+                || x.PendingShinyCaptures.Any(p => p.Season == EncounterSeasonTimeline.PendingSeasonId)
+                || x.Seasons.Any(p => p.Id == EncounterSeasonTimeline.PendingSeasonId))))
+                EnableVersion(account);
+            StatisticsLegacyMigration.Apply(document);
+            if (_spiritCatalogService is not null && document.Accounts.Any(x => x.Temporary is not null || x.PendingShinyCaptures.Count > 0))
             {
-                var config = _seasonConfigService.Load();
-                changed = StatisticsSeasonMigration.Apply(document, config);
-                if (_spiritCatalogService is not null && document.Accounts.Any(account =>
-                    account.PendingEncounters.Any(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name))
-                    || account.PendingShinyCaptures.Any(item => item.HandledAt is null && string.IsNullOrWhiteSpace(item.Name))))
-                {
-                    try
-                    {
-                        // 只读取本地图鉴；软件自带图鉴更新后也能补名称，不在启动时联网同步。
-                        var catalog = await _spiritCatalogService.LoadAsync();
-                        MatchPendingNames(document, new SpiritCatalogIndex(catalog), config.SpiritNameMatchThreshold, out var namesChanged);
-                        changed |= namesChanged;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "暂存记录的本地图鉴匹配失败，保留原始记录等待后续同步。");
-                    }
-                }
+                try { MatchPendingNames(document, new SpiritCatalogIndex(await _spiritCatalogService.LoadAsync()), _seasonConfigService?.Load().SpiritNameMatchThreshold ?? 0.55); }
+                catch (Exception ex) { _logger.LogWarning(ex, "暂存名称刷新失败，保留数据等待重试。"); }
             }
-            if (changed)
+            if (before != JsonSerializer.Serialize(document, JsonOptions))
             {
-                document = StatisticsDocumentNormalizer.Normalize(document);
+                foreach (var account in document.Accounts.Where(x => x.SyncVersion is not null
+                    && fingerprints.GetValueOrDefault(x.Uid) != StatisticsDocumentMerger.ComputeAccountFingerprint(x)))
+                    StatisticsAccountVersions.Advance(account, _deviceId);
                 await _localSettingsService.SaveSettingAsync(SettingsKeys.StatisticsData, document);
             }
             Volatile.Write(ref _document, document);

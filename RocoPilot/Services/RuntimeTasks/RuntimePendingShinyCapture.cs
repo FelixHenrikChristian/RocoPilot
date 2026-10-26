@@ -18,6 +18,7 @@ internal sealed class RuntimePendingShinyCapture(long battleId, string accountUi
 
     public string Id { get; } = Guid.NewGuid().ToString("N");
     public long BattleId { get; } = battleId;
+    public bool IsTemporary => _season.Id == RocoPilot.Services.Encounters.EncounterSeasonTimeline.PendingSeasonId;
     public bool HasName => !string.IsNullOrWhiteSpace(_name);
 
     public async Task SaveAsync(IStatisticsService statistics, string? rawText = null, string? name = null)
@@ -28,7 +29,7 @@ internal sealed class RuntimePendingShinyCapture(long battleId, string accountUi
             var nextRaw = string.IsNullOrWhiteSpace(rawText) ? _rawText : rawText.Trim();
             var nextName = string.IsNullOrWhiteSpace(name) ? _name : name.Trim();
             if (_saved && nextRaw == _rawText && nextName == _name) return;
-            await statistics.AddPendingShinyCaptureAsync(_season, nextName, detectedAt, Id, nextRaw, accountUid);
+            await statistics.AddPendingShinyCaptureAsync(_season, nextName, detectedAt, Id, nextRaw, accountUid, updateOnly: _saved);
             _rawText = nextRaw;
             _name = nextName;
             _saved = true;

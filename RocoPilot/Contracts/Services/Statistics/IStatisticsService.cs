@@ -41,16 +41,12 @@ public interface IStatisticsService
         DateTimeOffset capturedAt,
         string? accountUid = null);
 
-    Task<StatisticsDocument> AddPendingEncounterAsync(
-        string accountUid, EncounterSeasonDefinition season, string id, string rawText, DateTimeOffset detectedAt,
-        string? spiritName = null);
+    Task<string?> RecordTemporaryEncounterAsync(string accountUid, string eventId, string rawText,
+        string exactName, DateTimeOffset detectedAt, string? previousBucketId = null);
 
-    Task<PendingEncounterConfirmationResult> ConfirmPendingEncounterAsync(
-        string accountUid, string id, string spiritName);
+    Task<StatisticsDocument> TransferTemporaryStatisticsAsync(IReadOnlyList<TemporaryStatisticsTransfer> transfers);
 
-    Task<StatisticsDocument> DiscardPendingEncounterAsync(string accountUid, string id);
-
-    Task<int> RematchPendingEncountersAsync(SpiritCatalogDocument catalog, double minimumSimilarity);
+    Task<int> RefreshTemporaryNamesAsync(SpiritCatalogDocument catalog);
 
     Task<StatisticsDocument> UpsertEncounterAsync(
         string seasonId,
@@ -96,7 +92,7 @@ public interface IStatisticsService
         DateTimeOffset detectedAt,
         string? id = null,
         string? rawText = null,
-        string? accountUid = null);
+        string? accountUid = null, bool updateOnly = false);
 
     Task<StatisticsDocument> ConfirmPendingShinyCaptureAsync(
         string pendingCaptureId,

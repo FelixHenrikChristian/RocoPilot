@@ -1,416 +1,142 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using RocoPilot.Configuration;
-using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Models.Encounters;
-using RocoPilot.Models.Spirits;
 using RocoPilot.Models.Statistics;
 using RocoPilot.Services.Encounters;
 using RocoPilot.Services.Statistics;
 using RocoPilot.Tests.TestDoubles;
 using RocoPilot.ViewModels;
+using static RocoPilot.Tests.TemporaryStatisticsFixture;
 
 namespace RocoPilot.Tests;
 
 [TestClass]
 public sealed class SeasonTransitionStatisticsTests
 {
-    private static readonly EncounterSeasonDefinition S3 = new() { Id = "S3", Name = "S3赛季", DateRange = "2026/7/16-2026/9/9" };
-    private static readonly EncounterSeasonDefinition S4 = new() { Id = "S4", Name = "S4赛季", DateRange = "2026/9/10-2026/11/4" };
-    private static readonly EncounterSeasonDefinition S5 = new() { Id = "S5", Name = "S5赛季", DateRange = "2026/11/5-2027/1/6" };
-    private static readonly DateTimeOffset FirstS4Day = new(2026, 9, 10, 0, 0, 0, TimeSpan.FromHours(8));
-    private static readonly DateTimeOffset FirstS5Day = new(2026, 11, 5, 0, 0, 0, TimeSpan.FromHours(8));
-
     [TestMethod]
-    public void BundledS4ConfigIncludesNovemberFourthAndExpiresOnFifth()
+    public void EndDateIsInclusiveAndNextDayIsTemporary()
     {
-        var service = new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance);
-        var config = service.Load();
-        Assert.AreEqual("S4", service.GetCurrentSeason()?.Id);
-        Assert.AreEqual("星陨", service.GetCurrentSeason()?.EncounterTypeName);
-        Assert.AreEqual("S3", EncounterSeasonTimeline.FindSeason(config, new DateOnly(2026, 9, 9))?.Id);
-        Assert.AreEqual("S4", EncounterSeasonTimeline.FindSeason(config, new DateOnly(2026, 9, 10))?.Id);
-        Assert.AreEqual("S4", EncounterSeasonTimeline.FindSeason(config, new DateOnly(2026, 11, 4))?.Id);
-        Assert.IsFalse(EncounterSeasonTimeline.IsExpired(config, new DateOnly(2026, 11, 4)));
-        Assert.IsTrue(EncounterSeasonTimeline.IsExpired(config, new DateOnly(2026, 11, 5)));
-        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId,
-            EncounterSeasonTimeline.ResolveForRecording(config, FirstS5Day, service.GetCurrentSeason()!).Id);
+        var config = new TemporarySeasonConfig().Load();
+        Assert.IsFalse(EncounterSeasonTimeline.IsExpired(config, new(2026, 11, 4)));
+        Assert.IsTrue(EncounterSeasonTimeline.IsExpired(config, new(2026, 11, 5)));
+        Assert.AreEqual("S4", EncounterSeasonTimeline.ResolveForRecording(config, Date.AddDays(-1), S4).Id);
+        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, EncounterSeasonTimeline.ResolveForRecording(config, Date, S4).Id);
     }
 
     [TestMethod]
-    public async Task BundledS4UpdateCountsKnownNamesAndKeepsMissingNamesUntilCatalogSync()
+    public async Task MultipleMissedSeasonsAreSuggestedByOriginalDatesAndRequireConfirmation()
     {
-        var (service, store) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        await service.AddPendingEncounterAsync("100", S3, "missing", "烈火王", FirstS4Day.AddMinutes(1));
-        var seasonConfig = new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance);
-        var catalog = new StatisticsSpiritCatalogStub { Document = new SpiritCatalogDocument() };
-        var updated = new StatisticsService(store, NullLogger<StatisticsService>.Instance, seasonConfig, catalog);
-
-        await updated.LoadAsync();
-        Assert.AreEqual(1, Count(updated, "S4"));
-        Assert.AreEqual(0, Count(updated, "S3"));
-        var pending = Account(updated).PendingEncounters.Single(item => item.Id == "missing");
-        Assert.AreEqual("S4", pending.Season);
-        Assert.AreEqual("烈火王", pending.RawText);
-        Assert.IsNull(pending.HandledAt);
-
-        Assert.AreEqual(1, await updated.RematchPendingEncountersAsync(Catalog(), seasonConfig.Load().SpiritNameMatchThreshold));
-        Assert.AreEqual(2, Count(updated, "S4"));
-        Assert.AreEqual("小火苗", Account(updated).Seasons.Single(item => item.Id == "S4").Encounters.Single().Name);
-        Assert.AreEqual(0, await updated.RematchPendingEncountersAsync(Catalog(), seasonConfig.Load().SpiritNameMatchThreshold));
-        Assert.AreEqual(2, Count(updated, "S4"));
-    }
-
-    [TestMethod]
-    public async Task EndDateRemainsInOldSeasonAndNextDayStoresEveryEncounter()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day.AddTicks(-1));
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        await service.AddPendingEncounterAsync("100", S3, "unknown", " 新精灵原始 OCR ", FirstS4Day.AddMinutes(1));
-        Assert.AreEqual(1, Count(service, "S3"));
-        Assert.AreEqual(2, Account(service).PendingEncounters.Count);
-        var known = Account(service).PendingEncounters.Single(item => item.Name is not null);
-        Assert.AreEqual("小火苗", known.Name);
-        Assert.AreEqual(FirstS4Day, known.DetectedAt);
-        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, known.Season);
-        Assert.IsNull(known.HandledAt);
-        var restarted = Service(store, S3);
+        var f = await Create();
+        await f.Record("a", "小火苗"); await f.Record("b", "小火苗", 1); await f.Record("c", "小火苗", 70);
+        Assert.AreEqual(1, f.Items.Count);
+        f.Config.Seasons = [S4, S5, S6];
+        var restarted = new StatisticsService(f.Store, NullLogger<StatisticsService>.Instance, f.Config,
+            new StatisticsSpiritCatalogStub { Document = Catalog });
         await restarted.LoadAsync();
-        Assert.AreEqual(2, Account(restarted).PendingEncounters.Count);
-        Assert.AreEqual(" 新精灵原始 OCR ", Account(restarted).PendingEncounters.Single(item => item.Id == "unknown").RawText);
-        Assert.AreEqual(1, Count(restarted, "S3"));
+        var account = restarted.CurrentDocument.Accounts.Single();
+        Assert.AreEqual(0, account.Seasons.Sum(x => x.Encounters.Count));
+        var groups = TemporaryStatisticsItem.Build(account, f.Config.Load());
+        Assert.AreEqual(2, groups.Count);
+        Assert.AreEqual(2, groups.Single(x => x.SuggestedSeasonId == "S5").Count);
+        Assert.AreEqual(1, groups.Single(x => x.SuggestedSeasonId == "S6").Count);
+        await restarted.TransferTemporaryStatisticsAsync(groups.Select(Transfer).ToList());
+        account = restarted.CurrentDocument.Accounts.Single();
+        Assert.IsNull(account.Temporary);
+        Assert.AreEqual(2, account.Seasons.Single(x => x.Id == "S5").Encounters.Single().Count);
+        Assert.AreEqual(1, account.Seasons.Single(x => x.Id == "S6").Encounters.Single().Count);
     }
 
     [TestMethod]
-    [DataRow(true)]
-    [DataRow(false)]
-    public async Task CatalogAndSeasonCanBeUpdatedInEitherOrder(bool catalogFirst)
+    public async Task UnknownOrOverlappingSeasonNeverGuessesAndUnselectedGroupsRemain()
     {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "烈火王", FirstS4Day);
-        if (catalogFirst)
+        var f = await Create(); await f.Record("a", "甲"); await f.Record("b", "乙", 70);
+        f.Config.AddNextSeason();
+        Assert.AreEqual("", f.Items.Single(x => x.Name == "乙").SuggestedSeasonId);
+        await f.Service.TransferTemporaryStatisticsAsync([Transfer(f.Items.Single(x => x.Name == "甲"))]);
+        Assert.AreEqual("乙", f.Account.Temporary!.Encounters.Single().RawText);
+        f.Config.Seasons.Add(new() { Id = "bad", DateRange = S5.DateRange });
+        Assert.IsNull(EncounterSeasonTimeline.FindSeason(f.Config.Load(), new(2026, 11, 6)));
+    }
+
+    [TestMethod]
+    public async Task MigrationAggregatesUnprocessedLegacyAndPhysicallyRemovesHandledData()
+    {
+        var old = new StatisticsDocument { Accounts = [new() { Uid = "100", PendingEncounters = [
+            new() { Id = "a", RawText = "原文", Season = EncounterSeasonTimeline.PendingSeasonId, DetectedAt = Date },
+            new() { Id = "b", RawText = "原文", Season = EncounterSeasonTimeline.PendingSeasonId, DetectedAt = Date.AddHours(1) },
+            new() { Id = "old-normal", RawText = "旧正常赛季未匹配", Season = "S4", DetectedAt = Date.AddDays(-1) },
+            new() { Id = "handled", RawText = "删除内容", Season = "S4", DetectedAt = Date, HandledAt = Date }],
+            PendingShinyCaptures = [new() { Id = "ignored", RawText = "删除异色", Season = "S4", DetectedAt = Date, HandledAt = Date }] }] };
+        var store = new ControlledSettingsStore(); store.Seed(SettingsKeys.StatisticsData, old);
+        var config = new TemporarySeasonConfig(); config.AddNextSeason();
+        var service = new StatisticsService(store, NullLogger<StatisticsService>.Instance, config); await service.LoadAsync();
+        var account = service.CurrentDocument.Accounts.Single();
+        Assert.AreEqual(0, account.PendingEncounters.Count); Assert.AreEqual(0, account.PendingShinyCaptures.Count);
+        Assert.AreEqual(2, account.Temporary!.Encounters.Count);
+        Assert.AreEqual(2, account.Temporary.Encounters.Single(x => x.RawText == "原文").Count);
+        Assert.AreEqual(0, account.Seasons.Sum(x => x.Encounters.Count));
+        await service.MergeRemoteAsync(old, null, false);
+        Assert.AreEqual(3, service.CurrentDocument.Accounts.Single().Temporary!.Encounters.Sum(x => x.Count));
+        var restart = new StatisticsService(store, NullLogger<StatisticsService>.Instance, config); await restart.LoadAsync();
+        Assert.AreEqual(3, restart.CurrentDocument.Accounts.Single().Temporary!.Encounters.Sum(x => x.Count));
+    }
+
+    [TestMethod]
+    public async Task TemporaryShinyCanBeConfirmedNowAndArchivedLaterWithoutSecondReset()
+    {
+        var f = await Create(); await f.Record("a", "烈火王"); await f.Record("b", "烈火王", 1);
+        await f.Service.RefreshTemporaryNamesAsync(Catalog);
+        await f.Service.AddPendingShinyCaptureAsync(S4, "小火苗", Date.AddDays(2), "shiny", "烈火王");
+        var overview = new StatisticsOverviewViewModel(); overview.ApplyDocument(f.Service.CurrentDocument, "100", f.Config.Load());
+        Assert.IsNotNull(overview.LatestPendingShinyCapture);
+        Assert.AreEqual(2d, overview.PendingEditor.EncounterCount);
+        await f.Service.ConfirmPendingShinyCaptureAsync("shiny", "小火苗", null, Date.AddDays(2));
+        await f.Service.ConfirmPendingShinyCaptureAsync("shiny", "小火苗", null, Date.AddDays(2));
+        Assert.IsNull(f.Account.Temporary); Assert.AreEqual(0, f.Account.PendingShinyCaptures.Count);
+        var capture = f.Account.Seasons.Single().ShinyCaptures.Single();
+        Assert.AreEqual(2, capture.EncounterCountBeforeCapture); Assert.AreEqual(Date.AddDays(2), capture.CapturedAt);
+        await f.Record("after", "小火苗", 3);
+        f.Config.AddNextSeason();
+        await f.Service.RecordEncounterAsync(S5, "小火苗", Date.AddDays(4));
+        var items = f.Items;
+        await f.Service.TransferTemporaryStatisticsAsync([Transfer(items.Single(x => x.IsShiny))]);
+        Assert.AreEqual(1, f.Account.Temporary!.Encounters.Sum(x => x.Count));
+        Assert.AreEqual(1, f.Account.Seasons.Single(x => x.Id == "S5").Encounters.Single().Count);
+        Assert.AreEqual(2, f.Account.Seasons.Single(x => x.Id == "S5").ShinyCaptures.Single().EncounterCountBeforeCapture);
+        await f.Service.TransferTemporaryStatisticsAsync([Transfer(f.Items.Single())]);
+        Assert.AreEqual(2, f.Account.Seasons.Single(x => x.Id == "S5").Encounters.Single().Count);
+        Assert.IsNull(f.Account.Temporary);
+        Assert.IsFalse(f.Account.Seasons.Any(x => x.Id == EncounterSeasonTimeline.PendingSeasonId));
+    }
+
+    [TestMethod]
+    public void ExpiredConfigShowsEmptyTemporaryCardAndCorrespondingShinyScope()
+    {
+        var config = new EncounterSeasonConfig { Seasons = [new() { Id = "old", Name = "旧赛季", DateRange = "2020/1/1-2020/2/1" }] };
+        var view = new StatisticsOverviewViewModel(); view.ApplyDocument(new(), null, config);
+        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, view.Seasons.First().Id);
+        Assert.AreEqual("新赛季", view.Seasons.First().EncounterTitle);
+        Assert.IsTrue(view.ShinyScopes.Any(x => x.Name == "新赛季"));
+    }
+    [TestMethod]
+    public async Task LegacyTemporaryShinyOnlyMigrationRecognizesItsOldCloudSnapshot()
+    {
+        var old = new StatisticsDocument { Accounts = [new() { Uid = "100", PendingShinyCaptures = [new()
         {
-            Assert.AreEqual(1, await service.RematchPendingEncountersAsync(Catalog(), 0.55));
-            Assert.AreEqual("小火苗", Account(service).PendingEncounters.Single().Name);
-            Assert.AreEqual(0, Count(service, "S3"));
-            Assert.IsNull(Account(service).PendingEncounters.Single().HandledAt);
-        }
-
-        var updated = Service(store, S3, S4);
-        await updated.LoadAsync();
-        Assert.AreEqual("S4", Account(updated).PendingEncounters.Single().Season);
-        if (!catalogFirst)
-        {
-            Assert.AreEqual(0, Count(updated, "S4"));
-            Assert.AreEqual(1, await updated.RematchPendingEncountersAsync(Catalog(), 0.55));
-        }
-        Assert.AreEqual(1, Count(updated, "S4"));
-        Assert.AreEqual(0, Count(updated, "S3"));
-        Assert.AreEqual(FirstS4Day, Account(updated).Seasons.Single(item => item.Id == "S4").Encounters.Single().LastCapturedAt);
-        Assert.AreEqual(0, await updated.RematchPendingEncountersAsync(Catalog(), 0.55));
-        var restarted = Service(store, S3, S4);
-        await restarted.LoadAsync();
-        Assert.AreEqual(1, Count(restarted, "S4"));
+            Id = "legacy-shiny", RawText = "烈火王", Season = EncounterSeasonTimeline.PendingSeasonId, DetectedAt = Date
+        }] }] };
+        var store = new ControlledSettingsStore(); store.Seed(SettingsKeys.StatisticsData, old);
+        var config = new TemporarySeasonConfig();
+        var service = new StatisticsService(store, NullLogger<StatisticsService>.Instance, config,
+            new StatisticsSpiritCatalogStub { Document = Catalog });
+        await service.LoadAsync();
+        await service.ConfirmPendingShinyCaptureAsync("legacy-shiny", "小火苗", 15, Date);
+        await service.MergeRemoteAsync(old, null, false);
+        var account = service.CurrentDocument.Accounts.Single();
+        Assert.AreEqual(0, account.PendingShinyCaptures.Count);
+        Assert.AreEqual(15, account.Seasons.Single().ShinyCaptures.Single().EncounterCountBeforeCapture);
     }
 
-    [TestMethod]
-    public async Task SoftwareUpdatedFirstAlsoPreservesSubsequentMissingNames()
-    {
-        var (service, _) = await CreateAsync(S3, S4);
-        await service.AddPendingEncounterAsync("100", S3, "event", "烈火王", FirstS4Day);
-        Assert.AreEqual("S4", Account(service).PendingEncounters.Single().Season);
-        Assert.AreEqual(0, Count(service, "S3"));
-        Assert.AreEqual(1, await service.RematchPendingEncountersAsync(Catalog(), 0.55));
-        Assert.AreEqual(1, Count(service, "S4"));
-    }
-
-    [TestMethod]
-    public async Task StartupCanUseUpdatedBundledCatalogWithoutNetworkSync()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "烈火王", FirstS4Day);
-        var catalog = new StatisticsSpiritCatalogStub { Document = Catalog() };
-        var updated = new StatisticsService(store, NullLogger<StatisticsService>.Instance, Config(S3, S4), catalog);
-        await updated.LoadAsync();
-        Assert.AreEqual(1, catalog.LoadCount);
-        Assert.AreEqual(1, Count(updated, "S4"));
-        Assert.IsNotNull(store.ReadSaved<StatisticsDocument>(SettingsKeys.StatisticsData)!.Accounts.Single().PendingEncounters.Single().HandledAt);
-    }
-
-    [TestMethod]
-    public async Task CatalogReadFailureKeepsUnmatchedDataAndAllowsLaterSync()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "烈火王", FirstS4Day);
-        var catalog = new StatisticsSpiritCatalogStub { BeforeLoad = () => throw new IOException("catalog unavailable") };
-        var updated = new StatisticsService(store, NullLogger<StatisticsService>.Instance, Config(S3, S4), catalog);
-        await updated.LoadAsync();
-        Assert.AreEqual("烈火王", Account(updated).PendingEncounters.Single().RawText);
-        Assert.AreEqual(0, Count(updated, "S4"));
-        await updated.RematchPendingEncountersAsync(Catalog(), 0.55);
-        Assert.AreEqual(1, Count(updated, "S4"));
-    }
-
-    [TestMethod]
-    public async Task MissingNamesStillUseOriginalSimilarityThreshold()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "小火猫", FirstS4Day);
-        Assert.AreEqual(0, await service.RematchPendingEncountersAsync(Catalog(), 0.9));
-        Assert.AreEqual(1, await service.RematchPendingEncountersAsync(Catalog(), 0.55));
-        Assert.AreEqual(0, Count(service, "S3"));
-        var updated = Service(store, S3, S4);
-        await updated.LoadAsync();
-        Assert.AreEqual(1, Count(updated, "S4"));
-    }
-
-    [TestMethod]
-    public async Task UnmatchedBlankOcrSurvivesSeasonUpdateForManualFallback()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "", FirstS4Day);
-        var updated = Service(store, S3, S4);
-        await updated.LoadAsync();
-        Assert.AreEqual(0, await updated.RematchPendingEncountersAsync(Catalog(), 0.55));
-        Assert.AreEqual(PendingEncounterConfirmationResult.Counted,
-            await updated.ConfirmPendingEncounterAsync("100", "event", "新精灵"));
-        Assert.AreEqual(1, Count(updated, "S4"));
-    }
-
-    [TestMethod]
-    public async Task ManualNameCanBeSavedBeforeSeasonIsKnown()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "误识别", FirstS4Day);
-        Assert.AreEqual(PendingEncounterConfirmationResult.AwaitingSeason,
-            await service.ConfirmPendingEncounterAsync("100", "event", "用户确认的名称"));
-        Assert.AreEqual(0, Count(service, "S3"));
-        Assert.AreEqual(0, await service.RematchPendingEncountersAsync(Catalog(), 0.55));
-        var updated = Service(store, S3, S4);
-        await updated.LoadAsync();
-        Assert.AreEqual("用户确认的名称", Account(updated).Seasons.Single(item => item.Id == "S4").Encounters.Single().Name);
-    }
-
-    [TestMethod]
-    public async Task MultipleMissingSeasonsSplitByOccurrenceDateAndAccount()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddAccountAsync("200");
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day, "100");
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS5Day.AddTicks(-1), "100");
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS5Day, "100");
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS5Day, "200");
-        var updated = Service(store, S3, S4, S5);
-        await updated.LoadAsync();
-        Assert.AreEqual(2, Count(updated, "S4"));
-        Assert.AreEqual(1, Count(updated, "S5"));
-        var other = updated.CurrentDocument.Accounts.Single(item => item.Uid == "200");
-        Assert.AreEqual("S5", other.Seasons.Single().Id);
-        Assert.AreEqual(1, other.Seasons.Single().Encounters.Single().Count);
-    }
-
-    [TestMethod]
-    public async Task PartialSeasonUpdateLeavesLaterEventsInStaging()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS5Day);
-        var partial = Service(store, S3, S4);
-        await partial.LoadAsync();
-        Assert.AreEqual(1, Count(partial, "S4"));
-        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, Account(partial).PendingEncounters.Single(item => item.HandledAt is null).Season);
-        var updated = Service(store, S3, S4, S5);
-        await updated.LoadAsync();
-        Assert.AreEqual(1, Count(updated, "S4"));
-        Assert.AreEqual(1, Count(updated, "S5"));
-    }
-
-    [TestMethod]
-    public async Task FailedMigrationIsNotPublishedAndRetryDoesNotDuplicateCounts()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        store.BeforeSave = _ => throw new IOException("save failed");
-        var updated = Service(store, S3, S4);
-        await Assert.ThrowsExactlyAsync<IOException>(() => updated.LoadAsync());
-        Assert.AreEqual(0, updated.CurrentDocument.Accounts.Count);
-        var saved = store.ReadSaved<StatisticsDocument>(SettingsKeys.StatisticsData)!.Accounts.Single().PendingEncounters.Single();
-        Assert.IsNull(saved.HandledAt);
-        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, saved.Season);
-        store.BeforeSave = null;
-        await updated.LoadAsync();
-        Assert.AreEqual(1, Count(updated, "S4"));
-        await updated.LoadAsync();
-        Assert.AreEqual(1, Count(updated, "S4"));
-    }
-
-    [TestMethod]
-    public async Task OtherwiseUnchangedUpdateStillPersistsSeasonMigration()
-    {
-        var config = Config(S3);
-        var store = new ControlledSettingsStore();
-        var service = new StatisticsService(store, NullLogger<StatisticsService>.Instance, config);
-        await service.AddAccountAsync("100");
-        service.SetActiveAccountUid("100");
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        config.Load().Seasons.Add(S4);
-        var saves = store.SaveCount;
-        var notifications = 0;
-        service.DocumentChanged += (_, _) => notifications++;
-
-        await service.AddAccountAsync("100");
-
-        Assert.AreEqual(1, Count(service, "S4"));
-        Assert.AreEqual(saves + 1, store.SaveCount);
-        Assert.AreEqual(1, notifications);
-        Assert.IsNotNull(store.ReadSaved<StatisticsDocument>(SettingsKeys.StatisticsData)!
-            .Accounts.Single().PendingEncounters.Single().HandledAt);
-        await service.AddAccountAsync("100");
-        Assert.AreEqual(saves + 1, store.SaveCount);
-        Assert.AreEqual(1, notifications);
-    }
-
-    [TestMethod]
-    public async Task ImportAndCloudMergeUseCurrentSeasonConfigAndKeepMigrationIdempotent()
-    {
-        var (service, _) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        var oldCloud = service.CurrentDocument;
-        var (updated, _) = await CreateAsync(S3, S4);
-        await updated.ReplaceAsync(oldCloud);
-        Assert.AreEqual(1, Count(updated, "S4"));
-        await updated.MergeRemoteAsync(oldCloud, null, false);
-        Assert.AreEqual(1, Count(updated, "S4"));
-        Assert.IsNotNull(Account(updated).PendingEncounters.Single().HandledAt);
-    }
-
-    [TestMethod]
-    public async Task ShinyResetAfterSeasonUpdatePreventsOldUnknownNameEnteringNewCycle()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "小火苗", FirstS4Day);
-        var updated = Service(store, S3, S4);
-        await updated.LoadAsync();
-        updated.SetSelectedAccountUid("100");
-        await updated.AddShinyCapturesAsync("S4", "小火苗", 1, FirstS4Day.AddDays(1), true);
-        Assert.AreEqual(0, await updated.RematchPendingEncountersAsync(Catalog(), 0.55));
-        Assert.AreEqual(0, Count(updated, "S4"));
-        Assert.IsNull(Account(updated).PendingEncounters.Single().HandledAt);
-    }
-
-    [TestMethod]
-    public async Task PendingShiniesDoNotOverwriteEachOtherOrResetOldSeasonWhileSeasonUnknown()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day.AddDays(-1));
-        await service.AddPendingShinyCaptureAsync(S3, "小火苗", FirstS4Day);
-        await service.AddPendingShinyCaptureAsync(S3, "小火苗", FirstS5Day);
-        var shinyId = Account(service).PendingShinyCaptures.First().Id;
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => service.ConfirmPendingShinyCaptureAsync(shinyId, "小火苗", 10, FirstS5Day));
-        Assert.AreEqual(1, Count(service, "S3"));
-        Assert.AreEqual(2, Account(service).PendingShinyCaptures.Count);
-        var overview = new StatisticsOverviewViewModel();
-        overview.ApplyDocument(service.CurrentDocument, "100", Config(S3).Load());
-        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, overview.PendingShinyConfirmationVisibility);
-        Assert.IsFalse(overview.Seasons.Any(season => season.Id == EncounterSeasonTimeline.PendingSeasonId));
-        var updated = Service(store, S3, S4, S5);
-        await updated.LoadAsync();
-        CollectionAssert.AreEquivalent(new[] { "S4", "S5" }, Account(updated).PendingShinyCaptures.Select(item => item.Season).ToArray());
-        overview.ApplyDocument(updated.CurrentDocument, "100", Config(S3, S4, S5).Load());
-        Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, overview.PendingShinyConfirmationVisibility);
-    }
-
-    [TestMethod]
-    public async Task LegacyUnconfirmedRecordsCanBeReassignedButAggregatesAreLeftIntact()
-    {
-        var store = new ControlledSettingsStore();
-        var legacy = new StatisticsService(store, NullLogger<StatisticsService>.Instance);
-        await legacy.AddAccountAsync("100");
-        legacy.SetSelectedAccountUid("100");
-        legacy.SetActiveAccountUid("100");
-        await legacy.RecordEncounterAsync(S3, "已有汇总", FirstS4Day);
-        await legacy.AddPendingEncounterAsync("100", S3, "event", "小火苗", FirstS4Day);
-        await legacy.AddPendingShinyCaptureAsync(S3, "小火苗", FirstS4Day);
-        var updated = Service(store, S3);
-        await updated.LoadAsync();
-        Assert.AreEqual(1, Count(updated, "S3"));
-        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, Account(updated).PendingEncounters.Single().Season);
-        Assert.AreEqual(EncounterSeasonTimeline.PendingSeasonId, Account(updated).PendingShinyCaptures.Single().Season);
-    }
-
-    [TestMethod]
-    public async Task KnownDatesOverrideStaleCurrentSeasonIdWithoutUsingStaging()
-    {
-        var (service, _) = await CreateAsync(S3, S4);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        Assert.AreEqual(1, Count(service, "S4"));
-        Assert.AreEqual(0, Account(service).PendingEncounters.Count);
-    }
-
-    [TestMethod]
-    public async Task DiscardedStagingDoesNotReappearAfterUpdate()
-    {
-        var (service, store) = await CreateAsync(S3);
-        await service.AddPendingEncounterAsync("100", S3, "event", "小火苗", FirstS4Day);
-        await service.DiscardPendingEncounterAsync("100", "event");
-        var updated = Service(store, S3, S4);
-        await updated.LoadAsync();
-        Assert.AreEqual(0, Count(updated, "S4"));
-    }
-
-    [TestMethod]
-    public async Task OverviewExplainsWhichInformationIsStillMissing()
-    {
-        var (service, _) = await CreateAsync(S3);
-        await service.RecordEncounterAsync(S3, "小火苗", FirstS4Day);
-        var overview = new StatisticsOverviewViewModel();
-        overview.ApplyDocument(service.CurrentDocument, "100", Config(S3).Load());
-        var item = overview.PendingEncounters.Single();
-        Assert.IsTrue(item.IsSeasonPending);
-        Assert.AreEqual("赛季待更新", item.SeasonDisplay);
-        Assert.AreEqual("小火苗", item.NameDisplay);
-    }
-
-    [TestMethod]
-    public void TimelineUsesLatestValidEndAndDoesNotGuessMissingOrOverlappingRanges()
-    {
-        Assert.IsFalse(EncounterSeasonTimeline.IsExpired(new EncounterSeasonConfig(), DateOnly.FromDateTime(FirstS4Day.DateTime)));
-        var config = Config(S5, new EncounterSeasonDefinition { Id = "bad", DateRange = "2027/1/1-2026/1/1" }, S3).Load();
-        Assert.IsFalse(EncounterSeasonTimeline.IsExpired(config, DateOnly.FromDateTime(FirstS4Day.DateTime)));
-        Assert.IsNull(EncounterSeasonTimeline.FindSeason(config, DateOnly.FromDateTime(FirstS4Day.DateTime)));
-        config.Seasons = [S4, new() { Id = "overlap", DateRange = S4.DateRange }];
-        Assert.IsNull(EncounterSeasonTimeline.FindSeason(config, DateOnly.FromDateTime(FirstS4Day.DateTime)));
-    }
-
-    private static async Task<(StatisticsService, ControlledSettingsStore)> CreateAsync(params EncounterSeasonDefinition[] seasons)
-    {
-        var store = new ControlledSettingsStore();
-        var service = Service(store, seasons);
-        await service.AddAccountAsync("100");
-        service.SetSelectedAccountUid("100");
-        service.SetActiveAccountUid("100");
-        return (service, store);
-    }
-
-    private static StatisticsService Service(ControlledSettingsStore store, params EncounterSeasonDefinition[] seasons) =>
-        new(store, NullLogger<StatisticsService>.Instance, Config(seasons));
-    private static SeasonConfig Config(params EncounterSeasonDefinition[] seasons) => new(new EncounterSeasonConfig { CurrentSeasonId = "S3", Seasons = [.. seasons] });
-    private static AccountStatisticsData Account(StatisticsService service) => service.CurrentDocument.Accounts.Single(item => item.Uid == "100");
-    private static int Count(StatisticsService service, string seasonId) => Account(service).Seasons.FirstOrDefault(item => item.Id == seasonId)?.Encounters.Sum(item => item.Count) ?? 0;
-    private static SpiritCatalogDocument Catalog() => new()
-    {
-        Spirits =
-        [
-            new() { Id = "1", Name = "小火苗", BaseId = "1", BaseName = "小火苗", ChainId = "fire" },
-            new() { Id = "2", Name = "烈火王", BaseId = "1", BaseName = "小火苗", ChainId = "fire" }
-        ]
-    };
-
-    private sealed class SeasonConfig(EncounterSeasonConfig config) : IEncounterSeasonConfigService
-    {
-        public EncounterSeasonConfig Load() => config;
-        public EncounterSeasonDefinition? GetCurrentSeason() => config.Seasons.FirstOrDefault();
-    }
 }

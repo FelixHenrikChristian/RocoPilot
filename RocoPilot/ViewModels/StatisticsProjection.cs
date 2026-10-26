@@ -2,6 +2,7 @@ using RocoPilot.Helpers;
 using RocoPilot.Models.Encounters;
 using RocoPilot.Models.Statistics;
 using RocoPilot.Services.Encounters;
+using RocoPilot.Services.Statistics;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -31,6 +32,21 @@ internal static class StatisticsProjection
             .ThenByDescending(season => season.LatestCapturedAt)
             .ThenBy(season => season.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        if ((seasonConfig is not null && EncounterSeasonTimeline.IsExpired(seasonConfig, DateOnly.FromDateTime(DateTime.Now)))
+            || account?.Temporary is not null
+            || account?.PendingShinyCaptures.Any(x => x.Season == EncounterSeasonTimeline.PendingSeasonId) == true
+            || account?.Seasons.Any(x => x.Id == EncounterSeasonTimeline.PendingSeasonId && x.ShinyCaptures.Count > 0) == true)
+        {
+            var counts = (account?.Temporary?.Encounters ?? []).GroupBy(TemporaryStatisticsRules.DisplayName)
+                .Select(g => new SpiritCountItem(g.Key, g.Sum(x => x.Count),
+                    new DateTimeOffset(g.Max(x => x.Date).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                    EncounterSeasonTimeline.PendingSeasonId, avatar: g.Any(x => x.Name.Length > 0) ? avatarResolver?.Invoke(g.Key) : null))
+                .OrderByDescending(x => x.Count).ThenBy(x => x.Name).ToList();
+            var captures = account?.Seasons.FirstOrDefault(x => x.Id == EncounterSeasonTimeline.PendingSeasonId)?.ShinyCaptures ?? [];
+            seasons.Insert(0, new SeasonStatisticsGroup(EncounterSeasonTimeline.PendingSeasonId,
+                EncounterSeasonTimeline.PendingSeasonName, "更新后确认归属 · 当前数据已保存在本地", string.Empty,
+                counts, BuildShinyCounts(captures, EncounterSeasonTimeline.PendingSeasonId, shinyAvatarResolver ?? avatarResolver)));
+        }
         return seasons;
     }
 
@@ -72,7 +88,8 @@ internal static class StatisticsProjection
                     record.Id.Trim(),
                     record.Name.Trim(),
                     record.Season.Trim(),
-                    string.IsNullOrWhiteSpace(season?.Name) ? $"{record.Season.Trim()}赛季" : season.Name,
+                    record.Season == EncounterSeasonTimeline.PendingSeasonId ? EncounterSeasonTimeline.PendingSeasonName
+                        : string.IsNullOrWhiteSpace(season?.Name) ? $"{record.Season.Trim()}赛季" : season.Name,
                     record.DetectedAt,
                     encounterCount,
                     avatarResolver?.Invoke(record.Name),
@@ -119,12 +136,9 @@ internal static class StatisticsProjection
 
     public static string BuildAllSeasonDateDisplay(IReadOnlyList<SeasonStatisticsGroup> seasons)
     {
-        if (seasons.Count == 0)
-        {
-            return "无记录";
-        }
-
-        return $"{seasons.Min(season => season.DateRangeStart)}-{seasons.Max(season => season.DateRangeEnd)}";
+        var official = seasons.Where(x => x.Id != EncounterSeasonTimeline.PendingSeasonId).ToList();
+        if (official.Count == 0) return seasons.Count == 0 ? "无记录" : "新赛季记录等待归档";
+        return $"{official.Min(season => season.DateRangeStart)}-{official.Max(season => season.DateRangeEnd)}";
     }
 
     public static int FindEncounterCount(AccountStatisticsData? account, string seasonId, string spiritName)
@@ -134,6 +148,7 @@ internal static class StatisticsProjection
             return 0;
         }
 
+        if (seasonId == EncounterSeasonTimeline.PendingSeasonId) return TemporaryStatisticsRules.Count(account, spiritName);
         var season = account.Seasons.FirstOrDefault(item =>
             string.Equals(item.Id, seasonId, StringComparison.OrdinalIgnoreCase));
         return season?.Encounters
@@ -346,7 +361,7 @@ public sealed class SeasonStatisticsGroup
         ? DateRange
         : DateRange[(DateRangeSeparatorIndex + 1)..];
 
-    public string EncounterTitle => string.IsNullOrWhiteSpace(EncounterTypeName)
+    public string EncounterTitle => Id == EncounterSeasonTimeline.PendingSeasonId ? Name : string.IsNullOrWhiteSpace(EncounterTypeName)
         ? $"{SeasonCode}奇遇"
         : $"{SeasonCode}{EncounterTypeName}奇遇";
 

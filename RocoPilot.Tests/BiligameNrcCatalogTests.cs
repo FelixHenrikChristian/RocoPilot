@@ -75,20 +75,20 @@ public sealed class BiligameNrcCatalogTests
     }
 
     [TestMethod]
-    public async Task NewCatalogResolvesPendingS4EncounterToLowestEvolutionOnce()
+    public async Task NewCatalogResolvesTemporaryNameWithoutAutomaticCounting()
     {
         var config = new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance);
         var statistics = new StatisticsService(new ControlledSettingsStore(), NullLogger<StatisticsService>.Instance, config);
         await statistics.AddAccountAsync("100");
         var s4 = config.Load().Seasons.Single(season => season.Id == "S4");
-        await statistics.AddPendingEncounterAsync("100", s4, "new-wolf", "银月狼王",
-            new DateTimeOffset(2026, 9, 26, 12, 0, 0, TimeSpan.FromHours(8)));
+        await statistics.RecordTemporaryEncounterAsync("100", "new-wolf", "银月狼王", "",
+            new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.FromHours(8)));
         var document = SpiritCatalogService.BuildDocument(new("biligame", "新版 Wiki", ListUrl),
             BiligameSpiritCatalogParser.ParseListPage(Markup, ListUrl));
-        Assert.AreEqual(1, await statistics.RematchPendingEncountersAsync(document, 0.55));
-        var encounter = statistics.CurrentDocument.Accounts.Single().Seasons.Single(season => season.Id == "S4").Encounters.Single();
+        Assert.AreEqual(1, await statistics.RefreshTemporaryNamesAsync(document));
+        var encounter = statistics.CurrentDocument.Accounts.Single().Temporary!.Encounters.Single();
         Assert.AreEqual("诅咒狼灵", encounter.Name);
         Assert.AreEqual(1, encounter.Count);
-        Assert.AreEqual(0, await statistics.RematchPendingEncountersAsync(document, 0.55));
+        Assert.AreEqual(0, await statistics.RefreshTemporaryNamesAsync(document));
     }
 }

@@ -275,6 +275,44 @@ public sealed class StatisticsSyncServiceTests
         await stopping.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
+    [TestMethod]
+    [DataRow(false)] [DataRow(true)]
+    public async Task UploadReplacesStaleTemporarySnapshotWithAtomicSettlementAndCanRetry(bool failFirst)
+    {
+        var f = await TemporaryStatisticsFixture.Create();
+        await f.Record("event", "精灵");
+        var stale = f.Service.CurrentDocument;
+        f.Config.AddNextSeason();
+        await f.Service.TransferTemporaryStatisticsAsync([TemporaryStatisticsFixture.Transfer(f.Items.Single())]);
+        f.Store.Seed(SettingsKeys.StatisticsSyncSettings, new StatisticsSyncSettings
+        {
+            IsEnabled = true, ProviderId = "cloudflare-r2", ProviderKind = StatisticsSyncProviderKinds.S3,
+            Endpoint = "test", BucketName = "bucket", UserName = "test-key", RemotePath = "statistics.json"
+        });
+        var remote = new StatisticsRemoteStoreStub();
+        remote.OnRead = (_, _) => Task.FromResult(new StatisticsSyncRemoteInfo { Exists = true, EntityTag = "old" });
+        remote.OnDownload = (_, _) => Task.FromResult(new StatisticsRemoteDownload(stale,
+            new StatisticsSyncRemoteInfo { Exists = true, EntityTag = "old" }));
+        var attempts = 0;
+        remote.OnUpload = (document, expected, _) =>
+        {
+            Assert.AreEqual("old", expected.EntityTag);
+            Assert.IsNull(document.Accounts.Single().Temporary);
+            Assert.AreEqual(0, document.Accounts.Single().PendingEncounters.Count);
+            Assert.AreEqual(1, document.Accounts.Single().Seasons.Single().Encounters.Single().Count);
+            if (++attempts == 1 && failFirst) throw new IOException("network interrupted");
+            return Task.FromResult(Success("settled"));
+        };
+        await using var sync = new StatisticsSyncService(f.Store, f.Service,
+            NullLogger<StatisticsSyncService>.Instance, remote, new StatisticsCredentialsStub());
+        if (failFirst) await Assert.ThrowsExactlyAsync<IOException>(() => sync.UploadAsync());
+        await sync.UploadAsync();
+        Assert.AreEqual(failFirst ? 2 : 1, attempts);
+        Assert.AreEqual("settled", (await sync.LoadSettingsAsync()).LastSyncedRemoteEntityTag);
+        Assert.IsNull(f.Account.Temporary);
+        Assert.AreEqual(1, f.Account.Seasons.Single().Encounters.Single().Count);
+    }
+
     private static StatisticsRemoteUpload Success(string tag) => new(false, new StatisticsSyncResult
     {
         EntityTag = tag,

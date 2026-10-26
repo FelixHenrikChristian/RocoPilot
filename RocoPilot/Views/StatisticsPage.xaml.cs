@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.Controls;
 using RocoPilot.Helpers;
+using RocoPilot.Services.Encounters;
 using RocoPilot.ViewModels;
 using RocoPilot.Views.Windows;
 
@@ -24,6 +25,8 @@ public sealed partial class StatisticsPage : Page
     private StatisticsSyncWindow? _statisticsSyncWindow;
     private bool _uidConfirmationDialogOpen;
     private bool _uidConfirmationSubscribed;
+    private readonly DispatcherTimer _seasonRefreshTimer = new() { Interval = TimeSpan.FromMinutes(1) };
+    private DateOnly _displayDate;
 
     public StatisticsViewModel ViewModel
     {
@@ -34,6 +37,13 @@ public sealed partial class StatisticsPage : Page
     {
         ViewModel = App.GetService<StatisticsViewModel>();
         InitializeComponent();
+        _seasonRefreshTimer.Tick += (_, _) =>
+        {
+            var today = DateOnly.FromDateTime(DateTime.Now);
+            if (today == _displayDate) return;
+            _displayDate = today;
+            ViewModel.RefreshStatistics();
+        };
         Loaded += StatisticsPage_Loaded;
         Unloaded += StatisticsPage_Unloaded;
     }
@@ -47,11 +57,17 @@ public sealed partial class StatisticsPage : Page
         }
 
         await ViewModel.LoadAsync();
+        // 加载期间可能已切走页面，不能在 Unloaded 停止后重新启动计时器。
+        if (!_uidConfirmationSubscribed) return;
+        _displayDate = DateOnly.FromDateTime(DateTime.Now);
+        ViewModel.RefreshStatistics();
+        _seasonRefreshTimer.Start();
         await ShowPendingUidConfirmationAsync(force: false, retryFirst: false);
     }
 
     private void StatisticsPage_Unloaded(object sender, RoutedEventArgs e)
     {
+        _seasonRefreshTimer.Stop();
         if (!_uidConfirmationSubscribed)
         {
             return;
@@ -259,7 +275,9 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var flyout = CreateAddStatisticMenu(async () => await AddEncounterAsync(season.Id));
+        var flyout = season.Id == EncounterSeasonTimeline.PendingSeasonId
+            ? CreateAddStatisticMenu(() => ShowTemporaryStatisticsAsync(shiny: false), "确认归入正式赛季")
+            : CreateAddStatisticMenu(async () => await AddEncounterAsync(season.Id));
         flyout.ShowAt(target);
         e.Handled = true;
     }
@@ -271,16 +289,18 @@ public sealed partial class StatisticsPage : Page
             return;
         }
 
-        var flyout = CreateAddStatisticMenu(async () => await AddShinyAsync());
+        var flyout = ViewModel.Overview.DefaultShinyAddSeasonId == EncounterSeasonTimeline.PendingSeasonId
+            ? CreateAddStatisticMenu(() => ShowTemporaryStatisticsAsync(shiny: true), "确认归入正式赛季")
+            : CreateAddStatisticMenu(async () => await AddShinyAsync());
         flyout.ShowAt(target);
         e.Handled = true;
     }
 
-    private MenuFlyout CreateAddStatisticMenu(Func<Task> addHandler)
+    private MenuFlyout CreateAddStatisticMenu(Func<Task> addHandler, string label = "新增条目")
     {
         var addItem = new MenuFlyoutItem
         {
-            Text = "新增条目"
+            Text = label
         };
         addItem.Click += async (_, _) => await ViewModel.RunOperationAsync("新增条目失败", addHandler);
 
@@ -340,6 +360,11 @@ public sealed partial class StatisticsPage : Page
 
     private async Task ShowEncounterDetailsAsync(string seasonId, SpiritCountItem item)
     {
+        if (seasonId == EncounterSeasonTimeline.PendingSeasonId)
+        {
+            await ViewModel.RunOperationAsync("确认新赛季统计失败", () => ShowTemporaryStatisticsAsync(item.Name, false));
+            return;
+        }
         var xamlRoot = XamlRoot;
         if (xamlRoot is null || ViewModel.Overview.SelectedAccount is not { } account)
         {
@@ -708,27 +733,31 @@ public sealed partial class StatisticsPage : Page
 
     private static string FormatSeasonDisplay(string seasonId)
     {
+        if (seasonId == EncounterSeasonTimeline.PendingSeasonId) return EncounterSeasonTimeline.PendingSeasonName;
         return string.IsNullOrWhiteSpace(seasonId) || seasonId.EndsWith("赛季", StringComparison.Ordinal)
             ? seasonId
             : $"{seasonId}赛季";
     }
 
-    private async void PendingEncountersButton_Click(object sender, RoutedEventArgs e)
+    private async Task ShowTemporaryStatisticsAsync(string? name = null, bool? shiny = null)
+    {
+        var items = ViewModel.Overview.TemporaryItems
+            .Where(x => (name is null || x.Name == name) && (shiny is null || x.IsShiny == shiny)).ToList();
+        var input = await TemporaryStatisticsDialog.ShowAsync(XamlRoot, items, ViewModel.TransferSeasons);
+        if (input is not null) await ViewModel.ConfirmTemporaryStatisticsAsync(input);
+    }
+
+    private async void TemporaryStatisticsButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button) return;
         button.IsEnabled = false;
         try
         {
-            var input = await PendingEncounterDialog.ShowAsync(XamlRoot, ViewModel.Overview.PendingEncounters);
-            if (input is null) return;
-            if (input.Discard)
-                await ViewModel.DiscardPendingEncounterAsync(input.Item);
-            else
-                await ViewModel.ConfirmPendingEncounterAsync(input.Item, input.Name);
+            await ShowTemporaryStatisticsAsync();
         }
         catch (Exception ex)
         {
-            ViewModel.ShowOperationFailed("处理待确认奇遇失败", ex);
+            ViewModel.ShowOperationFailed("确认新赛季统计失败", ex);
         }
         finally
         {

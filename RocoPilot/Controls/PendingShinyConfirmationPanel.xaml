@@ -25,7 +25,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Text="确认暂存异色" Style="{StaticResource DialogTitleTextStyle}" />
+                <TextBlock Text="确认异色捕获" Style="{StaticResource DialogTitleTextStyle}" />
                 <Border Grid.Column="1" Padding="10,4" CornerRadius="12"
                         Background="{ThemeResource ControlFillColorDefaultBrush}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
@@ -60,7 +60,7 @@
                             </Grid>
                         </StackPanel>
                     </Border>
-                    <TextBlock Text="确认后计入异色统计，并清空该精灵的当前赛季奇遇计数。"
+                    <TextBlock Text="{Binding PendingShinyConfirmationHint}"
                                Style="{StaticResource DialogDescriptionTextStyle}" />
                 </StackPanel>
             </ScrollViewer>
@@ -73,7 +73,7 @@
                            Style="{StaticResource DialogDescriptionTextStyle}" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <Button Content="忽略此条" Click="DiscardButton_Click" />
-                    <Button Content="确认计入" Click="ConfirmButton_Click"
+                    <Button Content="确认捕获" Click="ConfirmButton_Click"
                             Style="{StaticResource DialogPrimaryButtonStyle}" />
                 </StackPanel>
             </Grid>

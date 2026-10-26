@@ -469,10 +469,52 @@ public sealed class RuntimeTaskStartupTests
         finally { await fixture.Runtime.StopAsync(); }
     }
 
-    private static RuntimeTaskStartOptions Options(bool enabled = true,
-        KeyboardInputMethod method = KeyboardInputMethod.Interception) => new()
+    [TestMethod]
+    [DataRow(true)] [DataRow(false)]
+    public async Task EncounterRuntimeOnlyStagesExpiredSeasonAndCompletesEmptyOcrOnce(bool expired)
     {
-        AutoBattleSettings = new() { IsEnabled = enabled, KeyboardInputMethod = method }
+        var config = new TemporarySeasonConfig { Seasons = [new()
+        {
+            Id = "test", Name = "测试赛季", DateRange = $"2020/1/1-{DateTime.Today.AddDays(expired ? -1 : 1):yyyy/M/d}"
+        }] };
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true, seasonConfig: config);
+        await fixture.Statistics.AddAccountAsync("100");
+        try
+        {
+            await fixture.StartBattleAsync(AutoBattleEncounterRelievedAction.NoAction, statistics: true);
+            fixture.Statistics.SetActiveAccountUid("100");
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Disabled;
+            await fixture.ProcessFrameAsync(); await fixture.ScanOcrAsync();
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Enabled;
+            await fixture.ProcessFrameAsync(); await fixture.ProcessFrameAsync();
+            await fixture.ScanOcrAsync(); await fixture.ScanOcrAsync();
+            var account = fixture.Statistics.CurrentDocument.Accounts.Single();
+            Assert.AreEqual(expired ? 1 : 0, account.Temporary?.Encounters.Sum(x => x.Count) ?? 0);
+            Assert.AreEqual(0, account.PendingEncounters.Count);
+            fixture.Catalog.Document.Spirits.Add(new() { Id = "1", Name = "小火苗" });
+            fixture.Ocr.ReadName = () => Task.FromResult(expired ? "图鉴尚未收录的新精灵" : "小火苗");
+            await fixture.ScanOcrAsync(); await fixture.ScanOcrAsync();
+            account = fixture.Statistics.CurrentDocument.Accounts.Single();
+            if (expired)
+            {
+                Assert.AreEqual(1, account.Temporary!.Encounters.Single().Count);
+                Assert.AreEqual("图鉴尚未收录的新精灵", account.Temporary.Encounters.Single().RawText);
+                Assert.AreEqual("", account.Temporary.Encounters.Single().Name);
+            }
+            else
+            {
+                Assert.IsNull(account.Temporary);
+                Assert.AreEqual(1, account.Seasons.Single().Encounters.Single().Count);
+            }
+        }
+        finally { await fixture.Runtime.StopAsync(); }
+    }
+
+    private static RuntimeTaskStartOptions Options(bool enabled = true,
+        KeyboardInputMethod method = KeyboardInputMethod.Interception, bool statistics = false) => new()
+    {
+        AutoBattleSettings = new() { IsEnabled = enabled, KeyboardInputMethod = method },
+        EncounterStatisticsEnabled = statistics
     };
 
     private sealed class StartupFixture : IDisposable
@@ -493,10 +535,10 @@ public sealed class RuntimeTaskStartupTests
         public AppNotificationStub Notifications { get; } = new();
         public AutoBattleController Battle => (AutoBattleController)GetField("_battle")!;
 
-        public StartupFixture(bool sceneRecognition = false, bool battleRecognition = false)
+        public StartupFixture(bool sceneRecognition = false, bool battleRecognition = false, RocoPilot.Contracts.Services.Encounters.IEncounterSeasonConfigService? seasonConfig = null)
         {
             var settings = new ControlledSettingsStore();
-            Statistics = new(settings, NullLogger<StatisticsService>.Instance);
+            Statistics = new(settings, NullLogger<StatisticsService>.Instance, seasonConfig);
             Uid = new(Detection, Statistics, Notice, NullLogger<StatisticsUidCoordinatorService>.Instance);
             Matching = new(sceneRecognition);
             var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
@@ -506,8 +548,8 @@ public sealed class RuntimeTaskStartupTests
             Runtime = new(Window, Keyboard, Capture, new RegionConfigStub(battleRecognition), Matching, recognizer,
                 new GameSceneRecognizer(recognizer, Matching, Overlay, debug, battleScreen), battleScreen,
                 new AutoBattleInputExecutor(Keyboard, NullLogger<AutoBattleInputExecutor>.Instance), debug,
-                battleRecognition ? new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance)
-                    : new StatisticsSeasonConfigStub(), Catalog,
+                seasonConfig ?? (battleRecognition ? new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance)
+                    : (RocoPilot.Contracts.Services.Encounters.IEncounterSeasonConfigService)new StatisticsSeasonConfigStub()), Catalog,
                 Statistics, Uid, settings,
                 Hotkeys, Overlay, Overlay,
                 new ShinyEncounterNotification(Notifications, NullLogger<ShinyEncounterNotification>.Instance),
@@ -519,9 +561,9 @@ public sealed class RuntimeTaskStartupTests
         }
 
         public async Task StartBattleAsync(AutoBattleEncounterRelievedAction action = AutoBattleEncounterRelievedAction.RecoverEnergy,
-            bool captureQiYi = true)
+            bool captureQiYi = true, bool statistics = false)
         {
-            var options = Options();
+            var options = Options(statistics: statistics);
             options.InfoOverlayEnabled = true;
             options.AutoBattleSettings.SkillSelectionActionDelayMs = 0;
             options.AutoBattleSettings.EncounterRelievedAction = action;

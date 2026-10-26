@@ -438,12 +438,12 @@
                 Orientation="Horizontal"
                 Spacing="14">
                 <Button
-                    Click="PendingEncountersButton_Click"
-                    ToolTipService.ToolTip="查看等待赛季或图鉴更新的奇遇"
-                    Visibility="{x:Bind ViewModel.Overview.PendingEncounterVisibility, Mode=OneWay}">
+                    Click="TemporaryStatisticsButton_Click"
+                    ToolTipService.ToolTip="核对新赛季奇遇与已捕获异色，确认后归档并清理暂存"
+                    Visibility="{x:Bind ViewModel.Overview.TemporaryReviewVisibility, Mode=OneWay}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <TextBlock VerticalAlignment="Center" Text="暂存奇遇" />
-                        <InfoBadge Value="{x:Bind ViewModel.Overview.PendingEncounterCount, Mode=OneWay}" />
+                        <TextBlock VerticalAlignment="Center" Text="确认新赛季统计" />
+                        <InfoBadge Value="{x:Bind ViewModel.Overview.TemporaryGroupCount, Mode=OneWay}" />
                     </StackPanel>
                 </Button>
                 <Grid Width="28" Height="28" VerticalAlignment="Center" Background="Transparent">

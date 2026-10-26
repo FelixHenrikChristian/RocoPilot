@@ -95,7 +95,12 @@ internal static class StatisticsDocumentMerger
             remoteFingerprints.TryGetValue(uid, out var remoteFingerprint);
 
             AccountStatisticsData? selectedAccount;
-            if (AreSameFingerprint(localFingerprint, remoteFingerprint))
+            if (localAccount is not null && remoteAccount is not null
+                && StatisticsAccountVersions.TrySelect(localAccount, remoteAccount, out var versioned, baselineFingerprint))
+            {
+                selectedAccount = versioned;
+            }
+            else if (AreSameFingerprint(localFingerprint, remoteFingerprint))
             {
                 selectedAccount = localAccount ?? remoteAccount;
             }
@@ -105,6 +110,8 @@ internal static class StatisticsDocumentMerger
                 var remoteChanged = !AreSameFingerprint(remoteFingerprint, baselineFingerprint);
                 if (localChanged && remoteChanged)
                 {
+                    if (localAccount?.SyncVersion is not null || remoteAccount?.SyncVersion is not null)
+                        throw new InvalidOperationException($"账号 {uid} 在一端被删除、另一端仍有未同步修改。本地和云端均已保留，请核对后再同步。");
                     // The user workflow guarantees that one account is not played on two devices at once.
                     // If that guarantee is broken, prefer the version just read from the cloud and surface a warning.
                     selectedAccount = remoteAccount;
@@ -146,7 +153,8 @@ internal static class StatisticsDocumentMerger
             }
             else
             {
-                local.Accounts[localAccountIndex] = remoteAccount;
+                local.Accounts[localAccountIndex] = StatisticsAccountVersions.TrySelect(
+                    local.Accounts[localAccountIndex], remoteAccount, out var versioned) ? versioned : remoteAccount;
             }
         }
 
@@ -165,7 +173,10 @@ internal static class StatisticsDocumentMerger
                 continue;
             }
 
-            MergeAccount(localAccount, remoteAccount);
+            if (StatisticsAccountVersions.TrySelect(localAccount, remoteAccount, out var versioned))
+                local.Accounts[local.Accounts.IndexOf(localAccount)] = versioned;
+            else
+                MergeAccount(localAccount, remoteAccount);
         }
 
         return StatisticsDocumentNormalizer.Normalize(local);
@@ -294,7 +305,7 @@ internal static class StatisticsDocumentMerger
         return normalized;
     }
 
-    private static string ComputeAccountFingerprint(AccountStatisticsData account)
+    internal static string ComputeAccountFingerprint(AccountStatisticsData account)
     {
         var json = JsonSerializer.Serialize(account, JsonOptions);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();

@@ -229,7 +229,7 @@ public sealed class StatisticsViewModelTests
         await Task.WhenAll(loading, sameLoading);
 
         Assert.AreEqual(2, viewModel.Overview.Accounts.Count);
-        Assert.AreEqual(2, store.ReadCount);
+        Assert.AreEqual(3, store.ReadCount);
         Assert.AreEqual(2, catalog.LoadCount);
     }
 

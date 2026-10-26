@@ -141,19 +141,18 @@ public sealed class StatisticsServiceTests
         var (service, store) = await CreateServiceAsync();
         var remote = Document(1);
         remote.Accounts.Add(new AccountStatisticsData { Uid = "200" });
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(service.CurrentDocument);
         using var pause = new AsyncPause();
         store.BeforeSave = pause.PauseAsync;
         var recording = service.RecordEncounterAsync(Season, "精灵", Now);
         await pause.WaitUntilEnteredAsync();
-        var merging = service.MergeRemoteAsync(remote, baseline, false);
+        var merging = service.MergeRemoteAsync(remote);
         Assert.IsFalse(merging.IsCompleted);
         pause.Dispose();
         await Task.WhenAll(recording, merging);
 
         Assert.AreEqual(2, Count(service.CurrentDocument));
         Assert.AreEqual(2, service.CurrentDocument.Accounts.Count);
-        Assert.AreEqual(0, (await merging).ConflictingAccountUids.Count);
+        Assert.AreEqual(2, (await merging).Accounts.Count);
     }
 
     [TestMethod]
@@ -162,10 +161,9 @@ public sealed class StatisticsServiceTests
         var (service, store) = await CreateServiceAsync();
         var sources = new ConcurrentBag<StatisticsDocumentChangeSource>();
         service.DocumentChanged += (_, e) => sources.Add(e.Source);
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(service.CurrentDocument);
         using var pause = new AsyncPause();
         store.BeforeSave = pause.PauseAsync;
-        var merging = service.MergeRemoteAsync(Document(5), baseline, false);
+        var merging = service.MergeRemoteAsync(ChangedRemote(service, 5));
         await pause.WaitUntilEnteredAsync();
         var recording = service.RecordEncounterAsync(Season, "精灵", Now);
         Assert.IsFalse(recording.IsCompleted);
@@ -177,18 +175,18 @@ public sealed class StatisticsServiceTests
     }
 
     [TestMethod]
-    public async Task FailedMergeKeepsOriginalAndSuccessfulRetryReportsConflicts()
+    public async Task FailedMergeKeepsOriginalAndSuccessfulRetryAcceptsDescendant()
     {
         var (service, store) = await CreateServiceAsync();
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(Document(0));
+        var remote = ChangedRemote(service, 9);
         store.BeforeSave = _ => throw new IOException("save failed");
-        await Assert.ThrowsExactlyAsync<IOException>(() => service.MergeRemoteAsync(Document(9), baseline, false));
+        await Assert.ThrowsExactlyAsync<IOException>(() => service.MergeRemoteAsync(remote));
         Assert.AreEqual(1, Count(service.CurrentDocument));
 
         store.BeforeSave = null;
-        var merged = await service.MergeRemoteAsync(Document(9), baseline, false);
-        Assert.AreEqual(9, Count(merged.Document));
-        CollectionAssert.AreEqual(new[] { "100" }, merged.ConflictingAccountUids.ToArray());
+        var merged = await service.MergeRemoteAsync(remote);
+        Assert.AreEqual(9, Count(merged));
+        Assert.AreEqual(9, Count(service.CurrentDocument));
     }
 
     [TestMethod]
@@ -200,13 +198,13 @@ public sealed class StatisticsServiceTests
         var recording = service.RecordEncounterAsync(Season, "精灵", Now);
         await pause.WaitUntilEnteredAsync();
         using var cancellation = new CancellationTokenSource();
-        var merging = service.MergeRemoteAsync(Document(9), null, false, cancellation.Token);
+        var merging = service.MergeRemoteAsync(Document(9), cancellation.Token);
         cancellation.Cancel();
         await Assert.ThrowsAsync<OperationCanceledException>(() => merging);
         pause.Dispose();
         await recording;
         Assert.AreEqual(2, Count(service.CurrentDocument));
-        Assert.AreEqual(2, store.SaveCount);
+        Assert.AreEqual(3, store.SaveCount);
     }
 
     [TestMethod]
@@ -329,6 +327,15 @@ public sealed class StatisticsServiceTests
         service.SetSelectedAccountUid("100");
         service.SetActiveAccountUid("100");
         return (service, store);
+    }
+
+    private static StatisticsDocument ChangedRemote(StatisticsService service, int count)
+    {
+        var document = service.CurrentDocument;
+        var account = document.Accounts.Single();
+        account.Seasons.Single().Encounters.Single().Count = count;
+        StatisticsAccountVersions.Advance(account.SyncVersion!, "remote");
+        return document;
     }
 
     private static int Count(StatisticsDocument document) =>

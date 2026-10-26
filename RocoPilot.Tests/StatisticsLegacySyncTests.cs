@@ -14,79 +14,75 @@ public sealed class StatisticsLegacySyncTests
     private static readonly DateTimeOffset Date = new(2026, 10, 25, 12, 0, 0, TimeSpan.FromHours(8));
 
     [TestMethod]
-    public async Task MigrationOnlyLocalAcceptsChangedLegacyCloudAndKeepsVersionHistory()
+    public async Task MigrationIsDeterministicAndUnchangedOldCloudDoesNotResurrectHandledRecords()
     {
-        var (service, _, old, baseline) = await Create();
+        var (service, _, old) = await Create();
         var migrated = service.CurrentDocument;
-        var firstVersion = migrated.Accounts.Single().SyncVersion!.Devices.Single();
-        old.Accounts.Single().Seasons.Single().Encounters.Single().Count += 5;
-        var merged = await service.MergeRemoteAsync(old, baseline, false);
-        var account = merged.Document.Accounts.Single();
-        Assert.AreEqual(15, account.Seasons.Single().Encounters.Single().Count);
+        Assert.AreEqual(0, migrated.Accounts.Single().SyncVersion!.Devices.Count);
+        await service.MergeRemoteAsync(old);
+        Assert.AreEqual(JsonSerializer.Serialize(migrated), JsonSerializer.Serialize(service.CurrentDocument));
+        var account = service.CurrentDocument.Accounts.Single();
         Assert.AreEqual(0, account.PendingEncounters.Count);
         Assert.AreEqual(0, account.PendingShinyCaptures.Count);
         Assert.AreEqual(0, account.Seasons.Single().EncounterCountResets.Count);
-        Assert.AreEqual(firstVersion.Value + 1, account.SyncVersion!.Devices[firstVersion.Key]);
-        await service.MergeRemoteAsync(old, baseline, false);
-        await service.MergeRemoteAsync(migrated, null, false);
-        Assert.AreEqual(15, service.CurrentDocument.Accounts.Single().Seasons.Single().Encounters.Single().Count);
-        Assert.AreEqual(firstVersion.Value + 1, service.CurrentDocument.Accounts.Single().SyncVersion!.Devices[firstVersion.Key]);
+        await service.UpsertEncounterAsync("S4", "精灵", 1, Date);
+        await service.MergeRemoteAsync(old);
+        Assert.AreEqual(11, service.CurrentDocument.Accounts.Single().Seasons.Single().Encounters.Single().Count);
     }
 
     [TestMethod]
-    public async Task FailedMigrationMergeCanRetryWithoutChangingLocalOrRemote()
+    public async Task ChangedOldCloudRequiresExplicitChoiceAndResolutionSurvivesRetry()
     {
-        var (service, store, old, baseline) = await Create();
+        var (service, store, old) = await Create();
         old.Accounts.Single().Seasons.Single().Encounters.Single().Count += 5;
-        var localBefore = JsonSerializer.Serialize(service.CurrentDocument);
-        var remoteBefore = JsonSerializer.Serialize(old);
-        store.BeforeSave = key => key == SettingsKeys.StatisticsData ? throw new IOException("disk full") : Task.CompletedTask;
-        await Assert.ThrowsExactlyAsync<IOException>(() => service.MergeRemoteAsync(old, baseline, false));
-        Assert.AreEqual(localBefore, JsonSerializer.Serialize(service.CurrentDocument));
-        Assert.AreEqual(localBefore, JsonSerializer.Serialize(store.ReadSaved<StatisticsDocument>(SettingsKeys.StatisticsData)));
-        Assert.AreEqual(remoteBefore, JsonSerializer.Serialize(old));
-        store.BeforeSave = null;
-        await service.MergeRemoteAsync(old, baseline, false);
-        Assert.AreEqual(15, service.CurrentDocument.Accounts.Single().Seasons.Single().Encounters.Single().Count);
-    }
-
-    [TestMethod]
-    [DataRow("local-count")]
-    [DataRow("changed-markers")]
-    [DataRow("no-baseline")]
-    public async Task UnprovenLegacyRelationshipStillRejectsConflict(string scenario)
-    {
-        var (service, _, old, baseline) = await Create();
-        old.Accounts.Single().Seasons.Single().Encounters.Single().Count += 5;
-        if (scenario == "local-count") await service.UpsertEncounterAsync("S4", "精灵", 1, Date);
-        if (scenario == "changed-markers") old.Accounts.Single().PendingEncounters.Single().HandledAt = Date.AddDays(1);
         var before = JsonSerializer.Serialize(service.CurrentDocument);
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => service.MergeRemoteAsync(old,
-            scenario == "no-baseline" ? null : baseline, false));
+        var conflict = await Assert.ThrowsExactlyAsync<StatisticsSyncConflictException>(() => service.MergeRemoteAsync(old));
         Assert.AreEqual(before, JsonSerializer.Serialize(service.CurrentDocument));
+        store.BeforeSave = key => key == SettingsKeys.StatisticsData ? throw new IOException("disk full") : Task.CompletedTask;
+        await Assert.ThrowsExactlyAsync<IOException>(() => service.ResolveConflictAsync(conflict, true));
+        Assert.AreEqual(before, JsonSerializer.Serialize(service.CurrentDocument));
+        store.BeforeSave = null;
+        await service.ResolveConflictAsync(conflict, true);
+        await service.MergeRemoteAsync(old);
+        Assert.AreEqual(15, service.CurrentDocument.Accounts.Single().Seasons.Single().Encounters.Single().Count);
     }
 
     [TestMethod]
-    public async Task FirstVersionCreatedByActualShinyConfirmationIsNotMistakenForMigrationOnly()
+    public async Task IndependentMigrationOfPendingBucketsProducesIdenticalSnapshots()
     {
-        var old = new StatisticsDocument { Accounts = [new() { Uid = "100", Seasons = [new()
+        var (_, _, old) = await Create();
+        old.Accounts.Single().PendingEncounters.Single().HandledAt = null;
+        var first = StatisticsDocumentMerger.Prepare(old);
+        var second = StatisticsDocumentMerger.Prepare(old);
+        Assert.AreEqual(StatisticsDocumentMerger.ComputeAccountFingerprints(first)["100"],
+            StatisticsDocumentMerger.ComputeAccountFingerprints(second)["100"]);
+        Assert.AreEqual(1, StatisticsDocumentMerger.Merge(first, second).Accounts.Single().Temporary!.Encounters.Single().Count);
+    }
+
+    [TestMethod]
+    public async Task LocalAccountDeletedBeforeUpgradeIsNotSilentlyRestored()
+    {
+        var (_, _, old) = await Create();
+        old.Info.Version = "2.0";
+        var baseline = new Dictionary<string, string>
         {
-            Id = "S4", Name = "S4赛季", Encounters = [new() { Name = "精灵", Count = 10, Season = "S4", LastCapturedAt = Date }]
-        }], PendingShinyCaptures = [new() { Id = "shiny", Name = "精灵", Season = "S4", DetectedAt = Date }] }] };
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(old);
+            ["100"] = StatisticsDocumentMerger.ComputeAccountFingerprint(old.Accounts.Single())
+        };
         var store = new ControlledSettingsStore();
-        store.Seed(SettingsKeys.StatisticsData, old);
+        store.Seed(SettingsKeys.StatisticsData, new StatisticsDocument { Info = new() { Version = "2.0" } });
+        store.Seed(SettingsKeys.StatisticsSyncSettings, new StatisticsSyncSettings { LastSyncedAccountFingerprints = baseline });
         var service = new StatisticsService(store, NullLogger<StatisticsService>.Instance);
         await service.LoadAsync();
-        await service.ConfirmPendingShinyCaptureAsync("shiny", "精灵", null, Date);
-        Assert.AreEqual(1L, service.CurrentDocument.Accounts.Single().SyncVersion!.Devices.Single().Value);
-        old.Accounts.Single().Seasons.Single().Encounters.Single().Count += 5;
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => service.MergeRemoteAsync(old, baseline, false));
-        Assert.AreEqual(1, service.CurrentDocument.Accounts.Single().Seasons.Single().ShinyCaptures.Count);
+        Assert.AreEqual(0, service.CurrentDocument.Accounts.Count);
+        Assert.IsTrue(service.CurrentDocument.DeletedAccounts.ContainsKey("100"));
+        var conflict = await Assert.ThrowsExactlyAsync<StatisticsSyncConflictException>(() => service.MergeRemoteAsync(old));
+        await service.ResolveConflictAsync(conflict, false);
+        await service.MergeRemoteAsync(old);
+        Assert.AreEqual(0, service.CurrentDocument.Accounts.Count);
+        Assert.AreEqual(1, service.CurrentDocument.DeletedAccounts.Count);
     }
 
-    private static async Task<(StatisticsService Service, ControlledSettingsStore Store, StatisticsDocument Old,
-        Dictionary<string, string> Baseline)> Create()
+    private static async Task<(StatisticsService Service, ControlledSettingsStore Store, StatisticsDocument Old)> Create()
     {
         var old = new StatisticsDocument { Accounts = [new()
         {
@@ -99,11 +95,10 @@ public sealed class StatisticsLegacySyncTests
             PendingEncounters = [new() { Id = "handled", RawText = "已处理", Season = "S4", DetectedAt = Date, HandledAt = Date }],
             PendingShinyCaptures = [new() { Id = "ignored", Name = "历史精灵", Season = "S4", DetectedAt = Date, HandledAt = Date }]
         }] };
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(old);
         var store = new ControlledSettingsStore();
         store.Seed(SettingsKeys.StatisticsData, old);
         var service = new StatisticsService(store, NullLogger<StatisticsService>.Instance);
         await service.LoadAsync();
-        return (service, store, old, baseline);
+        return (service, store, old);
     }
 }

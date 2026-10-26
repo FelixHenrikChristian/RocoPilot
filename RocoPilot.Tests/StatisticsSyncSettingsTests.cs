@@ -67,7 +67,7 @@ public sealed class StatisticsSyncSettingsTests
             return Task.CompletedTask;
         };
 
-        await statistics.MergeRemoteAsync(new StatisticsDocument(), null, false);
+        await statistics.MergeRemoteAsync(new StatisticsDocument());
         Assert.IsFalse(settingsRead.Task.IsCompleted);
         Assert.IsFalse(delay.HasPending);
         await statistics.AddAccountAsync("100");

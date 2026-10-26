@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 
-using RocoPilot.Helpers;
 using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Services.Statistics;
@@ -35,303 +34,64 @@ internal static class StatisticsDocumentMerger
         }
     };
 
-    public static StatisticsDocumentMergeResult Merge(
-        StatisticsDocument localDocument,
-        StatisticsDocument remoteDocument,
-        IReadOnlyDictionary<string, string>? lastSyncedAccountFingerprints,
-        bool preferRemoteAccountsWithoutBaseline)
+    public static StatisticsDocument Prepare(StatisticsDocument source, IReadOnlyDictionary<string, string>? legacyBaseline = null)
     {
-        var local = CloneAndNormalize(localDocument);
-        var remote = CloneAndNormalize(remoteDocument);
+        var document = JsonSerializer.Deserialize<StatisticsDocument>(JsonSerializer.Serialize(source, JsonOptions), JsonOptions)!;
+        var legacy = document.Info?.Version != StatisticsDocumentFormats.CurrentVersion;
+        StatisticsDocumentNormalizer.Normalize(document);
+        foreach (var account in document.Accounts) StatisticsAccountVersions.Enable(account);
+        // 升级前已删除但尚未同步的账号不能因缺少标记被恢复。
+        // 旧指纹无法还原版本历史，因此迁移成待核对的删除状态，不猜测先后。
+        if (legacy && legacyBaseline is not null)
+            foreach (var (uid, fingerprint) in legacyBaseline)
+                if (Find(document, uid) is null)
+                    document.DeletedAccounts[uid] = new StatisticsAccountVersion { LegacyFingerprint = fingerprint };
+        StatisticsLegacyMigration.Apply(document);
+        return StatisticsDocumentNormalizer.Normalize(document);
+    }
 
-        if (lastSyncedAccountFingerprints is null)
+    public static StatisticsDocument Merge(StatisticsDocument localDocument, StatisticsDocument remoteDocument)
+    {
+        var local = Prepare(localDocument);
+        var remote = Prepare(remoteDocument);
+        var result = new StatisticsDocument { Info = local.Info };
+        var states = Snapshots(local).ToDictionary(x => x.Uid, StringComparer.OrdinalIgnoreCase);
+        foreach (var incoming in Snapshots(remote))
+            states[incoming.Uid] = states.TryGetValue(incoming.Uid, out var current)
+                ? StatisticsAccountVersions.Select(current, incoming) : incoming;
+        foreach (var state in states.Values) Put(result, state);
+        return StatisticsDocumentNormalizer.Normalize(result);
+    }
+
+    internal static IEnumerable<StatisticsAccountSnapshot> Snapshots(StatisticsDocument document) =>
+        document.Accounts.Select(x => new StatisticsAccountSnapshot(x.Uid, x, x.SyncVersion!))
+            .Concat(document.DeletedAccounts.Select(x => new StatisticsAccountSnapshot(x.Key, null, x.Value)));
+
+    internal static StatisticsAccountSnapshot? Find(StatisticsDocument document, string uid) =>
+        Snapshots(document).FirstOrDefault(x => string.Equals(x.Uid, uid, StringComparison.OrdinalIgnoreCase));
+
+    internal static void Put(StatisticsDocument document, StatisticsAccountSnapshot state)
+    {
+        document.Accounts.RemoveAll(x => string.Equals(x.Uid, state.Uid, StringComparison.OrdinalIgnoreCase));
+        document.DeletedAccounts.Remove(state.Uid);
+        if (state.Account is { } account)
         {
-            var mergedWithoutBaseline = preferRemoteAccountsWithoutBaseline
-                ? MergeWithRemoteAccountPriority(local, remote)
-                : MergeLegacy(local, remote);
-            return new StatisticsDocumentMergeResult(mergedWithoutBaseline, []);
+            account.SyncVersion = state.Version;
+            document.Accounts.Add(account);
         }
-
-        return MergeWithBaseline(local, remote, lastSyncedAccountFingerprints);
+        else document.DeletedAccounts[state.Uid] = state.Version;
     }
 
-    public static Dictionary<string, string> ComputeAccountFingerprints(StatisticsDocument document)
-    {
-        var normalized = CloneAndNormalize(document);
-        return normalized.Accounts.ToDictionary(
-            account => account.Uid,
-            ComputeAccountFingerprint,
-            StringComparer.OrdinalIgnoreCase);
-    }
+    public static Dictionary<string, string> ComputeAccountFingerprints(StatisticsDocument document) =>
+        Snapshots(Prepare(document)).ToDictionary(x => x.Uid, Fingerprint, StringComparer.OrdinalIgnoreCase);
 
-    private static StatisticsDocumentMergeResult MergeWithBaseline(
-        StatisticsDocument local,
-        StatisticsDocument remote,
-        IReadOnlyDictionary<string, string> lastSyncedAccountFingerprints)
-    {
-        var baseline = NormalizeFingerprints(lastSyncedAccountFingerprints);
-        var localAccounts = local.Accounts.ToDictionary(account => account.Uid, StringComparer.OrdinalIgnoreCase);
-        var remoteAccounts = remote.Accounts.ToDictionary(account => account.Uid, StringComparer.OrdinalIgnoreCase);
-        var localFingerprints = localAccounts.ToDictionary(
-            pair => pair.Key,
-            pair => ComputeAccountFingerprint(pair.Value),
-            StringComparer.OrdinalIgnoreCase);
-        var remoteFingerprints = remoteAccounts.ToDictionary(
-            pair => pair.Key,
-            pair => ComputeAccountFingerprint(pair.Value),
-            StringComparer.OrdinalIgnoreCase);
-        var accountUids = new HashSet<string>(baseline.Keys, StringComparer.OrdinalIgnoreCase);
-        accountUids.UnionWith(localAccounts.Keys);
-        accountUids.UnionWith(remoteAccounts.Keys);
+    internal static string Fingerprint(StatisticsAccountSnapshot? state) => state is null ? string.Empty
+        : state.Account is { } account ? ComputeAccountFingerprint(account)
+        : "deleted:" + Hash(JsonSerializer.Serialize(state.Version, JsonOptions));
 
-        var mergedAccounts = new List<AccountStatisticsData>();
-        var conflictingAccountUids = new List<string>();
-        foreach (var uid in accountUids.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
-        {
-            localAccounts.TryGetValue(uid, out var localAccount);
-            remoteAccounts.TryGetValue(uid, out var remoteAccount);
-            baseline.TryGetValue(uid, out var baselineFingerprint);
-            localFingerprints.TryGetValue(uid, out var localFingerprint);
-            remoteFingerprints.TryGetValue(uid, out var remoteFingerprint);
+    internal static string ComputeAccountFingerprint(AccountStatisticsData account) =>
+        Hash(JsonSerializer.Serialize(account, JsonOptions));
 
-            AccountStatisticsData? selectedAccount;
-            if (localAccount is not null && remoteAccount is not null
-                && StatisticsAccountVersions.TrySelect(localAccount, remoteAccount, out var versioned, baselineFingerprint))
-            {
-                selectedAccount = versioned;
-            }
-            else if (AreSameFingerprint(localFingerprint, remoteFingerprint))
-            {
-                selectedAccount = localAccount ?? remoteAccount;
-            }
-            else
-            {
-                var localChanged = !AreSameFingerprint(localFingerprint, baselineFingerprint);
-                var remoteChanged = !AreSameFingerprint(remoteFingerprint, baselineFingerprint);
-                if (localChanged && remoteChanged)
-                {
-                    if (localAccount?.SyncVersion is not null || remoteAccount?.SyncVersion is not null)
-                        throw new InvalidOperationException($"账号 {uid} 在一端被删除、另一端仍有未同步修改。本地和云端均已保留，请核对后再同步。");
-                    // The user workflow guarantees that one account is not played on two devices at once.
-                    // If that guarantee is broken, prefer the version just read from the cloud and surface a warning.
-                    selectedAccount = remoteAccount;
-                    conflictingAccountUids.Add(uid);
-                }
-                else
-                {
-                    selectedAccount = remoteChanged ? remoteAccount : localAccount;
-                }
-            }
-
-            if (selectedAccount is not null)
-            {
-                mergedAccounts.Add(selectedAccount);
-            }
-        }
-
-        var merged = new StatisticsDocument
-        {
-            Info = remote.Info,
-            Accounts = mergedAccounts
-        };
-        return new StatisticsDocumentMergeResult(
-            StatisticsDocumentNormalizer.Normalize(merged),
-            conflictingAccountUids);
-    }
-
-    private static StatisticsDocument MergeWithRemoteAccountPriority(
-        StatisticsDocument local,
-        StatisticsDocument remote)
-    {
-        foreach (var remoteAccount in remote.Accounts)
-        {
-            var localAccountIndex = local.Accounts.FindIndex(account =>
-                string.Equals(account.Uid, remoteAccount.Uid, StringComparison.OrdinalIgnoreCase));
-            if (localAccountIndex < 0)
-            {
-                local.Accounts.Add(remoteAccount);
-            }
-            else
-            {
-                local.Accounts[localAccountIndex] = StatisticsAccountVersions.TrySelect(
-                    local.Accounts[localAccountIndex], remoteAccount, out var versioned) ? versioned : remoteAccount;
-            }
-        }
-
-        return StatisticsDocumentNormalizer.Normalize(local);
-    }
-
-    private static StatisticsDocument MergeLegacy(StatisticsDocument local, StatisticsDocument remote)
-    {
-        foreach (var remoteAccount in remote.Accounts)
-        {
-            var localAccount = local.Accounts.FirstOrDefault(account =>
-                string.Equals(account.Uid, remoteAccount.Uid, StringComparison.OrdinalIgnoreCase));
-            if (localAccount is null)
-            {
-                local.Accounts.Add(remoteAccount);
-                continue;
-            }
-
-            if (StatisticsAccountVersions.TrySelect(localAccount, remoteAccount, out var versioned))
-                local.Accounts[local.Accounts.IndexOf(localAccount)] = versioned;
-            else
-                MergeAccount(localAccount, remoteAccount);
-        }
-
-        return StatisticsDocumentNormalizer.Normalize(local);
-    }
-
-    private static void MergeAccount(AccountStatisticsData localAccount, AccountStatisticsData remoteAccount)
-    {
-        foreach (var remoteSeason in remoteAccount.Seasons)
-        {
-            var localSeason = localAccount.Seasons.FirstOrDefault(season =>
-                string.Equals(season.Id, remoteSeason.Id, StringComparison.OrdinalIgnoreCase));
-            if (localSeason is null)
-            {
-                localAccount.Seasons.Add(remoteSeason);
-                continue;
-            }
-
-            MergeSeason(localSeason, remoteSeason);
-        }
-
-        MergePendingShinyCaptures(localAccount, remoteAccount);
-        // Normalize 按事件 ID 合并，并优先保留已处理标记。
-        localAccount.PendingEncounters.AddRange(remoteAccount.PendingEncounters);
-    }
-
-    private static void MergeSeason(SeasonStatisticsData localSeason, SeasonStatisticsData remoteSeason)
-    {
-        localSeason.Name = PreferNonEmpty(localSeason.Name, remoteSeason.Name);
-        localSeason.DateRange = PreferNonEmpty(localSeason.DateRange, remoteSeason.DateRange);
-        localSeason.EncounterTypeName = PreferNonEmpty(localSeason.EncounterTypeName, remoteSeason.EncounterTypeName);
-
-        MergeEncounters(localSeason, remoteSeason);
-        MergeShinyCaptures(localSeason, remoteSeason);
-        localSeason.EncounterCountResets.AddRange(remoteSeason.EncounterCountResets);
-    }
-
-    private static void MergeEncounters(SeasonStatisticsData localSeason, SeasonStatisticsData remoteSeason)
-    {
-        foreach (var remoteEncounter in remoteSeason.Encounters)
-        {
-            var localEncounter = localSeason.Encounters.FirstOrDefault(encounter =>
-                TextMatchingHelper.AreSameSpiritName(encounter.Name, remoteEncounter.Name));
-            if (localEncounter is null)
-            {
-                localSeason.Encounters.Add(remoteEncounter);
-                continue;
-            }
-
-            var latest = localEncounter.LastCapturedAt >= remoteEncounter.LastCapturedAt
-                ? localEncounter
-                : remoteEncounter;
-            localEncounter.Name = latest.Name;
-            localEncounter.Count = Math.Max(localEncounter.Count, remoteEncounter.Count);
-            localEncounter.Season = string.IsNullOrWhiteSpace(latest.Season)
-                ? localSeason.Id
-                : latest.Season;
-            localEncounter.LastCapturedAt = Max(localEncounter.LastCapturedAt, remoteEncounter.LastCapturedAt);
-        }
-    }
-
-    private static void MergeShinyCaptures(SeasonStatisticsData localSeason, SeasonStatisticsData remoteSeason)
-    {
-        foreach (var remoteCapture in remoteSeason.ShinyCaptures)
-        {
-            var localCapture = localSeason.ShinyCaptures.FirstOrDefault(capture =>
-                string.Equals(capture.Id, remoteCapture.Id, StringComparison.OrdinalIgnoreCase));
-            if (localCapture is null)
-            {
-                localSeason.ShinyCaptures.Add(remoteCapture);
-                continue;
-            }
-
-            if (remoteCapture.CapturedAt > localCapture.CapturedAt)
-            {
-                localCapture.Name = remoteCapture.Name;
-                localCapture.Season = remoteCapture.Season;
-                localCapture.CapturedAt = remoteCapture.CapturedAt;
-                localCapture.EncounterCountBeforeCapture = remoteCapture.EncounterCountBeforeCapture;
-            }
-        }
-    }
-
-    private static void MergePendingShinyCaptures(
-        AccountStatisticsData localAccount,
-        AccountStatisticsData remoteAccount)
-    {
-        foreach (var remoteCapture in remoteAccount.PendingShinyCaptures)
-        {
-            var localCapture = localAccount.PendingShinyCaptures.FirstOrDefault(capture =>
-                string.Equals(capture.Id, remoteCapture.Id, StringComparison.OrdinalIgnoreCase));
-            if (localCapture is null)
-            {
-                localAccount.PendingShinyCaptures.Add(remoteCapture);
-                continue;
-            }
-
-            if (remoteCapture.HandledAt is { } handledAt
-                && (localCapture.HandledAt is null || handledAt > localCapture.HandledAt))
-                localCapture.HandledAt = handledAt;
-            if (!string.IsNullOrWhiteSpace(remoteCapture.Name)
-                && (string.IsNullOrWhiteSpace(localCapture.Name) || remoteCapture.DetectedAt > localCapture.DetectedAt))
-                localCapture.Name = remoteCapture.Name;
-            if (!string.IsNullOrWhiteSpace(remoteCapture.RawText)
-                && (string.IsNullOrWhiteSpace(localCapture.RawText) || remoteCapture.DetectedAt > localCapture.DetectedAt))
-                localCapture.RawText = remoteCapture.RawText;
-            if (remoteCapture.DetectedAt > localCapture.DetectedAt)
-            {
-                localCapture.Season = remoteCapture.Season;
-                localCapture.DetectedAt = remoteCapture.DetectedAt;
-            }
-        }
-    }
-
-    private static Dictionary<string, string> NormalizeFingerprints(
-        IReadOnlyDictionary<string, string> fingerprints)
-    {
-        var normalized = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (uid, fingerprint) in fingerprints)
-        {
-            if (!string.IsNullOrWhiteSpace(uid) && !string.IsNullOrWhiteSpace(fingerprint))
-            {
-                normalized[uid.Trim()] = fingerprint.Trim();
-            }
-        }
-
-        return normalized;
-    }
-
-    internal static string ComputeAccountFingerprint(AccountStatisticsData account)
-    {
-        var json = JsonSerializer.Serialize(account, JsonOptions);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
-    }
-
-    private static bool AreSameFingerprint(string? left, string? right)
-    {
-        return string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string PreferNonEmpty(string localValue, string remoteValue)
-    {
-        return string.IsNullOrWhiteSpace(localValue)
-            ? remoteValue
-            : localValue;
-    }
-
-    private static DateTimeOffset Max(DateTimeOffset left, DateTimeOffset right)
-    {
-        return left >= right ? left : right;
-    }
-
-    private static StatisticsDocument CloneAndNormalize(StatisticsDocument document)
-    {
-        var json = JsonSerializer.Serialize(document, JsonOptions);
-        var clone = JsonSerializer.Deserialize<StatisticsDocument>(json, JsonOptions) ?? new StatisticsDocument();
-        return StatisticsDocumentNormalizer.Normalize(clone);
-    }
+    private static string Hash(string json) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
 }

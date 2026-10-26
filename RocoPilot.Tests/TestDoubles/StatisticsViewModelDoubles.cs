@@ -43,6 +43,7 @@ internal sealed class StatisticsSyncStub : IStatisticsSyncService
     public Task<StatisticsSyncStatus> SaveSettingsAsync(StatisticsSyncSettings settings, string? password, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StatisticsSyncRemoteInfo> RefreshRemoteInfoAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StatisticsSyncResult> TestConnectionAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task ResolveConflictAsync(StatisticsSyncConflictException conflict, bool useRemote, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<bool> DownloadRemoteChangesIfNeededAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StatisticsSyncResult> UploadAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<StatisticsSyncResult> DownloadAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();

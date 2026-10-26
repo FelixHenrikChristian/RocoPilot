@@ -148,7 +148,7 @@ public sealed class PendingShinyCaptureTests
         if (confirm) await service.ConfirmPendingShinyCaptureAsync(capture.Id, "诅咒狼灵", 28, DetectedAt.AddHours(1));
         else await service.DiscardPendingShinyCaptureAsync(capture.Id);
         await capture.SaveAsync(service, "银月狼王", "诅咒狼灵");
-        await service.MergeRemoteAsync(oldCloud, null, false);
+        await service.MergeRemoteAsync(oldCloud);
         Assert.AreEqual(0, service.GetSelectedAccountPendingShinyCaptures().Count);
         Assert.AreEqual(0, Account(service).PendingShinyCaptures.Count);
         Assert.AreEqual(confirm ? 1 : 0, Account(service).Seasons.Single().ShinyCaptures.Count);
@@ -161,7 +161,8 @@ public sealed class PendingShinyCaptureTests
         await service.AddPendingShinyCaptureAsync(Season, string.Empty, DetectedAt, "cloud", "银月狼王");
         var remote = service.CurrentDocument;
         remote.Accounts.Single().PendingShinyCaptures.Single().Name = "诅咒狼灵";
-        await service.MergeRemoteAsync(remote, null, false);
+        StatisticsAccountVersions.Advance(remote.Accounts.Single().SyncVersion!, "remote");
+        await service.MergeRemoteAsync(remote);
         Assert.AreEqual("诅咒狼灵", service.GetSelectedAccountPendingShinyCaptures().Single().Name);
     }
 
@@ -185,7 +186,7 @@ public sealed class PendingShinyCaptureTests
     }
 
     [TestMethod]
-    public async Task EmptyNewFieldsDoNotChangeExistingCloudFingerprints()
+    public async Task LegacyFingerprintExcludesEmptyMigrationFields()
     {
         var (service, _) = await CreateAsync();
         await service.AddPendingShinyCaptureAsync(Season, "诅咒狼灵", DetectedAt);
@@ -202,7 +203,9 @@ public sealed class PendingShinyCaptureTests
         };
         var json = JsonSerializer.Serialize(legacy, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
         var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
-        Assert.AreEqual(fingerprint, StatisticsDocumentMerger.ComputeAccountFingerprints(service.CurrentDocument)["100"]);
+        var oldAccount = JsonSerializer.Deserialize<AccountStatisticsData>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        Assert.AreEqual(fingerprint, StatisticsDocumentMerger.ComputeAccountFingerprint(oldAccount));
+        Assert.AreNotEqual(fingerprint, StatisticsDocumentMerger.ComputeAccountFingerprints(service.CurrentDocument)["100"]);
     }
 
     private static async Task<(StatisticsService, ControlledSettingsStore)> CreateAsync()

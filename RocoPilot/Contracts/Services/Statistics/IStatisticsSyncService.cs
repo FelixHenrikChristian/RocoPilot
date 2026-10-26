@@ -27,6 +27,9 @@ public interface IStatisticsSyncService : IAsyncDisposable
 
     Task<StatisticsSyncResult> UploadAsync(CancellationToken cancellationToken = default);
 
+    Task ResolveConflictAsync(StatisticsSyncConflictException conflict, bool useRemote,
+        CancellationToken cancellationToken = default);
+
     Task<StatisticsSyncResult> DownloadAsync(CancellationToken cancellationToken = default);
 }
 

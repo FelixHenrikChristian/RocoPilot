@@ -128,16 +128,14 @@ public sealed class PendingEncounterTests
     }
 
     [TestMethod]
-    [DataRow(false)] [DataRow(true)]
-    public async Task OldCloudCannotRestoreDeletedBucketsOrEraseNewUnsyncedCounts(bool useBaseline)
+    public async Task OldCloudCannotRestoreDeletedBucketsOrEraseNewUnsyncedCounts()
     {
         var f = await TemporaryStatisticsFixture.Create(); await f.Record("a", "已处理");
         var stale = f.Service.CurrentDocument;
-        var baseline = useBaseline ? StatisticsDocumentMerger.ComputeAccountFingerprints(stale) : null;
         f.Config.AddNextSeason(); await f.Service.TransferTemporaryStatisticsAsync([TemporaryStatisticsFixture.Transfer(f.Items.Single())]);
         f.Config.Seasons = [TemporaryStatisticsFixture.S4]; await f.Record("b", "新数据");
-        await f.Service.MergeRemoteAsync(stale, baseline, false);
-        await f.Service.MergeRemoteAsync(stale, null, true);
+        await f.Service.MergeRemoteAsync(stale);
+        await f.Service.MergeRemoteAsync(stale);
         Assert.AreEqual("新数据", f.Account.Temporary!.Encounters.Single().RawText);
         Assert.AreEqual(1, f.Account.Seasons.Single().Encounters.Single().Count);
     }
@@ -151,7 +149,7 @@ public sealed class PendingEncounterTests
         await f.Record("left", "本地新增");
         await second.RecordTemporaryEncounterAsync("100", "right", "云端新增", "", TemporaryStatisticsFixture.Date);
         var local = JsonSerializer.Serialize(f.Service.CurrentDocument); var remote = second.CurrentDocument;
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => f.Service.MergeRemoteAsync(remote, null, false));
+        await Assert.ThrowsExactlyAsync<StatisticsSyncConflictException>(() => f.Service.MergeRemoteAsync(remote));
         Assert.AreEqual(local, JsonSerializer.Serialize(f.Service.CurrentDocument));
         Assert.IsTrue(remote.Accounts.Single().Temporary!.Encounters.Any(x => x.RawText == "云端新增"));
     }
@@ -170,7 +168,7 @@ public sealed class PendingEncounterTests
         var store2 = new ControlledSettingsStore(); store2.Seed(SettingsKeys.StatisticsData, f.Service.CurrentDocument);
         var second = new StatisticsService(store2, NullLogger<StatisticsService>.Instance, f.Config); await second.LoadAsync();
         await second.RecordEncounterAsync(TemporaryStatisticsFixture.S5, "正常新数据", TemporaryStatisticsFixture.Date);
-        await f.Service.MergeRemoteAsync(second.CurrentDocument, null, false);
+        await f.Service.MergeRemoteAsync(second.CurrentDocument);
         Assert.AreEqual(2, f.Account.SyncVersion.Devices.Count);
         Assert.IsTrue(f.Account.Seasons.Single().Encounters.Any(x => x.Name == "正常新数据"));
     }
@@ -195,7 +193,7 @@ public sealed class PendingEncounterTests
         await f.Record("l", "本地");
         var chosen = remote.CurrentDocument;
         await f.Service.ReplaceAsync(chosen);
-        await f.Service.MergeRemoteAsync(chosen, null, false);
+        await f.Service.MergeRemoteAsync(chosen);
         Assert.AreEqual(2, f.Account.Temporary!.Encounters.Sum(x => x.Count));
         Assert.AreEqual(2, f.Account.SyncVersion!.Devices.Count);
     }
@@ -204,21 +202,22 @@ public sealed class PendingEncounterTests
     public async Task ConcurrentRemoteAccountDeletionCannotDiscardLocalUnsyncedData()
     {
         var f = await TemporaryStatisticsFixture.Create(); await f.Record("a", "共同");
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(f.Service.CurrentDocument);
+        var store = new ControlledSettingsStore(); store.Seed(SettingsKeys.StatisticsData, f.Service.CurrentDocument);
+        var other = new StatisticsService(store, NullLogger<StatisticsService>.Instance); await other.LoadAsync();
+        await other.DeleteAccountAsync("100");
         await f.Record("b", "未上传");
-        await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => f.Service.MergeRemoteAsync(new(), baseline, false));
+        await Assert.ThrowsExactlyAsync<StatisticsSyncConflictException>(() => f.Service.MergeRemoteAsync(other.CurrentDocument));
         Assert.AreEqual(2, f.Account.Temporary!.Encounters.Sum(x => x.Count));
     }
 
     [TestMethod]
-    public async Task UnchangedLegacyCloudBaselineCannotEraseUnsyncedDataBeforeFirstTemporaryRecord()
+    public async Task UnchangedCloudCannotEraseUnsyncedDataBeforeFirstTemporaryRecord()
     {
         var f = await TemporaryStatisticsFixture.Create();
         var oldCloud = f.Service.CurrentDocument;
-        var baseline = StatisticsDocumentMerger.ComputeAccountFingerprints(oldCloud);
         await f.Service.RecordEncounterAsync(TemporaryStatisticsFixture.S4, "旧赛季未同步", TemporaryStatisticsFixture.Date.AddDays(-1));
         await f.Record("a", "新赛季");
-        await f.Service.MergeRemoteAsync(oldCloud, baseline, false);
+        await f.Service.MergeRemoteAsync(oldCloud);
         Assert.AreEqual(1, f.Account.Seasons.Single().Encounters.Single().Count);
         Assert.AreEqual(1, f.Account.Temporary!.Encounters.Single().Count);
     }
@@ -229,7 +228,7 @@ public sealed class PendingEncounterTests
         var f = await TemporaryStatisticsFixture.Create(); await f.Record("a", "暂存");
         var legacy = new StatisticsDocument { Accounts = [new() { Uid = "100" }] };
         await f.Service.ReplaceAsync(legacy);
-        await f.Service.MergeRemoteAsync(legacy, null, false);
+        await f.Service.MergeRemoteAsync(legacy);
         Assert.IsNull(f.Account.Temporary);
         Assert.IsNotNull(f.Account.SyncVersion);
     }

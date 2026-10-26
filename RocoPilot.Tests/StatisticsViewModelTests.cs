@@ -287,6 +287,15 @@ public sealed class StatisticsViewModelTests
         StringAssert.Contains(viewModel.SyncStatusToolTip, "自动上传统计失败：网络中断\n请稍后重试");
         CollectionAssert.Contains(notified, nameof(viewModel.SyncErrorIconVisibility));
 
+        sync.SetStatus(new StatisticsSyncStatus
+        {
+            IsEnabled = true, IsConfigured = true, HasPendingChanges = true,
+            RemoteLastModifiedAt = DateTimeOffset.Now
+        });
+        Assert.IsTrue(viewModel.HasPendingSyncChanges);
+        Assert.IsFalse(viewModel.HasSyncError);
+        StringAssert.Contains(viewModel.SyncStatusToolTip, "有本地修改等待上传");
+
         sync.SetStatus(new StatisticsSyncStatus { IsEnabled = true, IsConfigured = false });
         Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Visible, viewModel.SyncWarningIconVisibility);
         Assert.AreEqual(Microsoft.UI.Xaml.Visibility.Collapsed, viewModel.SyncErrorIconVisibility);

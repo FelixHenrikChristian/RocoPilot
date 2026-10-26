@@ -247,7 +247,26 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         try
         {
             SetActionsEnabled(false);
-            await operation();
+            while (true)
+            {
+                try { await operation(); break; }
+                catch (StatisticsSyncConflictException conflict)
+                {
+                    var choice = await StatisticsSyncConflictDialog.ShowAsync(ContentRoot.XamlRoot, conflict);
+                    if (choice is null)
+                    {
+                        ShowMessage("同步尚未完成", "已保留本地和云端数据，可稍后重新同步并处理冲突。", InfoBarSeverity.Warning);
+                        return;
+                    }
+                    await _viewModel.ResolveSyncConflictAsync(conflict, choice.Value);
+                    // 下载遇到冲突后也要上传决议，完成两端同步。
+                    operation = async () =>
+                    {
+                        await _viewModel.UploadStatisticsToCloudAsync();
+                        ShowMessage("同步完成", "冲突处理结果已上传到云端。", InfoBarSeverity.Success);
+                    };
+                }
+            }
             _settings = await _viewModel.LoadSyncSettingsAsync();
             ApplySettings(_settings);
         }
@@ -288,6 +307,8 @@ public sealed partial class StatisticsSyncWindow : WindowEx
             return "同步中";
         }
 
+        if (_viewModel.HasSyncError) return "同步失败";
+        if (EnableSyncSwitch.IsOn && _viewModel.HasPendingSyncChanges) return "待上传";
         return EnableSyncSwitch.IsOn ? "已启用" : "未启用";
     }
 
@@ -297,6 +318,13 @@ public sealed partial class StatisticsSyncWindow : WindowEx
         {
             StatusBadge.Background = (Brush)Application.Current.Resources["SystemFillColorAttentionBackgroundBrush"];
             StatusBadgeText.Foreground = (Brush)Application.Current.Resources["SystemFillColorAttentionBrush"];
+            return;
+        }
+
+        if (_viewModel.HasSyncError || (EnableSyncSwitch.IsOn && _viewModel.HasPendingSyncChanges))
+        {
+            StatusBadge.Background = (Brush)Application.Current.Resources["SystemFillColorCautionBackgroundBrush"];
+            StatusBadgeText.Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"];
             return;
         }
 

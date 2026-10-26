@@ -133,6 +133,10 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public bool IsSyncBusy => _syncStatus.IsBusy;
 
+    public bool HasSyncError => _syncStatus.HasError;
+
+    public bool HasPendingSyncChanges => _syncStatus.HasPendingChanges;
+
     public IReadOnlyList<StatisticsSyncProviderOption> SyncProviders => _statisticsSyncService.GetProviders();
 
     public StatisticsViewModel(
@@ -483,6 +487,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         ShowNotification(InfoBarSeverity.Success, "已刷新云端时间", message);
     }
 
+    public Task ResolveSyncConflictAsync(StatisticsSyncConflictException conflict, bool useRemote) =>
+        _statisticsSyncService.ResolveConflictAsync(conflict, useRemote);
+
     public async Task UploadStatisticsToCloudAsync()
     {
         await _statisticsSyncService.UploadAsync();
@@ -572,6 +579,8 @@ public partial class StatisticsViewModel : ObservableRecipient
         OnPropertyChanged(nameof(SyncWarningIconVisibility));
         OnPropertyChanged(nameof(SyncErrorIconVisibility));
         OnPropertyChanged(nameof(IsSyncBusy));
+        OnPropertyChanged(nameof(HasSyncError));
+        OnPropertyChanged(nameof(HasPendingSyncChanges));
     }
 
     private EncounterSeasonConfig LoadEncounterSeasonConfig()
@@ -710,6 +719,9 @@ public partial class StatisticsViewModel : ObservableRecipient
         {
             return "云同步：配置不完整";
         }
+
+        if (status.IsBusy) return $"{status.ProviderName} · {status.Message}";
+        if (status.HasPendingChanges) return $"{status.ProviderName} · 有本地修改等待上传";
 
         if (status.RemoteLastModifiedAt is not null)
         {

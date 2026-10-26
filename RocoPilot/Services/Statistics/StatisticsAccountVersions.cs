@@ -1,3 +1,4 @@
+using System.Text.Json;
 using RocoPilot.Models.Statistics;
 
 namespace RocoPilot.Services.Statistics;
@@ -27,6 +28,15 @@ internal static class StatisticsAccountVersions
                 selected = current;
                 return true;
             }
+            // 本地仅清理了旧格式标记，而云端在上次同步后有正常新增时，仍应允许拉取。
+            // 用云端保留的旧标记还原升级前指纹，不能只凭版本号为 1 判定本地未修改。
+            if (local.SyncVersion is not null && baselineFingerprint == local.SyncVersion.LegacyFingerprint
+                && MatchesBeforeMigration(local, remote, baselineFingerprint))
+            {
+                remote.SyncVersion = new StatisticsAccountVersion { LegacyFingerprint = fingerprint };
+                selected = remote;
+                return true;
+            }
             throw Conflict(local.Uid, "旧版数据与升级时的快照不同");
         }
         var left = local.SyncVersion.Devices;
@@ -39,6 +49,18 @@ internal static class StatisticsAccountVersions
             throw Conflict(local.Uid, "相同版本的内容不一致");
         selected = remoteNewer ? remote : local;
         return true;
+    }
+
+    private static bool MatchesBeforeMigration(AccountStatisticsData current, AccountStatisticsData legacy, string? fingerprint)
+    {
+        if (fingerprint is null) return false;
+        var restored = JsonSerializer.Deserialize<AccountStatisticsData>(JsonSerializer.Serialize(current))!;
+        restored.SyncVersion = null;
+        restored.PendingEncounters.AddRange(legacy.PendingEncounters.Where(x => x.HandledAt is not null));
+        restored.PendingShinyCaptures.AddRange(legacy.PendingShinyCaptures.Where(x => x.HandledAt is not null));
+        foreach (var season in restored.Seasons)
+            season.EncounterCountResets.AddRange(legacy.Seasons.FirstOrDefault(x => x.Id == season.Id)?.EncounterCountResets ?? []);
+        return StatisticsDocumentMerger.ComputeAccountFingerprints(new StatisticsDocument { Accounts = [restored] })[restored.Uid] == fingerprint;
     }
 
     private static InvalidOperationException Conflict(string uid, string reason) => new(

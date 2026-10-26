@@ -613,7 +613,13 @@ public sealed class StatisticsService : IStatisticsService
                 var original = _document.Accounts.FirstOrDefault(x => x.Uid == account.Uid);
                 if (source != StatisticsDocumentChangeSource.Local)
                 {
-                    if (account.SyncVersion is { Devices.Count: 0 }) StatisticsAccountVersions.Advance(account, _deviceId);
+                    if (account.SyncVersion is { Devices.Count: 0 } version)
+                    {
+                        // 接收旧格式云端更新时继承本地版本，再记录本次迁移，避免退回升级前分支。
+                        foreach (var entry in original?.SyncVersion?.Devices ?? [])
+                            version.Devices[entry.Key] = entry.Value;
+                        StatisticsAccountVersions.Advance(account, _deviceId);
+                    }
                     continue;
                 }
                 if (account.SyncVersion is null && (account.Temporary is not null

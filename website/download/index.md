@@ -25,7 +25,6 @@ RocoPilot 提供 Cloudflare R2 和 GitHub Release 两个下载源。<br>
             <span class="download-name">RocoPilot-Setup.exe</span>
             <span class="download-source">Cloudflare R2</span>
           </span>
-          <span class="file-size">(277.4 MB)</span>
         </a>
         <a class="download-btn" href="https://github.com/FelixHenrikChristian/RocoPilot/releases/latest/download/RocoPilot-Setup.exe" target="_blank" rel="noreferrer" aria-label="从 GitHub Release 下载 RocoPilot-Setup.exe">
           <span class="download-icon">📦</span>
@@ -33,12 +32,11 @@ RocoPilot 提供 Cloudflare R2 和 GitHub Release 两个下载源。<br>
             <span class="download-name">RocoPilot-Setup.exe</span>
             <span class="download-source">GitHub Release</span>
           </span>
-          <span class="file-size">(277.4 MB)</span>
         </a>
       </div>
     </div>
   </div>
   <div class="fallback-notice">
-    <p>如需查看历史版本，请访问 <a href="https://github.com/FelixHenrikChristian/RocoPilot/releases/latest" target="_blank" rel="noreferrer">GitHub Releases 页面</a></p>
+    <p>更多详细信息请查看 <a href="https://github.com/FelixHenrikChristian/RocoPilot/releases" target="_blank" rel="noreferrer">GitHub Releases 页面</a>。</p>
   </div>
 </div>

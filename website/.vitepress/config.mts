@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "RocoPilot",
-  description: "洛克王国世界自动战斗与奇遇计数工具",
+  description: "面向《洛克王国：世界》的 Windows 桌面辅助工具，支持自动战斗、奇遇与异色统计、花种与传说精灵挑战。",
   base: '/RocoPilot/',
   lang: 'zh-CN',
   head: [['link', { rel: 'icon', href: '/RocoPilot/logo.png' }]],

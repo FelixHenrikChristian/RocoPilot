@@ -2,6 +2,20 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-10-29：README 项目介绍与官网入口位置调整
+
+- [用户原图](LocalScreenshots/2026-10-29/readme-layout/readme-intro-and-website-link-before.png)：附件 `codex-clipboard-23d3a797-431c-49f9-9828-f1755008dd95.png`，2549×1403，原样归档，未裁剪。SHA-256：`1A1A0B1E52AD8CDCF7ACEB68E7B20C4006FCA969898532D696F71D47716947AD`。
+- 界面状态：GitHub README 预览，项目介绍位于封面上方，官网入口位于封面下方且左对齐；用户圈出这两处，要求将介绍移到官网入口下方，并将官网入口居中。
+- 用途：核对 `README.md` 中“封面 → 居中官网入口 → 项目介绍”的展示顺序及对齐方式。没有对应 OCR 或图像识别测试，未派生测试素材。
+- 已知限制：截图反映修改前的 GitHub 页面，不代表修改后的布局已发布。
+
+## 2026-10-28：官网截图采集诊断
+
+- 来源：本次文档更新任务中，使用当前仓库 Release 构建、隔离的 `LocalSettingsOptions.ApplicationDataFolder` 启动应用后现场采集；不是用户附件，也不是旧版官网图片。
+- [启动页捕获结果](LocalScreenshots/2026-10-28/documentation-capture-diagnostics/launch-overview.png)、[实时页捕获结果](LocalScreenshots/2026-10-28/documentation-capture-diagnostics/realtime-overview.png)：Windows Graphics Capture 输出，尺寸均为 1382×991，只有窗口边框及系统标题按钮，内容为黑色。
+- 已核对：应用 UI Automation 树包含实际页面控件，窗口捕获亲和性为 0；GDI、PrintWindow 和 Windows Graphics Capture 均出现黑色内容。用户随后确认屏幕上的应用界面正常；改用系统 Alt+PrintScreen 后取得完整界面。不能据此判断为应用黑屏、识别算法或游戏截图问题。
+- 用途与限制：仅保留采集失败的诊断现场，不用于官网、不作为 OCR／图像匹配测试样本，不证明当前界面的视觉布局。未派生测试素材。
+
 ## 2026-10-25：应用首页头图确认
 
 - [确认原图 forest-village-approved.png](LocalScreenshots/2026-10-25/launch-cover/forest-village-approved.png)：用户附件 `codex-clipboard-42032763-7bb1-451a-b295-1d610f3e9043.png`，尺寸 **1983×793**，原样归档，未裁剪。
@@ -111,3 +125,37 @@
 - 测试用途：核对本地、云端和同步基线的指纹差异，复现升级误判；不使用截图推断账号数据是否完整，未派生 OCR 素材。
 - 已知限制：截图仅证明出现冲突提示；实际差异须通过只读统计副本核对，不能据此直接选择覆盖任一端。
 - 核对结果：本地仅完成旧格式清理，云端正式奇遇新增 5 次；离线回放修复后 S4 奇遇从 195 更新到 200，异色仍为 60。副本回放未修改真实设置、同步基线或云端对象。通用回归入口：`StatisticsLegacySyncTests`。
+
+## 2026-10-28 至 2026-10-29：官网当前版本界面截图
+
+- 来源：本任务从当前仓库编译的 x64 Release 应用（0.4.4.0），通过系统 Alt+PrintScreen 取得实际窗口截图。官网展示素材统一放在 `website/public/screenshots/app/`，按页面和用途命名；各原图仍按实际采集日期归档。图片未裁剪、未重绘，旧版图片保留。
+- 运行数据：使用临时目录中的独立 `LocalSettingsOptions.ApplicationDataFolder`，未加载真实账号或云同步凭据。公共序列为配置窗口内的默认演示项，采集后取消修改；未启动实时任务、花种扫描或挑战，也未发送测试通知。
+- 测试用途：供官网使用步骤、配置项位置与视觉核对；不是游戏识别素材，没有派生 OCR 或图像匹配测试样本。
+- 已知限制：统计展示未选账号的空状态；花种未扫描；图中默认输入方式标注失效，仅展示控件，不代表推荐该方式。截图不证明游戏自动操作、异色确认、赛季归档或云同步执行成功。
+- 已核对：16 张发布素材均与归档原图 SHA-256 一致。
+
+| 官网素材 | 原图归档 | 尺寸 | 界面状态 |
+| --- | --- | --- | --- |
+| [launch-overview.png](../website/public/screenshots/app/launch-overview.png) | [原图](LocalScreenshots/2026-10-28/website-docs/launch-overview.png) | 1382×991 | 启动页，启动任务与信息遮罩卡片收起 |
+| [launch-options.png](../website/public/screenshots/app/launch-options.png) | [原图](LocalScreenshots/2026-10-28/website-docs/launch-options.png) | 1382×991 | 启动页，配置卡片展开，滚动到配置区域 |
+| [realtime-overview.png](../website/public/screenshots/app/realtime-overview.png) | [原图](LocalScreenshots/2026-10-28/website-docs/realtime-overview.png) | 1382×991 | 实时页，奇遇计数与自动战斗卡片收起 |
+| [realtime-options.png](../website/public/screenshots/app/realtime-options.png) | [原图](LocalScreenshots/2026-10-28/website-docs/realtime-options.png) | 1382×991 | 实时页，两张配置卡片展开 |
+| [flower-seed-options.png](../website/public/screenshots/app/flower-seed-options.png) | [原图](LocalScreenshots/2026-10-28/website-docs/flower-seed-options.png) | 1382×991 | 任务页，花种挑战展开，尚未扫描目标 |
+| [legendary-options.png](../website/public/screenshots/app/legendary-options.png) | [原图](LocalScreenshots/2026-10-28/website-docs/legendary-options.png) | 1382×991 | 任务页，传说精灵展开，展示默认难度与印记策略 |
+| [statistics-overview.png](../website/public/screenshots/app/statistics-overview.png) | [原图](LocalScreenshots/2026-10-28/website-docs/statistics-overview.png) | 1382×991 | 统计页，未选择账号，记录为空 |
+| [battle-shared-sequences.png](../website/public/screenshots/app/battle-shared-sequences.png) | [原图](LocalScreenshots/2026-10-28/website-docs/battle-shared-sequences.png) | 1362×1011 | 战斗配置，新增一条尚未保存的默认公共执行序列 |
+| [battle-release-order.png](../website/public/screenshots/app/battle-release-order.png) | [原图](LocalScreenshots/2026-10-28/website-docs/battle-release-order.png) | 1362×1011 | 战斗配置，普通战斗默认释放顺序与公共序列入口 |
+| [battle-bloodline-filter.png](../website/public/screenshots/app/battle-bloodline-filter.png) | [原图](LocalScreenshots/2026-10-28/website-docs/battle-bloodline-filter.png) | 1362×1011 | 战斗配置，捕捉血脉筛选选项 |
+| [statistics-cloud-sync.png](../website/public/screenshots/app/statistics-cloud-sync.png) | [原图](LocalScreenshots/2026-10-29/website-docs/statistics-cloud-sync.png) | 942×771 | 云同步窗口，连接配置，未填写凭据 |
+| [statistics-cloud-actions.png](../website/public/screenshots/app/statistics-cloud-actions.png) | [原图](LocalScreenshots/2026-10-29/website-docs/statistics-cloud-actions.png) | 942×771 | 云同步窗口，滚动至同步与数据，未启用自动同步 |
+| [hotkeys-overview.png](../website/public/screenshots/app/hotkeys-overview.png) | [原图](LocalScreenshots/2026-10-28/website-docs/hotkeys-overview.png) | 1382×991 | 热键页，功能分组与未绑定按钮 |
+| [notifications-overview.png](../website/public/screenshots/app/notifications-overview.png) | [原图](LocalScreenshots/2026-10-28/website-docs/notifications-overview.png) | 1382×991 | 通知页，Windows 通知展开，提示音和测试通知控件 |
+| [logs-overview.png](../website/public/screenshots/app/logs-overview.png) | [原图](LocalScreenshots/2026-10-29/website-docs/logs-overview.png) | 1382×991 | 日志页，搜索 RocoPilot 启动，仅展示启动标记 |
+| [settings-overview.png](../website/public/screenshots/app/settings-overview.png) | [原图](LocalScreenshots/2026-10-29/website-docs/settings-overview.png) | 1382×991 | 设置页，主题、恢复设置与关于区域 |
+
+## 2026-10-29：官网首页卡片布局调整前
+
+- [用户原图](LocalScreenshots/2026-10-29/website-home/home-feature-cards-and-auxiliary-table-before.png)：附件 `codex-clipboard-848009cc-ae6d-415c-b6d9-018df08d1350.png`，原样归档，未裁剪。SHA-256：`DE31F9503A89F7F44B7326095E5F2BAB8A61FFE37A5F9451027E1D26C3A0E42F`。
+- 界面状态：深色官网首页，上方展示四张主要功能卡片，下方为“辅助功能”标题和表格。
+- 测试用途：作为恢复首页统一功能卡片布局的修改前视觉依据；未派生 OCR 或图像识别测试素材。
+- 已知限制：截图仅显示页面的部分区域，不证明全部内容或线上部署状态。

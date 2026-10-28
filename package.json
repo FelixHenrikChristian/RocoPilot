@@ -16,7 +16,7 @@
   "bugs": {
     "url": "https://github.com/FelixHenrikChristian/RocoPilot/issues"
   },
-  "homepage": "https://github.com/FelixHenrikChristian/RocoPilot#readme",
+  "homepage": "https://felixhenrikchristian.github.io/RocoPilot/",
   "devDependencies": {
     "vitepress": "^1.6.4"
   }

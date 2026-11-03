@@ -12,6 +12,30 @@ public sealed class LegendaryLocalScreenshotTests
     [TestMethod]
     [DataRow(2048, 1152)]
     [DataRow(1280, 720)]
+    public async Task CaptureWithOnlyContractMarkCanConfirm(int width, int height)
+    {
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/capture-contract-only.png",
+            width, height, 12, 30);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.CaptureConfirmation, screen.Scene);
+        Assert.IsNotNull(screen.Marks);
+        Assert.IsFalse(screen.Marks.LegendarySelected);
+        Assert.IsNotNull(screen.Button);
+        Assert.IsTrue(screen.Button.IsMatch);
+        var confirmX = (screen.Button.X + screen.Button.Width / 2d - 12) / width;
+        var confirmY = (screen.Button.Y + screen.Button.Height / 2d - 30) / height;
+        Assert.IsTrue(confirmX is > .55 and < .61 && confirmY is > .79 and < .85);
+        Assert.AreEqual(screen.Button, await recognizer.FindClickTargetAsync(frame, screen.Scene,
+            screen.Button.TemplatePath, 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, "legendary-select-contract",
+            0, 12, 30, width, height, CancellationToken.None, legendary: true));
+    }
+
+    [TestMethod]
+    [DataRow(2048, 1152)]
+    [DataRow(1280, 720)]
     public async Task PreparationStartIsRecognizedWithoutCursor(int width, int height)
     {
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/preparation-start-stalled.png",

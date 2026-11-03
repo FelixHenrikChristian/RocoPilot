@@ -327,16 +327,17 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var header = await images.MatchAsync(frame, CreateArea(x, y, width, height, .44, .34, .56, .41),
             TemplatePath("legendary-capture-header"), options, token);
         if (!header.IsMatch) return null;
-        var contractArea = CreateArea(x, y, width, height, .42, .45, .50, .56);
+        // 无专属印记时只显示居中的契约卡片；同一区域覆盖左侧与居中位置。
+        var contractArea = CreateArea(x, y, width, height, .42, .45, .55, .56);
         var markArea = CreateArea(x, y, width, height, .50, .45, .58, .56);
         var contract = await images.MatchAsync(frame, contractArea, TemplatePath("legendary-contract-selected"), options, token);
         var unselected = await images.MatchAsync(frame, contractArea, TemplatePath("legendary-contract-unselected"), options, token);
-        // 二选一界面只识别左侧固定卡片的两种外观，避免依赖各赛季专属印记图案。
+        // 只识别契约卡片的两种外观，避免依赖各赛季专属印记图案。
         var known = contract.IsMatch != unselected.IsMatch;
         return new(ManualChallengeScene.CaptureConfirmation, [],
             await MatchButtonAsync(frame, "legendary-confirm", x, y, width, height, token),
             Marks: known ? new(unselected.IsMatch,
-                new(true, 1, contractArea.X, contractArea.Y, contractArea.Width, contractArea.Height, "legendary-select-contract"),
+                (contract.IsMatch ? contract : unselected) with { TemplatePath = "legendary-select-contract" },
                 new(true, 1, markArea.X, markArea.Y, markArea.Width, markArea.Height, "legendary-select-mark")) : null);
     }
 

@@ -58,6 +58,8 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(false, false, 3, "insufficient", true)]
     [DataRow(true, false, 3, "missing-mark", true)]
     [DataRow(false, false, 3, "missing-mark", true)]
+    [DataRow(true, false, 3, "contract-only", false)]
+    [DataRow(false, false, 3, "contract-only", false)]
     public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(
         bool allowMarks, bool switchPet, int difficulty, string shortage, bool directTeleport)
     {
@@ -86,7 +88,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
         var run = runner.RunLegendaryAsync(state, directTeleport ? "银月狼王" : "圣羽翼王", 2, difficulty, allowMarks,
             state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
-        if (allowMarks && shortage != "missing-mark")
+        if (shortage == "contract-only" || allowMarks && shortage != "missing-mark")
         {
             await run;
             var expected = switchPet
@@ -130,6 +132,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             if (!_pixels.TryGetValue(Scene, out var pixels))
             {
                 var fixture = Scene == "insufficient" ? shortage
+                    : Scene == "capture-contract" && shortage == "contract-only" ? "local/capture-contract-only"
                     : directTeleport && Scene == "capture-legendary" ? "local/capture-wolf"
                     : directTeleport && Scene == "list" ? "list-season4" : Scene;
                 using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-{fixture}.png", 1280, 720,
@@ -205,14 +208,15 @@ public sealed class FlowerSeedChallengeRunnerTests
             {
                 "list" => directTeleport ? "wolf-interaction" : "map",
                 "map" => "message",
-                "confirmation" when difficulty == 3 => "insufficient",
+                "confirmation" when difficulty == 3 => shortage == "contract-only" ? "preparation" : "insufficient",
                 "difficulty-1" or "difficulty-2" => "insufficient",
                 "insufficient" when x > 650 => "preparation",
                 "insufficient" when x < 650 => "confirmation",
                 "preparation" => "skip",
-                "capture-contract" when x is > 640 and < 750 && y < 450 => "capture-legendary",
+                "capture-contract" when shortage == "contract-only" && x > 650 && y > 550 => "rewards",
+                "capture-contract" when shortage != "contract-only" && x is > 640 and < 750 && y < 450 => "capture-legendary",
                 "capture-legendary" when y > 550 => "rewards",
-                "result" when Captures < 2 && x > 650 => "insufficient",
+                "result" when Captures < 2 && x > 650 => shortage == "contract-only" ? "preparation" : "insufficient",
                 "result" when Captures == 2 && x < 650 => "world",
                 _ => throw new AssertFailedException($"{Scene} 收到未预期点击：{x},{y}")
             };

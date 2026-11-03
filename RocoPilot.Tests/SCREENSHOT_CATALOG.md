@@ -2,6 +2,16 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-03：缺少传说印记时的单卡片捕捉确认
+
+- [用户原图](LocalScreenshots/2026-11-03/legendary/capture-contract-only-no-legendary-mark.png)：附件 `codex-clipboard-084eaf89-d1fb-42c6-a776-a5bbdda0578d.png`，尺寸 **2050×1184**，原样保存，未裁剪。SHA-256：`E368DC3C2DFABE9AA6A3F065A32F3D7B88E97C1E9D7C811F681E8E50E0C9C438`。
+- 界面状态：用户报告没有传说印记时卡在捕捉确认。右上显示契约印记 100、另一种印记 0；弹窗仅有一张居中的契约印记卡片，文案为消耗 40、本周还可使用 3 次。截图未显示精灵名，不依据背景推断目标。
+- 测试素材：按客户区 `(1,31,2048,1152)` 裁剪为 `Fixtures/legendary-local/capture-contract-only.png`；原图保留不变。
+- 根因与修复：修复前两种分辨率均识别到捕捉弹窗，但契约卡片超出原左侧搜索范围，`Marks` 为空，流程等待。现有卡片模板可直接复用，扩大同一搜索区域覆盖居中位置，并使用实际匹配位置作为契约卡片的点击目标。
+- 回归入口：`LegendaryLocalScreenshotTests.CaptureWithOnlyContractMarkCanConfirm` 覆盖 2048×1152、1280×720 及窗口偏移，检查捕捉方式、确认按钮及点击复查；`FlowerSeedChallengeRunnerTests.LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting` 的 `contract-only` 用例验证两种印记配置下连续完成 2 次挑战并返回大世界。
+- 验证结果：2026-11-03，142 项识别／流程回归及 11 项完整挑战回放通过，单卡片的两种分辨率再次通过；Release 构建成功。
+- 已知限制：截图可核对当前资源与剩余周次数，不能证明真实输入或捕捉已经成功；本次验证为离线截图和流程回放。
+
 ## 2026-10-29：README 项目介绍与官网入口位置调整
 
 - [用户原图](LocalScreenshots/2026-10-29/readme-layout/readme-intro-and-website-link-before.png)：附件 `codex-clipboard-23d3a797-431c-49f9-9828-f1755008dd95.png`，2549×1403，原样归档，未裁剪。SHA-256：`1A1A0B1E52AD8CDCF7ACEB68E7B20C4006FCA969898532D696F71D47716947AD`。

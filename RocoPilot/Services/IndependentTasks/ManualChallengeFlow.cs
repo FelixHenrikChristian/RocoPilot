@@ -20,7 +20,6 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
     private bool _topConfirmed;
     private TargetStage _targetStage;
     private ChallengePhase _challengePhase;
-    private bool _rewardsSeen;
     private bool _captureSeen;
     private (int Number, double Y, bool Matched)[] _visibleRows = [];
     private double _rowSpacing = double.PositiveInfinity;
@@ -53,7 +52,6 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
             if (_challengePhase == ChallengePhase.Battle && ++ConsecutiveFailures >= 3)
                 throw new InvalidOperationException("挑战连续失败 3 次，任务已停止。请检查精灵状态后重新启动。");
             _challengePhase = ChallengePhase.Navigation;
-            _rewardsSeen = false;
             _useLegendaryForCapture = false;
         }
         if ((target is not null || legendaryTarget is not null) && CompletedCount >= runCount && screen.Scene != ManualChallengeScene.Result) return default;
@@ -146,7 +144,6 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 if (!IsBattleActive)
                 {
                     _challengePhase = ChallengePhase.Battle;
-                    _rewardsSeen = false;
                     _captureSeen = false;
                     BattleNumber++;
                 }
@@ -166,15 +163,10 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 _challengePhase = ChallengePhase.Settlement;
                 _captureSeen = true;
                 return new(ManualChallengeAction.Capture);
-            case ManualChallengeScene.Rewards when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement:
-                if (screen.Button is not { IsMatch: true }) return default;
-                _challengePhase = ChallengePhase.Settlement;
-                _rewardsSeen = true;
-                return Click(screen.Button);
             case ManualChallengeScene.Result when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement or ChallengePhase.Result:
                 if (_challengePhase != ChallengePhase.Result)
                 {
-                    if (legendaryTarget is not null ? !_captureSeen : !_rewardsSeen) return default;
+                    if (!_captureSeen) return default;
                     CompletedCount++;
                     ConsecutiveFailures = 0;
                     _useLegendaryForCapture = false;

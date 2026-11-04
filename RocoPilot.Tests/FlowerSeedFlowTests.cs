@@ -357,7 +357,7 @@ public sealed class FlowerSeedFlowTests
     [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
-    public void CaptureTransitionsDoNotCountAsFailureOrBlockRewards(bool interactionVisible)
+    public void CaptureTransitionsDoNotCountAsFailureOrBlockResult(bool interactionVisible)
     {
         var flow = ReadyChallenge(2);
         FailBattle(flow);
@@ -370,7 +370,6 @@ public sealed class FlowerSeedFlowTests
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Unknown, []), 1152).Action);
         Assert.AreEqual(2, flow.ConsecutiveFailures);
         Assert.AreEqual(0, flow.CompletedCount);
-        Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(transition, [], Text: "挑战"), 1152).Action);
         var result = new ManualChallengeScreen(ManualChallengeScene.Result, [], Button, ExitButton: Button);
         Assert.AreEqual(ManualChallengeAction.Click, flow.Next(result, 1152).Action);
@@ -391,7 +390,7 @@ public sealed class FlowerSeedFlowTests
         {
             StartBattle(flow);
             Assert.AreEqual(number, flow.BattleNumber);
-            Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152).Action);
+            Assert.AreEqual(ManualChallengeAction.Capture, flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152).Action);
             Assert.AreEqual(number - 1, flow.CompletedCount);
             var decision = flow.Next(result, 1152);
             Assert.AreEqual(ManualChallengeAction.Click, decision.Action);
@@ -403,7 +402,7 @@ public sealed class FlowerSeedFlowTests
                 Assert.AreEqual(ManualChallengeAction.Click, flow.Next(result, 1152).Action);
                 Assert.AreEqual(number, flow.CompletedCount);
             }
-            Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152).Action);
+            Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152).Action);
         }
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Battle, []), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Unknown, []), 1152).Action);
@@ -412,15 +411,13 @@ public sealed class FlowerSeedFlowTests
     }
 
     [TestMethod]
-    public void ResultWithoutCurrentRewardsCannotCountOrIssueRetryAndMissingButtonsWait()
+    public void ResultRequiresCurrentCaptureAndMissingButtonsWait()
     {
         var flow = ReadyChallenge(1);
         StartBattle(flow);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Result, [], Button, ExitButton: Button), 1152).Action);
-        Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Rewards, []), 1152).Action);
-        Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Result, [], Button, ExitButton: Button), 1152).Action);
         Assert.AreEqual(0, flow.CompletedCount);
-        Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152).Action);
+        Assert.AreEqual(ManualChallengeAction.Capture, flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Result, [], Button), 1152).Action);
         Assert.AreEqual(1, flow.CompletedCount);
         Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.Result, [], ExitButton: Button), 1152).Action);
@@ -454,7 +451,7 @@ public sealed class FlowerSeedFlowTests
     {
         var flow = ReadyChallenge(2);
         StartBattle(flow);
-        flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152);
+        flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152);
         flow.Next(new(ManualChallengeScene.Result, [], Button, ExitButton: Button), 1152);
         var scene = interactionVisible ? ManualChallengeScene.Interaction : ManualChallengeScene.World;
         Assert.AreEqual(interactionVisible ? ManualChallengeAction.Interact : ManualChallengeAction.Approach,
@@ -471,7 +468,7 @@ public sealed class FlowerSeedFlowTests
         FailBattle(flow);
         Assert.AreEqual(2, flow.ConsecutiveFailures);
         StartBattle(flow);
-        flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152);
+        flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152);
         flow.Next(new(ManualChallengeScene.Result, [], Button, ExitButton: Button), 1152);
         Assert.AreEqual(0, flow.ConsecutiveFailures);
         Assert.AreEqual(1, flow.CompletedCount);
@@ -492,7 +489,7 @@ public sealed class FlowerSeedFlowTests
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Preparation, []), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Battle, []), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Capture, []), 1152).Action);
-        Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Rewards, [], Button), 1152).Action);
+        Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152).Action);
         Assert.AreEqual(ManualChallengeAction.None, flow.Next(new(ManualChallengeScene.Result, [], Button), 1152).Action);
         Assert.AreEqual(0, flow.BattleNumber);
         Assert.AreEqual(0, flow.CompletedCount);

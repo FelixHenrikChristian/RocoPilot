@@ -2,6 +2,15 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-04：双排奖励界面可能停滞的分析素材
+
+- [用户原图](LocalScreenshots/2026-11-04/challenge-rewards/rewards-two-rows-reported-stall.png)：附件 `codex-clipboard-58c7e031-0342-4a80-b6c1-9838547b63e2.png`，尺寸 **2050×1184**，原样保存，未裁剪。SHA-256：`B13CDE57D97643098AC5D5A9469295024825BC9621C7277E6F0E0B301B3DDBB2`。
+- 界面状态：左侧“获得奖励”标题及双排奖励，右侧人物；用户转述可能卡在此处，要求先分析，不修复。截图未显示挑战目标名称，不根据人物或背景推断具体目标。
+- 分析与后续调整：原实现依赖两处固定区域 OCR 精确匹配“获得奖励”。用户后续要求把奖励关闭并入捕捉：捕捉输入完成后等待 3 秒，按原客户区比例位置点击推进，以结果页的重试和退出按钮共同匹配确认完成；未到结果页时每隔 700 毫秒重试，确认等待上限 10 秒。删除独立 `Rewards` 状态、标题 OCR 和 `_rewardsSeen`，两种挑战均以本场捕捉证据和结果页确认计数；捕捉前的传说印记奖励保持原流程。
+- 测试素材：未派生本附件的测试图片。既有 `Fixtures/flower-seed-rewards.png`、`Fixtures/flower-seed-rewards-single-row.png` 用于 `FlowerSeedScreenRecognizerTests.RewardLayoutsDoNotRequireOcrAtDifferentResolutions`，覆盖三种分辨率且断言不调用 OCR；`FlowerSeedChallengeRunnerTests` 覆盖捕捉后的 HUD 过渡、延时关闭及结果页推进。
+- 验证结果：2026-11-04，首轮相关回归 190 项通过（含 11 组传说挑战截图回放），1 项旧断言仍要求未知画面调用两次奖励 OCR；更新为零调用后，补跑 38 项全部通过，包含该用例、三种分辨率、延时关闭、完整重复挑战和结算期间取消。Debug 构建成功，保留既有 XAML／过时 API 警告。
+- 已知限制：单帧附件不能证明停滞时长、实际捕获帧、OCR 输出、流程阶段或输入结果，尚未确认用户现场停滞根因；3 秒为本次采用的固定初始等待，实际游戏动画及输入时序仍需实机验证，离线回放不能代替实机结果。
+
 ## 2026-11-03：缺少传说印记时的单卡片捕捉确认
 
 - [用户原图](LocalScreenshots/2026-11-03/legendary/capture-contract-only-no-legendary-mark.png)：附件 `codex-clipboard-084eaf89-d1fb-42c6-a776-a5bbdda0578d.png`，尺寸 **2050×1184**，原样保存，未裁剪。SHA-256：`E368DC3C2DFABE9AA6A3F065A32F3D7B88E97C1E9D7C811F681E8E50E0C9C438`。

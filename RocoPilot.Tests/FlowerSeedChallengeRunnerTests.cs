@@ -470,6 +470,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.AreEqual(1, capture.Exits);
         Assert.AreEqual(4, capture.AnimationFrames);
         Assert.AreEqual(4, capture.CaptureTransitionFrames);
+        Assert.AreEqual(2, capture.RewardsClosed);
         Assert.AreEqual(medalConfirmation ? 1 : 0, capture.MedalStarts);
         Assert.IsTrue(updates.Any(update => update.Recognition.Contains("正在确认当前界面", StringComparison.Ordinal)));
         Assert.IsTrue(updates.Any(update => update.Operation == "技能 4"));
@@ -775,6 +776,31 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.AreEqual("挑战完成，成功1次，已返回大世界", updates[^1].Operation);
     }
 
+    [TestMethod]
+    public async Task CancellationDuringCaptureSettlementDoesNotClickRewards()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var capture = new ChallengeCapture();
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            capture.OnKey(sequence);
+            if (sequence == "1, Space") cancellation.CancelAfter(100);
+        } };
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var runner = CreateRunner(capture, new Images(), keyboard, mouse,
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(state,
+            new FlowerSeedOption(1, "友爱星飞"), 1, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+
+        Assert.AreEqual(0, capture.RewardsClosed);
+        Assert.AreEqual(0, capture.Retries);
+        Assert.AreEqual(0, capture.Exits);
+        Assert.AreEqual(1, keyboard.Keys.Count(key => key.Key == "1, Space"));
+    }
+
     private static ManualChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
@@ -843,6 +869,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         private byte _scene = 6;
         private int _animationFramesLeft;
         private int _skillsUsed;
+        private DateTimeOffset _captureStartedAt;
         public byte Scene => _scene;
         public int BattlesStarted;
         public int Retries;
@@ -851,6 +878,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public int MedalStarts;
         public int AnimationFrames;
         public int CaptureTransitionFrames;
+        public int RewardsClosed;
         public int Frames;
 
         public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
@@ -892,6 +920,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                     }
                     break;
                 case (15, "1, Space"):
+                    _captureStartedAt = DateTimeOffset.UtcNow;
                     _scene = 18;
                     break;
                 default:
@@ -924,7 +953,14 @@ public sealed class FlowerSeedChallengeRunnerTests
                     MedalStarts++;
                     StartBattle();
                     break;
+                case 19: // 捕捉动画尚未结束，关闭点击暂不生效。
+                    Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
+                    break;
                 case 16:
+                    Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
+                    Assert.AreEqual(48, x);
+                    Assert.AreEqual(49, y);
+                    RewardsClosed++;
                     _scene = 17;
                     break;
                 case 17 when x == 60:
@@ -1087,9 +1123,6 @@ public sealed class FlowerSeedChallengeRunnerTests
             TextRecognitionMethod method, CancellationToken cancellationToken = default)
         {
             Calls++;
-            if (region.Id == "花种奖励标题")
-                return Task.FromResult(new TextRecognitionResult(method, "ONNX", null,
-                    [frame.Pixels[0] == 16 ? "获得奖励" : string.Empty], 1));
             DuringRead?.Invoke();
             return Task.FromResult(new TextRecognitionResult(method, "ONNX", null, [ReadText?.Invoke(frame) ?? Text], 1));
         }

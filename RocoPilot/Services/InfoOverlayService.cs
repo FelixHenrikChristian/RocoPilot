@@ -135,8 +135,6 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
             _islandWindow.UpdateSnapshot(_lastSnapshot!);
             _overlayWindow.ShowOverlay();
             _islandWindow.ShowOverlay();
-            if (!_overlayWindow.IsExcludedFromCapture || !_islandWindow.IsExcludedFromCapture)
-                _logger.LogWarning("信息遮罩未能从系统截图中排除，使用 BitBlt 时请避免把遮罩放在识别区域上方");
 
             _ = LoadAvatarPathsAsync(_overlayWindow);
 

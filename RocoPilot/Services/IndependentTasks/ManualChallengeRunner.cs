@@ -201,7 +201,7 @@ public sealed class ManualChallengeRunner(
                     IsBattleWaiting = flow.IsBattleActive && plan is null && !switchingPet
                         && screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Unknown,
                     Recognition = scanning ? recognized
-                    : screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Capture or ManualChallengeScene.Rewards or ManualChallengeScene.Result
+                    : screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Capture or ManualChallengeScene.Result
                         ? $"{creatureName} · 成功 {flow.CompletedCount}/{runCount}"
                         : $"成功 {flow.CompletedCount}/{runCount} 次 · {recognized}" });
                 if (decision.Action == ManualChallengeAction.Stop)
@@ -269,6 +269,8 @@ public sealed class ManualChallengeRunner(
                                     battle.RecordAction(currentTurn.Id, plan!.Action, DateTimeOffset.UtcNow);
                                 logger.LogInformation("手册挑战：第 {Battle} 场，{Action}，序列 {Sequence}",
                                     battleNumber, plan!.Description, plan.Sequence);
+                                if (decision.Action == ManualChallengeAction.Capture)
+                                    await CloseCaptureRewardsAsync();
                                 break;
                         }
                         lastAction = DateTimeOffset.UtcNow;
@@ -340,6 +342,37 @@ public sealed class ManualChallengeRunner(
                 }
                 lastFrameTime = frame.CapturedAt;
                 return frame;
+            }
+        }
+
+        async Task CloseCaptureRewardsAsync()
+        {
+            minimumFrameAt = DateTimeOffset.UtcNow;
+            Publish(lastProgress with { Operation = "等待捕捉结算", IsBattleWaiting = false });
+            await Task.Delay(3000, token);
+            // 奖励页并入捕捉动作；固定点击推进，用结果页按钮确认整段结算完成。
+            var timer = Stopwatch.StartNew();
+            while (true)
+            {
+                using var next = await CaptureNextFrameAsync(timer, "关闭捕捉奖励");
+                _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(next, window,
+                    out var x, out var y, out var width, out var height);
+                if (await recognizer.ReadResultAsync(next, x, y, width, height, token, legendary) is not null)
+                {
+                    pendingFrame = next.AddReference();
+                    lastAdvance = DateTimeOffset.UtcNow;
+                    return;
+                }
+                if (keyboard.IsWindowForeground(window.Hwnd))
+                {
+                    Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
+                    var nativeWidth = window.ClientWidth > 0 ? window.ClientWidth : width;
+                    var nativeHeight = window.ClientHeight > 0 ? window.ClientHeight : height;
+                    await mouse.ClickAsync(window.Hwnd, (int)Math.Round(nativeWidth * .5),
+                        (int)Math.Round(nativeHeight * .9), inputMethod, token);
+                    minimumFrameAt = DateTimeOffset.UtcNow;
+                }
+                await Task.Delay(700, token);
             }
         }
 
@@ -485,7 +518,6 @@ public sealed class ManualChallengeRunner(
         ManualChallengeScene.Battle => "战斗",
         ManualChallengeScene.SkippableAnimation => "可跳过动画",
         ManualChallengeScene.Capture => "捕捉",
-        ManualChallengeScene.Rewards => "获得奖励",
         ManualChallengeScene.Result => "挑战结果",
         _ => "等待画面匹配"
     };
@@ -518,7 +550,6 @@ public sealed class ManualChallengeRunner(
             ManualChallengeScene.Confirmation => "点击挑战",
             ManualChallengeScene.Preparation => "点击开始",
             ManualChallengeScene.MedalConfirmation => "确认奖牌提示，点击开始",
-            ManualChallengeScene.Rewards => "关闭奖励结算",
             ManualChallengeScene.Result => "选择再次挑战或退出",
             _ => "点击匹配按钮"
         },

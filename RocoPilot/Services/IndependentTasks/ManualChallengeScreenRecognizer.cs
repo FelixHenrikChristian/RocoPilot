@@ -12,7 +12,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Rewards, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -24,7 +24,7 @@ internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOn
     ImageMatchResult? Button = null, string Text = "", BattleScreen? BattleScreen = null, ImageMatchResult? ExitButton = null,
     LegendaryCaptureMarks? Marks = null, bool HasChallengeOption = false, int Difficulty = 0);
 
-/// <summary>界面控件用模板定位，奖励标题和精灵名称使用默认 OCR 确认。</summary>
+/// <summary>界面控件用模板定位，动态名称和交互文字使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
     ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<ManualChallengeScreenRecognizer> logger)
 {
@@ -147,12 +147,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var medal = await Match("medal-confirmation", .32, .48, .68, .61);
         if (medal is not null)
             return new(ManualChallengeScene.MedalConfirmation, [], await Button("start"));
-        var retry = await Button(legendary ? "legendary-result-retry" : "result-retry");
-        if (retry is not null)
-        {
-            var exit = await Button(legendary ? "legendary-result-exit" : "result-exit");
-            if (exit is not null) return new(ManualChallengeScene.Result, [], retry, ExitButton: exit);
-        }
+        var result = await ReadResultAsync(frame, clientX, clientY, width, height, cancellationToken, legendary);
+        if (result is not null) return result;
         var exclusive = await Match("capture-exclusive", .08, .2, .23, .4);
         if (exclusive is not null)
         {
@@ -227,8 +223,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             var battle = await images.MatchAsync(frame, region, "2048x1152/" + template + ".png", options, cancellationToken);
             if (battle.IsMatch) return new(ManualChallengeScene.Battle, [], battle, BattleScreen: screen);
         }
-        return await ReadRewardsAsync(frame, clientX, clientY, width, height, cancellationToken, reportOcr)
-            ?? new(ManualChallengeScene.Unknown, []);
+        return new(ManualChallengeScene.Unknown, []);
 
         Task<ImageMatchResult?> Button(string template)
             => MatchButtonAsync(frame, template, clientX, clientY, width, height, cancellationToken);
@@ -271,8 +266,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             var hud = await MatchWorldHudAsync(frame, clientX, clientY, width, height, token);
             return hud.IsMatch ? hud : null;
         }
-        if (scene == ManualChallengeScene.Rewards)
-            return (await ReadRewardsAsync(frame, clientX, clientY, width, height, token))?.Button;
         if (scene == ManualChallengeScene.CaptureConfirmation)
         {
             var current = await ReadCaptureConfirmationAsync(frame, clientX, clientY, width, height, token);
@@ -374,24 +367,15 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         return result.IsMatch ? result : null;
     }
 
-    private async Task<ManualChallengeScreen?> ReadRewardsAsync(CapturedFrame frame, int clientX, int clientY,
-        int width, int height, CancellationToken token, Action<RecognitionRegion, string>? reportOcr = null)
+    internal async Task<ManualChallengeScreen?> ReadResultAsync(CapturedFrame frame, int clientX, int clientY,
+        int width, int height, CancellationToken token, bool legendary = false)
     {
-        // 单排和双排奖励的标题高度不同；只识别单行文字。
-        foreach (var (top, bottom) in new[] { (.4, .445), (.47, .505) })
-        {
-            var region = CreateArea(clientX, clientY, width, height, .132, top, .199, bottom);
-            region.Id = "花种奖励标题";
-            var result = await ocr.RecognizeAsync(frame, region, TextRecognitionDefaults.Method, token);
-            var matched = Normalize(result.Text) == "获得奖励";
-            logger.LogDebug("花种奖励识别：OCR={Text}，匹配={Matched}，区域=({X},{Y},{Width},{Height})",
-                result.Text, matched, region.X, region.Y, region.Width, region.Height);
-            if (!matched) continue;
-            reportOcr?.Invoke(region, $"OCR：{result.Text}");
-            return new(ManualChallengeScene.Rewards, [], new ImageMatchResult(true, 1,
-                clientX + (int)Math.Round(width * .5), clientY + (int)Math.Round(height * .9), 1, 1, "flower-rewards-dismiss"), Text: result.Text);
-        }
-        return null;
+        var retry = await MatchButtonAsync(frame, legendary ? "legendary-result-retry" : "result-retry",
+            clientX, clientY, width, height, token);
+        if (retry is null) return null;
+        var exit = await MatchButtonAsync(frame, legendary ? "legendary-result-exit" : "result-exit",
+            clientX, clientY, width, height, token);
+        return exit is null ? null : new(ManualChallengeScene.Result, [], retry, ExitButton: exit);
     }
 
     private static RecognitionRegion CreateArea(int x, int y, int width, int height,

@@ -182,6 +182,7 @@ public sealed class ManualChallengeRunner(
                 };
                 var operation = flow.StopReason is not null ? "退出并停止：" + flow.StopReason : decision.Action switch
                 {
+                    ManualChallengeAction.None when screen.Scene == ManualChallengeScene.UnderfilledTeam => "等待识别助战确认按钮",
                     ManualChallengeAction.None when screen.Scene == ManualChallengeScene.CaptureConfirmation
                         && screen.Marks is null => "等待识别捕捉方式",
                     ManualChallengeAction.None => lastProgress.Operation,
@@ -432,7 +433,8 @@ public sealed class ManualChallengeRunner(
                 token.ThrowIfCancellationRequested();
                 if (timer.Elapsed >= TimeSpan.FromSeconds(10))
                     throw new TimeoutException($"{operation}：输入 {attempts} 次后目标仍未消失（{initial.TemplatePath}）。");
-                if (!button.IsMatch) Publish(lastProgress with { Operation = operation + "（等待识别选中状态）" });
+                if (!button.IsMatch) Publish(lastProgress with { Operation = operation + (scene == ManualChallengeScene.UnderfilledTeam
+                    ? "（等待确认弹窗状态）" : "（等待识别选中状态）") });
                 // F3 是开关按键，只发一次；鼠标点击可以在原目标仍存在时重试。
                 // 非空但未匹配表示动作结果尚不明确，只复查画面，不点击未确认的位置。
                 if (button.IsMatch && keyboard.IsWindowForeground(window.Hwnd) && (action == ManualChallengeAction.Click || attempts == 0))
@@ -508,6 +510,7 @@ public sealed class ManualChallengeRunner(
         ManualChallengeScene.Interaction => "挑战交互菜单",
         ManualChallengeScene.LegendaryList => "传说精灵列表",
         ManualChallengeScene.LegendaryConfirmation => "传说精灵挑战详情",
+        ManualChallengeScene.UnderfilledTeam => "队伍不足，确认神秘帮手助战",
         ManualChallengeScene.InsufficientContractMark => "契约印记或本周捕捉次数不足提示",
         ManualChallengeScene.MissingLegendaryMark => "缺少专属印记提示",
         ManualChallengeScene.CaptureConfirmation => "选择捕捉印记",
@@ -543,6 +546,7 @@ public sealed class ManualChallengeRunner(
             ManualChallengeScene.FlowerList => "传送到目标花种",
             ManualChallengeScene.LegendaryList => "传送到目标传说精灵",
             ManualChallengeScene.LegendaryConfirmation => "点击开始挑战",
+            ManualChallengeScene.UnderfilledTeam => "确认神秘帮手助战",
             ManualChallengeScene.InsufficientContractMark => "确认继续，使用传说印记捕捉",
             ManualChallengeScene.MissingLegendaryMark => "取消并退出挑战",
             ManualChallengeScene.CaptureConfirmation => "选择印记并确认捕捉",

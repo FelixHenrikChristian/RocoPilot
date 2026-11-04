@@ -80,6 +80,9 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
             case ManualChallengeScene.MissingLegendaryMark when legendaryTarget is not null:
                 StopReason = $"{legendaryTarget}缺少可用专属印记，无法捕捉，已退出挑战。";
                 return Click(screen.ExitButton);
+            case ManualChallengeScene.UnderfilledTeam when legendaryTarget is not null && _targetStage == TargetStage.Confirmed
+                && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
+                return Click(screen.Button);
             case ManualChallengeScene.InsufficientContractMark when _targetStage == TargetStage.Confirmed
                 && _challengePhase is ChallengePhase.Navigation or ChallengePhase.Starting or ChallengePhase.Result:
                 if (useLegendaryMark)

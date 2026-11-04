@@ -12,7 +12,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Result, LegendaryList, LegendaryConfirmation, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -45,6 +45,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         ["legendary-difficulty-2"] = (.065, .235, .102, .29, RecognitionAnchor.TopLeft),
         ["legendary-difficulty-3"] = (.065, .33, .102, .385, RecognitionAnchor.TopLeft),
         ["legendary-challenge"] = (.66, .88, .94, .98, RecognitionAnchor.BottomRight),
+        ["legendary-underfilled-team"] = (620d / 2048, 535d / 1152, 1450d / 2048, 700d / 1152, RecognitionAnchor.Center),
+        ["legendary-underfilled-yes"] = (1060d / 2048, 885d / 1152, 1315d / 2048, 1015d / 1152, RecognitionAnchor.Center),
         ["legendary-confirm"] = (.5, .75, .65, .9, RecognitionAnchor.Center),
         ["legendary-cancel"] = (.35, .75, .49, .9, RecognitionAnchor.Center),
         ["legendary-result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
@@ -90,6 +92,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (legendary)
         {
             // 弹窗先于后方详情页判断，避免把被遮罩的开始挑战按钮当成当前目标。
+            if (await Button("legendary-underfilled-team") is not null)
+                return new(ManualChallengeScene.UnderfilledTeam, [], await Button("legendary-underfilled-yes"));
             // 只匹配“无法进行捕捉”，不依赖各传说精灵的专属印记名称。
             if (await Match("legendary-missing-mark", .25, .42, .75, .66) is { } missingMark)
             {
@@ -286,6 +290,17 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         }
         var template = Path.GetFileNameWithoutExtension(templatePath);
         if (templatePath.Replace('\\', '/').Contains("/legendary/")) template = "legendary-" + template;
+        if (scene == ManualChallengeScene.UnderfilledTeam)
+        {
+            var body = await MatchButtonAsync(frame, "legendary-underfilled-team", clientX, clientY, width, height, token);
+            var yes = await MatchButtonAsync(frame, "legendary-underfilled-yes", clientX, clientY, width, height, token);
+            // 只命中其中一项时继续复查，等两个特征一致后再点击或交回主流程。
+            if (body is null && yes is null) return null;
+            return body is not null && yes is not null ? yes : ImageMatchResult.NoMatch(0, templatePath);
+        }
+        if (template is "legendary-challenge" or "legendary-result-retry"
+            && await MatchButtonAsync(frame, "legendary-underfilled-team", clientX, clientY, width, height, token) is not null)
+            return null;
         return await MatchButtonAsync(frame, template,
             clientX, clientY, width, height, token,
             scene is ManualChallengeScene.FlowerList or ManualChallengeScene.LegendaryList ? rowY : null);

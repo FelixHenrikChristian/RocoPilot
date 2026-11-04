@@ -60,12 +60,16 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(false, false, 3, "missing-mark", true)]
     [DataRow(true, false, 3, "contract-only", false)]
     [DataRow(false, false, 3, "contract-only", false)]
+    [DataRow(false, false, 3, "underfilled-insufficient", false)]
+    [DataRow(true, false, 3, "underfilled-contract-only", false)]
     public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(
         bool allowMarks, bool switchPet, int difficulty, string shortage, bool directTeleport)
     {
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var capture = new LegendaryReplay(switchPet, difficulty, shortage, directTeleport);
+        var underfilled = shortage.StartsWith("underfilled-", StringComparison.Ordinal);
+        if (underfilled) shortage = shortage["underfilled-".Length..];
+        var capture = new LegendaryReplay(switchPet, difficulty, shortage, directTeleport, underfilled);
         var keyboard = new Keyboard { DuringSequence = capture.OnKey };
         List<IndependentTaskProgress> updates = [];
         var mouse = new Mouse { DuringClick = (x, y) =>
@@ -111,27 +115,32 @@ public sealed class FlowerSeedChallengeRunnerTests
             Assert.AreEqual(0, capture.Captures);
         }
         Assert.AreEqual("world", capture.Scene);
+        Assert.AreEqual(underfilled ? 2 : 0, capture.HelperConfirmClicks);
+        if (underfilled) Assert.IsTrue(updates.Any(update => update.Operation.Contains("等待确认弹窗状态")));
         if (shortage == "missing-mark") Assert.AreEqual(2, capture.CancelClicks);
         Assert.AreEqual(difficulty == 3 ? 0 : 2, capture.DifficultyClicks);
     }
 
     private sealed class LegendaryReplay(bool switchPet = false, int difficulty = 3, string shortage = "insufficient",
-        bool directTeleport = false) : IScreenCaptureService
+        bool directTeleport = false, bool underfilled = false) : IScreenCaptureService
     {
         private string _selectedSlot = "";
         private int _confirmAttempts;
         private int _uncertainFrames;
         private bool _lastFrameUncertain;
+        private bool _hideHelperButton;
         private readonly Dictionary<string, byte[]> _pixels = [];
         public string Scene = "list";
         public int Captures;
         public int DifficultyClicks;
         public int CancelClicks;
+        public int HelperConfirmClicks;
         public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
         {
             if (!_pixels.TryGetValue(Scene, out var pixels))
             {
                 var fixture = Scene == "insufficient" ? shortage
+                    : Scene == "underfilled-team" ? "local/multiplayer-underfilled-team"
                     : Scene == "capture-contract" && shortage == "contract-only" ? "local/capture-contract-only"
                     : directTeleport && Scene == "capture-legendary" ? "local/capture-wolf"
                     : directTeleport && Scene == "list" ? "list-season4" : Scene;
@@ -152,6 +161,12 @@ public sealed class FlowerSeedChallengeRunnerTests
                 pixels = (byte[])pixels.Clone();
                 // 切换后短暂无法识别左侧卡片，不能提前确认或点击无效坐标。
                 for (var y = 322; y < 422; y++) Array.Clear(pixels, (y * 1280 + 537) * 4, 104 * 4);
+            }
+            if (Scene == "underfilled-team" && _hideHelperButton)
+            {
+                _hideHelperButton = false;
+                pixels = (byte[])pixels.Clone();
+                for (var y = 555; y < 635; y++) Array.Clear(pixels, (y * 1280 + 660) * 4, 170 * 4);
             }
             return new(1280, 720, pixels);
         }
@@ -191,6 +206,14 @@ public sealed class FlowerSeedChallengeRunnerTests
         public void OnClick(int x, int y)
         {
             Assert.IsFalse(_lastFrameUncertain, "选中状态不明确时必须等待，不能点击。");
+            if (Scene == "underfilled-team")
+            {
+                Assert.IsTrue(x is > 720 and < 760 && y is > 575 and < 610, "队伍不足时只点击右侧的‘是’。");
+                // 第一次点击未生效，且复查时按钮暂时不可见。恢复后应重试同一个按钮。
+                if (++HelperConfirmClicks == 1) _hideHelperButton = true;
+                else Scene = shortage == "contract-only" ? "preparation" : "insufficient";
+                return;
+            }
             if (Scene == "insufficient" && shortage == "missing-mark")
             {
                 Assert.IsTrue(x < 650, "无法捕捉时只能点击取消。");
@@ -208,7 +231,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             {
                 "list" => directTeleport ? "wolf-interaction" : "map",
                 "map" => "message",
-                "confirmation" when difficulty == 3 => shortage == "contract-only" ? "preparation" : "insufficient",
+                "confirmation" when difficulty == 3 => underfilled ? "underfilled-team"
+                    : shortage == "contract-only" ? "preparation" : "insufficient",
                 "difficulty-1" or "difficulty-2" => "insufficient",
                 "insufficient" when x > 650 => "preparation",
                 "insufficient" when x < 650 => "confirmation",

@@ -10,6 +10,46 @@ namespace RocoPilot.Tests;
 public sealed class LegendaryLocalScreenshotTests
 {
     [TestMethod]
+    [DataRow(960, 540)]
+    [DataRow(1024, 576)]
+    [DataRow(1280, 720)]
+    [DataRow(1600, 900)]
+    [DataRow(1920, 1080)]
+    [DataRow(2048, 1152)]
+    [DataRow(2560, 1440)]
+    public async Task UnderfilledTeamConfirmsTheRightButtonAndYieldsToTheNextPrompt(int width, int height)
+    {
+        const string startTemplate = "2048x1152/legendary/challenge.png";
+        var images = new ImageMatchingService();
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/multiplayer-underfilled-team.png",
+            width, height, 12, 30, source =>
+            {
+                // 模拟遮罩后仍能命中的旧开始按钮。
+                using var start = OpenCvSharp.Cv2.ImRead(Path.Combine(images.TemplateDirectory, startTemplate));
+                using var area = new OpenCvSharp.Mat(source, new OpenCvSharp.Rect(1430, 1045, start.Width, start.Height));
+                start.CopyTo(area);
+            });
+        var recognizer = new ManualChallengeScreenRecognizer(images, null!, null!, null!,
+            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.UnderfilledTeam, screen.Scene);
+        Assert.IsNotNull(screen.Button);
+        var x = (screen.Button.X + screen.Button.Width / 2d - 12) / width;
+        var y = (screen.Button.Y + screen.Button.Height / 2d - 30) / height;
+        Assert.IsTrue(x is > .56 and < .61 && y is > .80 and < .85);
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.LegendaryConfirmation,
+            startTemplate, 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+        Assert.AreEqual(screen.Button, await Recheck(frame));
+
+        using var shortage = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-insufficient.png", width, height, 12, 30);
+        Assert.IsNull(await Recheck(shortage));
+
+        Task<RocoPilot.Models.ImageMatching.ImageMatchResult?> Recheck(RocoPilot.Models.Capture.CapturedFrame next) =>
+            recognizer.FindClickTargetAsync(next, screen.Scene, screen.Button.TemplatePath, 0,
+                12, 30, width, height, CancellationToken.None, legendary: true);
+    }
+
+    [TestMethod]
     [DataRow(2048, 1152)]
     [DataRow(1280, 720)]
     public async Task CaptureWithOnlyContractMarkCanConfirm(int width, int height)

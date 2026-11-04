@@ -56,8 +56,6 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private bool _isDragging;
     private bool _isOverlayVisible;
 
-    public bool IsExcludedFromCapture { get; private set; }
-
     public InfoOverlayWindow(
         CaptureTargetWindow targetWindow,
         bool isLocked,
@@ -195,7 +193,6 @@ public sealed partial class InfoOverlayWindow : WindowEx
         }
 
         TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: _isLocked, show);
-        IsExcludedFromCapture = TransparentOverlayWindowHelper.TryExcludeFromCapture(_hwnd);
     }
 
     private void FollowTimer_Tick(DispatcherQueueTimer sender, object args)
@@ -210,7 +207,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private bool UpdateOverlayState(bool forceMove = false)
     {
         if (_isClosed
-            || !TransparentOverlayWindowHelper.IsForegroundWindow(_targetWindow.Hwnd)
+            || !TransparentOverlayWindowHelper.ShouldShowOverlay(_targetWindow.Hwnd, _targetWindow.ProcessId, _isOverlayVisible)
             || !TransparentOverlayWindowHelper.TryGetClientScreenBounds(_targetWindow.Hwnd, out var clientBounds)
             || clientBounds.Width <= 0
             || clientBounds.Height <= 0)
@@ -236,7 +233,6 @@ public sealed partial class InfoOverlayWindow : WindowEx
             Activate();
             _hasActivated = true;
             TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: _isLocked);
-            IsExcludedFromCapture = TransparentOverlayWindowHelper.TryExcludeFromCapture(_hwnd);
         }
 
         if (forceMove || !SameBounds(_currentOverlayBounds, nextBounds))

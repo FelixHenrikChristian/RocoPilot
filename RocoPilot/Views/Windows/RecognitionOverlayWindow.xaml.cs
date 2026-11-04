@@ -55,7 +55,6 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
         _hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         _messageHook = TransparentOverlayWindowHelper.InstallMessageHook(_hwnd);
         TransparentOverlayWindowHelper.ApplyTransparentOverlayStyles(_hwnd, topMost: true, passThrough: true, show: false);
-        _ = TransparentOverlayWindowHelper.TryExcludeFromCapture(_hwnd);
 
         _followTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _followTimer.Interval = FollowInterval;
@@ -179,7 +178,7 @@ public sealed partial class RecognitionOverlayWindow : WindowEx
     private bool UpdateOverlayState()
     {
         if (_isClosed
-            || !TransparentOverlayWindowHelper.IsForegroundWindow(_targetWindow.Hwnd)
+            || !TransparentOverlayWindowHelper.ShouldShowOverlay(_targetWindow.Hwnd, _targetWindow.ProcessId, _isOverlayVisible)
             || !TransparentOverlayWindowHelper.TryGetClientScreenBounds(_targetWindow.Hwnd, out var bounds)
             || bounds.Width <= 0
             || bounds.Height <= 0)

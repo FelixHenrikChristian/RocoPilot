@@ -11,7 +11,7 @@ public sealed class IndependentTaskSettings
     public const int DefaultLegendaryDifficulty = 3;
     public const int DefaultFlowerSeedRunCount = 6;
 
-    public static IReadOnlyList<string> LegendaryTargets { get; } = Array.AsReadOnly(new[] { "圣羽翼王", "龙息帕尔", "银月狼王" });
+    public static IReadOnlyList<string> LegendaryTargets { get; } = Array.AsReadOnly(new[] { "圣羽翼王", "龙息帕尔" });
 
     public string LegendaryTargetName { get; set; } = LegendaryTargets[0];
     public int LegendaryDifficulty { get; set; } = DefaultLegendaryDifficulty;

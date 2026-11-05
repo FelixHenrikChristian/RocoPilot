@@ -27,10 +27,10 @@ public sealed class IndependentTaskServiceTests
         await fixture.Service.LoadSettingsAsync();
         await fixture.Notifications.SetEnabledAsync(notificationsEnabled);
         var settings = fixture.Service.Settings;
-        settings.LegendaryTargetName = "银月狼王";
+        settings.LegendaryTargetName = "圣羽翼王";
         settings.UseLegendaryMarkWhenInsufficient = allowMarks;
         fixture.Service.SetSettings(settings);
-        fixture.Runner.Failure = "银月狼王缺少可用专属印记，无法捕捉，已退出挑战。";
+        fixture.Runner.Failure = "圣羽翼王缺少可用专属印记，无法捕捉，已退出挑战。";
 
         Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryChallenge)).Success);
         await WaitStoppedAsync(fixture.Service);
@@ -130,7 +130,7 @@ public sealed class IndependentTaskServiceTests
     {
         var fixture = new Fixture();
         await fixture.Service.LoadSettingsAsync();
-        CollectionAssert.AreEqual(new[] { "圣羽翼王", "龙息帕尔", "银月狼王" }, fixture.Service.LegendaryTargets.ToArray());
+        CollectionAssert.AreEqual(new[] { "圣羽翼王", "龙息帕尔" }, fixture.Service.LegendaryTargets.ToArray());
         var settings = fixture.Service.Settings;
         settings.LegendaryTargetName = "龙息帕尔";
         fixture.Service.SetSettings(settings);

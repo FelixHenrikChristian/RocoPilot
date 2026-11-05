@@ -466,6 +466,7 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
             HotkeyAction.ToggleInfoOverlay => "信息遮罩窗口",
             HotkeyAction.ToggleEncounterStatistics => "奇遇统计",
             HotkeyAction.ToggleAutoBattle => "自动战斗",
+            HotkeyAction.TakeScreenshot => "截图",
             _ => action.ToString()
         };
     }

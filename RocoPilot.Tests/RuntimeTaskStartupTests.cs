@@ -30,6 +30,51 @@ namespace RocoPilot.Tests;
 public sealed class RuntimeTaskStartupTests
 {
     [TestMethod]
+    public async Task ScreenshotHotkeySavesClientAreaWithoutStartingRealtimeTask()
+    {
+        using var fixture = new StartupFixture();
+        fixture.Window.Target = new()
+        {
+            Hwnd = 1, Width = 16, Height = 9, ClientWidth = 8, ClientHeight = 5,
+            WindowClientOffsetX = 3, WindowClientOffsetY = 2
+        };
+        var directory = Path.Combine(AppContext.BaseDirectory, "Screenshots");
+        var previous = Directory.Exists(directory) ? Directory.GetFiles(directory).ToHashSet() : [];
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Capture.OnRelease = () => finished.TrySetResult();
+        string[] created = [];
+        try
+        {
+            fixture.Hotkeys.Trigger(HotkeyAction.TakeScreenshot);
+            await finished.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            created = Directory.GetFiles(directory).Where(path => !previous.Contains(path)).ToArray();
+            Assert.AreEqual(1, created.Length);
+            using var file = File.OpenRead(created[0]);
+            var decoder = await Windows.Graphics.Imaging.BitmapDecoder.CreateAsync(file.AsRandomAccessStream());
+            Assert.AreEqual(8u, decoder.PixelWidth);
+            Assert.AreEqual(5u, decoder.PixelHeight);
+            Assert.IsNull(fixture.Runtime.CurrentState);
+            Assert.AreEqual(1, fixture.Capture.Releases);
+            Assert.AreEqual(0, fixture.Keyboard.Sends);
+        }
+        finally
+        {
+            foreach (var path in created) File.Delete(path);
+        }
+    }
+
+    [TestMethod]
+    public async Task ScreenshotWithoutGameWindowDoesNotCreateAFile()
+    {
+        using var fixture = new StartupFixture();
+        fixture.Window.Available = false;
+        var screenshot = typeof(RuntimeTaskService).GetMethod("TakeScreenshotAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        await (Task)screenshot.Invoke(fixture.Runtime, null)!;
+        Assert.AreEqual(0, fixture.Capture.Calls);
+        Assert.AreEqual(0, fixture.Capture.Releases);
+    }
+
+    [TestMethod]
     [DataRow(false)]
     [DataRow(true)]
     public async Task EnablingStatisticsPreparesUidThroughSettingsAndHotkeys(bool hotkey)
@@ -612,9 +657,10 @@ public sealed class RuntimeTaskStartupTests
     private sealed class WindowStub : IGameWindowService
     {
         public bool Available = true;
+        public CaptureTargetWindow Target = new() { Hwnd = 1 };
         public int ForegroundCalls;
         public string TargetProcessName => "test-game";
-        public CaptureTargetWindow? FindGameWindow() => Available ? new() { Hwnd = 1 } : null;
+        public CaptureTargetWindow? FindGameWindow() => Available ? Target : null;
         public bool TryBringGameWindowToForeground(CaptureTargetWindow window) { ForegroundCalls++; return true; }
     }
 
@@ -650,6 +696,7 @@ public sealed class RuntimeTaskStartupTests
     {
         public int Calls;
         public int Releases;
+        public Action? OnRelease;
         public Action? BeforeCapture;
         public volatile Action? BeforeWorkerCapture;
         public volatile bool ContinuousFrames;
@@ -663,7 +710,11 @@ public sealed class RuntimeTaskStartupTests
             BeforeWorkerCapture?.Invoke();
             return ContinuousFrames ? CapturedFrame.RentBgra32(16, 9) : null;
         }
-        public void Release(CaptureTargetWindow window, CaptureMethod method) => Releases++;
+        public void Release(CaptureTargetWindow window, CaptureMethod method)
+        {
+            Releases++;
+            OnRelease?.Invoke();
+        }
     }
 
     private sealed class RegionConfigStub(bool includeOcr = false) : IRecognitionRegionConfigService

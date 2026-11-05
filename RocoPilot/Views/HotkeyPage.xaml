@@ -127,7 +127,7 @@
                         <TextBlock
                             FontSize="13"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="实时任务运行且游戏窗口处于前台时生效。"
+                            Text="游戏窗口处于前台时生效；截图无需启动实时任务。"
                             TextWrapping="Wrap" />
                     </StackPanel>
                 </Grid>

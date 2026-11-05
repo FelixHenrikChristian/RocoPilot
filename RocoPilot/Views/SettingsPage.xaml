@@ -70,13 +70,13 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="20"
                             Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE7C3;" />
+                            Glyph="&#xE838;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock FontWeight="SemiBold" Text="日志" TextWrapping="Wrap" />
+                            <TextBlock FontWeight="SemiBold" Text="文件目录" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,4,0,0"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="管理日志文件"
+                                Text="打开日志和截图的保存位置"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                     </Grid>
@@ -96,7 +96,7 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE838;" />
                         <StackPanel Grid.Column="1">
-                            <TextBlock Text="日志文件" TextWrapping="Wrap" />
+                            <TextBlock Text="日志目录" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
                                 FontSize="12"
@@ -108,8 +108,47 @@
                             Grid.Column="2"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
-                            Command="{x:Bind ViewModel.OpenLogFolderCommand}"
+                            Command="{x:Bind ViewModel.OpenFolderCommand}"
+                            CommandParameter="{x:Bind ViewModel.LogDirectory}"
+                            AutomationProperties.Name="打开日志目录"
                             ToolTipService.ToolTip="打开日志目录">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Glyph="&#xE838;" />
+                        </Button>
+                    </Grid>
+                    <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" />
+                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE722;" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="截图目录" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="在资源管理器中打开 Screenshots 文件夹"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button
+                            Grid.Column="2"
+                            HorizontalAlignment="Right"
+                            VerticalAlignment="Center"
+                            Command="{x:Bind ViewModel.OpenFolderCommand}"
+                            CommandParameter="{x:Bind ViewModel.ScreenshotDirectory}"
+                            AutomationProperties.Name="打开截图目录"
+                            ToolTipService.ToolTip="打开截图目录">
                             <FontIcon
                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                 FontSize="16"

@@ -4,5 +4,6 @@ public enum HotkeyAction
 {
     ToggleInfoOverlay,
     ToggleEncounterStatistics,
-    ToggleAutoBattle
+    ToggleAutoBattle,
+    TakeScreenshot
 }

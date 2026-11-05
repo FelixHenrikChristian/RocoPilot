@@ -58,6 +58,10 @@ public partial class SettingsViewModel : ObservableRecipient
 
     public string AppVersion { get; }
 
+    public string LogDirectory => LoggingHelper.LogDirectory;
+
+    public string ScreenshotDirectory => Path.Combine(AppContext.BaseDirectory, "Screenshots");
+
     public SettingsViewModel(
         IThemeSelectorService themeSelectorService,
         ILocalSettingsService localSettingsService,
@@ -101,20 +105,20 @@ public partial class SettingsViewModel : ObservableRecipient
     }
 
     [RelayCommand]
-    private void OpenLogFolder()
+    private void OpenFolder(string path)
     {
         try
         {
-            Directory.CreateDirectory(LoggingHelper.LogDirectory);
+            Directory.CreateDirectory(path);
             Process.Start(new ProcessStartInfo
             {
-                FileName = LoggingHelper.LogDirectory,
+                FileName = path,
                 UseShellExecute = true,
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "打开日志目录失败");
+            _logger.LogError(ex, "打开目录失败：{Path}", path);
         }
     }
 

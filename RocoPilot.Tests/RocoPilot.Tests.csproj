@@ -16,6 +16,7 @@
   <ItemGroup>
     <ProjectReference Include="..\RocoPilot\RocoPilot.csproj" />
     <None Update="Fixtures\biligame-nrc-catalog.html" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures\biligame-nrc-season5.html" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Fixtures\battle-chat-*.png" CopyToOutputDirectory="PreserveNewest">
       <TargetPath>Fixtures\%(Filename)%(Extension)</TargetPath>
     </Content>

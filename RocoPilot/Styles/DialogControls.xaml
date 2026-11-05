@@ -9,6 +9,9 @@
     <Style TargetType="PasswordBox" BasedOn="{StaticResource DialogPasswordBoxStyle}" />
     <Style TargetType="ComboBox" BasedOn="{StaticResource DialogComboBoxStyle}" />
     <Style TargetType="NumberBox" BasedOn="{StaticResource DialogNumberBoxStyle}" />
+    <Style TargetType="ToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
+        <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
+    </Style>
     <Style TargetType="ToggleSwitch">
         <Setter Property="FontSize" Value="13" />
     </Style>

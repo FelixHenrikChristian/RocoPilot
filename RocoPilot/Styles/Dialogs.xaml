@@ -94,6 +94,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
     </Style>
 
     <Style x:Key="DialogSectionCardStyle" TargetType="Border" BasedOn="{StaticResource DialogCardStyle}">

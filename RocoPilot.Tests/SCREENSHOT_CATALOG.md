@@ -211,3 +211,10 @@
 - 界面状态：应用设置页，“日志”面板已展开，仅有“日志文件”的打开目录按钮。
 - 用途：作为合并日志与截图目录入口的修改前参考；调整为“文件目录” Expander，内含“日志目录”和“截图目录”，后者指向安装目录下的 `Screenshots`。
 - 已知限制：截图为修改前界面，不能证明新按钮已打开正确目录。未派生 OCR 或图像识别测试素材。
+
+## 2026-11-05：新赛季统计确认弹窗控件底色不一致
+
+- [用户原图](LocalScreenshots/2026-11-05/temporary-statistics/selection-count-background-mismatch.png)：附件 `codex-clipboard-63369977-a764-4f85-92b8-5065d7f2a21c.png`，1332×891，原样保存，未裁剪。SHA-256：`E02B89167EA2E45A83B63DBA15EC8A4332B6016C746D3A6FF8B53E7E646DC2CC`。
+- 界面状态：“确认新赛季统计”弹窗，奇遇 1 项，未勾选。用户框出了选择按钮和次数输入框，两者为浅灰底，精灵名输入和赛季选择为深色底。
+- 原因与调整：选择控件实际为 `ToggleButton`，弹窗尚未统一其背景；`DialogNumberBoxStyle` 也缺少背景设置，而 TextBox 和 ComboBox 已使用 `SolidBackgroundFillColorBaseBrush`。在弹窗样式中统一 NumberBox 与 ToggleButton 的普通状态底色，沿用默认选中及交互状态模板。
+- 用途与限制：修改前视觉参考，不作为 OCR 素材；未派生识别测试样本。截图不能证明修复后的视觉表现。

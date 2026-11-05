@@ -3,9 +3,9 @@
     "id": "biligame",
     "name": "Biligame 洛克王国世界 Wiki 精灵图鉴",
     "listUrl": "https://wiki.biligame.com/nrc/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4",
-    "scrapedAt": "2026-10-24T20:12:27.3446045+00:00"
+    "scrapedAt": "2026-11-05T05:43:17.505019+00:00"
   },
-  "count": 468,
+  "count": 493,
   "spirits": [
     {
       "id": "001",
@@ -17803,13 +17803,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/2/25/lzfak0tl2l8ldthdlmmj4oppext378k.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/25/lzfak0tl2l8ldthdlmmj4oppext378k.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/092_b92d6b37f1.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/2/28/e07ejtpknfuqrobzai3dnz7ep9tn5kt.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/28/e07ejtpknfuqrobzai3dnz7ep9tn5kt.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/092_563b779fa6.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "翼",
       "secondaryAttribute": "水",
       "updateVersion": "",
@@ -28531,13 +28531,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/6/68/s9lvo67mbkj161lqi06h2hqao16o8r0.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/68/s9lvo67mbkj161lqi06h2hqao16o8r0.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/201_3355cbbb8a.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/d/de/qcyh60pm6xc7a45om97didk62nveph0.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/de/qcyh60pm6xc7a45om97didk62nveph0.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/201_062fe36270.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "本来的样子",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "地",
       "secondaryAttribute": "草",
       "updateVersion": "",
@@ -28661,13 +28661,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/f/fa/coxv9m2bvlijrlnbj5e1t6hxg5cahp5.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/f/fa/coxv9m2bvlijrlnbj5e1t6hxg5cahp5.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/202_045eed1841.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/a/a2/sua39wwy33bx4mosytctka0am9no87y.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/a/a2/sua39wwy33bx4mosytctka0am9no87y.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/202_eadf5f868e.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "本来的样子",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "地",
       "secondaryAttribute": "草",
       "updateVersion": "",
@@ -28791,13 +28791,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/7/71/ca7fybku3ukf135uybvizu1xw3400ib.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/7/71/ca7fybku3ukf135uybvizu1xw3400ib.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/203_b6045dba6b.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/8/83/gii8jz1sy227sht0ny46wk6bwy2nh7t.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/83/gii8jz1sy227sht0ny46wk6bwy2nh7t.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/203_1a0e276b6c.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "龙",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -28846,13 +28846,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/0/09/71w1s2tihrhyla7mdzufawxylgpppzm.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/0/09/71w1s2tihrhyla7mdzufawxylgpppzm.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/204_a5a9559c0c.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/a/a7/gf3zfomhmedf4nm59zk9l0x7b5k45zl.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/a/a7/gf3zfomhmedf4nm59zk9l0x7b5k45zl.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/204_b111fffafd.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "龙",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -28901,13 +28901,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/1/14/jpzp49gq1gnf5dxn9p75kdw1kuz8uax.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/1/14/jpzp49gq1gnf5dxn9p75kdw1kuz8uax.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/204_c1b4c3eef4.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/2/2c/tds5hujs7spyjku8okmyd84hei45ovj.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/2c/tds5hujs7spyjku8okmyd84hei45ovj.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/204_99f96ab61e.png",
       "stage": "首领形态",
       "form": "首领形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "龙",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -30284,13 +30284,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/8c/oa29n6quvtyms7emd2bmwurs27ui8wt.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/8c/oa29n6quvtyms7emd2bmwurs27ui8wt.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/224_245dfc9f93.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/2/21/gbgm6b6kvojn6j6tk15muqs8wr7dbu2.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/21/gbgm6b6kvojn6j6tk15muqs8wr7dbu2.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/224_72ff8f93b8.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "龙",
       "secondaryAttribute": "翼",
       "updateVersion": "",
@@ -30331,13 +30331,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/de/saoqwb4357x06yp298ko24h1hah10jh.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/de/saoqwb4357x06yp298ko24h1hah10jh.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/225_cce960f49a.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/b/be/o2gn0rlvduoqcf9j1r7x5t4j67namik.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/b/be/o2gn0rlvduoqcf9j1r7x5t4j67namik.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/225_147f75b255.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "龙",
       "secondaryAttribute": "翼",
       "updateVersion": "",
@@ -30630,13 +30630,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/5/56/kx35o354gmxndynw87z3droc5wtfwt9.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/5/56/kx35o354gmxndynw87z3droc5wtfwt9.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/229_c06970b552.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/8/84/or238uzrfcdvjumwqx9r5mcbt08195s.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/84/or238uzrfcdvjumwqx9r5mcbt08195s.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/229_eb10fc00c1.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "机械",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -30677,13 +30677,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/9/95/s1f4szxmr4h5jaqptptoi966hiwygfv.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/9/95/s1f4szxmr4h5jaqptptoi966hiwygfv.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/230_7be693e2f0.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/b/b7/he1ju01qbfersi6icu31klxvfr90c4z.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/b/b7/he1ju01qbfersi6icu31klxvfr90c4z.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/230_4a639164ad.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "机械",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -33531,11 +33531,74 @@
           "stage": "Ⅱ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "245",
+          "name": "琉璃君主",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "evolutionChainNames": [
         "翡翠水母",
-        "琉璃水母"
+        "琉璃水母",
+        "琉璃君主"
+      ]
+    },
+    {
+      "id": "245",
+      "name": "琉璃君主",
+      "wikiName": "琉璃君主",
+      "baseName": "翡翠水母",
+      "pageUrl": "https://wiki.biligame.com/nrc/琉璃君主",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/e/ec/orbqswx2vjngqcs57sjeqwgyy6vtbrv.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/e/ec/orbqswx2vjngqcs57sjeqwgyy6vtbrv.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/245_bcfd92e7b4.png",
+      "shinyAvatarUrl": "",
+      "shinyOriginalImageUrl": "",
+      "shinyAvatarPath": "",
+      "stage": "首领形态",
+      "form": "首领形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "毒",
+      "updateVersion": "",
+      "aliases": [
+        "琉璃君主"
+      ],
+      "chainId": "244-翡翠水母",
+      "baseId": "244",
+      "finalId": "245",
+      "finalName": "琉璃水母",
+      "evolutionChain": [
+        {
+          "id": "244",
+          "name": "翡翠水母",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "245",
+          "name": "琉璃水母",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "245",
+          "name": "琉璃君主",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "翡翠水母",
+        "琉璃水母",
+        "琉璃君主"
       ]
     },
     {
@@ -33578,11 +33641,19 @@
           "stage": "Ⅱ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "245",
+          "name": "琉璃君主",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "evolutionChainNames": [
         "翡翠水母",
-        "琉璃水母"
+        "琉璃水母",
+        "琉璃君主"
       ]
     },
     {
@@ -33759,13 +33830,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/8d/b1stgs58ljvt49n7ubovxsfx1eazob7.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/8d/b1stgs58ljvt49n7ubovxsfx1eazob7.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/249_2ff0112290.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/9/98/icucng2gt8tkv3ubhvzicxsdm9jlwws.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/9/98/icucng2gt8tkv3ubhvzicxsdm9jlwws.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/249_320ea5bf0b.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "火",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -33814,13 +33885,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/5/56/rbba0mpgckbx9j0yjoqj4tijmt8b6e9.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/5/56/rbba0mpgckbx9j0yjoqj4tijmt8b6e9.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/250_b7b36dd8fe.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/7/72/4ima17pdfomwy2011wk6f1jwebh1u4t.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/7/72/4ima17pdfomwy2011wk6f1jwebh1u4t.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/250_923193a818.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "火",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -33869,13 +33940,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/7/76/giwrwlewr2b1aldvc0mccyb5h7moxhs.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/7/76/giwrwlewr2b1aldvc0mccyb5h7moxhs.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/251_c11b7d3703.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/6/61/e5gx6ed9fhigbbh5z8cwd3mie5uen2f.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/61/e5gx6ed9fhigbbh5z8cwd3mie5uen2f.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/251_54f2effed8.png",
       "stage": "Ⅲ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "火",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -33962,12 +34033,20 @@
           "stage": "Ⅲ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "圣冠布鲁斯",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "evolutionChainNames": [
         "布鲁斯",
         "雪顶布鲁斯",
-        "冰钻布鲁斯"
+        "冰钻布鲁斯",
+        "圣冠布鲁斯"
       ]
     },
     {
@@ -34017,12 +34096,20 @@
           "stage": "Ⅲ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "圣冠布鲁斯",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "evolutionChainNames": [
         "布鲁斯",
         "雪顶布鲁斯",
-        "冰钻布鲁斯"
+        "冰钻布鲁斯",
+        "圣冠布鲁斯"
       ]
     },
     {
@@ -34072,12 +34159,83 @@
           "stage": "Ⅲ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "圣冠布鲁斯",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "evolutionChainNames": [
         "布鲁斯",
         "雪顶布鲁斯",
-        "冰钻布鲁斯"
+        "冰钻布鲁斯",
+        "圣冠布鲁斯"
+      ]
+    },
+    {
+      "id": "254",
+      "name": "圣冠布鲁斯",
+      "wikiName": "圣冠布鲁斯",
+      "baseName": "布鲁斯",
+      "pageUrl": "https://wiki.biligame.com/nrc/圣冠布鲁斯",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/85/2avek67c1dfglta1lzy3fw49gjsqr4s.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/85/2avek67c1dfglta1lzy3fw49gjsqr4s.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/254_1162d849ec.png",
+      "shinyAvatarUrl": "",
+      "shinyOriginalImageUrl": "",
+      "shinyAvatarPath": "",
+      "stage": "首领形态",
+      "form": "首领形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "冰",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "圣冠布鲁斯"
+      ],
+      "chainId": "252-布鲁斯",
+      "baseId": "252",
+      "finalId": "254",
+      "finalName": "冰钻布鲁斯",
+      "evolutionChain": [
+        {
+          "id": "252",
+          "name": "布鲁斯",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "253",
+          "name": "雪顶布鲁斯",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "冰钻布鲁斯",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "圣冠布鲁斯",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "布鲁斯",
+        "雪顶布鲁斯",
+        "冰钻布鲁斯",
+        "圣冠布鲁斯"
       ]
     },
     {
@@ -35384,13 +35542,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/3e/ck2qgfmv5oy4dttmavkoiv4mvpjs2ev.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/3e/ck2qgfmv5oy4dttmavkoiv4mvpjs2ev.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/273_942de76ac1.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/6/6c/mckicfv6wjezxyzyf81gri0tuyo0q39.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/6c/mckicfv6wjezxyzyf81gri0tuyo0q39.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/273_b43269ebc3.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "水",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -36498,13 +36656,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/39/kgv1epiemo8l8ra0qitu56q5xmrqox6.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/39/kgv1epiemo8l8ra0qitu56q5xmrqox6.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/287_7aa444928f.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/4/4e/0ze13gmh2z3so8lw01ul771tdq467vh.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/4/4e/0ze13gmh2z3so8lw01ul771tdq467vh.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/287_26e8c369d9.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "地",
       "secondaryAttribute": "翼",
       "updateVersion": "",
@@ -36553,13 +36711,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/a/ac/km0e909ezmbsyefl45tj498uan46js5.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/a/ac/km0e909ezmbsyefl45tj498uan46js5.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/288_47619d1c4b.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/1/1c/k3gmqv4zbnrjswow93m0gsr7gho9ry3.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/1/1c/k3gmqv4zbnrjswow93m0gsr7gho9ry3.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/288_99fe5c349c.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "地",
       "secondaryAttribute": "翼",
       "updateVersion": "",
@@ -36608,13 +36766,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/8c/3yg4rehan6ijhu4ilb8ai6vwjs9bvz0.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/8c/3yg4rehan6ijhu4ilb8ai6vwjs9bvz0.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/288_6cabea4454.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/0/0d/aa7rnbsvpjlv0nyslwp9se88gurgz79.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/0/0d/aa7rnbsvpjlv0nyslwp9se88gurgz79.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/288_9c92238cda.png",
       "stage": "首领形态",
       "form": "首领形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "地",
       "secondaryAttribute": "翼",
       "updateVersion": "",
@@ -39947,13 +40105,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/d6/55oo796mao4o9q1ub4z3oot8oig9vr2.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/d6/55oo796mao4o9q1ub4z3oot8oig9vr2.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/348_52cd35b886.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/a/a2/77eouj2ynxmu8vthenxbfmki6z5jfhp.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/a/a2/77eouj2ynxmu8vthenxbfmki6z5jfhp.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/348_d407c17a2c.png",
       "stage": "Ⅰ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "机械",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -40002,13 +40160,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/df/h85hofpu4hpec8yn690mdfwnp5axa10.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/df/h85hofpu4hpec8yn690mdfwnp5axa10.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/349_232c43408b.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/5/59/ce3bomuu7gaple9xha0mrjkmsvl4pdz.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/5/59/ce3bomuu7gaple9xha0mrjkmsvl4pdz.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/349_20bc8a7547.png",
       "stage": "Ⅱ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "机械",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -40057,13 +40215,13 @@
       "avatarUrl": "https://patchwiki.biligame.com/images/nrc/2/22/4a5q5q7324whz660nz4d2lc82gm0fio.png",
       "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/22/4a5q5q7324whz660nz4d2lc82gm0fio.png",
       "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/350_f6777680fd.png",
-      "shinyAvatarUrl": "",
-      "shinyOriginalImageUrl": "",
-      "shinyAvatarPath": "",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/1/1f/m39ye5oxx0oi2k6k24h8f00cmxvrpi2.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/1/1f/m39ye5oxx0oi2k6k24h8f00cmxvrpi2.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/350_972d6a2ce1.png",
       "stage": "Ⅲ阶",
       "form": "原始形态",
       "regionalForm": "",
-      "hasShiny": false,
+      "hasShiny": true,
       "primaryAttribute": "机械",
       "secondaryAttribute": "",
       "updateVersion": "",
@@ -46291,6 +46449,1351 @@
         "云梦豚",
         "长江豚"
       ]
+    },
+    {
+      "id": "469",
+      "name": "小冥龙",
+      "wikiName": "小冥龙",
+      "baseName": "小冥龙",
+      "pageUrl": "https://wiki.biligame.com/nrc/小冥龙",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/2/27/1338abxa4rc9xur88ququuru2pgqq2i.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/27/1338abxa4rc9xur88ququuru2pgqq2i.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/469_394b7f9769.png",
+      "shinyAvatarUrl": "",
+      "shinyOriginalImageUrl": "",
+      "shinyAvatarPath": "",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "幽",
+      "secondaryAttribute": "龙",
+      "updateVersion": "",
+      "aliases": [
+        "小冥龙"
+      ],
+      "chainId": "469-小冥龙",
+      "baseId": "469",
+      "finalId": "470",
+      "finalName": "冥古龙",
+      "evolutionChain": [
+        {
+          "id": "469",
+          "name": "小冥龙",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "470",
+          "name": "冥古龙",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小冥龙",
+        "冥古龙"
+      ]
+    },
+    {
+      "id": "470",
+      "name": "冥古龙",
+      "wikiName": "冥古龙",
+      "baseName": "小冥龙",
+      "pageUrl": "https://wiki.biligame.com/nrc/冥古龙",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/d5/j0a3p13gjadj7zdbrno1o6hkafe9hr0.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/d5/j0a3p13gjadj7zdbrno1o6hkafe9hr0.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/470_531dcf4fa1.png",
+      "shinyAvatarUrl": "",
+      "shinyOriginalImageUrl": "",
+      "shinyAvatarPath": "",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "幽",
+      "secondaryAttribute": "龙",
+      "updateVersion": "",
+      "aliases": [
+        "冥古龙"
+      ],
+      "chainId": "469-小冥龙",
+      "baseId": "469",
+      "finalId": "470",
+      "finalName": "冥古龙",
+      "evolutionChain": [
+        {
+          "id": "469",
+          "name": "小冥龙",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "470",
+          "name": "冥古龙",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小冥龙",
+        "冥古龙"
+      ]
+    },
+    {
+      "id": "471",
+      "name": "地银链",
+      "wikiName": "地银链",
+      "baseName": "地银链",
+      "pageUrl": "https://wiki.biligame.com/nrc/地银链",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/d9/oj53hbcwfw7uyu4hc3zs42c2s56s4iz.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/d9/oj53hbcwfw7uyu4hc3zs42c2s56s4iz.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/471_c2bf0b0aa7.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/6/61/qtz6g1b7n54ln3r9wim4dr9c0lmvr83.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/61/qtz6g1b7n54ln3r9wim4dr9c0lmvr83.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/471_e563051408.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "地",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "地银链"
+      ],
+      "chainId": "471-地银链",
+      "baseId": "471",
+      "finalId": "473",
+      "finalName": "地绡银龙",
+      "evolutionChain": [
+        {
+          "id": "471",
+          "name": "地银链",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "472",
+          "name": "地底银鳞",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "473",
+          "name": "地绡银龙",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "地银链",
+        "地底银鳞",
+        "地绡银龙"
+      ]
+    },
+    {
+      "id": "472",
+      "name": "地底银鳞",
+      "wikiName": "地底银鳞",
+      "baseName": "地银链",
+      "pageUrl": "https://wiki.biligame.com/nrc/地底银鳞",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/d6/l45f5ag78ctm9mookf3b08m4ys9eg3e.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/d6/l45f5ag78ctm9mookf3b08m4ys9eg3e.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/472_9a39cec796.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/1/16/aa2hkl3knav0zzdw1ygk7bm5jejy5h7.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/1/16/aa2hkl3knav0zzdw1ygk7bm5jejy5h7.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/472_fa28c4de2b.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "地",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "地底银鳞"
+      ],
+      "chainId": "471-地银链",
+      "baseId": "471",
+      "finalId": "473",
+      "finalName": "地绡银龙",
+      "evolutionChain": [
+        {
+          "id": "471",
+          "name": "地银链",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "472",
+          "name": "地底银鳞",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "473",
+          "name": "地绡银龙",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "地银链",
+        "地底银鳞",
+        "地绡银龙"
+      ]
+    },
+    {
+      "id": "473",
+      "name": "地绡银龙",
+      "wikiName": "地绡银龙",
+      "baseName": "地银链",
+      "pageUrl": "https://wiki.biligame.com/nrc/地绡银龙",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/8a/9gzupux5k9lkvrtol494s5pmlsgflus.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/8a/9gzupux5k9lkvrtol494s5pmlsgflus.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/473_2078a1b3e2.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/4/46/rs4dgdcjvcyb0w6tqpbr76ymju8xnmb.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/4/46/rs4dgdcjvcyb0w6tqpbr76ymju8xnmb.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/473_9182972cd4.png",
+      "stage": "Ⅲ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "地",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "地绡银龙"
+      ],
+      "chainId": "471-地银链",
+      "baseId": "471",
+      "finalId": "473",
+      "finalName": "地绡银龙",
+      "evolutionChain": [
+        {
+          "id": "471",
+          "name": "地银链",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "472",
+          "name": "地底银鳞",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "473",
+          "name": "地绡银龙",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "地银链",
+        "地底银鳞",
+        "地绡银龙"
+      ]
+    },
+    {
+      "id": "474",
+      "name": "沉金兽",
+      "wikiName": "沉金兽",
+      "baseName": "沉金兽",
+      "pageUrl": "https://wiki.biligame.com/nrc/沉金兽",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/5/53/igistzlg3aa2ytoz58qpntzqbgpvzuw.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/5/53/igistzlg3aa2ytoz58qpntzqbgpvzuw.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/474_6b0412fe6d.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/0/04/c1mdqocxfs6yjj2tmoptmxfauq6n585.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/0/04/c1mdqocxfs6yjj2tmoptmxfauq6n585.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/474_c43b7844a1.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "电",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "沉金兽"
+      ],
+      "chainId": "474-沉金兽",
+      "baseId": "474",
+      "finalId": "476",
+      "finalName": "龙嵴金脉",
+      "evolutionChain": [
+        {
+          "id": "474",
+          "name": "沉金兽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "475",
+          "name": "龙头金",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "476",
+          "name": "龙嵴金脉",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "沉金兽",
+        "龙头金",
+        "龙嵴金脉"
+      ]
+    },
+    {
+      "id": "475",
+      "name": "龙头金",
+      "wikiName": "龙头金",
+      "baseName": "沉金兽",
+      "pageUrl": "https://wiki.biligame.com/nrc/龙头金",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/81/mreka0axoouzmyh1lz9rmno08jehu7y.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/81/mreka0axoouzmyh1lz9rmno08jehu7y.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/475_0daeda6e36.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/8/88/mos0n73uwktwt66qm55wssdomwtzdcd.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/88/mos0n73uwktwt66qm55wssdomwtzdcd.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/475_68108daa90.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "电",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "龙头金"
+      ],
+      "chainId": "474-沉金兽",
+      "baseId": "474",
+      "finalId": "476",
+      "finalName": "龙嵴金脉",
+      "evolutionChain": [
+        {
+          "id": "474",
+          "name": "沉金兽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "475",
+          "name": "龙头金",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "476",
+          "name": "龙嵴金脉",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "沉金兽",
+        "龙头金",
+        "龙嵴金脉"
+      ]
+    },
+    {
+      "id": "476",
+      "name": "龙嵴金脉",
+      "wikiName": "龙嵴金脉",
+      "baseName": "沉金兽",
+      "pageUrl": "https://wiki.biligame.com/nrc/龙嵴金脉",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/b/bc/iskpnmfkwt0p040e19imrzadug0y779.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/b/bc/iskpnmfkwt0p040e19imrzadug0y779.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/476_1359228dc3.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/6/68/omez94k5gi7ro6h8rldc4h097o6qrjz.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/68/omez94k5gi7ro6h8rldc4h097o6qrjz.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/476_737dd2dea3.png",
+      "stage": "Ⅲ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "电",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "龙嵴金脉"
+      ],
+      "chainId": "474-沉金兽",
+      "baseId": "474",
+      "finalId": "476",
+      "finalName": "龙嵴金脉",
+      "evolutionChain": [
+        {
+          "id": "474",
+          "name": "沉金兽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "475",
+          "name": "龙头金",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "476",
+          "name": "龙嵴金脉",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "沉金兽",
+        "龙头金",
+        "龙嵴金脉"
+      ]
+    },
+    {
+      "id": "477",
+      "name": "乐乐鲨",
+      "wikiName": "乐乐鲨",
+      "baseName": "乐乐鲨",
+      "pageUrl": "https://wiki.biligame.com/nrc/乐乐鲨",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/6/6d/3z1axg1rdzoeyngkk4tbbf8x19e2by7.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/6d/3z1axg1rdzoeyngkk4tbbf8x19e2by7.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/477_1eeb4ee2fe.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/e/e4/dg00owlowj4rt6iyr070ekq9miw78ig.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/e/e4/dg00owlowj4rt6iyr070ekq9miw78ig.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/477_e5237e6aa6.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "乐乐鲨"
+      ],
+      "chainId": "477-乐乐鲨",
+      "baseId": "477",
+      "finalId": "478",
+      "finalName": "阿瓦鲨（柠檬鲨的样子）",
+      "evolutionChain": [
+        {
+          "id": "477",
+          "name": "乐乐鲨",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（柠檬鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "柠檬鲨的样子"
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（虎纹鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "虎纹鲨的样子"
+        }
+      ],
+      "evolutionChainNames": [
+        "乐乐鲨",
+        "阿瓦鲨（柠檬鲨的样子）",
+        "阿瓦鲨（虎纹鲨的样子）"
+      ]
+    },
+    {
+      "id": "478",
+      "name": "阿瓦鲨（柠檬鲨的样子）",
+      "wikiName": "阿瓦鲨",
+      "baseName": "乐乐鲨",
+      "pageUrl": "https://wiki.biligame.com/nrc/阿瓦鲨（柠檬鲨的样子）",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/3a/9g0vayrjnienh36tqtipl9u9frsa82r.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/3a/9g0vayrjnienh36tqtipl9u9frsa82r.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/478_71a8595cde.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/3/36/5j140h6th7h4b3vo2vtcpg1wvowxpqc.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/36/5j140h6th7h4b3vo2vtcpg1wvowxpqc.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/478_2971cf13a5.png",
+      "stage": "Ⅱ阶",
+      "form": "地区形态",
+      "regionalForm": "柠檬鲨的样子",
+      "hasShiny": true,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "阿瓦鲨",
+        "阿瓦鲨(柠檬鲨的样子)",
+        "阿瓦鲨（柠檬鲨的样子）"
+      ],
+      "chainId": "477-乐乐鲨",
+      "baseId": "477",
+      "finalId": "478",
+      "finalName": "阿瓦鲨（柠檬鲨的样子）",
+      "evolutionChain": [
+        {
+          "id": "477",
+          "name": "乐乐鲨",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（柠檬鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "柠檬鲨的样子"
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（虎纹鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "虎纹鲨的样子"
+        }
+      ],
+      "evolutionChainNames": [
+        "乐乐鲨",
+        "阿瓦鲨（柠檬鲨的样子）",
+        "阿瓦鲨（虎纹鲨的样子）"
+      ]
+    },
+    {
+      "id": "478",
+      "name": "阿瓦鲨（虎纹鲨的样子）",
+      "wikiName": "阿瓦鲨",
+      "baseName": "乐乐鲨",
+      "pageUrl": "https://wiki.biligame.com/nrc/阿瓦鲨（虎纹鲨的样子）",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/37/k31rdf4e0liirdz69j0lvju803l44x3.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/37/k31rdf4e0liirdz69j0lvju803l44x3.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/478_a19f8059c5.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/a/a8/ewqclkkrij2qy184dub59h51q3qwjqq.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/a/a8/ewqclkkrij2qy184dub59h51q3qwjqq.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/478_38c9ce4cbf.png",
+      "stage": "Ⅱ阶",
+      "form": "地区形态",
+      "regionalForm": "虎纹鲨的样子",
+      "hasShiny": true,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "阿瓦鲨",
+        "阿瓦鲨(虎纹鲨的样子)",
+        "阿瓦鲨（虎纹鲨的样子）"
+      ],
+      "chainId": "477-乐乐鲨",
+      "baseId": "477",
+      "finalId": "478",
+      "finalName": "阿瓦鲨（柠檬鲨的样子）",
+      "evolutionChain": [
+        {
+          "id": "477",
+          "name": "乐乐鲨",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（柠檬鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "柠檬鲨的样子"
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（虎纹鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "虎纹鲨的样子"
+        }
+      ],
+      "evolutionChainNames": [
+        "乐乐鲨",
+        "阿瓦鲨（柠檬鲨的样子）",
+        "阿瓦鲨（虎纹鲨的样子）"
+      ]
+    },
+    {
+      "id": "479",
+      "name": "蛋包蛋",
+      "wikiName": "蛋包蛋",
+      "baseName": "蛋包蛋",
+      "pageUrl": "https://wiki.biligame.com/nrc/蛋包蛋",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/7/7d/5bjz2ojkgpsrk69uxpd6xm39cfuoqbb.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/7/7d/5bjz2ojkgpsrk69uxpd6xm39cfuoqbb.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/479_9abb923539.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/3/30/56qtel4732oy4n6pvp474ktjy6tgf4t.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/30/56qtel4732oy4n6pvp474ktjy6tgf4t.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/479_cc5ec4d5b1.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "普通",
+      "secondaryAttribute": "萌",
+      "updateVersion": "",
+      "aliases": [
+        "蛋包蛋"
+      ],
+      "chainId": "479-蛋包蛋",
+      "baseId": "479",
+      "finalId": "480",
+      "finalName": "鸡麻麻",
+      "evolutionChain": [
+        {
+          "id": "479",
+          "name": "蛋包蛋",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "480",
+          "name": "鸡麻麻",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "蛋包蛋",
+        "鸡麻麻"
+      ]
+    },
+    {
+      "id": "480",
+      "name": "鸡麻麻",
+      "wikiName": "鸡麻麻",
+      "baseName": "蛋包蛋",
+      "pageUrl": "https://wiki.biligame.com/nrc/鸡麻麻",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/6/6b/qifvyi2gy764o0wrbo8w7hlozbxhr9j.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/6b/qifvyi2gy764o0wrbo8w7hlozbxhr9j.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/480_bf6a96a3f2.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/b/b1/mrh68folot5ueeh4t15p26hc67ef1g6.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/b/b1/mrh68folot5ueeh4t15p26hc67ef1g6.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/480_b98be6774d.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "普通",
+      "secondaryAttribute": "萌",
+      "updateVersion": "",
+      "aliases": [
+        "鸡麻麻"
+      ],
+      "chainId": "479-蛋包蛋",
+      "baseId": "479",
+      "finalId": "480",
+      "finalName": "鸡麻麻",
+      "evolutionChain": [
+        {
+          "id": "479",
+          "name": "蛋包蛋",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "480",
+          "name": "鸡麻麻",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "蛋包蛋",
+        "鸡麻麻"
+      ]
+    },
+    {
+      "id": "481",
+      "name": "蟹蟹椰",
+      "wikiName": "蟹蟹椰",
+      "baseName": "蟹蟹椰",
+      "pageUrl": "https://wiki.biligame.com/nrc/蟹蟹椰",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/3c/acdp5ax3i8iupxja3tirjagcw9sv3ps.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/3c/acdp5ax3i8iupxja3tirjagcw9sv3ps.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/481_ad631bb3d0.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/9/9c/nbekruxwdbroj3bnfvdcj4rk8t3re3d.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/9/9c/nbekruxwdbroj3bnfvdcj4rk8t3re3d.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/481_f43f755cdd.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "草",
+      "updateVersion": "",
+      "aliases": [
+        "蟹蟹椰"
+      ],
+      "chainId": "481-蟹蟹椰",
+      "baseId": "481",
+      "finalId": "482",
+      "finalName": "沙咔蟹",
+      "evolutionChain": [
+        {
+          "id": "481",
+          "name": "蟹蟹椰",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "482",
+          "name": "沙咔蟹",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "蟹蟹椰",
+        "沙咔蟹"
+      ]
+    },
+    {
+      "id": "482",
+      "name": "沙咔蟹",
+      "wikiName": "沙咔蟹",
+      "baseName": "蟹蟹椰",
+      "pageUrl": "https://wiki.biligame.com/nrc/沙咔蟹",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/c/cf/221i8tcgc5f47znf2x7s6z7wwpotkva.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/c/cf/221i8tcgc5f47znf2x7s6z7wwpotkva.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/482_8f1553afad.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/6/64/2spp4ititg3sew679oow03opkf1o9xm.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/64/2spp4ititg3sew679oow03opkf1o9xm.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/482_a8bd4467d9.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "水",
+      "secondaryAttribute": "草",
+      "updateVersion": "",
+      "aliases": [
+        "沙咔蟹"
+      ],
+      "chainId": "481-蟹蟹椰",
+      "baseId": "481",
+      "finalId": "482",
+      "finalName": "沙咔蟹",
+      "evolutionChain": [
+        {
+          "id": "481",
+          "name": "蟹蟹椰",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "482",
+          "name": "沙咔蟹",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "蟹蟹椰",
+        "沙咔蟹"
+      ]
+    },
+    {
+      "id": "483",
+      "name": "鲸羽",
+      "wikiName": "鲸羽",
+      "baseName": "鲸羽",
+      "pageUrl": "https://wiki.biligame.com/nrc/鲸羽",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/6/66/chgk1u1sommhc2zeeni0v9dpep2oboe.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/6/66/chgk1u1sommhc2zeeni0v9dpep2oboe.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/483_4e36d14085.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/a/a9/h2pd1t9dxzqqfa8xoh3a80w99ezjnao.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/a/a9/h2pd1t9dxzqqfa8xoh3a80w99ezjnao.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/483_26485cf946.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "幻",
+      "secondaryAttribute": "冰",
+      "updateVersion": "",
+      "aliases": [
+        "鲸羽"
+      ],
+      "chainId": "483-鲸羽",
+      "baseId": "483",
+      "finalId": "484",
+      "finalName": "圆环鲸羽",
+      "evolutionChain": [
+        {
+          "id": "483",
+          "name": "鲸羽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "484",
+          "name": "圆环鲸羽",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "鲸羽",
+        "圆环鲸羽"
+      ]
+    },
+    {
+      "id": "484",
+      "name": "圆环鲸羽",
+      "wikiName": "圆环鲸羽",
+      "baseName": "鲸羽",
+      "pageUrl": "https://wiki.biligame.com/nrc/圆环鲸羽",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/f/fe/62bijr0lzasasx1difjunw6ezoiojcv.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/f/fe/62bijr0lzasasx1difjunw6ezoiojcv.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/484_efdb3f1156.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/0/08/o69qh8x5bh9y5g4d18leg7kh2bmnp3g.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/0/08/o69qh8x5bh9y5g4d18leg7kh2bmnp3g.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/484_d096b22452.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "幻",
+      "secondaryAttribute": "冰",
+      "updateVersion": "",
+      "aliases": [
+        "圆环鲸羽"
+      ],
+      "chainId": "483-鲸羽",
+      "baseId": "483",
+      "finalId": "484",
+      "finalName": "圆环鲸羽",
+      "evolutionChain": [
+        {
+          "id": "483",
+          "name": "鲸羽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "484",
+          "name": "圆环鲸羽",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "鲸羽",
+        "圆环鲸羽"
+      ]
+    },
+    {
+      "id": "485",
+      "name": "豆粒鹅",
+      "wikiName": "豆粒鹅",
+      "baseName": "豆粒鹅",
+      "pageUrl": "https://wiki.biligame.com/nrc/豆粒鹅",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/8/84/1363c27cetafp637mn152hlvi1yd6my.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/84/1363c27cetafp637mn152hlvi1yd6my.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/485_4c00f9a345.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/0/0d/q1isp18ncev630teus144x7shjmpzgy.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/0/0d/q1isp18ncev630teus144x7shjmpzgy.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/485_0c01a13fef.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "冰",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "豆粒鹅"
+      ],
+      "chainId": "485-豆粒鹅",
+      "baseId": "485",
+      "finalId": "486",
+      "finalName": "刨雪鹅",
+      "evolutionChain": [
+        {
+          "id": "485",
+          "name": "豆粒鹅",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "486",
+          "name": "刨雪鹅",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "豆粒鹅",
+        "刨雪鹅"
+      ]
+    },
+    {
+      "id": "486",
+      "name": "刨雪鹅",
+      "wikiName": "刨雪鹅",
+      "baseName": "豆粒鹅",
+      "pageUrl": "https://wiki.biligame.com/nrc/刨雪鹅",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/b/b4/bovcos2ouvzl07p3emwx8mo7xoqmi6w.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/b/b4/bovcos2ouvzl07p3emwx8mo7xoqmi6w.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/486_0a47d16c40.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/3/3c/buq6piolzmjeihie2v7pnils4yx5d4g.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/3c/buq6piolzmjeihie2v7pnils4yx5d4g.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/486_e1febf6354.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "冰",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "刨雪鹅"
+      ],
+      "chainId": "485-豆粒鹅",
+      "baseId": "485",
+      "finalId": "486",
+      "finalName": "刨雪鹅",
+      "evolutionChain": [
+        {
+          "id": "485",
+          "name": "豆粒鹅",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "486",
+          "name": "刨雪鹅",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "豆粒鹅",
+        "刨雪鹅"
+      ]
+    },
+    {
+      "id": "487",
+      "name": "西瓜虫",
+      "wikiName": "西瓜虫",
+      "baseName": "西瓜虫",
+      "pageUrl": "https://wiki.biligame.com/nrc/西瓜虫",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/d/de/9n8i73uallik1nxxqnt6csogj1lib5v.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/d/de/9n8i73uallik1nxxqnt6csogj1lib5v.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/487_6f71032e8f.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/e/e2/r81ydsfmpyo2mae4edqnwwky9njwl7f.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/e/e2/r81ydsfmpyo2mae4edqnwwky9njwl7f.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/487_12c7a3a74e.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "虫",
+      "secondaryAttribute": "草",
+      "updateVersion": "",
+      "aliases": [
+        "西瓜虫"
+      ],
+      "chainId": "487-西瓜虫",
+      "baseId": "487",
+      "finalId": "488",
+      "finalName": "冬虫夏瓜",
+      "evolutionChain": [
+        {
+          "id": "487",
+          "name": "西瓜虫",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "488",
+          "name": "冬虫夏瓜",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "西瓜虫",
+        "冬虫夏瓜"
+      ]
+    },
+    {
+      "id": "488",
+      "name": "冬虫夏瓜",
+      "wikiName": "冬虫夏瓜",
+      "baseName": "西瓜虫",
+      "pageUrl": "https://wiki.biligame.com/nrc/冬虫夏瓜",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/f/fd/59mm6l1dfeqj1tvi1vsr4fqhhe0lczy.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/f/fd/59mm6l1dfeqj1tvi1vsr4fqhhe0lczy.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/488_e49bfcb7dd.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/0/0d/fz29rh11o0lei7jvo4kx2mbg7ovi7nb.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/0/0d/fz29rh11o0lei7jvo4kx2mbg7ovi7nb.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/488_f69b3e1e7c.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "虫",
+      "secondaryAttribute": "草",
+      "updateVersion": "",
+      "aliases": [
+        "冬虫夏瓜"
+      ],
+      "chainId": "487-西瓜虫",
+      "baseId": "487",
+      "finalId": "488",
+      "finalName": "冬虫夏瓜",
+      "evolutionChain": [
+        {
+          "id": "487",
+          "name": "西瓜虫",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "488",
+          "name": "冬虫夏瓜",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "西瓜虫",
+        "冬虫夏瓜"
+      ]
+    },
+    {
+      "id": "489",
+      "name": "小剪影",
+      "wikiName": "小剪影",
+      "baseName": "小剪影",
+      "pageUrl": "https://wiki.biligame.com/nrc/小剪影",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/4/43/i6b2eb56fcb1viliw2ca3wfoj38ksln.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/4/43/i6b2eb56fcb1viliw2ca3wfoj38ksln.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/489_cea7947d40.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/8/88/d9toeeovkl8tkjx64h4vtd6byvdizoq.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/8/88/d9toeeovkl8tkjx64h4vtd6byvdizoq.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/489_2949635218.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "幽",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "小剪影"
+      ],
+      "chainId": "489-小剪影",
+      "baseId": "489",
+      "finalId": "490",
+      "finalName": "影子剪纸",
+      "evolutionChain": [
+        {
+          "id": "489",
+          "name": "小剪影",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "490",
+          "name": "影子剪纸",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小剪影",
+        "影子剪纸"
+      ]
+    },
+    {
+      "id": "490",
+      "name": "影子剪纸",
+      "wikiName": "影子剪纸",
+      "baseName": "小剪影",
+      "pageUrl": "https://wiki.biligame.com/nrc/影子剪纸",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/37/33hyo2j4v1y8wf0lmw1y498sl3bcpj5.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/37/33hyo2j4v1y8wf0lmw1y498sl3bcpj5.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/490_9b2ef4c536.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/3/3f/j6jgkweikstuqrcey8m4q9f9ybwpuru.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/3f/j6jgkweikstuqrcey8m4q9f9ybwpuru.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/490_2b3f1245d5.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "幽",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "影子剪纸"
+      ],
+      "chainId": "489-小剪影",
+      "baseId": "489",
+      "finalId": "490",
+      "finalName": "影子剪纸",
+      "evolutionChain": [
+        {
+          "id": "489",
+          "name": "小剪影",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "490",
+          "name": "影子剪纸",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "小剪影",
+        "影子剪纸"
+      ]
+    },
+    {
+      "id": "491",
+      "name": "滴溜豚",
+      "wikiName": "滴溜豚",
+      "baseName": "滴溜豚",
+      "pageUrl": "https://wiki.biligame.com/nrc/滴溜豚",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/f/f4/mb9fx10emihsm947qn54mui7df87x8t.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/f/f4/mb9fx10emihsm947qn54mui7df87x8t.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/491_82053458f5.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/f/f9/803m4xtfcmxobfaeky44b35jnslem8u.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/f/f9/803m4xtfcmxobfaeky44b35jnslem8u.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/491_c120ec9368.png",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "毒",
+      "secondaryAttribute": "幻",
+      "updateVersion": "",
+      "aliases": [
+        "滴溜豚"
+      ],
+      "chainId": "491-滴溜豚",
+      "baseId": "491",
+      "finalId": "492",
+      "finalName": "滴廿豚",
+      "evolutionChain": [
+        {
+          "id": "491",
+          "name": "滴溜豚",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "492",
+          "name": "滴廿豚",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "滴溜豚",
+        "滴廿豚"
+      ]
+    },
+    {
+      "id": "492",
+      "name": "滴廿豚",
+      "wikiName": "滴廿豚",
+      "baseName": "滴溜豚",
+      "pageUrl": "https://wiki.biligame.com/nrc/滴廿豚",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/2/2e/dxea2u45nrmgmbco2ympophvg25zwcl.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/2/2e/dxea2u45nrmgmbco2ympophvg25zwcl.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/492_23c7dd6c06.png",
+      "shinyAvatarUrl": "https://patchwiki.biligame.com/images/nrc/7/7c/6e1oz5cf9ievwy6sr1nnhrtl9wvz36e.png",
+      "shinyOriginalImageUrl": "https://patchwiki.biligame.com/images/nrc/7/7c/6e1oz5cf9ievwy6sr1nnhrtl9wvz36e.png",
+      "shinyAvatarPath": "Configuration/Spirits/Sources/biligame/Avatars/492_3407370dde.png",
+      "stage": "Ⅱ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": true,
+      "primaryAttribute": "毒",
+      "secondaryAttribute": "幻",
+      "updateVersion": "",
+      "aliases": [
+        "滴廿豚"
+      ],
+      "chainId": "491-滴溜豚",
+      "baseId": "491",
+      "finalId": "492",
+      "finalName": "滴廿豚",
+      "evolutionChain": [
+        {
+          "id": "491",
+          "name": "滴溜豚",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "492",
+          "name": "滴廿豚",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "滴溜豚",
+        "滴廿豚"
+      ]
+    },
+    {
+      "id": "493",
+      "name": "超能阿布",
+      "wikiName": "超能阿布",
+      "baseName": "阿布",
+      "pageUrl": "https://wiki.biligame.com/nrc/超能阿布",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/5/5c/men4ik1vob1cxrc26bh7bt1bizyhoxp.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/5/5c/men4ik1vob1cxrc26bh7bt1bizyhoxp.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/493_b7490164d8.png",
+      "shinyAvatarUrl": "",
+      "shinyOriginalImageUrl": "",
+      "shinyAvatarPath": "",
+      "stage": "首领形态",
+      "form": "首领形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "龙",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "超能阿布"
+      ],
+      "chainId": "493-阿布",
+      "baseId": "493",
+      "finalId": "493",
+      "finalName": "阿布",
+      "evolutionChain": [
+        {
+          "id": "493",
+          "name": "阿布",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "493",
+          "name": "超能阿布",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "阿布",
+        "超能阿布"
+      ]
+    },
+    {
+      "id": "493",
+      "name": "阿布",
+      "wikiName": "阿布",
+      "baseName": "阿布",
+      "pageUrl": "https://wiki.biligame.com/nrc/阿布",
+      "avatarUrl": "https://patchwiki.biligame.com/images/nrc/3/3c/8h4p3cculcy04ivn7kflfne2j0v7wgf.png",
+      "originalImageUrl": "https://patchwiki.biligame.com/images/nrc/3/3c/8h4p3cculcy04ivn7kflfne2j0v7wgf.png",
+      "avatarPath": "Configuration/Spirits/Sources/biligame/Avatars/493_851792cad5.png",
+      "shinyAvatarUrl": "",
+      "shinyOriginalImageUrl": "",
+      "shinyAvatarPath": "",
+      "stage": "Ⅰ阶",
+      "form": "原始形态",
+      "regionalForm": "",
+      "hasShiny": false,
+      "primaryAttribute": "龙",
+      "secondaryAttribute": "",
+      "updateVersion": "",
+      "aliases": [
+        "阿布"
+      ],
+      "chainId": "493-阿布",
+      "baseId": "493",
+      "finalId": "493",
+      "finalName": "阿布",
+      "evolutionChain": [
+        {
+          "id": "493",
+          "name": "阿布",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "493",
+          "name": "超能阿布",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
+        }
+      ],
+      "evolutionChainNames": [
+        "阿布",
+        "超能阿布"
+      ]
     }
   ],
   "evolutionChains": [
@@ -52254,6 +53757,13 @@
           "stage": "Ⅱ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "245",
+          "name": "琉璃君主",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "spirits": [
@@ -52270,11 +53780,19 @@
           "stage": "Ⅱ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "245",
+          "name": "琉璃君主",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "names": [
         "翡翠水母",
-        "琉璃水母"
+        "琉璃水母",
+        "琉璃君主"
       ]
     },
     {
@@ -52378,6 +53896,13 @@
           "stage": "Ⅲ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "圣冠布鲁斯",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "spirits": [
@@ -52401,12 +53926,20 @@
           "stage": "Ⅲ阶",
           "form": "原始形态",
           "regionalForm": ""
+        },
+        {
+          "id": "254",
+          "name": "圣冠布鲁斯",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
         }
       ],
       "names": [
         "布鲁斯",
         "雪顶布鲁斯",
-        "冰钻布鲁斯"
+        "冰钻布鲁斯",
+        "圣冠布鲁斯"
       ]
     },
     {
@@ -56127,6 +57660,476 @@
       "names": [
         "云梦豚",
         "长江豚"
+      ]
+    },
+    {
+      "id": "469-小冥龙",
+      "baseId": "469",
+      "baseName": "小冥龙",
+      "highestId": "470",
+      "highestName": "冥古龙",
+      "highestCandidates": [
+        {
+          "id": "470",
+          "name": "冥古龙",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "469",
+          "name": "小冥龙",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "470",
+          "name": "冥古龙",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "小冥龙",
+        "冥古龙"
+      ]
+    },
+    {
+      "id": "471-地银链",
+      "baseId": "471",
+      "baseName": "地银链",
+      "highestId": "473",
+      "highestName": "地绡银龙",
+      "highestCandidates": [
+        {
+          "id": "473",
+          "name": "地绡银龙",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "471",
+          "name": "地银链",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "472",
+          "name": "地底银鳞",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "473",
+          "name": "地绡银龙",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "地银链",
+        "地底银鳞",
+        "地绡银龙"
+      ]
+    },
+    {
+      "id": "474-沉金兽",
+      "baseId": "474",
+      "baseName": "沉金兽",
+      "highestId": "476",
+      "highestName": "龙嵴金脉",
+      "highestCandidates": [
+        {
+          "id": "476",
+          "name": "龙嵴金脉",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "474",
+          "name": "沉金兽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "475",
+          "name": "龙头金",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "476",
+          "name": "龙嵴金脉",
+          "stage": "Ⅲ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "沉金兽",
+        "龙头金",
+        "龙嵴金脉"
+      ]
+    },
+    {
+      "id": "477-乐乐鲨",
+      "baseId": "477",
+      "baseName": "乐乐鲨",
+      "highestId": "478",
+      "highestName": "阿瓦鲨（柠檬鲨的样子）",
+      "highestCandidates": [
+        {
+          "id": "478",
+          "name": "阿瓦鲨（柠檬鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "柠檬鲨的样子"
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（虎纹鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "虎纹鲨的样子"
+        }
+      ],
+      "spirits": [
+        {
+          "id": "477",
+          "name": "乐乐鲨",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（柠檬鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "柠檬鲨的样子"
+        },
+        {
+          "id": "478",
+          "name": "阿瓦鲨（虎纹鲨的样子）",
+          "stage": "Ⅱ阶",
+          "form": "地区形态",
+          "regionalForm": "虎纹鲨的样子"
+        }
+      ],
+      "names": [
+        "乐乐鲨",
+        "阿瓦鲨（柠檬鲨的样子）",
+        "阿瓦鲨（虎纹鲨的样子）"
+      ]
+    },
+    {
+      "id": "479-蛋包蛋",
+      "baseId": "479",
+      "baseName": "蛋包蛋",
+      "highestId": "480",
+      "highestName": "鸡麻麻",
+      "highestCandidates": [
+        {
+          "id": "480",
+          "name": "鸡麻麻",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "479",
+          "name": "蛋包蛋",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "480",
+          "name": "鸡麻麻",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "蛋包蛋",
+        "鸡麻麻"
+      ]
+    },
+    {
+      "id": "481-蟹蟹椰",
+      "baseId": "481",
+      "baseName": "蟹蟹椰",
+      "highestId": "482",
+      "highestName": "沙咔蟹",
+      "highestCandidates": [
+        {
+          "id": "482",
+          "name": "沙咔蟹",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "481",
+          "name": "蟹蟹椰",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "482",
+          "name": "沙咔蟹",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "蟹蟹椰",
+        "沙咔蟹"
+      ]
+    },
+    {
+      "id": "483-鲸羽",
+      "baseId": "483",
+      "baseName": "鲸羽",
+      "highestId": "484",
+      "highestName": "圆环鲸羽",
+      "highestCandidates": [
+        {
+          "id": "484",
+          "name": "圆环鲸羽",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "483",
+          "name": "鲸羽",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "484",
+          "name": "圆环鲸羽",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "鲸羽",
+        "圆环鲸羽"
+      ]
+    },
+    {
+      "id": "485-豆粒鹅",
+      "baseId": "485",
+      "baseName": "豆粒鹅",
+      "highestId": "486",
+      "highestName": "刨雪鹅",
+      "highestCandidates": [
+        {
+          "id": "486",
+          "name": "刨雪鹅",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "485",
+          "name": "豆粒鹅",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "486",
+          "name": "刨雪鹅",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "豆粒鹅",
+        "刨雪鹅"
+      ]
+    },
+    {
+      "id": "487-西瓜虫",
+      "baseId": "487",
+      "baseName": "西瓜虫",
+      "highestId": "488",
+      "highestName": "冬虫夏瓜",
+      "highestCandidates": [
+        {
+          "id": "488",
+          "name": "冬虫夏瓜",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "487",
+          "name": "西瓜虫",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "488",
+          "name": "冬虫夏瓜",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "西瓜虫",
+        "冬虫夏瓜"
+      ]
+    },
+    {
+      "id": "489-小剪影",
+      "baseId": "489",
+      "baseName": "小剪影",
+      "highestId": "490",
+      "highestName": "影子剪纸",
+      "highestCandidates": [
+        {
+          "id": "490",
+          "name": "影子剪纸",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "489",
+          "name": "小剪影",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "490",
+          "name": "影子剪纸",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "小剪影",
+        "影子剪纸"
+      ]
+    },
+    {
+      "id": "491-滴溜豚",
+      "baseId": "491",
+      "baseName": "滴溜豚",
+      "highestId": "492",
+      "highestName": "滴廿豚",
+      "highestCandidates": [
+        {
+          "id": "492",
+          "name": "滴廿豚",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "491",
+          "name": "滴溜豚",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "492",
+          "name": "滴廿豚",
+          "stage": "Ⅱ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "滴溜豚",
+        "滴廿豚"
+      ]
+    },
+    {
+      "id": "493-阿布",
+      "baseId": "493",
+      "baseName": "阿布",
+      "highestId": "493",
+      "highestName": "阿布",
+      "highestCandidates": [
+        {
+          "id": "493",
+          "name": "阿布",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "493",
+          "name": "超能阿布",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
+        }
+      ],
+      "spirits": [
+        {
+          "id": "493",
+          "name": "阿布",
+          "stage": "Ⅰ阶",
+          "form": "原始形态",
+          "regionalForm": ""
+        },
+        {
+          "id": "493",
+          "name": "超能阿布",
+          "stage": "首领形态",
+          "form": "首领形态",
+          "regionalForm": ""
+        }
+      ],
+      "names": [
+        "阿布",
+        "超能阿布"
       ]
     }
   ]

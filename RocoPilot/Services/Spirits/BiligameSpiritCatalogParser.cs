@@ -69,6 +69,13 @@ internal static partial class BiligameSpiritCatalogParser
                 ? cardStarts[index + 1].Index
                 : markup.Length;
             var block = markup[start..end];
+            if (isNrc && ParseAttributes(cardStarts[index].Groups["attrs"].Value)
+                .GetValueOrDefault("class", string.Empty)
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .Contains("is-placeholder", StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
             cards.Add(isNrc
                 ? ParseNrcCard(block, cardStarts[index], listUri, index)
                 : ParseCard(block, cardStarts[index], listUri, index));

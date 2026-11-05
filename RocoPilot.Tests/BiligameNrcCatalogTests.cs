@@ -1,6 +1,9 @@
+using System.Text.Json;
+
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using RocoPilot.Services.Encounters;
+
+using RocoPilot.Models.Spirits;
 using RocoPilot.Services.Spirits;
 using RocoPilot.Services.Statistics;
 using RocoPilot.Tests.TestDoubles;
@@ -63,6 +66,52 @@ public sealed class BiligameNrcCatalogTests
     }
 
     [TestMethod]
+    public void Season5CardsSkipUnknownPlaceholdersAndKeepEvolutionAndForms()
+    {
+        var markup = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "biligame-nrc-season5.html"));
+        var states = BiligameSpiritCatalogParser.ParseListPage(markup, ListUrl);
+        Assert.AreEqual(9, states.Count);
+        Assert.AreEqual(BiligameSpiritCatalogParser.ParseReportedCount(markup), states.Count);
+        var document = SpiritCatalogService.BuildDocument(new("biligame", "新版 Wiki", ListUrl), states);
+        Assert.AreEqual(7, document.Count);
+        var index = new SpiritCatalogIndex(document);
+        Assert.AreEqual("小冥龙", index.ResolveEvolutionRecordName("冥古龙"));
+        Assert.AreEqual("乐乐鲨", index.ResolveEvolutionRecordName("阿瓦鲨（虎纹鲨的样子）"));
+        Assert.AreEqual("小剪影", index.ResolveEvolutionRecordName("影子剪纸"));
+        Assert.AreEqual("阿布", index.ResolveEvolutionRecordName("超能阿布"));
+        Assert.IsFalse(document.Spirits.Any(item => int.Parse(item.Id) >= 494));
+        Assert.IsTrue(document.Spirits.Single(item => item.Name == "小剪影").HasShiny);
+        Assert.IsFalse(document.Spirits.Single(item => item.Name == "小冥龙").HasShiny);
+    }
+
+    [TestMethod]
+    [DataRow("冥古龙", "小冥龙")]
+    [DataRow("地绡银龙", "地银链")]
+    [DataRow("龙嵴金脉", "沉金兽")]
+    [DataRow("阿瓦鲨（虎纹鲨的样子）", "乐乐鲨", "阿瓦鲨")]
+    [DataRow("鸡麻麻", "蛋包蛋")]
+    [DataRow("沙咔蟹", "蟹蟹椰")]
+    [DataRow("圆环鲸羽", "鲸羽")]
+    [DataRow("刨雪鹅", "豆粒鹅")]
+    [DataRow("冬虫夏瓜", "西瓜虫")]
+    [DataRow("影子剪纸", "小剪影")]
+    [DataRow("滴廿豚", "滴溜豚")]
+    [DataRow("超能阿布", "阿布")]
+    public void BundledSeason5CatalogRecognizesNamesAndResolvesBaseForms(string name, string baseName, string? matchedName = null)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", "Sources", "biligame", "spirits.json");
+        var document = JsonSerializer.Deserialize<SpiritCatalogDocument>(File.ReadAllText(path),
+            new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        var index = new SpiritCatalogIndex(document);
+        Assert.AreEqual(matchedName ?? name, index.Match(name, 1));
+        Assert.AreEqual(baseName, index.ResolveEvolutionRecordName(name));
+        var item = document.Spirits.Single(item => item.Name == name);
+        Assert.IsTrue(File.Exists(Path.Combine(AppContext.BaseDirectory, item.AvatarPath)));
+        if (item.HasShiny)
+            Assert.IsTrue(File.Exists(Path.Combine(AppContext.BaseDirectory, item.ShinyAvatarPath)));
+    }
+
+    [TestMethod]
     [DataRow("data-number=\"443\"", "data-number=\"\"")]
     [DataRow("data-form=\"main\"", "data-form=\"unknown\"")]
     [DataRow("data-form=\"main|regional\"", "data-form=\"regional\"")]
@@ -77,10 +126,9 @@ public sealed class BiligameNrcCatalogTests
     [TestMethod]
     public async Task NewCatalogResolvesTemporaryNameWithoutAutomaticCounting()
     {
-        var config = new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance);
+        var config = new TemporarySeasonConfig();
         var statistics = new StatisticsService(new ControlledSettingsStore(), NullLogger<StatisticsService>.Instance, config);
         await statistics.AddAccountAsync("100");
-        var s4 = config.Load().Seasons.Single(season => season.Id == "S4");
         await statistics.RecordTemporaryEncounterAsync("100", "new-wolf", "银月狼王", "",
             new DateTimeOffset(2026, 11, 5, 12, 0, 0, TimeSpan.FromHours(8)));
         var document = SpiritCatalogService.BuildDocument(new("biligame", "新版 Wiki", ListUrl),

@@ -67,6 +67,10 @@ public class HotkeyViewModel : ObservableRecipient
         Groups =
         [
             new(
+                "基础功能",
+                "\uE713",
+                items.Where(item => item.Action is HotkeyAction.TakeScreenshot).ToList()),
+            new(
                 "遮罩窗口",
                 "\uEABC",
                 items.Where(item => item.Action

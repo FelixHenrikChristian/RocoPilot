@@ -11,6 +11,11 @@ public sealed record HotkeyActionDescriptor(
         return
         [
             new(
+                HotkeyAction.TakeScreenshot,
+                "截图",
+                "截取游戏画面，保存到安装目录的 Screenshots 文件夹。",
+                "\uE722"),
+            new(
                 HotkeyAction.ToggleInfoOverlay,
                 "信息遮罩窗口",
                 "切换运行状态、计数和识别结果遮罩。",

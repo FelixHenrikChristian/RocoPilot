@@ -4,8 +4,7 @@
       "commandName": "MsixPackage"
     },
     "RocoPilot (Unpackaged)": {
-      "commandName": "Project",
-      "nativeDebugging": true
+      "commandName": "Project"
     }
   }
 }

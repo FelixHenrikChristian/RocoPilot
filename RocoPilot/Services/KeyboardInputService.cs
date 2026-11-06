@@ -374,7 +374,7 @@ public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
 
             if (InterceptionInput.Disposed && !InterceptionInput.Initialize())
             {
-                throw new InvalidOperationException("Interception 初始化失败。请确认驱动已安装，并以管理员身份启动 RocoPilot。");
+                throw new InvalidOperationException("Interception 初始化失败。请确认安装驱动后已重启电脑。");
             }
 
             var keyboardHook = new InterceptionKeyboardHook(InterceptionKeyboardFilter.None);

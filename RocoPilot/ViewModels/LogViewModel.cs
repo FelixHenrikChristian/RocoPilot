@@ -1,6 +1,5 @@
 using System;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -161,7 +160,7 @@ public partial class LogViewModel : ObservableRecipient
     }
 
     [RelayCommand]
-    private void OpenLogFile()
+    private async Task OpenLogFileAsync()
     {
         try
         {
@@ -171,13 +170,10 @@ public partial class LogViewModel : ObservableRecipient
                 LoggingHelper.LogDirectory,
                 $"app-{DateTime.Now:yyyyMMdd}.log");
 
-            var target = File.Exists(todayFile) ? todayFile : LoggingHelper.LogDirectory;
-
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = target,
-                UseShellExecute = true,
-            });
+            var opened = File.Exists(todayFile)
+                ? await Windows.System.Launcher.LaunchFileAsync(await Windows.Storage.StorageFile.GetFileFromPathAsync(todayFile))
+                : await Windows.System.Launcher.LaunchFolderPathAsync(LoggingHelper.LogDirectory);
+            if (!opened) _logger.LogWarning("系统未能打开日志：{Path}", todayFile);
         }
         catch (Exception ex)
         {

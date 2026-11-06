@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 
@@ -105,16 +104,13 @@ public partial class SettingsViewModel : ObservableRecipient
     }
 
     [RelayCommand]
-    private void OpenFolder(string path)
+    private async Task OpenFolderAsync(string path)
     {
         try
         {
             Directory.CreateDirectory(path);
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = path,
-                UseShellExecute = true,
-            });
+            if (!await Windows.System.Launcher.LaunchFolderPathAsync(path))
+                _logger.LogWarning("系统未能打开目录：{Path}", path);
         }
         catch (Exception ex)
         {

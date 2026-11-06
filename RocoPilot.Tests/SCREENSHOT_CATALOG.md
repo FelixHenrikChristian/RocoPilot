@@ -2,6 +2,19 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-07：每日页传说挑战目标列表展开
+
+- [用户原图](LocalScreenshots/2026-11-07/daily/legendary-target-list-open.png)：附件 codex-clipboard-b01973c1-074c-4469-be02-7adeac70c0ad.png。每日页的传说挑战目标已展开，第二项带选中标记，第一项显示在上方。
+- 用于核对组合框弹层与配置行的对齐。单帧截图仅记录展开状态，无派生识别样本或自动化测试。
+
+## 2026-11-06：每日任务界面设计参考
+
+- [用户原图](LocalScreenshots/2026-11-06/daily-design/bettergi-one-dragon-task-list-reference.png)：附件 `codex-clipboard-5359a9b6-77e6-40e6-9d2e-3b18864d00c0.png`，尺寸 **900×600**，原样保存，未裁剪。SHA-256：`DBBFA9DA0BCA377A54D155EC0CC832268BF376DB8BC3F1AF6B6DD7689AC32893`。
+- 界面状态：BetterGI 0.66.0 的“一条龙”页面，左侧为带拖拽柄与开关的任务列表，右侧为配置选择及各任务设置。每日页参考其紧凑任务列表和右侧配置布局。
+- 用途：讨论 RocoPilot 在“任务”下方新增“每日”页面，使用一份通用配置，支持拖拽排序、启用子任务和整组启动。
+- 对应测试素材：未派生 OCR 或图像识别样本，无关联的自动化测试；后续用于界面需求核对。
+- 已知限制：截图来自其他应用，不代表 RocoPilot 当前或最终界面，也不能证明两者实际运行权限、拖拽行为或游戏任务执行结果。
+
 ## 2026-11-05：传说精灵多人挑战队伍不足提示
 
 - [用户原图](LocalScreenshots/2026-11-05/legendary/multiplayer-underfilled-team-confirmation.png)：附件 `codex-clipboard-222bdd23-ed55-45e6-92f3-9224b50fdd04.png`，尺寸 **2050×1184**，含标题栏和边框，原样保存。SHA-256 为 `44DD7EC843B229B418202422746470B1BF64F4729AD8237D59FBEC7C7179E828`。

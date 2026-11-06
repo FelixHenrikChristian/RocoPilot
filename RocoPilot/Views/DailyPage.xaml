@@ -1,0 +1,146 @@
+<Page
+    x:Class="RocoPilot.Views.DailyPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:RocoPilot.Helpers"
+    xmlns:vm="using:RocoPilot.ViewModels">
+
+    <Grid Padding="20,16" ColumnSpacing="18" RowSpacing="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+            <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="任务列表" />
+            <Button HorizontalAlignment="Right" Width="40" Height="30" Padding="0"
+                    Style="{StaticResource AccentButtonStyle}" Command="{x:Bind ViewModel.ToggleRunCommand}"
+                    AutomationProperties.Name="{x:Bind ViewModel.StartButtonText, Mode=OneWay}"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.StartButtonText, Mode=OneWay}"
+                    IsEnabled="{x:Bind ViewModel.CanStartOrStop, Mode=OneWay}">
+                <FontIcon FontSize="14" Glyph="{x:Bind ViewModel.StartButtonGlyph, Mode=OneWay}" />
+            </Button>
+        </Grid>
+        <Grid Grid.Column="1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+            <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="配置" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="TaskRows" ItemsSource="{x:Bind ViewModel.Items}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DailyTaskItemViewModel">
+                        <Border Margin="0,0,0,5" Padding="6,0,10,0" MinHeight="48" CornerRadius="5"
+                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <Grid ColumnSpacing="7" ToolTipService.ToolTip="{x:Bind Status, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="20" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Background="Transparent" Tag="{x:Bind}" ManipulationMode="None"
+                                        PointerPressed="Handle_Pressed" PointerMoved="Handle_Moved"
+                                        PointerReleased="Handle_Released" PointerCaptureLost="Handle_CaptureLost"
+                                        ToolTipService.ToolTip="拖动排序">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="⠿"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </Border>
+                                <TextBlock Grid.Column="1" Width="78" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" Text="{x:Bind Title}" />
+                                <ToggleSwitch Grid.Column="2" MinWidth="0" OnContent="" OffContent=""
+                                              VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Title}"
+                                              IsEnabled="{x:Bind CanToggle, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="8">
+                <TextBlock Margin="4,0,0,0" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="传说挑战" />
+                <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="2*" MaxWidth="180" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE734;" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock FontWeight="SemiBold" Text="挑战目标" />
+                        <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="选择本轮挑战的传说精灵" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" PlaceholderText="请先在任务页扫描" ItemsSource="{x:Bind Challenges.LegendaryTargets}"
+                                SelectedItem="{x:Bind Challenges.SelectedLegendaryTarget, Mode=TwoWay}" />
+                </Grid>
+                <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="2*" MaxWidth="180" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE9D9;" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock FontWeight="SemiBold" Text="难度" />
+                        <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="进入挑战时使用此难度" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" ItemsSource="{x:Bind Challenges.LegendaryDifficulties}" SelectedIndex="{x:Bind Challenges.SelectedLegendaryDifficultyIndex, Mode=TwoWay}" />
+                </Grid>
+                <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="2*" MaxWidth="180" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE8EE;" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock FontWeight="SemiBold" Text="战斗次数" />
+                        <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="每成功捕捉一次计一场" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind Challenges.LegendaryChallengeRunCount, Mode=TwoWay}" />
+                </Grid>
+                <TextBlock Margin="4,10,0,0" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="花种挑战" />
+                <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="2*" MaxWidth="180" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xEB9F;" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock FontWeight="SemiBold" Text="挑战目标" />
+                        <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="从已扫描的花种中选择" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsFlowerSeedConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" PlaceholderText="请先在任务页扫描" ItemsSource="{x:Bind Challenges.FlowerSeedOptions}"
+                                DisplayMemberPath="DisplayName" SelectedItem="{x:Bind Challenges.SelectedFlowerSeed, Mode=TwoWay}" />
+                </Grid>
+                <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="3*" />
+                        <ColumnDefinition Width="2*" MaxWidth="180" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE8EE;" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                        <TextBlock FontWeight="SemiBold" Text="战斗次数" />
+                        <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="每成功捕捉一次计一场" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsFlowerSeedConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind Challenges.FlowerSeedRunCount, Mode=TwoWay}" />
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+
+        <InfoBar x:Name="DailyNotice" Grid.RowSpan="2" Grid.ColumnSpan="2" Canvas.ZIndex="10"
+                 Style="{StaticResource AppToastStyle}" Margin="4,0,4,0"
+                 helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+                 Title="每日任务" Severity="Warning" />
+    </Grid>
+</Page>

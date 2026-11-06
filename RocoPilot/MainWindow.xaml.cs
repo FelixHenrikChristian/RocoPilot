@@ -15,7 +15,7 @@ public sealed partial class MainWindow : WindowEx
 {
     private readonly WindowShutdownCoordinator _shutdownCoordinator;
 
-    private Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue dispatcherQueue;
 
     private UISettings? settings;
 
@@ -47,8 +47,6 @@ public sealed partial class MainWindow : WindowEx
 
     private async Task ShutdownAsync()
     {
-        UnsubscribeThemeEvents();
-
         try
         {
             var runtimeTaskService = App.GetService<IRuntimeTaskService>();
@@ -80,44 +78,21 @@ public sealed partial class MainWindow : WindowEx
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
-        UnsubscribeWindowEvents();
-        UnsubscribeThemeEvents();
+        AppWindow.Closing -= AppWindow_Closing;
+        Closed -= MainWindow_Closed;
+        settings!.ColorValuesChanged -= Settings_ColorValuesChanged;
+        settings = null;
     }
 
-    // this handles updating the caption button colors correctly when indows system theme is changed
-    // while the app is open
     private void Settings_ColorValuesChanged(UISettings sender, object args)
     {
-        var queue = dispatcherQueue;
-        if (_shutdownCoordinator.IsShutdownStarted || queue is null)
+        _ = dispatcherQueue.TryEnqueue(() =>
         {
-            return;
-        }
-
-        // This calls comes off-thread, hence we will need to dispatch it to current app's thread
-        _ = queue.TryEnqueue(() =>
-        {
-            if (!_shutdownCoordinator.IsShutdownStarted)
+            if (settings is not null && !_shutdownCoordinator.IsShutdownStarted)
             {
                 TitleBarHelper.ApplySystemThemeToCaptionButtons();
             }
         });
     }
 
-    private void UnsubscribeWindowEvents()
-    {
-        AppWindow.Closing -= AppWindow_Closing;
-        Closed -= MainWindow_Closed;
-    }
-
-    private void UnsubscribeThemeEvents()
-    {
-        if (settings is not null)
-        {
-            settings.ColorValuesChanged -= Settings_ColorValuesChanged;
-            settings = null;
-        }
-
-        dispatcherQueue = null;
-    }
 }

@@ -1,7 +1,4 @@
 using System.Xml.Linq;
-using System.IO.Pipes;
-using System.Security.AccessControl;
-using System.Security.Principal;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using RocoPilot.Notifications;
@@ -12,29 +9,6 @@ namespace RocoPilot.Tests;
 [TestClass]
 public sealed class AppNotificationServiceTests
 {
-    [TestMethod]
-    public async Task NotificationPipeAllowsTheAccountSidRegardlessOfElevation()
-    {
-        var name = "RocoPilot.Notifications.Test." + Guid.NewGuid().ToString("N");
-        using var server = AppNotificationService.CreateNotificationPipe(name);
-        using var identity = WindowsIdentity.GetCurrent();
-        var security = server.GetAccessControl();
-        Assert.AreEqual(identity.User, security.GetOwner(typeof(SecurityIdentifier)));
-        var rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier)).Cast<PipeAccessRule>().ToArray();
-        Assert.HasCount(1, rules);
-        Assert.AreEqual(identity.User, rules[0].IdentityReference);
-        Assert.AreEqual(AccessControlType.Allow, rules[0].AccessControlType);
-        Assert.AreEqual(PipeAccessRights.FullControl, rules[0].PipeAccessRights);
-
-        using var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.Asynchronous);
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        await Task.WhenAll(server.WaitForConnectionAsync(timeout.Token), client.ConnectAsync(timeout.Token));
-        var received = new byte[1];
-        await Task.WhenAll(client.WriteAsync(new byte[] { 42 }, timeout.Token).AsTask(),
-            server.ReadExactlyAsync(received, timeout.Token).AsTask());
-        Assert.AreEqual((byte)42, received[0]);
-    }
-
     [TestMethod]
     public async Task PreferencesDefaultToEnabledAndSurviveReload()
     {

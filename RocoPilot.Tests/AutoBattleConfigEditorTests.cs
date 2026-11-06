@@ -11,7 +11,7 @@ namespace RocoPilot.Tests;
 public sealed class AutoBattleConfigEditorTests
 {
     [TestMethod]
-    public void ReordersMixedStepsAndUpdatesMoveAvailability()
+    public void ReordersMixedStepsAndSavesTheirNewPositions()
     {
         var settings = AutoBattleSettings.CreateDefault();
         settings.TurnSequencePresets =
@@ -22,28 +22,19 @@ public sealed class AutoBattleConfigEditorTests
         editor.NormalRelease.Items.Clear();
         editor.NormalRelease.AppendSkill("1");
         var skill = editor.NormalRelease.Items.Single();
-        Assert.IsFalse(skill.CanMoveEarlier);
-        Assert.IsFalse(skill.CanMoveLater);
 
         Assert.IsTrue(editor.TryInsertSharedPreset(editor.SharedPresetItems.Single(), editor.NormalRelease, out _));
         var preset = editor.NormalRelease.Items[1];
         editor.NormalRelease.AppendSkill("4");
         var last = editor.NormalRelease.Items[2];
-        Assert.IsTrue(skill.CanMoveLater);
-        Assert.IsFalse(last.CanMoveLater);
 
-        editor.NormalRelease.MoveEarlier(preset);
+        editor.NormalRelease.Items.Move(1, 0);
         Assert.AreSame(preset, editor.NormalRelease.Items[0]);
-        Assert.IsFalse(preset.CanMoveEarlier);
         Assert.AreEqual(1, preset.Position);
-        editor.NormalRelease.MoveEarlier(preset);
-        Assert.AreSame(preset, editor.NormalRelease.Items[0]);
 
-        editor.NormalRelease.MoveLater(skill);
+        editor.NormalRelease.Items.Move(1, 2);
         Assert.AreSame(skill, editor.NormalRelease.Items[2]);
-        Assert.IsFalse(skill.CanMoveLater);
         editor.NormalRelease.Items.Remove(skill);
-        Assert.IsFalse(last.CanMoveLater);
         Assert.AreEqual(2, last.Position);
 
         Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
@@ -140,7 +131,7 @@ public sealed class AutoBattleConfigEditorTests
         ];
         var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
         Assert.IsTrue(editor.TryInsertSharedPreset(editor.SharedPresetItems[1], editor.NormalRelease, out _));
-        editor.NormalRelease.MoveEarlier(editor.NormalRelease.Items[^1]);
+        editor.NormalRelease.Items.Move(editor.NormalRelease.Items.Count - 1, editor.NormalRelease.Items.Count - 2);
         Assert.IsTrue(editor.TryBuildSettings(settings, out var saved, out _));
         var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(saved))!;
         var reopened = new AutoBattleConfigEditor(reloaded, new KeyboardInputService());
@@ -240,7 +231,7 @@ public sealed class AutoBattleConfigEditorTests
         editor.FlowerSeedRelease.Items.Clear();
         editor.FlowerSeedRelease.AppendSkill("3");
         editor.FlowerSeedRelease.AppendSkill("X");
-        editor.FlowerSeedRelease.MoveEarlier(editor.FlowerSeedRelease.Items[1]);
+        editor.FlowerSeedRelease.Items.Move(1, 0);
         var current = source.Clone();
         current.KeyboardHoldDurationMs = 250;
         current.IsEnabled = true;

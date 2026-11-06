@@ -34,6 +34,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
     public bool IsRunning => _runningTaskKind is not null;
 
+    public bool IsDailyRunning { get; private set; }
+
+    public string StatusMessage { get; private set; } = "就绪";
+
     public IndependentTaskKind? RunningTaskKind => _runningTaskKind;
 
     public IndependentTaskSettings Settings => _settings.Clone();
@@ -86,10 +90,28 @@ public sealed class IndependentTaskService : IIndependentTaskService
         _ = SaveSettingsAsync(_settings.Clone());
     }
 
-    public async Task<IndependentTaskStartResult> StartAsync(
+    public Task<IndependentTaskStartResult> StartAsync(
         IndependentTaskKind kind,
         CancellationToken cancellationToken = default)
+        => StartTasksAsync([kind], false, cancellationToken);
+
+    public Task<IndependentTaskStartResult> StartDailyAsync(
+        IReadOnlyList<IndependentTaskKind> tasks,
+        CancellationToken cancellationToken = default)
     {
+        if (tasks.Count == 0)
+            return Task.FromResult(IndependentTaskStartResult.Failed("请至少启用一个每日任务。"));
+        if (tasks.Any(kind => kind is not (IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge)))
+            return Task.FromResult(IndependentTaskStartResult.Failed("每日清单仅支持已接入的挑战任务。"));
+        return StartTasksAsync(tasks.ToArray(), true, cancellationToken);
+    }
+
+    private async Task<IndependentTaskStartResult> StartTasksAsync(
+        IReadOnlyList<IndependentTaskKind> tasks,
+        bool isDaily,
+        CancellationToken cancellationToken)
+    {
+        var kind = tasks[0];
         await _stateLock.WaitAsync(cancellationToken);
         try
         {
@@ -108,13 +130,13 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     "请先在启动页启动任务，再运行独立任务。");
             }
 
-            if (kind == IndependentTaskKind.FlowerSeedChallenge
+            if (tasks.Contains(IndependentTaskKind.FlowerSeedChallenge)
                 && !_settings.FlowerSeedOptions.Any(option => option.Number == _settings.FlowerSeedTargetNumber))
             {
                 return IndependentTaskStartResult.Failed("请先扫描并选择目标花种。");
             }
 
-            if (kind == IndependentTaskKind.LegendaryChallenge && !LegendaryTargets.Contains(_settings.LegendaryTargetName))
+            if (tasks.Contains(IndependentTaskKind.LegendaryChallenge) && !LegendaryTargets.Contains(_settings.LegendaryTargetName))
                 return IndependentTaskStartResult.Failed("请先选择目标传说精灵。");
 
             if (kind == IndependentTaskKind.FlowerSeedScan)
@@ -129,9 +151,11 @@ public sealed class IndependentTaskService : IIndependentTaskService
             var taskCts = new CancellationTokenSource();
             _taskCts = taskCts;
             _runningTaskKind = kind;
+            IsDailyRunning = isDaily;
+            StatusMessage = isDaily ? "每日任务准备中" : $"{GetTaskDisplayName(kind)}准备中";
             var settings = _settings.Clone();
             var battleSettings = _runtimeTaskService.AutoBattleSettings;
-            _taskLoop = Task.Run(() => RunTaskAsync(kind, settings, battleSettings, taskCts), CancellationToken.None);
+            _taskLoop = Task.Run(() => RunTasksAsync(tasks, isDaily, settings, battleSettings, taskCts), CancellationToken.None);
             _logger.LogInformation("独立任务已启动：{TaskName}", GetTaskDisplayName(kind));
         }
         finally
@@ -140,7 +164,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
 
         NotifyStateChanged();
-        return IndependentTaskStartResult.Started($"{GetTaskDisplayName(kind)}任务已启动，实时任务自动暂停，结束后恢复。");
+        return IndependentTaskStartResult.Started($"{(isDaily ? "每日" : GetTaskDisplayName(kind))}任务已启动，实时任务自动暂停，结束后恢复。");
     }
 
     public async Task StopAsync()
@@ -184,13 +208,15 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
     }
 
-    private async Task RunTaskAsync(
-        IndependentTaskKind kind,
+    private async Task RunTasksAsync(
+        IReadOnlyList<IndependentTaskKind> tasks,
+        bool isDaily,
         IndependentTaskSettings settings,
         AutoBattleSettings battleSettings,
         CancellationTokenSource taskCts)
     {
         var ownsSuspension = !_runtimeTaskService.IsSuspended;
+        var kind = tasks[0];
         var taskName = GetTaskDisplayName(kind);
         try
         {
@@ -204,7 +230,15 @@ public sealed class IndependentTaskService : IIndependentTaskService
             else
                 _logger.LogWarning("独立任务启动：未能将游戏窗口切换到前台。Task={TaskName}, Window={Window}", taskName, state.TargetWindow.DisplayName);
 
-            switch (kind)
+            for (var index = 0; index < tasks.Count; index++)
+            {
+                taskCts.Token.ThrowIfCancellationRequested();
+                kind = tasks[index];
+                taskName = GetTaskDisplayName(kind);
+                _runningTaskKind = kind;
+                StatusMessage = isDaily ? $"正在执行 {index + 1}/{tasks.Count}：{taskName}" : $"正在执行：{taskName}";
+                NotifyStateChanged();
+                switch (kind)
             {
                 case IndependentTaskKind.LegendaryScan:
                     var names = await _challengeRunner.ScanLegendaryAsync(state, UpdateProgress, taskCts.Token);
@@ -230,7 +264,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
                         settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
-                    await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
+                    await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界", !isDaily);
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:
                     await _challengeRunner.RunAsync(state,
@@ -238,7 +272,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                         settings.FlowerSeedRunCount, battleSettings,
                         UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
-                    await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
+                    await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界", !isDaily);
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
                     var options = await _challengeRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
@@ -260,16 +294,22 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     taskCts.Token.ThrowIfCancellationRequested();
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {_settings.FlowerSeedOptions.Count} 个花种", "花种选项已更新");
                     break;
+                }
             }
+
+            StatusMessage = isDaily ? $"每日任务完成，共 {tasks.Count} 项" : $"{taskName}完成";
+            if (isDaily) await ReportResultAsync(StatusMessage, "已返回大世界，即将恢复实时任务");
         }
         catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
         {
+            StatusMessage = isDaily ? "每日任务已停止" : $"{taskName}已停止";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "独立任务异常终止：{TaskName}", GetTaskDisplayName(kind));
+            StatusMessage = $"{(isDaily ? "每日任务" : taskName)}已停止：{ex.Message}";
             UpdateProgress(new("任务失败", ex.Message));
-            await ReportResultAsync($"{taskName}已停止", ex.Message);
+            await ReportResultAsync($"{(isDaily ? "每日任务" : taskName)}已停止", ex.Message);
         }
         finally
         {
@@ -288,6 +328,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     _taskCts = null;
                     _taskLoop = null;
                     _runningTaskKind = null;
+                    IsDailyRunning = false;
                     stateCleared = true;
                 }
             }
@@ -307,10 +348,11 @@ public sealed class IndependentTaskService : IIndependentTaskService
         void UpdateProgress(IndependentTaskProgress progress)
             => _runtimeTaskService.UpdateIndependentTaskStatus(taskName, progress);
 
-        async Task ReportResultAsync(string title, string message)
+        async Task ReportResultAsync(string title, string message, bool notify = true)
         {
+            // 每日清单仅通知最终结果，各子任务的完成信息仍显示在遮罩中。
             _runtimeTaskService.ShowIndependentTaskResult(title, message);
-            if (_notifications.IsEnabled && !await _notifications.ShowAsync(title, message))
+            if (notify && _notifications.IsEnabled && !await _notifications.ShowAsync(title, message))
                 _logger.LogWarning("任务结果通知未显示：{Title}，{Message}", title, message);
         }
     }

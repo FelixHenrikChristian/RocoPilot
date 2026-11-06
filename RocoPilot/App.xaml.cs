@@ -161,6 +161,8 @@ public partial class App : Application
             services.AddTransient<RealtimePage>();
             services.AddSingleton<TasksViewModel>();
             services.AddTransient<TasksPage>();
+            services.AddSingleton<DailyViewModel>();
+            services.AddTransient<DailyPage>();
             services.AddSingleton<StatisticsViewModel>();
             services.AddTransient<StatisticsPage>();
             services.AddSingleton<LogViewModel>();

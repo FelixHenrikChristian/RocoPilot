@@ -23,6 +23,7 @@
     <x:String x:Key="AutoBattleGlyph">&#xE1B8;</x:String>
     <x:String x:Key="EncounterCountGlyph">&#xF33F;</x:String>
     <x:String x:Key="StartGlyph">&#xF605;</x:String>
+    <x:String x:Key="ScreenshotGlyph">&#xF68D;</x:String>
     <x:String x:Key="OverlayInfoGlyph">&#xF4A3;</x:String>
     <x:String x:Key="FileFolderGlyph">&#xF42E;</x:String>
     <x:String x:Key="WindowsNotificationGlyph">&#xF114;</x:String>

@@ -21,10 +21,13 @@ public partial class DailyTaskItemViewModel(DailyTaskKind kind) : ObservableObje
     {
         DailyTaskKind.StaminaCrafting => "体力合成",
         DailyTaskKind.Mail => "邮件领取",
-        DailyTaskKind.LegendaryChallenge => "传说挑战",
+        DailyTaskKind.LegendaryChallenge => "传说精灵挑战",
         DailyTaskKind.FlowerSeedChallenge => "花种挑战",
         DailyTaskKind.Gardening => "自动种菜",
         DailyTaskKind.BattlePassRewards => "通行证奖励",
+        DailyTaskKind.Inspiration => "自动灵感",
+        DailyTaskKind.Sell => "自动出售",
+        DailyTaskKind.EveningRest => "晚风小憩",
         _ => string.Empty
     };
 

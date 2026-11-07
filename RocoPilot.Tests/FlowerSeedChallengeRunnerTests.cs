@@ -1104,6 +1104,8 @@ public sealed class FlowerSeedChallengeRunnerTests
 
     private sealed class Mouse : IMouseInputService
     {
+        public Task DragAsync(nint hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
         public int Clicks;
         public Action? DuringScroll;
         public Action<int, int>? DuringClick;

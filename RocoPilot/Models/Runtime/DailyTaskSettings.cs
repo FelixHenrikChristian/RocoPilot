@@ -15,7 +15,7 @@ public enum DailyTaskKind
 
 public sealed record DailyTaskEntry(DailyTaskKind Kind, bool IsEnabled = false);
 
-/// <summary>仅保存一份每日清单；挑战参数由独立任务统一管理。</summary>
+/// <summary>每日清单及其专用挑战参数。</summary>
 public sealed class DailyTaskSettings
 {
     private static readonly DailyTaskKind[] DefaultOrder =
@@ -24,6 +24,8 @@ public sealed class DailyTaskSettings
         DailyTaskKind.StaminaCrafting, DailyTaskKind.Gardening, DailyTaskKind.Inspiration,
         DailyTaskKind.Sell, DailyTaskKind.BattlePassRewards, DailyTaskKind.EveningRest
     ];
+
+    public IndependentTaskSettings? Challenges { get; set; }
 
     public List<DailyTaskEntry> Tasks { get; set; } = [];
 
@@ -36,6 +38,6 @@ public sealed class DailyTaskSettings
             if (!tasks.Any(task => task.Kind == kind)) tasks.Add(new(kind));
         }
 
-        return new() { Tasks = tasks };
+        return new() { Tasks = tasks, Challenges = Challenges };
     }
 }

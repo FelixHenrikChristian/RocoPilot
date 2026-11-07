@@ -1,8 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.IndependentTasks;
 
 namespace RocoPilot.Services;
 
@@ -15,6 +16,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
 {
     private readonly IRuntimeSessionControl _runtimeTaskService;
     private readonly ILocalSettingsService _localSettingsService;
+    private readonly StaminaCraftingRunner _staminaCrafting;
     private readonly IManualChallengeRunner _challengeRunner;
     private readonly IAppNotificationService _notifications;
     private readonly IGameWindowService _gameWindowService;
@@ -50,6 +52,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         IManualChallengeRunner challengeRunner,
         IAppNotificationService notifications,
         IGameWindowService gameWindowService,
+        StaminaCraftingRunner staminaCrafting,
         ILogger<IndependentTaskService> logger)
     {
         _runtimeTaskService = runtimeTaskService;
@@ -57,6 +60,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         _challengeRunner = challengeRunner;
         _notifications = notifications;
         _gameWindowService = gameWindowService;
+        _staminaCrafting = staminaCrafting;
         _logger = logger;
     }
 
@@ -93,24 +97,25 @@ public sealed class IndependentTaskService : IIndependentTaskService
     public Task<IndependentTaskStartResult> StartAsync(
         IndependentTaskKind kind,
         CancellationToken cancellationToken = default)
-        => StartTasksAsync([kind], false, cancellationToken);
+        => StartTasksAsync([kind], null, cancellationToken);
 
     public Task<IndependentTaskStartResult> StartDailyAsync(
-        IReadOnlyList<IndependentTaskKind> tasks,
+        IReadOnlyList<IndependentTaskKind> tasks, IndependentTaskSettings challenges,
         CancellationToken cancellationToken = default)
     {
         if (tasks.Count == 0)
             return Task.FromResult(IndependentTaskStartResult.Failed("请至少启用一个每日任务。"));
-        if (tasks.Any(kind => kind is not (IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge)))
-            return Task.FromResult(IndependentTaskStartResult.Failed("每日清单仅支持已接入的挑战任务。"));
-        return StartTasksAsync(tasks.ToArray(), true, cancellationToken);
+        if (tasks.Any(kind => kind is not (IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge or IndependentTaskKind.StaminaCrafting)))
+            return Task.FromResult(IndependentTaskStartResult.Failed("每日清单包含尚未接入的任务。"));
+        return StartTasksAsync(tasks.ToArray(), challenges.Clone(), cancellationToken);
     }
 
     private async Task<IndependentTaskStartResult> StartTasksAsync(
         IReadOnlyList<IndependentTaskKind> tasks,
-        bool isDaily,
+        IndependentTaskSettings? dailySettings,
         CancellationToken cancellationToken)
     {
+        var isDaily = dailySettings is not null;
         var kind = tasks[0];
         await _stateLock.WaitAsync(cancellationToken);
         try
@@ -130,13 +135,16 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     "请先在启动页启动任务，再运行独立任务。");
             }
 
+            var settings = dailySettings?.Normalize(LegendaryTargets) ?? _settings.Clone();
+            settings.FlowerSeedOptions = [.. _settings.FlowerSeedOptions];
+            settings.UseLegendaryMarkWhenInsufficient = _settings.UseLegendaryMarkWhenInsufficient;
             if (tasks.Contains(IndependentTaskKind.FlowerSeedChallenge)
-                && !_settings.FlowerSeedOptions.Any(option => option.Number == _settings.FlowerSeedTargetNumber))
+                && !settings.FlowerSeedOptions.Any(option => option.Number == settings.FlowerSeedTargetNumber))
             {
                 return IndependentTaskStartResult.Failed("请先扫描并选择目标花种。");
             }
 
-            if (tasks.Contains(IndependentTaskKind.LegendaryChallenge) && !LegendaryTargets.Contains(_settings.LegendaryTargetName))
+            if (tasks.Contains(IndependentTaskKind.LegendaryChallenge) && !LegendaryTargets.Contains(settings.LegendaryTargetName))
                 return IndependentTaskStartResult.Failed("请先选择目标传说精灵。");
 
             if (kind == IndependentTaskKind.FlowerSeedScan)
@@ -153,7 +161,6 @@ public sealed class IndependentTaskService : IIndependentTaskService
             _runningTaskKind = kind;
             IsDailyRunning = isDaily;
             StatusMessage = isDaily ? "每日任务准备中" : $"{GetTaskDisplayName(kind)}准备中";
-            var settings = _settings.Clone();
             var battleSettings = _runtimeTaskService.AutoBattleSettings;
             _taskLoop = Task.Run(() => RunTasksAsync(tasks, isDaily, settings, battleSettings, taskCts), CancellationToken.None);
         }
@@ -240,6 +247,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 _logger.LogInformation("开始执行{Task}（第 {Index}/{Total} 项）", taskName, index + 1, tasks.Count);
                 switch (kind)
             {
+                case IndependentTaskKind.StaminaCrafting:
+                    await _staminaCrafting.RunAsync(state, UpdateProgress, taskCts.Token);
+                    break;
                 case IndependentTaskKind.LegendaryScan:
                     var names = await _challengeRunner.ScanLegendaryAsync(state, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
@@ -393,6 +403,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
             IndependentTaskKind.LegendaryChallenge => "传说精灵挑战",
             IndependentTaskKind.FlowerSeedChallenge => "花种挑战",
             IndependentTaskKind.FlowerSeedScan => "扫描花种",
+            IndependentTaskKind.StaminaCrafting => "体力合成",
             IndependentTaskKind.LegendaryScan => "扫描传说精灵",
             _ => "独立"
         };

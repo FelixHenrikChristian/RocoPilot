@@ -2,6 +2,32 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-08：体力合成停在批量制造结果
+
+- [用户原图](LocalScreenshots/2026-11-08/stamina-crafting/craft-result-bonus-61.png)，附件 codex-clipboard-70c69e24-0ce1-48f7-a6db-ff1c40febe8f.png，2048×1152。拼图球结算显示绿色 ×61 和特权额外获得 11，助手显示“等待制造结果”。
+- 配合 11 月 7 日白色 ×1 结果图回放。复查制造按钮消失后等待 3 秒按 ESC，以重新出现的炼金界面确认退出。StaminaCraftingTests 覆盖批量结果和首次 ESC 未生效后重新关闭。截图记录静态结果，不能测出游戏实际接受按键的时间。
+
+## 2026-11-07：体力合成
+
+- [map-continent](LocalScreenshots/2026-11-07/stamina-crafting/map-continent.png)，codex-clipboard-3d8072c3-4da5-4f97-b39f-614c068f04e5.png，(2048, 1152)。
+- [map-academy](LocalScreenshots/2026-11-07/stamina-crafting/map-academy.png)，codex-clipboard-5417a9b8-7396-4126-be17-f8450905f92a.png，(2048, 1152)。
+- [map-garden](LocalScreenshots/2026-11-07/stamina-crafting/map-garden.png)，codex-clipboard-8e6ac409-0cf9-48e3-8b27-777482eabf8c.png，(2048, 1152)。
+- [map-options](LocalScreenshots/2026-11-07/stamina-crafting/map-options.png)，codex-clipboard-89e9fcc4-d18b-4d93-b22d-6f97db9aa7a7.png，(2048, 1152)。
+- [garden-cauldron-marked](LocalScreenshots/2026-11-07/stamina-crafting/garden-cauldron-marked.png)，codex-clipboard-d1fa01cd-ee40-416c-bc87-101959afdd1a.png，(2048, 1152)。
+- [teleport](LocalScreenshots/2026-11-07/stamina-crafting/teleport.png)，codex-clipboard-2d1f8617-50dd-41de-a071-36fb43b91881.png，(2048, 1152)。
+- [world-arrival](LocalScreenshots/2026-11-07/stamina-crafting/world-arrival.png)，codex-clipboard-95e3283e-c3cc-4d35-80bf-554265c0ede4.png，(2048, 1152)。
+- [world-interaction](LocalScreenshots/2026-11-07/stamina-crafting/world-interaction.png)，codex-clipboard-f0c02719-d2f3-465b-a046-6270935f3f28.png，(2048, 1152)。
+- [dialogue](LocalScreenshots/2026-11-07/stamina-crafting/dialogue.png)，codex-clipboard-06ef667a-3f7d-4e65-b8a4-6e22ed6dfa1e.png，(2048, 1152)。
+- [choices](LocalScreenshots/2026-11-07/stamina-crafting/choices.png)，codex-clipboard-530236ca-7275-43bb-98f1-12a205b03d5f.png，(2048, 1152)。
+- [recipe-list-marked](LocalScreenshots/2026-11-07/stamina-crafting/recipe-list-marked.png)，codex-clipboard-08dafc2f-a2bf-48e7-aa6e-f8bff44039a8.png，(2052, 1199)。
+- [season-selected](LocalScreenshots/2026-11-07/stamina-crafting/season-selected.png)，codex-clipboard-02171c61-6e25-4c36-a20b-23b19513c111.png，(2048, 1152)。
+- [slider-maximum](LocalScreenshots/2026-11-07/stamina-crafting/slider-maximum.png)，codex-clipboard-5f6e5f04-2501-48e2-949c-53b38bb304d1.png，(2048, 1152)。
+- [craft-result](LocalScreenshots/2026-11-07/stamina-crafting/craft-result.png)，codex-clipboard-c1d3d1f7-480e-4ffc-9d26-8fcf6a4dad90.png，(2048, 1152)。
+
+用户提供，依次覆盖三张地图、地图选择、炼金釜定位与传送、大世界接近与交互、对话与选项、配方初选、赛季详情、最大数量与结果。第 5、11 张带标注，第 11 张含标题栏。用于体力合成截图回放，识别模板位于应用识别资源的 stamina-crafting 目录。单帧素材未覆盖体力不足、其他赛季及动画时长。
+
+回放入口为 `StaminaCraftingTests.DailyCraftsOnlyAfterSelectingSeasonAndMaximum`，直接读取上述本地原图。第 11 张回放取客户区 `(2,45,2048,1152)`。三种起始地图分别测试 2048×1152、1280×720、960×540，加客户区偏移 (12,30)。另用已有 `Fixtures/legendary-skip.png` 模拟两段动画的跳过提示。配方回放会先保留旧详情和未拉满的滑块，检验制造时机；1280×720 用例会交换两个配方格，检验点击位置是否跟随角标。切换地图的灰色“家园种植园”菜单模板依据图 4 选中行的字形及同图未选中行的颜色生成，尚缺该项未选中时的实拍展开菜单。
+
 ## 2026-11-07：每日页传说挑战目标列表展开
 
 - [用户原图](LocalScreenshots/2026-11-07/daily/legendary-target-list-open.png)：附件 codex-clipboard-b01973c1-074c-4469-be02-7adeac70c0ad.png。每日页的传说挑战目标已展开，第二项带选中标记，第一项显示在上方。

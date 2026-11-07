@@ -69,8 +69,8 @@ public partial class App : Application
     {
         InitializeComponent();
 
-        LoggingHelper.ConfigureSerilog();
-        LoggingHelper.LogStartupBanner();
+        Log.Logger = LoggingHelper.CreateLogger(LoggingHelper.LogDirectory);
+        LoggingHelper.LogStartup();
 
         Host = Microsoft.Extensions.Hosting.Host.
         CreateDefaultBuilder().
@@ -78,6 +78,7 @@ public partial class App : Application
         ConfigureLogging(logging =>
         {
             logging.ClearProviders();
+            logging.SetMinimumLevel(LogLevel.Debug);
             logging.AddSerilog(dispose: true);
         }).
         ConfigureServices((context, services) =>
@@ -102,7 +103,6 @@ public partial class App : Application
             services.AddSingleton<IManualChallengeRunner, ManualChallengeRunner>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();
-            services.AddSingleton<RuntimeDebugLogger>();
             services.AddSingleton<RuntimeFrameRecognizer>();
             services.AddSingleton<GameSceneRecognizer>();
             services.AddSingleton<BattleScreenRecognizer>();
@@ -165,8 +165,6 @@ public partial class App : Application
             services.AddTransient<DailyPage>();
             services.AddSingleton<StatisticsViewModel>();
             services.AddTransient<StatisticsPage>();
-            services.AddSingleton<LogViewModel>();
-            services.AddTransient<LogPage>();
             services.AddSingleton<HotkeyViewModel>();
             services.AddTransient<HotkeyPage>();
 #if DEBUG
@@ -189,7 +187,7 @@ public partial class App : Application
 
     private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        Log.Fatal(e.Exception, "未处理异常: {Message}", e.Message);
+        Log.ForContext(typeof(App)).Fatal(e.Exception, "未处理异常: {Message}", e.Message);
         LoggingHelper.CloseAndFlush();
     }
 

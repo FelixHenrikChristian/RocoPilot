@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.TextRecognition;
@@ -7,7 +6,6 @@ using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.Recognition;
-using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
 
 namespace RocoPilot.Services.RuntimeTasks;
 
@@ -15,15 +13,13 @@ namespace RocoPilot.Services.RuntimeTasks;
 public sealed class RuntimeFrameRecognizer(
     IImageMatchingService imageMatching,
     ITextRecognitionService textRecognition,
-    IRecognitionOverlayService overlay,
-    RuntimeDebugLogger debugLog)
+    IRecognitionOverlayService overlay)
 {
     public async Task<string> RecognizeRegionTextAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
         IReadOnlyList<string> regionAliases,
-        CancellationToken cancellationToken,
-        string taskName)
+        CancellationToken cancellationToken)
     {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
@@ -33,26 +29,12 @@ public sealed class RuntimeFrameRecognizer(
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            debugLog.Write(
-                CreateDebugLogKey("ocr-skip-outside-frame", taskName, region.Id),
-                $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
-                "{TaskName} OCR跳过：识别区域不在截图内。Region={RegionId}, Aliases={RegionAliases}",
-                taskName,
-                region.Id,
-                string.Join("|", regionAliases));
             return string.Empty;
         }
 
         var recognitionMethod = textRecognition.GetDefaultMethod();
         if (recognitionMethod is not { IsAvailable: true })
         {
-            debugLog.Write(
-                CreateDebugLogKey("ocr-skip-method-unavailable", taskName, region.Id, state.Options.TextRecognitionMethod),
-                "method-unavailable",
-                "{TaskName} OCR跳过：OCR 方法不可用。Method={TextRecognitionMethod}, Region={RegionId}",
-                taskName,
-                state.Options.TextRecognitionMethod,
-                region.Id);
             return string.Empty;
         }
 
@@ -62,18 +44,6 @@ public sealed class RuntimeFrameRecognizer(
             recognitionMethod.Method,
             cancellationToken);
         overlay.ShowOcrResult(region.Id, result.Text);
-        debugLog.Write(
-            CreateDebugLogKey("ocr-result", taskName, region.Id, recognitionMethod.Method),
-            CreateTextDebugFingerprint(result.Text),
-            "{TaskName} OCR结果：Region={RegionId}, Method={TextRecognitionMethod}, FrameRegion={X},{Y},{Width}x{Height}, Text={Text}",
-            taskName,
-            region.Id,
-            recognitionMethod.Method,
-            frameRegion.X,
-            frameRegion.Y,
-            frameRegion.Width,
-            frameRegion.Height,
-            FormatLogText(result.Text));
         return result.Text;
     }
 
@@ -83,8 +53,6 @@ public sealed class RuntimeFrameRecognizer(
         IReadOnlyList<string> regionAliases,
         string templateName,
         ImageMatchOptions options,
-        string taskName,
-        string targetName,
         CancellationToken cancellationToken)
     {
         var result = await MatchRuntimeTemplateResultAsync(
@@ -93,8 +61,6 @@ public sealed class RuntimeFrameRecognizer(
             regionAliases,
             templateName,
             options,
-            taskName,
-            targetName,
             cancellationToken);
         return result.IsMatch;
     }
@@ -105,22 +71,12 @@ public sealed class RuntimeFrameRecognizer(
         IReadOnlyList<string> regionAliases,
         string templateName,
         ImageMatchOptions options,
-        string taskName,
-        string targetName,
         CancellationToken cancellationToken)
     {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         var templatePath = GetResolutionTemplatePath(state.RecognitionRegionConfig, templateName);
         if (!TemplateExists(templatePath))
         {
-            debugLog.Write(
-                CreateDebugLogKey("template-skip-missing-template", taskName, targetName, region.Id, templatePath),
-                "missing-template",
-                "{TaskName} 目标识别跳过：未找到模板。Target={Target}, Region={RegionId}, Template={Template}",
-                taskName,
-                targetName,
-                region.Id,
-                templatePath);
             return ImageMatchResult.NoMatch(0, templatePath);
         }
 
@@ -131,14 +87,6 @@ public sealed class RuntimeFrameRecognizer(
             state.RecognitionRegionConfig);
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            debugLog.Write(
-                CreateDebugLogKey("template-skip-outside-frame", taskName, targetName, region.Id, templatePath),
-                $"{frameRegion.X},{frameRegion.Y},{frameRegion.Width}x{frameRegion.Height}",
-                "{TaskName} 目标识别跳过：识别区域不在截图内。Target={Target}, Region={RegionId}, Template={Template}",
-                taskName,
-                targetName,
-                region.Id,
-                templatePath);
             return ImageMatchResult.NoMatch(0, templatePath);
         }
 
@@ -154,25 +102,8 @@ public sealed class RuntimeFrameRecognizer(
             matchOptions,
             cancellationToken);
         overlay.ShowImageMatchResult(region.Id, result.Score);
-        debugLog.Write(
-            CreateDebugLogKey("template-result", taskName, targetName, region.Id, templatePath),
-            CreateBooleanDebugFingerprint(result.IsMatch),
-            "{TaskName} 目标识别结果：Target={Target}, Region={RegionId}, Template={Template}, Score={Score:F3}, Threshold={Threshold:F3}, IsMatch={IsMatch}, FrameRegion={X},{Y},{Width}x{Height}, MatchRegion={MatchX},{MatchY},{MatchWidth}x{MatchHeight}",
-            taskName,
-            targetName,
-            region.Id,
-            templatePath,
-            result.Score,
-            matchOptions.MinimumScore,
-            result.IsMatch,
-            frameRegion.X,
-            frameRegion.Y,
-            frameRegion.Width,
-            frameRegion.Height,
-            result.X, result.Y, result.Width, result.Height);
         return result;
     }
-
 
     public bool TemplateExists(string templateName)
     {

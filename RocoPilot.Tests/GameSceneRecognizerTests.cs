@@ -22,8 +22,7 @@ public sealed class GameSceneRecognizerTests
         string sample, bool expected)
     {
         var matching = new ImageMatchingService();
-        var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
-        var recognizer = new BattleScreenRecognizer(new RuntimeFrameRecognizer(matching, null!, new OverlayStub(), debug));
+        var recognizer = new BattleScreenRecognizer(new RuntimeFrameRecognizer(matching, null!, new OverlayStub()));
         var samplePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", sample);
         using var crop = Cv2.ImRead(samplePath, ImreadModes.Unchanged);
         Assert.IsFalse(crop.Empty(), $"未读取到测试样本：{samplePath}");
@@ -168,9 +167,8 @@ public sealed class GameSceneRecognizerTests
                 },
                 new RuntimeTaskStartOptions { AutoBattleSettings = new() { IsEnabled = autoBattleEnabled } },
                 DateTimeOffset.Now);
-            var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
-            var frameRecognizer = new RuntimeFrameRecognizer(Matching, null!, Overlay, debug);
-            Recognizer = new(frameRecognizer, Matching, Overlay, debug, new BattleScreenRecognizer(frameRecognizer));
+            var frameRecognizer = new RuntimeFrameRecognizer(Matching, null!, Overlay);
+            Recognizer = new(frameRecognizer, Matching, Overlay, new BattleScreenRecognizer(frameRecognizer));
             var templateDirectory = Path.Combine(Matching.TemplateDirectory, "96x54");
             Directory.CreateDirectory(templateDirectory);
             foreach (var template in new[] { "magic-point.png", "battle-chat.png", "battle-button-skill.png", "battle-button-change.png" })

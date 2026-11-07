@@ -9,19 +9,8 @@ public sealed class AutoBattleInputExecutor(IKeyboardInputService keyboard, ILog
 {
     public bool CanSend(nint window, AutoBattleSettings settings)
     {
-        if (!keyboard.IsWindowAvailable(window))
-        {
-            logger.LogWarning("自动战斗未执行：目标游戏窗口句柄已失效。");
-            return false;
-        }
-
-        if (keyboard.RequiresForeground(settings.KeyboardInputMethod) && !keyboard.IsWindowForeground(window))
-        {
-            logger.LogDebug("自动战斗按键未发送：{InputMethod} 需要游戏窗口处于前台。", settings.KeyboardInputMethod);
-            return false;
-        }
-
-        return true;
+        return keyboard.IsWindowAvailable(window)
+            && (!keyboard.RequiresForeground(settings.KeyboardInputMethod) || keyboard.IsWindowForeground(window));
     }
 
     public async Task<bool> ExecuteAsync(nint window, AutoBattleSettings settings, AutoBattlePlan plan, CancellationToken token,

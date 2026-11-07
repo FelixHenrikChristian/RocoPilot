@@ -30,7 +30,7 @@ public sealed partial class MainWindow : WindowEx
             ShutdownAsync,
             callback => DispatcherQueue.TryEnqueue(() => callback()),
             Close,
-            exception => Log.Error(exception, "关闭主窗口时发生异常"));
+            exception => Log.ForContext(typeof(MainWindow)).Error(exception, "关闭主窗口时发生异常"));
 
         // Theme change code picked from https://github.com/microsoft/WinUI-Gallery/pull/1239
         dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -52,8 +52,9 @@ public sealed partial class MainWindow : WindowEx
             var runtimeTaskService = App.GetService<IRuntimeTaskService>();
             await runtimeTaskService.StopAsync();
         }
-        catch
+        catch (Exception ex)
         {
+            Log.ForContext(typeof(MainWindow)).Warning(ex, "关闭应用时停止实时任务失败");
         }
 
         try
@@ -62,18 +63,17 @@ public sealed partial class MainWindow : WindowEx
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "关闭云同步任务时发生异常");
+            Log.ForContext(typeof(MainWindow)).Warning(ex, "关闭云同步任务时发生异常");
         }
 
         try
         {
             App.GetService<IAppNotificationService>().Unregister();
         }
-        catch
+        catch (Exception ex)
         {
+            Log.ForContext(typeof(MainWindow)).Warning(ex, "注销 Windows 通知失败");
         }
-
-        LoggingHelper.CloseAndFlush();
     }
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
@@ -82,6 +82,8 @@ public sealed partial class MainWindow : WindowEx
         Closed -= MainWindow_Closed;
         settings!.ColorValuesChanged -= Settings_ColorValuesChanged;
         settings = null;
+        Log.ForContext(typeof(MainWindow)).Information("RocoPilot 已关闭");
+        LoggingHelper.CloseAndFlush();
     }
 
     private void Settings_ColorValuesChanged(UISettings sender, object args)

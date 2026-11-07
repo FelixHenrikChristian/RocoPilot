@@ -302,7 +302,6 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
         }
 
         HotkeyTriggered?.Invoke(this, new HotkeyTriggeredEventArgs(action.Value));
-        _logger.LogInformation("热键已触发：{Action}", GetActionName(action.Value));
         return true;
     }
 
@@ -457,18 +456,6 @@ public sealed class HotkeyService : IHotkeyService, IDisposable
     private static bool IsKeyDown(int virtualKey)
     {
         return (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
-    }
-
-    private static string GetActionName(HotkeyAction action)
-    {
-        return action switch
-        {
-            HotkeyAction.ToggleInfoOverlay => "信息遮罩窗口",
-            HotkeyAction.ToggleEncounterStatistics => "奇遇统计",
-            HotkeyAction.ToggleAutoBattle => "自动战斗",
-            HotkeyAction.TakeScreenshot => "截图",
-            _ => action.ToString()
-        };
     }
 
     private delegate IntPtr LowLevelKeyboardProc(int code, IntPtr wParam, IntPtr lParam);

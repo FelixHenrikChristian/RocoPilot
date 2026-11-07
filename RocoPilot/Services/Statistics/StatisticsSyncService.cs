@@ -65,7 +65,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         _credentials = credentials;
         _autoUpload = new StatisticsAutoUploadScheduler(AutoUploadDelay,
             token => UploadAsync(automatic: true, token),
-            ex => _logger.LogWarning(ex, "自动上传统计数据失败。"), delay);
+            ex => _logger.LogDebug("后台上传结束，后续变更可再次触发上传：{Reason}", ex.Message), delay);
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
         ApplyStatusFromSettings(_settings, "未配置云同步");
     }
@@ -369,6 +369,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
                     settings.LastSyncedAccountFingerprints[uid] = version.LegacyFingerprint!;
         await SaveSettingsCoreAsync(settings, cancellationToken);
         ApplyStatusFromSettings(settings, successMessage);
+        _logger.LogInformation("云端统计已下载并合并，大小 {Bytes} 字节", result.ContentLength);
         return result;
     }
 
@@ -440,6 +441,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
                         ? "已自动上传统计数据"
                         : "已上传统计数据";
                 ApplyStatusFromSettings(settings, successMessage);
+                _logger.LogInformation("统计数据已上传，自动上传={Automatic}，大小 {Bytes} 字节", automatic, result.ContentLength);
                 return result;
             }
 

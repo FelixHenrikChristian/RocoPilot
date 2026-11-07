@@ -586,13 +586,12 @@ public sealed class RuntimeTaskStartupTests
             Statistics = new(settings, NullLogger<StatisticsService>.Instance, seasonConfig);
             Uid = new(Detection, Statistics, Notice, NullLogger<StatisticsUidCoordinatorService>.Instance);
             Matching = new(sceneRecognition);
-            var debug = new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance);
             Catalog.MatchName = (text, threshold) => new SpiritCatalogIndex(Catalog.Document).Match(text, threshold);
-            var recognizer = new RuntimeFrameRecognizer(Matching, Ocr, Overlay, debug);
+            var recognizer = new RuntimeFrameRecognizer(Matching, Ocr, Overlay);
             var battleScreen = new BattleScreenRecognizer(recognizer);
             Runtime = new(Window, Keyboard, Capture, new RegionConfigStub(battleRecognition), Matching, recognizer,
-                new GameSceneRecognizer(recognizer, Matching, Overlay, debug, battleScreen), battleScreen,
-                new AutoBattleInputExecutor(Keyboard, NullLogger<AutoBattleInputExecutor>.Instance), debug,
+                new GameSceneRecognizer(recognizer, Matching, Overlay, battleScreen), battleScreen,
+                new AutoBattleInputExecutor(Keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
                 seasonConfig ?? (battleRecognition ? new EncounterSeasonConfigService(NullLogger<EncounterSeasonConfigService>.Instance)
                     : (RocoPilot.Contracts.Services.Encounters.IEncounterSeasonConfigService)new StatisticsSeasonConfigStub()), Catalog,
                 Statistics, Uid, settings,

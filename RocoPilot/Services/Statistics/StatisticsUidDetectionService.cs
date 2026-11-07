@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 
 using RocoPilot.Configuration;
+using RocoPilot.Helpers;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Recognition;
@@ -143,7 +144,7 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
                     {
                         _logger.LogDebug(
                             "首页启动 UID OCR 未得到纯数字：Text={Text}, Method={OcrMethod}, Capture={CaptureMethod}",
-                            FormatLogText(result.Text),
+                            LoggingHelper.FormatLogText(result.Text, 80),
                             recognitionMethod.Method,
                             captureMethod);
                     }
@@ -195,18 +196,5 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
             .Prepend(preferredCaptureMethod)
             .Distinct()
             .ToArray();
-    }
-
-    private static string FormatLogText(string? text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return "<empty>";
-        }
-
-        var normalized = string.Join(
-            " ",
-            text.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return normalized.Length <= 80 ? normalized : $"{normalized[..80]}...";
     }
 }

@@ -9,6 +9,7 @@
                 <ResourceDictionary Source="ms-appx:///Styles/FontSizes.xaml" />
                 <ResourceDictionary Source="ms-appx:///Styles/Thickness.xaml" />
                 <ResourceDictionary Source="ms-appx:///Styles/TextBlock.xaml" />
+                <ResourceDictionary Source="ms-appx:///Styles/AppIcons.xaml" />
                 <ResourceDictionary Source="ms-appx:///Styles/Cards.xaml" />
                 <ResourceDictionary Source="ms-appx:///Styles/Dialogs.xaml" />
                 <ResourceDictionary Source="ms-appx:///Styles/InfoBar.xaml" />

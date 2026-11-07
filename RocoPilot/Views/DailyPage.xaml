@@ -68,7 +68,7 @@
                         <ColumnDefinition Width="3*" />
                         <ColumnDefinition Width="2*" MaxWidth="180" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE734;" />
+                    <FontIcon VerticalAlignment="Center" FontSize="18" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource ChallengeTargetGlyph}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="挑战目标" />
                         <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -83,7 +83,7 @@
                         <ColumnDefinition Width="3*" />
                         <ColumnDefinition Width="2*" MaxWidth="180" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE9D9;" />
+                    <FontIcon VerticalAlignment="Center" FontSize="18" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource ChallengeDifficultyGlyph}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="难度" />
                         <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -97,7 +97,7 @@
                         <ColumnDefinition Width="3*" />
                         <ColumnDefinition Width="2*" MaxWidth="180" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE8EE;" />
+                    <FontIcon VerticalAlignment="Center" FontSize="18" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource BattleCountGlyph}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="战斗次数" />
                         <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -112,7 +112,7 @@
                         <ColumnDefinition Width="3*" />
                         <ColumnDefinition Width="2*" MaxWidth="180" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xEB9F;" />
+                    <FontIcon VerticalAlignment="Center" FontSize="18" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource ChallengeTargetGlyph}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="挑战目标" />
                         <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
@@ -127,7 +127,7 @@
                         <ColumnDefinition Width="3*" />
                         <ColumnDefinition Width="2*" MaxWidth="180" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon VerticalAlignment="Center" FontSize="18" Glyph="&#xE8EE;" />
+                    <FontIcon VerticalAlignment="Center" FontSize="18" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource BattleCountGlyph}" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                         <TextBlock FontWeight="SemiBold" Text="战斗次数" />
                         <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"

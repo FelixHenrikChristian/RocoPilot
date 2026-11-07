@@ -231,3 +231,13 @@
 - 界面状态：“确认新赛季统计”弹窗，奇遇 1 项，未勾选。用户框出了选择按钮和次数输入框，两者为浅灰底，精灵名输入和赛季选择为深色底。
 - 原因与调整：选择控件实际为 `ToggleButton`，弹窗尚未统一其背景；`DialogNumberBoxStyle` 也缺少背景设置，而 TextBox 和 ComboBox 已使用 `SolidBackgroundFillColorBaseBrush`。在弹窗样式中统一 NumberBox 与 ToggleButton 的普通状态底色，沿用默认选中及交互状态模板。
 - 用途与限制：修改前视觉参考，不作为 OCR 素材；未派生识别测试样本。截图不能证明修复后的视觉表现。
+
+## 2026-11-07：任务页挑战图标消失
+
+- 用户原图：[首次进入，部分空白](LocalScreenshots/2026-11-07/task-icons/first-entry-partial.png)（附件 e3b21e26-867f-4fd2-839b-c79bc37a197a）和[再次进入，挑战图标全部空白](LocalScreenshots/2026-11-07/task-icons/second-entry-empty.png)（附件 83cf92a8-f84e-4a92-942a-914a6b999400）。已按字节核对原图。
+- 用途：对照深色主题下首次进入和往返导航时的显示状态。截图仅覆盖可见区域，用作视觉回归参照，未派生 OCR 测试素材。
+
+## 2026-11-07：任务页展开标题与内容图标的大小
+
+- [用户原图](LocalScreenshots/2026-11-07/task-icons/expanded-task-header-size-before.png)，来源 codex-clipboard-c1999428-5bc3-4b46-941a-12d6c4134bd5.png，SHA-256 729B116BFE9D4EC711CE8BAF0928DBE17F24EFDE00FDB26D6C466F1C1D0FE6A9。
+- 深色主题，花种挑战和传说精灵面板均已展开。用于对照标题图标放大前与内容行的视觉层级；截图仅显示任务页可见区域，未派生 OCR 素材。

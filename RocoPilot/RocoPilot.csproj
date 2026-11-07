@@ -101,6 +101,7 @@
   </Target>
 
   <ItemGroup>
+    <Content Include="Assets\Fonts\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Configuration\RecognitionRegions\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

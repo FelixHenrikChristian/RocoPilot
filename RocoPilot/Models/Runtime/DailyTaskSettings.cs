@@ -7,7 +7,10 @@ public enum DailyTaskKind
     LegendaryChallenge,
     FlowerSeedChallenge,
     Gardening,
-    BattlePassRewards
+    BattlePassRewards,
+    Inspiration,
+    Sell,
+    EveningRest
 }
 
 public sealed record DailyTaskEntry(DailyTaskKind Kind, bool IsEnabled = false);
@@ -15,14 +18,20 @@ public sealed record DailyTaskEntry(DailyTaskKind Kind, bool IsEnabled = false);
 /// <summary>仅保存一份每日清单；挑战参数由独立任务统一管理。</summary>
 public sealed class DailyTaskSettings
 {
+    private static readonly DailyTaskKind[] DefaultOrder =
+    [
+        DailyTaskKind.Mail, DailyTaskKind.FlowerSeedChallenge, DailyTaskKind.LegendaryChallenge,
+        DailyTaskKind.StaminaCrafting, DailyTaskKind.Gardening, DailyTaskKind.Inspiration,
+        DailyTaskKind.Sell, DailyTaskKind.BattlePassRewards, DailyTaskKind.EveningRest
+    ];
+
     public List<DailyTaskEntry> Tasks { get; set; } = [];
 
     public DailyTaskSettings Normalize()
     {
-        var kinds = Enum.GetValues<DailyTaskKind>();
         var tasks = (Tasks ?? []).Where(task => task is not null && Enum.IsDefined(task.Kind))
             .DistinctBy(task => task.Kind).ToList();
-        foreach (var kind in kinds)
+        foreach (var kind in DefaultOrder)
         {
             if (!tasks.Any(task => task.Kind == kind)) tasks.Add(new(kind));
         }

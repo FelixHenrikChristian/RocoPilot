@@ -24,6 +24,9 @@ public partial class DailyViewModel : ObservableObject
 
     public ObservableCollection<DailyTaskItemViewModel> Items { get; } = [];
 
+    public DailyTaskItemViewModel? FlowerSeedTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.FlowerSeedChallenge);
+    public DailyTaskItemViewModel? LegendaryTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.LegendaryChallenge);
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StartButtonText))]
     [NotifyPropertyChangedFor(nameof(StartButtonGlyph))]
@@ -69,6 +72,8 @@ public partial class DailyViewModel : ObservableObject
                 Items.Add(item);
             }
 
+            OnPropertyChanged(nameof(FlowerSeedTask));
+            OnPropertyChanged(nameof(LegendaryTask));
             _loaded = true;
         }
 

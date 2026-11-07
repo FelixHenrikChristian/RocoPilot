@@ -27,6 +27,8 @@
         </Grid>
         <Grid Grid.Column="1" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
             <TextBlock VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Text="配置" />
+            <Button HorizontalAlignment="Right" Content="重置" Command="{x:Bind ViewModel.ResetCommand}"
+                    ToolTipService.ToolTip="恢复每日任务的默认顺序、开关和挑战配置" />
         </Grid>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -76,7 +78,7 @@
                                        Text="从已扫描的花种中选择" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsFlowerSeedConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" PlaceholderText="请先在任务页扫描" ItemsSource="{x:Bind Challenges.FlowerSeedOptions}"
-                                    DisplayMemberPath="DisplayName" SelectedItem="{x:Bind Challenges.SelectedFlowerSeed, Mode=TwoWay}" />
+                                    DisplayMemberPath="DisplayName" SelectedItem="{x:Bind ViewModel.SelectedFlowerSeed, Mode=TwoWay}" />
                     </Grid>
                     <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
@@ -90,7 +92,7 @@
                             <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="每成功捕捉一次计一场" TextWrapping="Wrap" />
                         </StackPanel>
-                        <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsFlowerSeedConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind Challenges.FlowerSeedRunCount, Mode=TwoWay}" />
+                        <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsFlowerSeedConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind ViewModel.FlowerSeedRunCount, Mode=TwoWay}" />
                     </Grid>
                 </StackPanel>
                 <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.LegendaryTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
@@ -108,7 +110,7 @@
                                        Text="选择本轮挑战的传说精灵" TextWrapping="Wrap" />
                         </StackPanel>
                         <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" PlaceholderText="请先在任务页扫描" ItemsSource="{x:Bind Challenges.LegendaryTargets}"
-                                    SelectedItem="{x:Bind Challenges.SelectedLegendaryTarget, Mode=TwoWay}" />
+                                    SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
                     </Grid>
                     <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
@@ -122,7 +124,7 @@
                             <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="进入挑战时使用此难度" TextWrapping="Wrap" />
                         </StackPanel>
-                        <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" ItemsSource="{x:Bind Challenges.LegendaryDifficulties}" SelectedIndex="{x:Bind Challenges.SelectedLegendaryDifficultyIndex, Mode=TwoWay}" />
+                        <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" ItemsSource="{x:Bind Challenges.LegendaryDifficulties}" SelectedIndex="{x:Bind ViewModel.SelectedLegendaryDifficultyIndex, Mode=TwoWay}" />
                     </Grid>
                     <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
@@ -136,7 +138,7 @@
                             <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="每成功捕捉一次计一场" TextWrapping="Wrap" />
                         </StackPanel>
-                        <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind Challenges.LegendaryChallengeRunCount, Mode=TwoWay}" />
+                        <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind ViewModel.LegendaryChallengeRunCount, Mode=TwoWay}" />
                     </Grid>
                 </StackPanel>
             </StackPanel>

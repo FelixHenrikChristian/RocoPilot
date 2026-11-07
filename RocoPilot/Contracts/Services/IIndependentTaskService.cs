@@ -38,6 +38,6 @@ public interface IIndependentTaskService
     Task StopAsync();
 
     Task<IndependentTaskStartResult> StartDailyAsync(
-        IReadOnlyList<IndependentTaskKind> tasks,
+        IReadOnlyList<IndependentTaskKind> tasks, IndependentTaskSettings challenges,
         CancellationToken cancellationToken = default);
 }

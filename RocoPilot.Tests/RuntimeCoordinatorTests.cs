@@ -102,7 +102,7 @@ public sealed class RuntimeCoordinatorTests
         public Task LoadSettingsAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
         public void SetSettings(IndependentTaskSettings settings) { }
         public Task<IndependentTaskStartResult> StartAsync(IndependentTaskKind kind, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<IndependentTaskStartResult> StartDailyAsync(IReadOnlyList<IndependentTaskKind> tasks, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IndependentTaskStartResult> StartDailyAsync(IReadOnlyList<IndependentTaskKind> tasks, IndependentTaskSettings challenges, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task StopAsync()
         {
             calls.Add("independent-stop");

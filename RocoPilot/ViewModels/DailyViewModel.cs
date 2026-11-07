@@ -18,7 +18,7 @@ public partial class DailyViewModel : ObservableObject
     private readonly IIndependentTaskService _tasks;
     private readonly ILocalSettingsService _settings;
     private readonly ILogger<DailyViewModel> _logger;
-    private readonly DispatcherQueue? _dispatcher = DispatcherQueue.GetForCurrentThread();
+    private readonly SynchronizationContext? _uiContext = SynchronizationContext.Current;
     private readonly SemaphoreSlim _saveLock = new(1, 1);
     private bool _loaded;
 
@@ -34,6 +34,21 @@ public partial class DailyViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool CanStartOrStop { get; set; }
+
+    [ObservableProperty]
+    public partial string? SelectedLegendaryTarget { get; set; }
+
+    [ObservableProperty]
+    public partial int SelectedLegendaryDifficultyIndex { get; set; }
+
+    [ObservableProperty]
+    public partial double LegendaryChallengeRunCount { get; set; }
+
+    [ObservableProperty]
+    public partial FlowerSeedOption? SelectedFlowerSeed { get; set; }
+
+    [ObservableProperty]
+    public partial double FlowerSeedRunCount { get; set; }
 
     public event EventHandler<string>? NoticeRequested;
 
@@ -64,20 +79,61 @@ public partial class DailyViewModel : ObservableObject
                 NoticeRequested?.Invoke(this, "读取每日清单失败，已使用默认清单。");
             }
 
-            foreach (var entry in (saved ?? new()).Normalize().Tasks)
-            {
-                var item = new DailyTaskItemViewModel(entry.Kind);
-                item.IsEnabled = item.IsAvailable && entry.IsEnabled;
-                item.PropertyChanged += Item_PropertyChanged;
-                Items.Add(item);
-            }
-
-            OnPropertyChanged(nameof(FlowerSeedTask));
-            OnPropertyChanged(nameof(LegendaryTask));
-            _loaded = true;
+            Apply(saved ?? new(), _tasks.Settings);
         }
 
         Refresh();
+    }
+
+    private void Apply(DailyTaskSettings settings, IndependentTaskSettings defaults)
+    {
+        _loaded = false;
+        foreach (var item in Items) item.PropertyChanged -= Item_PropertyChanged;
+        Items.Clear();
+        foreach (var entry in settings.Normalize().Tasks)
+        {
+            var item = new DailyTaskItemViewModel(entry.Kind);
+            item.IsEnabled = item.IsAvailable && entry.IsEnabled;
+            item.PropertyChanged += Item_PropertyChanged;
+            Items.Add(item);
+        }
+
+        var challenges = (settings.Challenges ?? defaults).Normalize(_tasks.LegendaryTargets);
+        SelectedLegendaryTarget = challenges.LegendaryTargetName;
+        SelectedLegendaryDifficultyIndex = challenges.LegendaryDifficulty - 1;
+        LegendaryChallengeRunCount = challenges.LegendaryChallengeRunCount;
+        SelectedFlowerSeed = _tasks.Settings.FlowerSeedOptions.FirstOrDefault(o => o.Number == challenges.FlowerSeedTargetNumber);
+        FlowerSeedRunCount = challenges.FlowerSeedRunCount;
+        OnPropertyChanged(nameof(FlowerSeedTask));
+        OnPropertyChanged(nameof(LegendaryTask));
+        _loaded = true;
+    }
+
+    private bool CanReset() => _loaded && !_tasks.IsRunning;
+
+    [RelayCommand(CanExecute = nameof(CanReset))]
+    private async Task ResetAsync()
+    {
+        Apply(new(), IndependentTaskSettings.CreateDefault());
+        Refresh();
+        await SaveAsync();
+    }
+
+    private IndependentTaskSettings ChallengeSnapshot() => new()
+    {
+        LegendaryTargetName = SelectedLegendaryTarget ?? string.Empty,
+        LegendaryDifficulty = SelectedLegendaryDifficultyIndex + 1,
+        LegendaryChallengeRunCount = TasksViewModel.ToRunCount(LegendaryChallengeRunCount, IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
+        FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
+        FlowerSeedRunCount = TasksViewModel.ToRunCount(FlowerSeedRunCount, IndependentTaskSettings.DefaultFlowerSeedRunCount)
+    };
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (_loaded && e.PropertyName is nameof(SelectedLegendaryTarget) or nameof(SelectedLegendaryDifficultyIndex)
+            or nameof(LegendaryChallengeRunCount) or nameof(SelectedFlowerSeed) or nameof(FlowerSeedRunCount))
+            _ = SaveAsync();
     }
 
     [RelayCommand]
@@ -91,7 +147,7 @@ public partial class DailyViewModel : ObservableObject
         {
             var kinds = Items.Where(item => item.IsEnabled && item.IsAvailable)
                 .Select(item => item.TaskKind!.Value).ToArray();
-            var result = await _tasks.StartDailyAsync(kinds);
+            var result = await _tasks.StartDailyAsync(kinds, ChallengeSnapshot());
             if (!result.Success) NoticeRequested?.Invoke(this, result.Message);
         }
 
@@ -120,6 +176,7 @@ public partial class DailyViewModel : ObservableObject
     {
         var snapshot = new DailyTaskSettings
         {
+            Challenges = ChallengeSnapshot(),
             Tasks = Items.Select(item => new DailyTaskEntry(item.Kind, item.IsEnabled)).ToList()
         };
         await _saveLock.WaitAsync();
@@ -137,12 +194,13 @@ public partial class DailyViewModel : ObservableObject
 
     private void Tasks_StateChanged(object? sender, EventArgs e)
     {
-        if (_dispatcher is null || _dispatcher.HasThreadAccess) Refresh();
-        else _dispatcher.TryEnqueue(Refresh);
+        if (_uiContext is null || _uiContext == SynchronizationContext.Current) Refresh();
+        else _uiContext.Post(_ => Refresh(), null);
     }
 
     private void Refresh()
     {
+        ResetCommand.NotifyCanExecuteChanged();
         IsRunning = _tasks.IsDailyRunning;
         var enabled = Items.Count(item => item.IsEnabled && item.IsAvailable);
         CanStartOrStop = _loaded && (IsRunning || !_tasks.IsRunning && enabled > 0);

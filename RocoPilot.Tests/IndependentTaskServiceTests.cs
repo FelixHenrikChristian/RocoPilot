@@ -17,6 +17,45 @@ namespace RocoPilot.Tests;
 public sealed class IndependentTaskServiceTests
 {
     [TestMethod]
+    public async Task DailyResetRestoresOrderAndDefaultsWithoutChangingIndependentSettings()
+    {
+        var fixture = new Fixture();
+        fixture.Store.Seed(SettingsKeys.DailyTaskSettings, new DailyTaskSettings
+        {
+            Tasks = [new(DailyTaskKind.StaminaCrafting, true), new(DailyTaskKind.Mail)],
+            Challenges = new() { LegendaryDifficulty = 1, FlowerSeedRunCount = 9 }
+        });
+        var vm = new RocoPilot.ViewModels.DailyViewModel(fixture.Service, fixture.Store,
+            NullLogger<RocoPilot.ViewModels.DailyViewModel>.Instance);
+        await vm.LoadAsync();
+        Assert.AreEqual(DailyTaskKind.StaminaCrafting, vm.Items[0].Kind);
+        Assert.AreEqual(9d, vm.FlowerSeedRunCount);
+        var savedBefore = fixture.Store.ReadSaved<IndependentTaskSettings>(SettingsKeys.IndependentTaskSettings)!;
+        await vm.ResetCommand.ExecuteAsync(null);
+        var saved = fixture.Store.ReadSaved<DailyTaskSettings>(SettingsKeys.DailyTaskSettings)!;
+        CollectionAssert.AreEqual(new DailyTaskSettings().Normalize().Tasks.ToArray(), saved.Tasks.ToArray());
+        Assert.AreEqual(IndependentTaskSettings.DefaultFlowerSeedRunCount, saved.Challenges!.FlowerSeedRunCount);
+        Assert.AreEqual(IndependentTaskSettings.DefaultLegendaryDifficulty, saved.Challenges.LegendaryDifficulty);
+        Assert.AreEqual(savedBefore.FlowerSeedTargetNumber, fixture.Service.Settings.FlowerSeedTargetNumber);
+        Assert.AreEqual(savedBefore.FlowerSeedTargetNumber,
+            fixture.Store.ReadSaved<IndependentTaskSettings>(SettingsKeys.IndependentTaskSettings)!.FlowerSeedTargetNumber);
+    }
+
+    [TestMethod]
+    public async Task DailyChallengeUsesDailyTargetAndCountWithScannedOptions()
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        var result = await fixture.Service.StartDailyAsync([IndependentTaskKind.FlowerSeedChallenge],
+            new() { FlowerSeedTargetNumber = 2, FlowerSeedRunCount = 7 });
+        Assert.IsTrue(result.Success);
+        await WaitStoppedAsync(fixture.Service);
+        Assert.AreEqual(2, fixture.Runner.Target!.Number);
+        Assert.AreEqual(7, fixture.Runner.RunCount);
+        Assert.AreEqual(1, fixture.Service.Settings.FlowerSeedTargetNumber);
+    }
+
+    [TestMethod]
     [DataRow(true, true)]
     [DataRow(false, true)]
     [DataRow(true, false)]
@@ -157,7 +196,7 @@ public sealed class IndependentTaskServiceTests
         Assert.AreEqual("新传说精灵", fixture.Runner.Target!.Name);
 
         var restarted = new IndependentTaskService(fixture.Runtime, fixture.Store, fixture.Runner,
-            fixture.Notifications, fixture.Window, NullLogger<IndependentTaskService>.Instance);
+            fixture.Notifications, fixture.Window, null!, NullLogger<IndependentTaskService>.Instance);
         await restarted.LoadSettingsAsync();
         CollectionAssert.AreEqual(IndependentTaskSettings.LegendaryTargets.ToArray(), restarted.LegendaryTargets.ToArray());
         Assert.AreEqual("龙息帕尔", restarted.Settings.LegendaryTargetName);
@@ -589,7 +628,7 @@ public sealed class IndependentTaskServiceTests
                 FlowerSeedOptions = [new(1, "友爱星飞"), new(2, "旧花种")],
                 FlowerSeedTargetNumber = 1
             });
-            Service = new(Runtime, Store, Runner, Notifications, Window, NullLogger<IndependentTaskService>.Instance);
+            Service = new(Runtime, Store, Runner, Notifications, Window, null!, NullLogger<IndependentTaskService>.Instance);
         }
     }
 

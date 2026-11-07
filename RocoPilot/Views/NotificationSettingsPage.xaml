@@ -34,13 +34,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="20"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xEA8F;" />
+                        <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource WindowsNotificationGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock FontWeight="SemiBold" Text="Windows 通知" TextWrapping="Wrap" />
                             <TextBlock

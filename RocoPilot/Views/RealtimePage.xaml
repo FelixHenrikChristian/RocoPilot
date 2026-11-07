@@ -20,13 +20,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="20"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE9A3;" />
+                        <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource EncounterCountGlyph}" />
 
                         <StackPanel
                             Grid.Column="1"
@@ -67,10 +61,10 @@
                         <FontIcon
                             Grid.Column="0"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontFamily="{StaticResource AppIconFont}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xF6FA;" />
+                            Glyph="{StaticResource CatalogSourceGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="图鉴源" TextWrapping="Wrap" />
                             <TextBlock
@@ -102,10 +96,10 @@
                         <FontIcon
                             Grid.Column="0"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontFamily="{StaticResource AppIconFont}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE8F1;" />
+                            Glyph="{StaticResource SpiritCatalogGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="精灵图鉴" TextWrapping="Wrap" />
                             <TextBlock
@@ -143,10 +137,10 @@
                         <FontIcon
                             Grid.Column="0"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontFamily="{StaticResource AppIconFont}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE895;" />
+                            Glyph="{StaticResource CatalogSyncGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="同步图鉴数据" TextWrapping="Wrap" />
                             <TextBlock
@@ -193,13 +187,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="20"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xF272;" />
+                        <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource AutoBattleGlyph}" />
 
                         <StackPanel
                             Grid.Column="1"
@@ -240,10 +228,10 @@
                         <FontIcon
                             Grid.Column="0"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontFamily="{StaticResource AppIconFont}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE945;" />
+                            Glyph="{StaticResource EncounterActionGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="奇遇解除操作" TextWrapping="Wrap" />
                             <TextBlock
@@ -275,10 +263,8 @@
                         <FontIcon
                             Grid.Column="0"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE9F5;" />
+                            FontSize="18" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource BattleSettingsGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="战斗配置" TextWrapping="Wrap" />
                             <TextBlock
@@ -317,10 +303,10 @@
                         <FontIcon
                             Grid.Column="0"
                             VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontFamily="{StaticResource AppIconFont}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE713;" />
+                            Glyph="{StaticResource OtherSettingsGlyph}" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="其他配置" TextWrapping="Wrap" />
                             <TextBlock

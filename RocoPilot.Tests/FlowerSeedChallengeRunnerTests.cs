@@ -32,8 +32,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         var mouse = new Mouse { DuringScroll = () => scrolls++ };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
-            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55),
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
@@ -80,8 +79,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         } };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
-            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55),
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
@@ -828,7 +826,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     private static ManualChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
-            new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!, NullLogger<ManualChallengeScreenRecognizer>.Instance),
+            new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
             overlay ?? new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);

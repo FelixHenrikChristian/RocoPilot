@@ -29,8 +29,7 @@ public sealed class LegendaryLocalScreenshotTests
                 using var area = new OpenCvSharp.Mat(source, new OpenCvSharp.Rect(1430, 1045, start.Width, start.Height));
                 start.CopyTo(area);
             });
-        var recognizer = new ManualChallengeScreenRecognizer(images, null!, null!, null!,
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(images, null!, null!, null!);
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.UnderfilledTeam, screen.Scene);
         Assert.IsNotNull(screen.Button);
@@ -56,8 +55,7 @@ public sealed class LegendaryLocalScreenshotTests
     {
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/capture-contract-only.png",
             width, height, 12, 30);
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!);
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.CaptureConfirmation, screen.Scene);
         Assert.IsNotNull(screen.Marks);
@@ -80,8 +78,7 @@ public sealed class LegendaryLocalScreenshotTests
     {
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/preparation-start-stalled.png",
             width, height, 12, 30);
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!);
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.Preparation, screen.Scene);
         Assert.IsNotNull(screen.Button);
@@ -102,8 +99,7 @@ public sealed class LegendaryLocalScreenshotTests
     [DataRow("bones-mark", true)]
     public async Task CaptureConfirmationRecognizesBothChoices(string sample, bool markSelected)
     {
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!,
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!);
         foreach (var (width, height) in new[] { (2048, 1152), (1280, 720) })
         {
             using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-local/{sample}.png",

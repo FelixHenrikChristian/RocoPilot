@@ -68,7 +68,7 @@ public partial class NotificationSettingsViewModel : ObservableRecipient
         var sent = await _notifications.ShowAsync("测试通知", "这是一条来自 RocoPilot 的测试通知。");
         if (!sent)
             ShowStatus(InfoBarSeverity.Error,
-                _notifications.LastError ?? "Windows 通知发送失败，请查看日志中的具体原因。");
+                _notifications.LastError ?? "Windows 通知发送失败，请从「设置 → 文件目录 → 日志目录」查看详情。");
     }
 
     private void ShowStatus(InfoBarSeverity severity, string message)

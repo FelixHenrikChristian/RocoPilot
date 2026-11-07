@@ -125,7 +125,6 @@ public partial class MainViewModel : ObservableRecipient
         {
             await _runtimeTaskService.StopAsync();
             IsRealtimeCaptureRunning = false;
-            _logger.LogDebug("实时任务停止命令已完成");
             ShowLaunchNotification(InfoBarSeverity.Success, "任务已停止", "场景识别和实时任务已停止。");
             return;
         }
@@ -142,6 +141,7 @@ public partial class MainViewModel : ObservableRecipient
         var recognitionMethod = _textRecognitionService.GetDefaultMethod();
         if (recognitionMethod is not { IsAvailable: true })
         {
+            _logger.LogWarning("实时任务未启动：OCR 不可用。{Reason}", recognitionMethod?.UnavailableReason);
             ShowLaunchNotification(
                 InfoBarSeverity.Error,
                 "OCR 不可用",
@@ -164,7 +164,6 @@ public partial class MainViewModel : ObservableRecipient
         if (!result.Success || result.State is null)
         {
             IsRealtimeCaptureRunning = false;
-            _logger.LogWarning("启动失败：{Message}", result.Message);
             ShowLaunchNotification(
                 InfoBarSeverity.Error,
                 "启动失败",
@@ -172,18 +171,7 @@ public partial class MainViewModel : ObservableRecipient
             return;
         }
 
-        var gameWindow = result.State.TargetWindow;
         IsRealtimeCaptureRunning = true;
-        _logger.LogDebug(
-            "启动成功：已找到游戏窗口。标题：{WindowTitle}  进程：{ProcessName}  PID：{ProcessId}  HWND：{WindowHandle}  窗口尺寸：{WindowWidth}x{WindowHeight}  客户区：{ClientWidth}x{ClientHeight}",
-            gameWindow.Title,
-            gameWindow.ProcessName,
-            gameWindow.ProcessId,
-            gameWindow.HandleText,
-            gameWindow.Width,
-            gameWindow.Height,
-            gameWindow.ClientWidth,
-            gameWindow.ClientHeight);
         ShowLaunchNotification(
             InfoBarSeverity.Success,
             "启动成功",

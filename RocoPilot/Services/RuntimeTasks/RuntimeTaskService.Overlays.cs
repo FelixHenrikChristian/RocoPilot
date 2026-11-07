@@ -33,6 +33,7 @@ public sealed partial class RuntimeTaskService
         }
 
         state.Options.RecognitionOverlayEnabled = isEnabled;
+        _logger.LogInformation("识别区域遮罩{State}", isEnabled ? "已开启" : "已关闭");
         if (isEnabled)
         {
             if (!_isSuspended) _recognitionOverlayService.Show(state);
@@ -58,6 +59,7 @@ public sealed partial class RuntimeTaskService
         }
 
         state.Options.InfoOverlayEnabled = isEnabled;
+        _logger.LogInformation("信息遮罩{State}", isEnabled ? "已开启" : "已关闭");
         if (isEnabled)
         {
             _infoOverlayService.Show(state);

@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using Microsoft.Extensions.Logging;
 
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
@@ -15,6 +16,7 @@ namespace RocoPilot.ViewModels;
 
 public partial class RealtimeViewModel : ObservableRecipient
 {
+    private readonly ILogger<RealtimeViewModel> _logger;
     private readonly IRuntimeTaskService _runtimeTaskService;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
@@ -167,8 +169,10 @@ public partial class RealtimeViewModel : ObservableRecipient
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         ILocalSettingsService localSettingsService,
-        IStatisticsService statisticsService)
+        IStatisticsService statisticsService,
+        ILogger<RealtimeViewModel> logger)
     {
+        _logger = logger;
         _runtimeTaskService = runtimeTaskService;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
@@ -227,6 +231,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             }
             catch (Exception ex)
             {
+                _logger.LogWarning(ex, "图鉴同步完成，更新暂存统计名称失败");
                 SpiritCatalogSyncStatus += $" · 暂存记录处理失败，可重新同步后重试：{ex.Message}";
             }
         }
@@ -256,6 +261,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "读取图鉴摘要失败");
             SpiritCatalogSummary = "图鉴数据加载失败";
             SpiritCatalogSyncStatus = ex.Message;
         }
@@ -276,8 +282,9 @@ public partial class RealtimeViewModel : ObservableRecipient
             var source = ResolveSpiritCatalogSource(savedSourceId) ?? SpiritCatalogSources.FirstOrDefault();
             ApplySelectedSpiritCatalogSource(source, reloadSummary: false);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "读取图鉴来源失败，使用默认来源");
             ApplySelectedSpiritCatalogSource(SpiritCatalogSources.FirstOrDefault(), reloadSummary: false);
         }
     }
@@ -321,9 +328,9 @@ public partial class RealtimeViewModel : ObservableRecipient
         {
             await _localSettingsService.SaveSettingAsync(SettingsKeys.SpiritCatalogSourceId, sourceId);
         }
-        catch
+        catch (Exception ex)
         {
-            // 选择源失败不影响当前会话的图鉴查看。
+            _logger.LogWarning(ex, "保存图鉴来源失败：{Source}", sourceId);
         }
     }
 

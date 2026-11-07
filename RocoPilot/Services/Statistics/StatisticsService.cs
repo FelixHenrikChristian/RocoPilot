@@ -37,7 +37,6 @@ public sealed class StatisticsService : IStatisticsService
     private string? _selectedAccountUid;
     private string? _activeAccountUid;
     private bool _isActiveAccountSelectionRequired;
-    private int _activeAccountWarningLogged;
 
     public event EventHandler<StatisticsDocumentChangedEventArgs>? DocumentChanged;
 
@@ -472,15 +471,15 @@ public sealed class StatisticsService : IStatisticsService
 
         Volatile.Write(ref _activeAccountUid, uid);
         Volatile.Write(ref _isActiveAccountSelectionRequired, false);
-        Interlocked.Exchange(ref _activeAccountWarningLogged, 0);
         _logger.LogInformation("本次启动的统计记录账号已设为 {Uid}。", uid);
     }
 
     public void RequireActiveAccountSelection()
     {
-        Volatile.Write(ref _activeAccountUid, null);
+        var previousUid = Interlocked.Exchange(ref _activeAccountUid, null);
         Volatile.Write(ref _isActiveAccountSelectionRequired, true);
-        Interlocked.Exchange(ref _activeAccountWarningLogged, 0);
+        if (previousUid is not null)
+            _logger.LogInformation("统计账号 {Uid} 已解除绑定，自动统计等待账号确认", previousUid);
     }
 
     public IReadOnlyList<EncounterSpiritRecord> GetActiveAccountSeasonEncounters(string seasonId)
@@ -556,11 +555,7 @@ public sealed class StatisticsService : IStatisticsService
             ?? Volatile.Read(ref _document).Accounts.FirstOrDefault()?.Uid;
         return UpdateAsync(document =>
         {
-            if (selectionRequired)
-            {
-                LogMissingActiveAccountOnce("尚未确认本次启动使用的统计账号，本次自动统计已跳过。");
-                return document;
-            }
+            if (selectionRequired) return document;
 
             // 首次载入前尚无默认账号时，才从载入的数据中选第一个账号。
             var account = targetUid is null ? document.Accounts.FirstOrDefault() : document.Accounts.FirstOrDefault(item =>
@@ -571,7 +566,6 @@ public sealed class StatisticsService : IStatisticsService
             {
                 if (string.Equals(ActiveAccountUid, targetUid, StringComparison.OrdinalIgnoreCase))
                     RequireActiveAccountSelection();
-                LogMissingActiveAccountOnce($"统计账号 {targetUid} 已不存在，本次自动统计已跳过。");
             }
             if (account is not null) update(account);
             return document;
@@ -710,14 +704,6 @@ public sealed class StatisticsService : IStatisticsService
                 string.Equals(account.Uid, activeAccountUid, StringComparison.OrdinalIgnoreCase)))
         {
             RequireActiveAccountSelection();
-        }
-    }
-
-    private void LogMissingActiveAccountOnce(string message)
-    {
-        if (Interlocked.Exchange(ref _activeAccountWarningLogged, 1) == 0)
-        {
-            _logger.LogWarning("{Message}", message);
         }
     }
 

@@ -141,7 +141,7 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
 
             NormalizeConfig(config, width, height, path, expectedWidth, expectedHeight);
             _logger.LogDebug(
-                "Loaded recognition region config {ConfigPath}. Enabled region count: {RegionCount}",
+                "已加载识别区域配置 {ConfigPath}，启用 {RegionCount} 个区域",
                 path,
                 config.Regions.Count(region => region.Enabled));
 
@@ -149,12 +149,12 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Recognition region config JSON is invalid: {ConfigPath}", path);
+            _logger.LogError(ex, "识别区域配置 JSON 无效：{ConfigPath}", path);
             return RecognitionRegionConfig.Empty(expectedWidth, expectedHeight, path);
         }
         catch (IOException ex)
         {
-            _logger.LogError(ex, "Failed to read recognition region config: {ConfigPath}", path);
+            _logger.LogError(ex, "读取识别区域配置失败：{ConfigPath}", path);
             return RecognitionRegionConfig.Empty(expectedWidth, expectedHeight, path);
         }
     }
@@ -183,7 +183,7 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         File.WriteAllText(path, json);
 
         _logger.LogInformation(
-            "Saved recognition region config {ConfigPath}. Enabled region count: {RegionCount}",
+            "已保存识别区域配置 {ConfigPath}，启用 {RegionCount} 个区域",
             path,
             config.Regions.Count(region => region.Enabled));
     }
@@ -229,7 +229,7 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
             && (config.ResolutionWidth != expectedWidth || config.ResolutionHeight != expectedHeight))
         {
             _logger.LogWarning(
-                "Recognition region config resolution differs from current frame. Config={ConfigWidth}x{ConfigHeight}, Current={FrameWidth}x{FrameHeight}",
+                "识别区域配置与截图分辨率不同：配置 {ConfigWidth}x{ConfigHeight}，截图 {FrameWidth}x{FrameHeight}",
                 config.ResolutionWidth,
                 config.ResolutionHeight,
                 expectedWidth,

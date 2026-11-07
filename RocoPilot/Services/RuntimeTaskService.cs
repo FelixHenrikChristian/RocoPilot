@@ -13,7 +13,6 @@ using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
-using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
 using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
@@ -32,7 +31,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private readonly GameSceneRecognizer _gameScene;
     private readonly BattleScreenRecognizer _battleScreen;
     private readonly AutoBattleInputExecutor _battleInput;
-    private readonly RuntimeDebugLogger _debugLog;
     private readonly IEncounterSeasonConfigService _encounterSeasonConfigService;
     private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly IStatisticsService _statisticsService;
@@ -117,7 +115,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         GameSceneRecognizer gameScene,
         BattleScreenRecognizer battleScreen,
         AutoBattleInputExecutor battleInput,
-        RuntimeDebugLogger debugLog,
         IEncounterSeasonConfigService encounterSeasonConfigService,
         ISpiritCatalogService spiritCatalogService,
         IStatisticsService statisticsService,
@@ -138,7 +135,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _gameScene = gameScene;
         _battleScreen = battleScreen;
         _battleInput = battleInput;
-        _debugLog = debugLog;
         _encounterSeasonConfigService = encounterSeasonConfigService;
         _spiritCatalogService = spiritCatalogService;
         _statisticsService = statisticsService;
@@ -301,6 +297,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 return RuntimeTaskStartResult.Failed(missingConfigMessage);
             }
 
+            var markerTemplate = GetResolutionTemplatePath(recognitionRegionConfig, CaptureButtonDisabledMarkerTemplateName);
+            if (!_frameRecognizer.TemplateExists(markerTemplate))
+                _logger.LogWarning("缺少捕捉按钮模板，本次会话无法识别奇遇效果解除：{Template}", markerTemplate);
+
             var state = new RuntimeTaskState(
                 targetWindow,
                 recognitionRegionConfig,
@@ -313,7 +313,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             _unrecognizedStateDetectedAt = null;
             _isSuspended = false;
             _suspendedReason = null;
-            _debugLog.Reset();
             ResetAutoBattleBattleState();
             _overlayActivities.Clear();
             Volatile.Write(ref _lastInfoOverlayStatus, "状态待识别");
@@ -325,9 +324,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             UpdateInfoOverlayTaskIndicators();
             session.Start(CaptureLoopAsync, RuntimeOcrLoopAsync);
 
-            _logger.LogInformation("实时任务：已启动（窗口 {Window}）", targetWindow.DisplayName);
-            _logger.LogDebug(
-                "实时任务启动详情：Window={Window}, Client={ClientWidth}x{ClientHeight}, FirstFrame={FrameWidth}x{FrameHeight}, CaptureMethod={CaptureMethod}, OCR={TextRecognitionMethod}, ImageMatching={ImageMatchAlgorithm}, ConfigPath={ConfigPath}",
+            _logger.LogInformation(
+                "实时任务已启动：{Window}，客户区 {ClientWidth}×{ClientHeight}，首帧 {FrameWidth}×{FrameHeight}，截图 {CaptureMethod}，OCR {TextRecognitionMethod}，匹配 {ImageMatchAlgorithm}，自动战斗 {AutoBattle}，输入 {InputMethod}，配置 {ConfigPath}",
                 targetWindow.DisplayName,
                 configResolutionWidth,
                 configResolutionHeight,
@@ -336,6 +334,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 options.CaptureMethod,
                 options.TextRecognitionMethod,
                 _imageMatchingService.DefaultAlgorithm,
+                autoBattleSettings.IsEnabled,
+                autoBattleSettings.KeyboardInputMethod,
                 recognitionRegionConfig.SourcePath);
 
             _logger.LogDebug(
@@ -453,7 +453,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        _logger.LogWarning(ex, "捕获画面失败");
+                        _logger.LogWarning(ex, "捕获游戏画面失败：{Window}，截图方式 {Method}", state.TargetWindow.DisplayName, state.Options.CaptureMethod);
                         await DelayAsync(500, cancellationToken);
                     }
 
@@ -543,33 +543,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             {
                 await Task.Delay(RuntimeRecognitionDefaults.OcrScanIntervalMs, cancellationToken);
 
-                if (activeScanTask is not null)
-                {
-                    if (activeScanTask.IsCompleted)
-                    {
-                        try
-                        {
-                            await activeScanTask;
-                        }
-                        catch (OperationCanceledException)
-                        {
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Runtime OCR scan failed.");
-                        }
-
-                        activeScanTask = null;
-                    }
-                    else
-                    {
-                        _debugLog.Write(
-                            CreateDebugLogKey("runtime-ocr-skip-busy"),
-                            "busy",
-                            "后台 OCR 本轮跳过：上一次 OCR 仍在执行。");
-                        continue;
-                    }
-                }
+                if (activeScanTask is { IsCompleted: false }) continue;
+                if (activeScanTask is not null) await activeScanTask;
+                activeScanTask = null;
 
                 if (_isSuspended || _scene != GameScene.Battle)
                 {
@@ -594,21 +570,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         }
         finally
         {
-            if (activeScanTask is not null)
-            {
-                try
-                {
-                    await activeScanTask;
-                }
-                catch (OperationCanceledException)
-                {
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Runtime OCR scan failed.");
-                }
-            }
-
+            if (activeScanTask is not null) await activeScanTask;
             session.ClearFrame();
         }
     }
@@ -630,7 +592,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Runtime OCR scan failed.");
+                _logger.LogWarning(ex, "后台战斗 OCR 失败：战斗 {BattleId}，OCR {Method}", battleId, state.Options.TextRecognitionMethod);
             }
         }
     }
@@ -641,6 +603,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         CancellationToken cancellationToken)
     {
         var match = await _gameScene.RecognizeAsync(state, frame, cancellationToken);
+        if (_scene != match.Scene) _logger.LogDebug("游戏场景变化：{Previous} → {Current}", _scene, match.Scene);
         _scene = match.Scene;
         switch (match.Scene)
         {

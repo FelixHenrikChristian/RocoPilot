@@ -48,13 +48,13 @@ public sealed class EncounterSeasonConfigService : IEncounterSeasonConfigService
                     return _config;
                 }
             }
+            _logger.LogWarning("未找到有效赛季奇遇配置文件：{ConfigPath}", configPath);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取赛季奇遇配置失败。");
+            _logger.LogWarning(ex, "读取赛季奇遇配置失败：{ConfigPath}", configPath);
         }
 
-        _logger.LogWarning("未找到有效赛季奇遇配置文件。路径：{ConfigPath}", configPath);
         _config = new EncounterSeasonConfig();
         return _config;
     }

@@ -25,7 +25,7 @@ public sealed partial class RuntimeTaskService
                 ToggleInfoOverlayByHotkey();
                 break;
             case HotkeyAction.ToggleEncounterStatistics:
-                ToggleEncounterStatisticsByHotkey();
+                SetEncounterStatisticsEnabled(!EncounterStatisticsEnabled);
                 break;
             case HotkeyAction.ToggleAutoBattle:
                 ToggleAutoBattleByHotkey();
@@ -75,16 +75,7 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var nextValue = !state.Options.InfoOverlayEnabled;
-        SetInfoOverlayEnabled(nextValue);
-        _logger.LogInformation("热键：{State}信息遮罩窗口。", FormatEnabledState(nextValue));
-    }
-
-    private void ToggleEncounterStatisticsByHotkey()
-    {
-        var nextValue = !EncounterStatisticsEnabled;
-        SetEncounterStatisticsEnabled(nextValue);
-        _logger.LogInformation("热键：{State}奇遇统计。", FormatEnabledState(nextValue));
+        SetInfoOverlayEnabled(!state.Options.InfoOverlayEnabled);
     }
 
     private void ToggleAutoBattleByHotkey()
@@ -92,11 +83,5 @@ public sealed partial class RuntimeTaskService
         var settings = _autoBattleSettings.Clone();
         settings.IsEnabled = !settings.IsEnabled;
         SetAutoBattleSettings(settings);
-        _logger.LogInformation("热键：{State}自动战斗。", FormatEnabledState(settings.IsEnabled));
-    }
-
-    private static string FormatEnabledState(bool isEnabled)
-    {
-        return isEnabled ? "已开启" : "已关闭";
     }
 }

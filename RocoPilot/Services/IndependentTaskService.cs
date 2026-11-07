@@ -156,7 +156,6 @@ public sealed class IndependentTaskService : IIndependentTaskService
             var settings = _settings.Clone();
             var battleSettings = _runtimeTaskService.AutoBattleSettings;
             _taskLoop = Task.Run(() => RunTasksAsync(tasks, isDaily, settings, battleSettings, taskCts), CancellationToken.None);
-            _logger.LogInformation("独立任务已启动：{TaskName}", GetTaskDisplayName(kind));
         }
         finally
         {
@@ -238,6 +237,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 _runningTaskKind = kind;
                 StatusMessage = isDaily ? $"正在执行 {index + 1}/{tasks.Count}：{taskName}" : $"正在执行：{taskName}";
                 NotifyStateChanged();
+                _logger.LogInformation("开始执行{Task}（第 {Index}/{Total} 项）", taskName, index + 1, tasks.Count);
                 switch (kind)
             {
                 case IndependentTaskKind.LegendaryScan:
@@ -258,12 +258,14 @@ public sealed class IndependentTaskService : IIndependentTaskService
                         _stateLock.Release();
                     }
                     NotifyStateChanged();
+                    _logger.LogInformation("传说精灵扫描完成，共 {Count} 个", names.Count);
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {names.Count} 个传说精灵", "名单和选择仅本次启动有效，重启后恢复本地设置");
                     break;
                 case IndependentTaskKind.LegendaryChallenge:
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
                         settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
+                    _logger.LogInformation("传说精灵挑战完成：{Target}，成功 {Count} 次", settings.LegendaryTargetName, settings.LegendaryChallengeRunCount);
                     await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界", !isDaily);
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:
@@ -272,6 +274,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                         settings.FlowerSeedRunCount, battleSettings,
                         UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
+                    _logger.LogInformation("花种挑战完成：编号 {Target}，成功 {Count} 次", settings.FlowerSeedTargetNumber, settings.FlowerSeedRunCount);
                     await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界", !isDaily);
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
@@ -298,10 +301,15 @@ public sealed class IndependentTaskService : IIndependentTaskService
             }
 
             StatusMessage = isDaily ? $"每日任务完成，共 {tasks.Count} 项" : $"{taskName}完成";
-            if (isDaily) await ReportResultAsync(StatusMessage, "已返回大世界，即将恢复实时任务");
+            if (isDaily)
+            {
+                _logger.LogInformation("每日任务已完成，共 {Count} 项", tasks.Count);
+                await ReportResultAsync(StatusMessage, "已返回大世界，即将恢复实时任务");
+            }
         }
         catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
         {
+            _logger.LogInformation("任务已取消：{Task}", taskName);
             StatusMessage = isDaily ? "每日任务已停止" : $"{taskName}已停止";
         }
         catch (Exception ex)
@@ -340,7 +348,6 @@ public sealed class IndependentTaskService : IIndependentTaskService
             taskCts.Dispose();
             if (stateCleared)
             {
-                _logger.LogInformation("独立任务已停止：{TaskName}", GetTaskDisplayName(kind));
                 NotifyStateChanged();
             }
         }
@@ -352,8 +359,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         {
             // 每日清单仅通知最终结果，各子任务的完成信息仍显示在遮罩中。
             _runtimeTaskService.ShowIndependentTaskResult(title, message);
-            if (notify && _notifications.IsEnabled && !await _notifications.ShowAsync(title, message))
-                _logger.LogWarning("任务结果通知未显示：{Title}，{Message}", title, message);
+            if (notify && _notifications.IsEnabled) await _notifications.ShowAsync(title, message);
         }
     }
 

@@ -16,19 +16,22 @@ namespace RocoPilot.Tests;
 public class StaminaCraftingTests
 {
     [TestMethod]
-    [DataRow("map-continent", 2048)]
-    [DataRow("map-academy", 1280)]
-    [DataRow("map-garden", 960)]
-    public async Task DailyCraftsOnlyAfterSelectingSeasonAndMaximum(string initialMap, int width)
+    [DataRow("map-continent", 2048, false)]
+    [DataRow("map-academy", 1280, false)]
+    [DataRow("map-garden", 960, false)]
+    [DataRow("map-garden", 960, true)]
+    [DataRow("map-academy", 1280, true)]
+    public async Task DailyCraftsOnlyAfterSelectingSeasonAndMaximum(string initialMap, int width, bool insufficient)
     {
-        var replay = new Replay(initialMap, width);
+        var replay = new Replay(initialMap, width, insufficient);
         var runner = new StaminaCraftingRunner(replay, new ImageMatchingService(), replay, replay);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };
-        await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), _ => { }, CancellationToken.None);
+        var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), _ => { }, CancellationToken.None);
         Assert.AreEqual("done", replay.Stage);
+        Assert.AreEqual(insufficient ? "跳过：体力不足" : "成功：已制造赛季球", result);
     }
 
-    private sealed class Replay(string initialMap, int width) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
+    private sealed class Replay(string initialMap, int width, bool insufficient) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
     {
         public string Stage = "start";
         private int _frames;
@@ -56,6 +59,8 @@ public class StaminaCraftingTests
             };
             if (Stage == "skip-craft" && _frames == 3) _resultWait.Restart();
             var path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-07", "stamina-crafting", name + ".png");
+            if (name == "season-selected" && insufficient)
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "stamina-crafting", "season-insufficient-stamina.png");
             if (name == "craft-result" && initialMap != "map-continent")
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "stamina-crafting", "craft-result-bonus-61.png");
             if (name == "legendary-skip") path = Path.Combine(SourceDirectory(), "Fixtures", name + ".png");
@@ -109,6 +114,7 @@ public class StaminaCraftingTests
                 ("dialogue", "Esc") => "choices",
                 ("choices", "1") => "recipe-list-marked",
                 ("craft-result", "Esc") => "exit-recipe",
+                ("season-selected", "Esc") when insufficient => "exit-dialogue",
                 ("exit-recipe", "Esc") => "exit-dialogue",
                 ("exit-dialogue", "Esc") => "done",
                 _ => throw new AssertFailedException($"{Stage} 意外按键 {key}")
@@ -138,6 +144,7 @@ public class StaminaCraftingTests
 
         public Task DragAsync(nint hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method, CancellationToken cancellationToken)
         {
+            Assert.IsFalse(insufficient, "制造按钮置灰时不应拖动滑块。");
             Assert.AreEqual("season-selected", Stage);
             Assert.IsTrue(_frames > 1);
             CheckPoint(x, y, 1239, 1021);

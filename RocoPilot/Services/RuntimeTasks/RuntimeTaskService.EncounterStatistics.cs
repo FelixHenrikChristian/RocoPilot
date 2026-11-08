@@ -187,14 +187,27 @@ public sealed partial class RuntimeTaskService
             frame,
             EncounterBloodlineRecognition.RegionIds,
             cancellationToken);
-        if (string.IsNullOrWhiteSpace(tipText))
+        var capturedAt = frame.CapturedAt;
+        for (var attempt = 0; ; attempt++)
         {
-            return;
-        }
+            if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
+            {
+                _battle.ObserveBloodline(battleId, kind);
+                return;
+            }
 
-        if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
-        {
-            _battle.ObserveBloodline(battleId, kind);
+            // 长提示可能只识别到一部分，趁台词仍在画面上复查新帧。
+            if (attempt >= 2 || TextMatchingHelper.CountChineseCharacters(tipText) < 8
+                || _battle.Bloodline != EncounterBloodlineKind.Unrecognized || _battle.IsSuspendedForShiny)
+                return;
+
+            await Task.Delay(RuntimeRecognitionDefaults.FrameCaptureIntervalMs, cancellationToken);
+            using var next = _session?.RentFrame(battleId);
+            if (next is null || _isSuspended || _scene != GameScene.Battle || battleId != _battle.BattleId) return;
+            if (next.CapturedAt <= capturedAt) continue;
+            capturedAt = next.CapturedAt;
+            tipText = await _frameRecognizer.RecognizeRegionTextAsync(
+                state, next, EncounterBloodlineRecognition.RegionIds, cancellationToken);
         }
     }
 

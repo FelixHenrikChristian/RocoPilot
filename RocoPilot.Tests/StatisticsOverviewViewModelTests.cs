@@ -16,7 +16,7 @@ public sealed class StatisticsOverviewViewModelTests
         var document = Document();
         var overview = new StatisticsOverviewViewModel();
         overview.ApplyDocument(document, "100", new EncounterSeasonConfig { CurrentSeasonId = "S1" });
-        overview.SelectedShinyScopeIndex = 1;
+        Assert.AreEqual("S1", overview.SelectedShinyScopeSeasonId);
         Assert.AreEqual("S1", overview.SelectedSeason?.Id);
 
         overview.ApplyDocument(document, "100", new EncounterSeasonConfig { CurrentSeasonId = "S2" });
@@ -33,7 +33,7 @@ public sealed class StatisticsOverviewViewModelTests
         var document = Document();
         var overview = new StatisticsOverviewViewModel();
         overview.ApplyDocument(document, "100", new EncounterSeasonConfig { CurrentSeasonId = "S1" });
-        overview.SelectedShinyScopeIndex = 1;
+        Assert.AreEqual("S1", overview.SelectedShinyScopeSeasonId);
         document.Accounts[0].Seasons.RemoveAll(item => item.Id == "S1");
 
         overview.ApplyDocument(document, "100", new EncounterSeasonConfig());

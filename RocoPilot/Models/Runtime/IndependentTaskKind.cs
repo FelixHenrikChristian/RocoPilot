@@ -9,5 +9,6 @@ public enum IndependentTaskKind
     FlowerSeedChallenge,
     FlowerSeedScan,
     LegendaryScan,
-    StaminaCrafting
+    StaminaCrafting,
+    EveningRest
 }

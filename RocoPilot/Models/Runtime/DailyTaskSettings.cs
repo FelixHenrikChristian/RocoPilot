@@ -22,7 +22,7 @@ public sealed class DailyTaskSettings
     [
         DailyTaskKind.Mail, DailyTaskKind.FlowerSeedChallenge, DailyTaskKind.LegendaryChallenge,
         DailyTaskKind.StaminaCrafting, DailyTaskKind.Gardening, DailyTaskKind.Inspiration,
-        DailyTaskKind.Sell, DailyTaskKind.BattlePassRewards, DailyTaskKind.EveningRest
+        DailyTaskKind.Sell, DailyTaskKind.EveningRest, DailyTaskKind.BattlePassRewards
     ];
 
     public IndependentTaskSettings? Challenges { get; set; }

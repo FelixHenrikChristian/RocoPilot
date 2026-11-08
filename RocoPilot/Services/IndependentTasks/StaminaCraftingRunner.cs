@@ -4,7 +4,6 @@ using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
-using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
@@ -51,27 +50,10 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             // 静止的结算画面可能只返回上一帧；允许在同一帧上按间隔重试 ESC。
             if (frame is null || (frame.CapturedAt <= freshAfter &&
                 !(step == Step.ExitRecipe && frame.CapturedAt == lastResultFrame && timer.Elapsed >= nextResultEscape))) continue;
-            RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(frame, window, out var x, out var y,
-                out var width, out var height);
-            var scale = Math.Min(width / 2048d, height / 1152d);
-            async Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom, double threshold = .94)
-            {
-                var region = RecognitionRegionImageHelper.MapReferenceArea(x, y, width, height, 2048, 1152,
-                    left, top, right - left, bottom - top);
-                var path = name switch
-                {
-                    "world" => "2048x1152/magic-point.png",
-                    "teleport" => "2048x1152/flower-seed/map-teleport.png",
-                    "skip" => "2048x1152/flower-seed/animation-skip.png",
-                    _ => $"2048x1152/stamina-crafting/{name}.png"
-                };
-                var result = await images.MatchAsync(frame, region, path,
-                    new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = scale, TemplateScaleY = scale }, token);
-                return result.IsMatch ? result : null;
-            }
-
+            var screen = new DailyTaskScreen(frame, window, images);
+            Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom, double threshold = .94) =>
+                screen.Find($"stamina-crafting/{name}", left, top, right, bottom, token, threshold);
             Task<ImageMatchResult?> MakeButton() => Find("make", 1640, 1010, 1960, 1140);
-            Task<ImageMatchResult?> World() => Find("world", 155, 20, 410, 104);
             Task<ImageMatchResult?> Recipe() => Find("recipe", 40, 0, 370, 115);
             Task<ImageMatchResult?> Choices() => Find("choices", 1420, 620, 1950, 735, .90);
             Task<ImageMatchResult?> SeasonTimer() => Find("timer", 550, 870, 1020, 971);
@@ -79,9 +61,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                 await Find("garden-option", 100, 300, 485, 1045, .90) ??
                 await Find("garden-option-selected", 100, 300, 485, 1045, .90);
             Task<ImageMatchResult?> Maximum() => Find("max", 1460, 975, 1560, 1060);
-            Task<ImageMatchResult?> Skip() => Find("skip", 80, 10, 240, 146);
-            int ClientX(double px) => (int)Math.Round((px - x) * (window.ClientWidth > 0 ? window.ClientWidth : width) / width);
-            int ClientY(double py) => (int)Math.Round((py - y) * (window.ClientHeight > 0 ? window.ClientHeight : height) / height);
+            Task<ImageMatchResult?> Skip() => screen.Find("flower-seed/animation-skip", 80, 10, 240, 146, token);
             async Task AfterInput()
             {
                 freshAfter = DateTimeOffset.UtcNow;
@@ -90,8 +70,8 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
 
             async Task Click(ImageMatchResult target, int dx = 0, int dy = 0)
             {
-                await mouse.ClickAsync(window.Hwnd, ClientX(target.X + target.Width / 2d + dx * scale),
-                    ClientY(target.Y + target.Height / 2d + dy * scale), input.KeyboardInputMethod, token);
+                await mouse.ClickAsync(window.Hwnd, screen.ClientX(target.X + target.Width / 2d + dx * screen.Scale),
+                    screen.ClientY(target.Y + target.Height / 2d + dy * screen.Scale), input.KeyboardInputMethod, token);
                 await AfterInput();
             }
 
@@ -109,7 +89,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             {
                 case Step.OpenMap:
                     if (await Find("map", 45, 0, 320, 120) is not null) step = Step.SelectMap;
-                    else if (await World() is not null)
+                    else if (await screen.World(token) is not null)
                     {
                         await Key("M");
                         step = Step.SelectMap;
@@ -147,7 +127,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                     break;
                 case Step.Teleport:
                     if (await Find("teleport-title", 1280, 0, 1790, 118) is not null &&
-                        await Find("teleport", 1330, 985, 1940, 1145) is { } teleport)
+                        await screen.Teleport(token) is { } teleport)
                     {
                         await Click(teleport);
                         step = Step.Approach;
@@ -159,7 +139,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                         await Key("F");
                         step = Step.Dialogue;
                     }
-                    else if (await World() is not null) await Key("W", 300);
+                    else if (await screen.World(token) is not null) await Key("W", 300);
                     break;
                 case Step.Dialogue:
                     if (await Choices() is not null)
@@ -184,8 +164,8 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                     else if (await Find("handle", 1180, 970, 1305, 1070) is { } handle)
                     {
                         var px = handle.X + handle.Width / 2d;
-                        var py = ClientY(handle.Y + handle.Height / 2d);
-                        await mouse.DragAsync(window.Hwnd, ClientX(px), py, ClientX(px + 276 * scale), py,
+                        var py = screen.ClientY(handle.Y + handle.Height / 2d);
+                        await mouse.DragAsync(window.Hwnd, screen.ClientX(px), py, screen.ClientX(px + 276 * screen.Scale), py,
                             input.KeyboardInputMethod, token);
                         await AfterInput();
                         step = Step.Make;
@@ -220,7 +200,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                     else if (await Recipe() is not null) await Key("Esc");
                     break;
                 case Step.ReturnWorld:
-                    if (await World() is not null) return;
+                    if (await screen.World(token) is not null) return;
                     if (await Choices() is not null) await Key("Esc");
                     break;
             }

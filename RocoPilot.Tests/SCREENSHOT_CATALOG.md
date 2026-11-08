@@ -2,6 +2,17 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-08：晚风小憩活动
+
+- [推荐页，探索入口右上有红点](LocalScreenshots/2026-11-08/evening-rest/recommended.png)，来源 codex-clipboard-67c1464d-3c58-4109-8265-4f79b0827e45.png。
+- [探索页，晚风小憩 0/1200](LocalScreenshots/2026-11-08/evening-rest/event-0.png)，来源 codex-clipboard-91d432d3-c410-4199-a269-578f42dc5c13.png。
+- [星光庇护所传送详情](LocalScreenshots/2026-11-08/evening-rest/shelter-map.png)，来源 codex-clipboard-b2761132-3305-483c-a536-81f7ca32904b.png。
+- [48/1200](LocalScreenshots/2026-11-08/evening-rest/event-48.png)，来源 codex-clipboard-f1e31240-9d69-4219-8965-d844aafab343.png。
+- [864/1200](LocalScreenshots/2026-11-08/evening-rest/event-864.png)，来源 codex-clipboard-3122c68d-9106-45ab-90e0-711afc24364e.png。
+- [1200/1200](LocalScreenshots/2026-11-08/evening-rest/event-full.png)，来源 codex-clipboard-03b7fa68-fd2b-4f51-9246-403fb060639c.png。
+
+六张原图均为 2048×1152，用于验证探索入口、默认活动、前往、传送及满额判定。完成模板只取右下 1200/1200 数字区域，入口模板避开右上红点。原图为静帧，未记录加载耗时、活动未开放时的默认页及实际挂机时长。
+
 ## 2026-11-08：体力合成停在批量制造结果
 
 - [用户原图](LocalScreenshots/2026-11-08/stamina-crafting/craft-result-bonus-61.png)，附件 codex-clipboard-70c69e24-0ce1-48f7-a6db-ff1c40febe8f.png，2048×1152。拼图球结算显示绿色 ×61 和特权额外获得 11，助手显示“等待制造结果”。

@@ -83,10 +83,13 @@ public partial class TasksViewModel : ObservableRecipient
     public partial double LegendaryChallengeRunCount { get; set; }
 
     [ObservableProperty]
-    public partial double FlowerSeedRunCount { get; set; }
+    public partial bool FlowerSeedAtTargetLocation { get; set; }
 
     [ObservableProperty]
-    public partial bool IsTaskNotificationOpen { get; set; }
+    public partial bool FlowerSeedPreferCondensedMark { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool LegendaryAtTargetLocation { get; set; }
 
     [ObservableProperty]
     public partial InfoBarSeverity TaskNotificationSeverity { get; set; }
@@ -208,12 +211,9 @@ public partial class TasksViewModel : ObservableRecipient
         SaveSettingsIfLoaded();
     }
 
-    partial void OnSelectedLegendaryTargetChanged(string value) => SaveSettingsIfLoaded();
-    partial void OnSelectedLegendaryDifficultyIndexChanged(int value) => SaveSettingsIfLoaded();
-    partial void OnUseLegendaryMarkWhenInsufficientChanged(bool value) => SaveSettingsIfLoaded();
-
-    partial void OnFlowerSeedRunCountChanged(double value)
-    {
+    partial void OnFlowerSeedAtTargetLocationChanged(bool value) => SaveSettingsIfLoaded();
+    partial void OnFlowerSeedPreferCondensedMarkChanged(bool value) => SaveSettingsIfLoaded();
+    partial void OnLegendaryAtTargetLocationChanged(bool value) => SaveSettingsIfLoaded();
         SaveSettingsIfLoaded();
     }
 
@@ -246,12 +246,9 @@ public partial class TasksViewModel : ObservableRecipient
             LegendaryDifficulty = SelectedLegendaryDifficultyIndex + 1,
             UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
             FlowerSeedRunCount = ToRunCount(
-                FlowerSeedRunCount,
-                IndependentTaskSettings.DefaultFlowerSeedRunCount),
-            FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
-            FlowerSeedOptions = [.. FlowerSeedOptions]
-        };
-    }
+            FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
+            FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
+            LegendaryAtTargetLocation = LegendaryAtTargetLocation,
 
     private void ApplySettings(IndependentTaskSettings settings)
     {
@@ -265,12 +262,9 @@ public partial class TasksViewModel : ObservableRecipient
                 foreach (var name in _independentTaskService.LegendaryTargets) LegendaryTargets.Add(name);
             }
             SelectedLegendaryTarget = settings.LegendaryTargetName;
-            SelectedLegendaryDifficultyIndex = settings.LegendaryDifficulty - 1;
-            UseLegendaryMarkWhenInsufficient = settings.UseLegendaryMarkWhenInsufficient;
-            FlowerSeedRunCount = settings.FlowerSeedRunCount;
-            if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))
-            {
-                FlowerSeedOptions.Clear();
+            FlowerSeedAtTargetLocation = settings.FlowerSeedAtTargetLocation;
+            FlowerSeedPreferCondensedMark = settings.FlowerSeedPreferCondensedMark;
+            LegendaryAtTargetLocation = settings.LegendaryAtTargetLocation;
                 foreach (var option in settings.FlowerSeedOptions)
                 {
                     FlowerSeedOptions.Add(option);

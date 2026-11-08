@@ -20,12 +20,8 @@ public interface IManualChallengeRunner
         CancellationToken cancellationToken);
 
     Task RunAsync(
-        RuntimeTaskState state,
-        FlowerSeedOption target,
-        int runCount,
-        AutoBattleSettings battleSettings,
-        Action<IndependentTaskProgress> progress,
-        CancellationToken cancellationToken);
+        bool atTargetLocation,
+        bool preferCondensedMark,
 
     Task<IReadOnlyList<FlowerSeedOption>> ScanAsync(
         RuntimeTaskState state,

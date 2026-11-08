@@ -24,12 +24,15 @@ public sealed class IndependentTaskSettings
     } = DefaultLegendaryChallengeRunCount;
 
     public int FlowerSeedRunCount { get; set; } = DefaultFlowerSeedRunCount;
+    /// <summary>花种挑战：已手动传送到目标场景，跳过列表导航与地图传送。</summary>
+    public bool FlowerSeedAtTargetLocation { get; set; }
 
-    public int FlowerSeedTargetNumber { get; set; }
+    /// <summary>花种挑战：捕捉前优先使用凝练印记（紫色星星）；数量 ≥20 时先确保其选中。</summary>
+    public bool FlowerSeedPreferCondensedMark { get; set; } = true;
 
-    public List<FlowerSeedOption> FlowerSeedOptions { get; set; } = [];
+    /// <summary>传说精灵挑战：已手动传送到目标场景，跳过列表导航与地图传送。</summary>
+    public bool LegendaryAtTargetLocation { get; set; }
 
-    public static IndependentTaskSettings CreateDefault()
     {
         return new IndependentTaskSettings();
     }
@@ -41,12 +44,9 @@ public sealed class IndependentTaskSettings
             LegendaryChallengeRunCount = LegendaryChallengeRunCount,
             LegendaryTargetName = LegendaryTargetName,
             LegendaryDifficulty = LegendaryDifficulty,
-            UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
-            FlowerSeedRunCount = FlowerSeedRunCount,
-            FlowerSeedTargetNumber = FlowerSeedTargetNumber,
-            FlowerSeedOptions = [.. FlowerSeedOptions]
-        };
-    }
+            FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
+            FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
+            LegendaryAtTargetLocation = LegendaryAtTargetLocation,
 
     public IndependentTaskSettings Normalize(IReadOnlyList<string>? legendaryTargets = null)
     {
@@ -56,10 +56,7 @@ public sealed class IndependentTaskSettings
             LegendaryTargetName = (legendaryTargets ?? LegendaryTargets).Contains(LegendaryTargetName)
                 ? LegendaryTargetName : legendaryTargets is null ? LegendaryTargets[0] : string.Empty,
             LegendaryDifficulty = LegendaryDifficulty is >= 1 and <= 3 ? LegendaryDifficulty : DefaultLegendaryDifficulty,
-            UseLegendaryMarkWhenInsufficient = UseLegendaryMarkWhenInsufficient,
-            FlowerSeedRunCount = Math.Clamp(FlowerSeedRunCount, MinimumRunCount, MaximumRunCount),
-            FlowerSeedTargetNumber = FlowerSeedTargetNumber,
-            FlowerSeedOptions = [.. FlowerSeedOptions ?? []]
-        };
-    }
+            FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
+            FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
+            LegendaryAtTargetLocation = LegendaryAtTargetLocation,
 }

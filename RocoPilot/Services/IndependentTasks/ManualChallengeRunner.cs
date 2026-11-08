@@ -12,54 +12,35 @@ using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
 
 namespace RocoPilot.Services.IndependentTasks;
+    IKeyboardInputService keyboard,
+    IMouseInputService mouse,
+    ManualChallengeScreenRecognizer recognizer,
+    AutoBattleInputExecutor battleInput,
+    IRecognitionOverlayService overlay,
+    ILogger<ManualChallengeRunner> logger) : IManualChallengeRunner
+{
+    public async Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
+        Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
 
-public sealed class ManualChallengeRunner(
-    IScreenCaptureService capture,
-    BattleScreenRecognizer battleScreen,
-    private static readonly TimeSpan MyTurnCheckInterval = TimeSpan.FromMilliseconds(500);
-    /// <summary>中间跳过的黄框阶段超时：黄框（轮到玩家）出现后等 AI 插入超过 5 秒即强制执行。</summary>
-    private const double SkipTurnTimeoutSeconds = 5;
-    /// <summary>开头跳过的最短等待：从跳过开始至少满 10 秒且箭头顺延才执行后续操作。</summary>
-    private const double HeadSkipMinimumSeconds = 10;
+        CancellationToken cancellationToken)
 
-        int difficulty, bool useLegendaryMark, bool atTargetLocation, AutoBattleSettings battleSettings,
-        => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken,
-            targetName, useLegendaryMark, difficulty, atTargetLocation: atTargetLocation);
-    public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target, int runCount, bool atTargetLocation,
-        bool preferCondensedMark, AutoBattleSettings battleSettings, Action<IndependentTaskProgress> progress,
-        => _ = await RunCoreAsync(state, target, runCount, battleSettings, progress, cancellationToken,
-            atTargetLocation: atTargetLocation, preferCondensedMark: preferCondensedMark);
-        => RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken);
-
-    public async Task<IReadOnlyList<string>> ScanLegendaryAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
+    public Task<IReadOnlyList<FlowerSeedOption>> ScanAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
+        CancellationToken cancellationToken)
         CancellationToken cancellationToken)
         => (await RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken, legendary: true))
             .Select(option => option.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
 
-    private async Task<IReadOnlyList<FlowerSeedOption>> RunCoreAsync(RuntimeTaskState state, FlowerSeedOption? target,
-        int runCount, AutoBattleSettings battleSettings,
-        Action<IndependentTaskProgress> progress, CancellationToken token, string? legendaryTarget = null, bool useLegendaryMark = true,
-        int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty, bool legendary = false)
-    {
-        legendary |= legendaryTarget is not null;
-        var scanning = target is null && legendaryTarget is null;
-        var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark, legendaryDifficulty);
-        var settings = AutoBattleSettingsRules.Normalize(battleSettings);
-        if (!scanning)
-        {
-            settings.IsEnabled = true;
-            settings.ReleaseSequence = legendary ? settings.LegendaryReleaseSequence : settings.FlowerSeedReleaseSequence;
-        var loggedSkipTurnWaiting = false;
-        var myTurnCache = false;
-        var myTurnCheckedAt = DateTimeOffset.MinValue;
+        int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty, bool legendary = false,
+        bool atTargetLocation = false, bool preferCondensedMark = false)
+        var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark, legendaryDifficulty, atTargetLocation);
+            settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
+        }
+        var battle = new AutoBattleController();
         DateTimeOffset? skipTurnHighlightAt = null;
         byte[]? skillQueueBaseline = null;
-        var hasReleasedSkillInBattle = false;
-        DateTimeOffset? headSkipStartedAt = null;
-        var markClickAt = DateTimeOffset.MinValue;
-        keyboard.EnsureReady(inputMethod);
-        var lastScene = ManualChallengeScene.Unknown;
-        (ManualChallengeScene Scene, BattleScreen? Screen, ManualChallengeAction Action)? lastObservation = null;
+        var battleNumber = 0;
+        var window = state.TargetWindow;
+        var inputMethod = settings.KeyboardInputMethod;
         var creatureName = legendaryTarget ?? target?.Name ?? string.Empty;
         var lastProgress = new IndependentTaskProgress("准备启动");
         var lastAdvance = DateTimeOffset.UtcNow;
@@ -225,17 +206,13 @@ public sealed class ManualChallengeRunner(
                             battle.BeginSkillSelection(settings, now);
                         if (battle.ShouldRecoverAfterSkillFailure(settings, now))
                             plan = new(AutoBattleAction.EnergyRecovery, "X", "技能未离开选择界面，回能 X，原技能延后", "X");
-                        else if (battle.CanAct(settings, now))
-                            plan = battle.PlanSkillSelection(settings, false, now);
-                    }
-                {
-                    // 中间跳过等待期间界面离开（AI 行动动画）：不可操作状态，重置
-                    // 5 秒计时；基线保留，界面回来时图标若已变化即可完成跳过。
-                    skipTurnHighlightAt = null;
                 }
-                // 捕捉前优先使用凝练印记：紫星未选中即点击切换（不做数量判断，
-                // OCR 小数字不可靠）；出现"凝练印记不足"提示（数量耗尽）时改点
-                // 蓝星（契约印记）。点击后本帧不捕捉，等下一帧复查选中状态。
+                else if (screen.Scene != ManualChallengeScene.Unknown)
+                    battle.CompleteSkillSelection();
+                if (switchingPet && battle.Phase != AutoBattlePhase.PetSwitching)
+                    battle.BeginPetSwitching(settings);
+                else if (screen.Scene != ManualChallengeScene.Unknown && !switchingPet)
+                    battle.ObservePetSwitching(false);
                 if (decision.Action == ManualChallengeAction.Capture
                     && preferCondensedMark && !legendary)
                 {

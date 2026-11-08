@@ -324,12 +324,37 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         return new(true, 1, button.X, button.Y, button.Width, button.Height, TemplatePath("legendary-tab"));
     }
 
-    private static string TemplatePath(string name) => name.StartsWith("legendary-", StringComparison.Ordinal)
-        ? $"2048x1152/legendary/{name[10..]}.png" : $"2048x1152/flower-seed/{name}.png";
-
-    private async Task<ManualChallengeScreen?> ReadCaptureConfirmationAsync(CapturedFrame frame, int x, int y,
-        int width, int height, CancellationToken token)
+    /// <summary>
+    /// 读取捕捉界面右上角的凝练印记（紫色星星）状态：
+    /// 是否已选中（白色高亮胶囊）与是否弹出"凝练印记不足，无法捕捉"提示
+    /// （数量耗尽的直接标志）。不做数量 OCR——小数字识别不可靠，
+    /// 不足时由游戏提示兜底切换蓝星。
+    /// </summary>
+    internal async Task<(bool Selected, bool Insufficient)> ReadCondensedMarkAsync(
+        CapturedFrame frame, int clientX, int clientY, int width, int height, CancellationToken token)
     {
+        var scale = Math.Min(width / 2048d, height / 1152d);
+        var options = new ImageMatchOptions
+        {
+            // 选中/未选中实测约 0.98 / 0.13，窗口等比缩放误差会压低选中得分，取 0.85 留余量。
+            MinimumScore = .85,
+            TemplateScaleX = scale,
+            TemplateScaleY = scale
+        };
+        // 坐标基于原生窗口截图校准（用户截图含 17.4px 标题栏已扣除）：
+        // 紫星按钮窗口位 (1795-1884, 111-159) → 2048 基准 (1914-2010, 119-170)。
+        var selectedArea = CreateArea(clientX, clientY, width, height, .925, .098, .99, .155);
+        selectedArea.Id = "凝练印记选择";
+        var selected = await images.MatchAsync(frame, selectedArea, TemplatePath("condensed-selected"), options, token);
+        // 不足提示：屏幕上方居中的"凝练印记不足，无法捕捉"横条（实测 0.99 / 0.10 区分）。
+        var promptArea = CreateArea(clientX, clientY, width, height, .33, .125, .68, .18);
+        promptArea.Id = "凝练印记不足提示";
+        var prompt = await images.MatchAsync(frame, promptArea, TemplatePath("condensed-insufficient"), options, token);
+        logger.LogDebug("凝练印记状态：选中={Selected}，不足提示={Insufficient}，得分={Score:F3}",
+            selected.IsMatch, prompt.IsMatch, prompt.Score);
+        return (selected.IsMatch, prompt.IsMatch);
+    }
+
         var scale = Math.Min(width / 2048d, height / 1152d);
         var options = new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale };
         var header = await images.MatchAsync(frame, CreateArea(x, y, width, height, .44, .34, .56, .41),

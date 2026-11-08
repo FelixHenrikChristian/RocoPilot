@@ -101,6 +101,7 @@ public partial class App : Application
             services.AddSingleton<IMouseInputService, MouseInputService>();
             services.AddSingleton<ManualChallengeScreenRecognizer>();
             services.AddSingleton<StaminaCraftingRunner>();
+            services.AddSingleton<EveningRestRunner>();
             services.AddSingleton<IManualChallengeRunner, ManualChallengeRunner>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();

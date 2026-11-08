@@ -34,6 +34,8 @@ public sealed class IndependentTaskServiceTests
         await vm.ResetCommand.ExecuteAsync(null);
         var saved = fixture.Store.ReadSaved<DailyTaskSettings>(SettingsKeys.DailyTaskSettings)!;
         CollectionAssert.AreEqual(new DailyTaskSettings().Normalize().Tasks.ToArray(), saved.Tasks.ToArray());
+        Assert.AreEqual(DailyTaskKind.EveningRest, saved.Tasks[^2].Kind);
+        Assert.AreEqual(DailyTaskKind.BattlePassRewards, saved.Tasks[^1].Kind);
         Assert.AreEqual(IndependentTaskSettings.DefaultFlowerSeedRunCount, saved.Challenges!.FlowerSeedRunCount);
         Assert.AreEqual(IndependentTaskSettings.DefaultLegendaryDifficulty, saved.Challenges.LegendaryDifficulty);
         Assert.AreEqual(savedBefore.FlowerSeedTargetNumber, fixture.Service.Settings.FlowerSeedTargetNumber);
@@ -196,7 +198,7 @@ public sealed class IndependentTaskServiceTests
         Assert.AreEqual("新传说精灵", fixture.Runner.Target!.Name);
 
         var restarted = new IndependentTaskService(fixture.Runtime, fixture.Store, fixture.Runner,
-            fixture.Notifications, fixture.Window, null!, NullLogger<IndependentTaskService>.Instance);
+            fixture.Notifications, fixture.Window, null!, null!, NullLogger<IndependentTaskService>.Instance);
         await restarted.LoadSettingsAsync();
         CollectionAssert.AreEqual(IndependentTaskSettings.LegendaryTargets.ToArray(), restarted.LegendaryTargets.ToArray());
         Assert.AreEqual("龙息帕尔", restarted.Settings.LegendaryTargetName);
@@ -628,7 +630,7 @@ public sealed class IndependentTaskServiceTests
                 FlowerSeedOptions = [new(1, "友爱星飞"), new(2, "旧花种")],
                 FlowerSeedTargetNumber = 1
             });
-            Service = new(Runtime, Store, Runner, Notifications, Window, null!, NullLogger<IndependentTaskService>.Instance);
+            Service = new(Runtime, Store, Runner, Notifications, Window, null!, null!, NullLogger<IndependentTaskService>.Instance);
         }
     }
 

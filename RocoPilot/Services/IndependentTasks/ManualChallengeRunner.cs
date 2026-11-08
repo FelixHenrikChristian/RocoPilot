@@ -8,39 +8,80 @@ using RocoPilot.Models.Input;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Configuration;
 using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
 
 namespace RocoPilot.Services.IndependentTasks;
+
+public sealed class ManualChallengeRunner(
+    IScreenCaptureService capture,
     IKeyboardInputService keyboard,
     IMouseInputService mouse,
     ManualChallengeScreenRecognizer recognizer,
+    BattleScreenRecognizer battleScreen,
     AutoBattleInputExecutor battleInput,
     IRecognitionOverlayService overlay,
     ILogger<ManualChallengeRunner> logger) : IManualChallengeRunner
 {
-    public async Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
-        Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
+    private static readonly TimeSpan MyTurnCheckInterval = TimeSpan.FromMilliseconds(500);
+    /// <summary>中间跳过的黄框阶段超时：黄框（轮到玩家）出现后等 AI 插入超过 5 秒即强制执行。</summary>
+    private const double SkipTurnTimeoutSeconds = 5;
+    /// <summary>开头跳过的最短等待：从跳过开始至少满 10 秒且箭头顺延才执行后续操作。</summary>
+    private const double HeadSkipMinimumSeconds = 10;
 
+    public async Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
+        int difficulty, bool useLegendaryMark, bool atTargetLocation, AutoBattleSettings battleSettings,
+        Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
+        => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken,
+            targetName, useLegendaryMark, difficulty, atTargetLocation: atTargetLocation);
+
+    public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target, int runCount, bool atTargetLocation,
+        bool preferCondensedMark, AutoBattleSettings battleSettings, Action<IndependentTaskProgress> progress,
         CancellationToken cancellationToken)
+        => _ = await RunCoreAsync(state, target, runCount, battleSettings, progress, cancellationToken,
+            atTargetLocation: atTargetLocation, preferCondensedMark: preferCondensedMark);
 
     public Task<IReadOnlyList<FlowerSeedOption>> ScanAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
         CancellationToken cancellationToken)
+        => RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken);
+
+    public async Task<IReadOnlyList<string>> ScanLegendaryAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
         CancellationToken cancellationToken)
         => (await RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken, legendary: true))
             .Select(option => option.Name).Where(name => !string.IsNullOrWhiteSpace(name)).Distinct().ToArray();
 
+    private async Task<IReadOnlyList<FlowerSeedOption>> RunCoreAsync(RuntimeTaskState state, FlowerSeedOption? target,
+        int runCount, AutoBattleSettings battleSettings,
+        Action<IndependentTaskProgress> progress, CancellationToken token, string? legendaryTarget = null, bool useLegendaryMark = true,
         int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty, bool legendary = false,
         bool atTargetLocation = false, bool preferCondensedMark = false)
+    {
+        legendary |= legendaryTarget is not null;
+        var scanning = target is null && legendaryTarget is null;
         var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark, legendaryDifficulty, atTargetLocation);
+        var settings = AutoBattleSettingsRules.Normalize(battleSettings);
+        if (!scanning)
+        {
+            settings.IsEnabled = true;
+            settings.ReleaseSequence = legendary ? settings.LegendaryReleaseSequence : settings.FlowerSeedReleaseSequence;
             settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
         }
         var battle = new AutoBattleController();
+        var loggedSkipTurnWaiting = false;
+        var myTurnCache = false;
+        var myTurnCheckedAt = DateTimeOffset.MinValue;
         DateTimeOffset? skipTurnHighlightAt = null;
         byte[]? skillQueueBaseline = null;
+        var hasReleasedSkillInBattle = false;
+        DateTimeOffset? headSkipStartedAt = null;
+        var markClickAt = DateTimeOffset.MinValue;
         var battleNumber = 0;
         var window = state.TargetWindow;
         var inputMethod = settings.KeyboardInputMethod;
+        keyboard.EnsureReady(inputMethod);
+        var lastScene = ManualChallengeScene.Unknown;
+        (ManualChallengeScene Scene, BattleScreen? Screen, ManualChallengeAction Action)? lastObservation = null;
         var creatureName = legendaryTarget ?? target?.Name ?? string.Empty;
         var lastProgress = new IndependentTaskProgress("准备启动");
         var lastAdvance = DateTimeOffset.UtcNow;
@@ -90,6 +131,9 @@ namespace RocoPilot.Services.IndependentTasks;
                     logger.LogWarning("挑战失败，原地重试：连续失败 {Failures}/3，已成功 {Completed}/{Total} 次，触发画面 {Scene}",
                         flow.ConsecutiveFailures, flow.CompletedCount, runCount, screen.Scene);
                 if (flow.BattleNumber != battleNumber)
+                {
+                    battleNumber = flow.BattleNumber;
+                    battle.ResetBattle();
                     myTurnCache = false;
                     myTurnCheckedAt = DateTimeOffset.MinValue;
                     loggedSkipTurnWaiting = false;
@@ -97,7 +141,13 @@ namespace RocoPilot.Services.IndependentTasks;
                     skillQueueBaseline = null;
                     hasReleasedSkillInBattle = false;
                     headSkipStartedAt = null;
+                }
+                AutoBattlePlan? plan = null;
+                var switchingPet = decision.Action == ManualChallengeAction.Battle
                     && screen.BattleScreen is BattleScreen.PetSwitching or BattleScreen.PetSwitchConfirmation;
+                if (decision.Action == ManualChallengeAction.Battle && screen.BattleScreen == BattleScreen.SkillSelection)
+                {
+                    var now = DateTimeOffset.UtcNow;
                     // 跳过回合步骤。序列开头：进战斗箭头先指第 1 个图标（本玩家可
                     // 出招，跳过即不出招），AI 插队出招后箭头顺延到第 2 个图标，此时
                     // 再执行后续技能。序列中间：等待第 1 个技能图标发生变化（出招队
@@ -206,13 +256,24 @@ namespace RocoPilot.Services.IndependentTasks;
                             battle.BeginSkillSelection(settings, now);
                         if (battle.ShouldRecoverAfterSkillFailure(settings, now))
                             plan = new(AutoBattleAction.EnergyRecovery, "X", "技能未离开选择界面，回能 X，原技能延后", "X");
+                        else if (battle.CanAct(settings, now))
+                            plan = battle.PlanSkillSelection(settings, false, now);
+                    }
                 }
                 else if (screen.Scene != ManualChallengeScene.Unknown)
+                {
                     battle.CompleteSkillSelection();
+                    // 中间跳过等待期间界面离开（AI 行动动画）：不可操作状态，重置
+                    // 5 秒计时；基线保留，界面回来时图标若已变化即可完成跳过。
+                    skipTurnHighlightAt = null;
+                }
                 if (switchingPet && battle.Phase != AutoBattlePhase.PetSwitching)
                     battle.BeginPetSwitching(settings);
                 else if (screen.Scene != ManualChallengeScene.Unknown && !switchingPet)
                     battle.ObservePetSwitching(false);
+                // 捕捉前优先使用凝练印记：紫星未选中即点击切换（不做数量判断，
+                // OCR 小数字不可靠）；出现"凝练印记不足"提示（数量耗尽）时改点
+                // 蓝星（契约印记）。点击后本帧不捕捉，等下一帧复查选中状态。
                 if (decision.Action == ManualChallengeAction.Capture
                     && preferCondensedMark && !legendary)
                 {
@@ -242,6 +303,9 @@ namespace RocoPilot.Services.IndependentTasks;
                     }
                 }
 
+                if (decision.Action == ManualChallengeAction.Capture)
+                    plan = new(AutoBattleAction.Capture, "1, Space", "使用专属球捕捉", "1, Space");
+                if (screen.Scene == ManualChallengeScene.FlowerList)
                 {
                     if (!flow.IsTopConfirmed) previews.Clear();
                     else for (var i = 0; i < previews.Count; i++)
@@ -348,6 +412,15 @@ namespace RocoPilot.Services.IndependentTasks;
                                     decision.Action == ManualChallengeAction.ScrollUp ? 3600 : -720, inputMethod, token);
                                 flow.RecordScroll(screen, height);
                                 break;
+                            case ManualChallengeAction.ScrollBalls:
+                                // 捕捉界面左侧球列表未显示专属球：鼠标移到球列表，
+                                // 滚轮向上 4 下切出专属球。
+                                await mouse.ScrollAsync(window.Hwnd,
+                                    (int)Math.Round(nativeWidth * .19),
+                                    (int)Math.Round(nativeHeight * .56),
+                                    480, inputMethod, token);
+                                logger.LogInformation("手册挑战：捕捉界面未显示专属球，已在球列表滚动切换");
+                                break;
                             case ManualChallengeAction.Approach:
                                 await SendKey("W", 200);
                                 break;
@@ -372,6 +445,7 @@ namespace RocoPilot.Services.IndependentTasks;
                                     break;
                                 if (decision.Action == ManualChallengeAction.Battle && battle.CurrentTurn is { } currentTurn)
                                     battle.RecordAction(currentTurn.Id, plan!.Action, DateTimeOffset.UtcNow);
+                                    hasReleasedSkillInBattle = true;
                                 logger.LogInformation("手册挑战：第 {Battle} 场，{Action}，序列 {Sequence}",
                                     battleNumber, plan!.Description, plan.Sequence);
                                 if (decision.Action == ManualChallengeAction.Capture)
@@ -607,6 +681,7 @@ namespace RocoPilot.Services.IndependentTasks;
     private static string Stage(ManualChallengeScene scene) => scene switch
     {
         ManualChallengeScene.World => "大世界",
+        ManualChallengeScene.CaptureBallMissing => "捕捉界面（切换专属球）",
         ManualChallengeScene.Manual => "魔法师手册 - 学院作业",
         ManualChallengeScene.ChallengePage => "魔法师手册 - 挑战",
         ManualChallengeScene.FlowerList => "稀兽花种列表",

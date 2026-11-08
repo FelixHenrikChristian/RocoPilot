@@ -225,10 +225,22 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     }
                     NotifyStateChanged();
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {names.Count} 个传说精灵", "名单和选择仅本次启动有效，重启后恢复本地设置");
+                    break;
+                case IndependentTaskKind.LegendaryChallenge:
+                    await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
                         settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient,
                         settings.LegendaryAtTargetLocation, battleSettings, UpdateProgress, taskCts.Token);
+                    taskCts.Token.ThrowIfCancellationRequested();
+                    await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
+                    break;
+                case IndependentTaskKind.FlowerSeedChallenge:
+                    await _challengeRunner.RunAsync(state,
+                        settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
                         settings.FlowerSeedRunCount, settings.FlowerSeedAtTargetLocation,
                         settings.FlowerSeedPreferCondensedMark, battleSettings,
+                        UpdateProgress, taskCts.Token);
+                    taskCts.Token.ThrowIfCancellationRequested();
+                    await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
                     var options = await _challengeRunner.ScanAsync(state, UpdateProgress, taskCts.Token);

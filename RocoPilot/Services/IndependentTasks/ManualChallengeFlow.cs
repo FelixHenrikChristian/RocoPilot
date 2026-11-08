@@ -3,13 +3,14 @@ using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeAction { None, OpenManual, Click, ScrollUp, ScrollDown, Approach, SelectChallenge, Interact, Battle, Capture, Complete, Escape, Stop }
+internal enum ManualChallengeAction { None, OpenManual, Click, ScrollUp, ScrollDown, ScrollBalls, Approach, SelectChallenge, Interact, Battle, Capture, Complete, Escape, Stop }
 
 internal readonly record struct ManualChallengeDecision(ManualChallengeAction Action, ImageMatchResult? Button = null);
 
 // 动作只消费当前匹配画面；滚动前后行位置用于确认列表边界。
 internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount = 6, string? legendaryTarget = null,
-    bool useLegendaryMark = true, int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty)
+    bool useLegendaryMark = true, int legendaryDifficulty = IndependentTaskSettings.DefaultLegendaryDifficulty,
+    bool atTargetLocation = false)
 {
     private enum ChallengePhase { Navigation, Starting, Battle, Settlement, Result }
     private enum TargetStage { None, Selected, MapOpened, Confirmed }
@@ -18,12 +19,14 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
     private (string Name, double Y)[]? _beforeScroll;
     private int _unchangedScrolls;
     private bool _topConfirmed;
-    private TargetStage _targetStage;
+    // 已手动到达目标场景时视为目标已确认，跳过列表导航与地图传送，直接走向挑战点。
+    private TargetStage _targetStage = atTargetLocation ? TargetStage.Confirmed : TargetStage.None;
     private ChallengePhase _challengePhase;
     private bool _captureSeen;
     private (int Number, double Y, bool Matched)[] _visibleRows = [];
     private double _rowSpacing = double.PositiveInfinity;
     private bool _useLegendaryForCapture;
+    private int _ballScrolls;
 
     public string? StopReason { get; private set; }
 
@@ -165,7 +168,17 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 // 专属球保证捕捉成功；之后短暂出现的大世界 HUD 仍属于结算过渡。
                 _challengePhase = ChallengePhase.Settlement;
                 _captureSeen = true;
+                _ballScrolls = 0;
                 return new(ManualChallengeAction.Capture);
+            case ManualChallengeScene.CaptureBallMissing when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement:
+                // 捕捉界面在但专属球未显示：滚轮向上切出专属球；多次无效则停止避免死循环。
+                if (++_ballScrolls > 12)
+                {
+                    StopReason = "捕捉界面多次滚动后仍未出现专属球，已停止。";
+                    return new(ManualChallengeAction.Stop);
+                }
+
+                return new(ManualChallengeAction.ScrollBalls);
             case ManualChallengeScene.Result when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement or ChallengePhase.Result:
                 if (_challengePhase != ChallengePhase.Result)
                 {

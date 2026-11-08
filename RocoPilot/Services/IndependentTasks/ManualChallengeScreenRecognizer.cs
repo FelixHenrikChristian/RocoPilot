@@ -12,7 +12,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, CaptureBallMissing, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -154,11 +154,12 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var result = await ReadResultAsync(frame, clientX, clientY, width, height, cancellationToken, legendary);
         if (result is not null) return result;
         var exclusive = await Match("capture-exclusive", .08, .2, .23, .4);
-        if (exclusive is not null)
-        {
-            var capture = await Match("capture-button", .88, .84, 1, 1);
-            if (capture is not null) return new(ManualChallengeScene.Capture, [], capture);
-        }
+        var captureButton = await Match("capture-button", .88, .84, 1, 1);
+        if (exclusive is not null && captureButton is not null)
+            return new(ManualChallengeScene.Capture, [], captureButton);
+        // 捕捉按钮在但专属球标记不在：球列表停留在普通球，需要滚轮切出专属球。
+        if (exclusive is null && captureButton is not null)
+            return new(ManualChallengeScene.CaptureBallMissing, [], captureButton);
         // 交互菜单必须同时具有大世界 HUD，结束动画中的浅色图形不能判为挑战失败。
         var world = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
         var prompt = world.IsMatch ? await Match("interaction-f", .42, .24, .84, .9) : null;
@@ -324,6 +325,9 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         return new(true, 1, button.X, button.Y, button.Width, button.Height, TemplatePath("legendary-tab"));
     }
 
+    private static string TemplatePath(string name) => name.StartsWith("legendary-", StringComparison.Ordinal)
+        ? $"2048x1152/legendary/{name[10..]}.png" : $"2048x1152/flower-seed/{name}.png";
+
     /// <summary>
     /// 读取捕捉界面右上角的凝练印记（紫色星星）状态：
     /// 是否已选中（白色高亮胶囊）与是否弹出"凝练印记不足，无法捕捉"提示
@@ -355,6 +359,9 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         return (selected.IsMatch, prompt.IsMatch);
     }
 
+    private async Task<ManualChallengeScreen?> ReadCaptureConfirmationAsync(CapturedFrame frame, int x, int y,
+        int width, int height, CancellationToken token)
+    {
         var scale = Math.Min(width / 2048d, height / 1152d);
         var options = new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale };
         var header = await images.MatchAsync(frame, CreateArea(x, y, width, height, .44, .34, .56, .41),

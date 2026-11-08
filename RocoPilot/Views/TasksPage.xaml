@@ -169,6 +169,9 @@
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" FontSize="14" Glyph="&#xE713;" />
                                     <TextBlock Text="配置" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
@@ -231,6 +234,9 @@
                                 IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
                                 IsChecked="{x:Bind ViewModel.FlowerSeedPreferCondensedMark, Mode=TwoWay}" />
                         </Grid>
+                    </StackPanel>
+                </Expander>
+
                 <Expander Style="{StaticResource CardExpanderStyle}">
                     <Expander.Header>
                         <Grid ColumnSpacing="12">
@@ -467,6 +473,37 @@
                                     <TextBlock Text="配置" />
                                 </StackPanel>
                             </Button>
+                        </Grid>
+                        <Border
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="0,1,0,0" />
+                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <FontIcon
+                                VerticalAlignment="Center"
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="18"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Glyph="&#xE707;" />
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="已到目标位置" />
+                                <TextBlock
+                                    Margin="0,2,0,0"
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="勾选后跳过列表导航与地图传送，直接从当前场景开始挑战。"
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <CheckBox
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="传说精灵挑战已到目标位置"
+                                IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                IsChecked="{x:Bind ViewModel.LegendaryAtTargetLocation, Mode=TwoWay}" />
                         </Grid>
                     </StackPanel>
                 </Expander>

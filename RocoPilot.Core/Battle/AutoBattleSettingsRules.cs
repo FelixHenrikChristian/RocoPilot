@@ -22,7 +22,7 @@ public static class AutoBattleSettingsRules
             .Replace(';', ',')
             .Split([',', '\n', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(key => key.ToUpperInvariant())
-            .Where(key => key is "1" or "2" or "3" or "4" or "X")
+            .Where(key => key is "1" or "2" or "3" or "4" or "X" or "S")
             .ToArray();
         return keys.Length == 0 ? DefaultRoundOrder : keys;
     }
@@ -90,6 +90,8 @@ public static class AutoBattleSettingsRules
         {
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
         }
+
+        normalized.PlayerNumber = Math.Clamp(normalized.PlayerNumber, 1, 4);
 
         if (!Enum.IsDefined(normalized.KeyboardInputMethod))
         {
@@ -260,9 +262,19 @@ public static class AutoBattleSettingsRules
         }
 
         var normalized = skillKey.Trim().ToUpperInvariant();
-        return normalized is "1" or "2" or "3" or "4" or "X"
+        return normalized is "1" or "2" or "3" or "4" or "X" or "S"
             ? normalized
             : null;
+    }
+
+    /// <summary>跳过回合步骤：等待轮到本玩家（P 角标）后，立即继续执行后续步骤。</summary>
+    public const string SkipTurnSkillKey = "S";
+
+    public static string GetSkillKeyDisplayName(string? skillKey)
+    {
+        return string.Equals(skillKey, SkipTurnSkillKey, StringComparison.OrdinalIgnoreCase)
+            ? "跳过回合"
+            : skillKey ?? string.Empty;
     }
 
     public static bool RequiresReliefDetection(AutoBattleEncounterRelievedAction action)

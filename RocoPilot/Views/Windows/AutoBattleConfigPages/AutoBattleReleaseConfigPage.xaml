@@ -119,6 +119,13 @@
                                     Content="X"
                                     Style="{StaticResource SkillKeyButtonStyle}"
                                     Tag="X" />
+                                <Button
+                                    Click="AppendSkillButton_Click"
+                                    Content="跳过"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="S"
+                                    Visibility="{x:Bind SkipTurnButtonVisibility}"
+                                    ToolTipService.ToolTip="跳过回合：等待轮到本玩家（出招队列顺延）后再执行后续步骤" />
                             </StackPanel>
                         </Grid>
 

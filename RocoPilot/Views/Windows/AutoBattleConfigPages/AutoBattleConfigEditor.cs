@@ -655,7 +655,11 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
         CanMoveLater = Position < count;
     }
 
-    public string StepTitle => IsCustom ? $"公共序列 · {Name}" : $"技能 {SkillKey}";
+    public string StepTitle => IsCustom
+        ? $"公共序列 · {Name}"
+        : SkillKey == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey
+            ? "跳过回合"
+            : $"技能 {SkillKey}";
 
     public Visibility SequenceVisibility => IsCustom ? Visibility.Visible : Visibility.Collapsed;
 
@@ -663,7 +667,11 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 
     public string DisplayText => IsCustom ? Name : SkillKey;
 
-    public string DetailText => IsCustom ? Sequence : "技能键";
+    public string DetailText => IsCustom
+        ? Sequence
+        : SkillKey == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey
+            ? "等待轮到本玩家（P 角标）后继续"
+            : "技能键";
 
     public static AutoBattleReleaseEditorItem CreateSkill(string skillKey)
     {

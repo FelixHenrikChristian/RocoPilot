@@ -57,6 +57,16 @@ public sealed partial class RuntimeTaskService
         if (_isSuspended) return;
         var now = DateTimeOffset.Now;
         var settings = _autoBattleSettings;
+        // 普通战斗没有多人出招队列，不支持跳过回合；序列中的跳过步骤直接忽略。
+        while (AutoBattleController.IsSkipTurnStep(_battle.PeekReleaseStep(settings)))
+        {
+            _battle.SkipReleaseStep();
+            LogAutoBattleTurnAction(
+                "普通战斗不支持跳过回合，该步骤已忽略，继续执行 " +
+                AutoBattleSettingsRules.GetReleaseStepDisplay(_battle.PeekReleaseStep(settings)),
+                forceInformation: true);
+        }
+
         if (_battle.Phase != AutoBattlePhase.SkillSelection)
         {
             BeginAutoBattleSkillSelectionTurn(settings, now);

@@ -208,6 +208,27 @@ public sealed class AutoBattleController
         }
     }
 
+    /// <summary>跳过回合步骤：技能键为 S；等待轮到本玩家后由调用方跳到下一步骤。</summary>
+    public static bool IsSkipTurnStep(AutoBattleReleaseStep? step)
+    {
+        return step is { IsCustom: false }
+            && string.Equals(step.SkillKey, AutoBattleSettingsRules.SkipTurnSkillKey, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>查看序列中当前指向的步骤，不创建回合。</summary>
+    public AutoBattleReleaseStep PeekReleaseStep(AutoBattleSettings settings)
+    {
+        lock (_gate)
+            return CurrentReleaseStep(settings).Clone();
+    }
+
+    /// <summary>消耗一个跳过回合步骤，推进到序列中的下一步骤。</summary>
+    public void SkipReleaseStep()
+    {
+        lock (_gate)
+            _roundIndex++;
+    }
+
     private AutoBattleReleaseStep CurrentReleaseStep(AutoBattleSettings settings)
     {
         if (_roundIndex >= settings.ReleaseSequence.Count) _roundIndex = 0;
@@ -247,6 +268,12 @@ public sealed class AutoBattleController
 
     private static AutoBattlePlan PlanSkill(AutoBattleSettings settings, AutoBattleReleaseStep step)
     {
+        if (IsSkipTurnStep(step))
+        {
+            // 正常流程中该步骤在创建回合前就被等待逻辑消耗；到达这里说明状态异常，宁可不动。
+            return new(AutoBattleAction.NoAction, "", "跳过回合步骤未被消耗，等待轮次识别", "-");
+        }
+
         var display = AutoBattleSettingsRules.GetReleaseStepDisplay(step);
         return new(AutoBattleAction.Skill, AutoBattleSettingsRules.BuildReleaseSequence(settings, step),
             step.IsCustom ? $"执行自定义序列 {display}" : $"释放技能 {display}", display,

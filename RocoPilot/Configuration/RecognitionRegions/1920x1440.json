@@ -35,6 +35,38 @@
       "enabled": true
     },
     {
+      "id": "battle-skill-second-badge",
+      "x": 975,
+      "y": 148,
+      "width": 70,
+      "height": 60,
+      "enabled": true
+    },
+    {
+      "id": "battle-skill-queue-anchor",
+      "x": 852,
+      "y": 116,
+      "width": 70,
+      "height": 78,
+      "enabled": true
+    },
+    {
+      "id": "battle-skill-turn-arrow-mine",
+      "x": 922,
+      "y": 176,
+      "width": 82,
+      "height": 66,
+      "enabled": true
+    },
+    {
+      "id": "battle-skill-player-badge",
+      "x": 840,
+      "y": 95,
+      "width": 105,
+      "height": 125,
+      "enabled": true
+    },
+    {
       "id": "battle-tip-shiny",
       "x": 1485,
       "y": 149,

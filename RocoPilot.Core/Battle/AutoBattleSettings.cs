@@ -64,6 +64,13 @@ public sealed class AutoBattleSettings
         set;
     } = AutoBattleEncounterRelievedAction.RecoverEnergy;
 
+    /// <summary>本玩家在多人战斗中的编号（1P-4P）；跳过回合步骤等待该编号的 P 角标出现。</summary>
+    public int PlayerNumber
+    {
+        get;
+        set;
+    } = 1;
+
     public KeyboardInputMethod KeyboardInputMethod
     {
         get;
@@ -121,6 +128,7 @@ public sealed class AutoBattleSettings
             LegendaryReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
+            PlayerNumber = 1,
             KeyboardInputMethod = KeyboardInputMethod.PostMessage,
             SkillSelectionActionDelayMs = DefaultSkillSelectionActionDelayMs,
             SkillSelectionRetryDelayMs = DefaultSkillSelectionRetryDelayMs,
@@ -155,6 +163,7 @@ public sealed class AutoBattleSettings
             LegendaryReleaseSequence = (LegendaryReleaseSequence ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).OfType<AutoBattleTurnSequencePreset>().Select(preset => preset.Clone()).ToList(),
             EncounterRelievedAction = EncounterRelievedAction,
+            PlayerNumber = Math.Clamp(PlayerNumber, 1, 4),
             KeyboardInputMethod = KeyboardInputMethod,
             SkillSelectionActionDelayMs = SkillSelectionActionDelayMs,
             SkillSelectionRetryDelayMs = SkillSelectionRetryDelayMs,

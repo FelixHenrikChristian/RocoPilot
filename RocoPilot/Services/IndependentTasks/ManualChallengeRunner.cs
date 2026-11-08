@@ -15,25 +15,20 @@ namespace RocoPilot.Services.IndependentTasks;
 
 public sealed class ManualChallengeRunner(
     IScreenCaptureService capture,
-    IKeyboardInputService keyboard,
-    IMouseInputService mouse,
-    ManualChallengeScreenRecognizer recognizer,
-    AutoBattleInputExecutor battleInput,
-    IRecognitionOverlayService overlay,
-    ILogger<ManualChallengeRunner> logger) : IManualChallengeRunner
-{
-    public async Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
-        int difficulty, bool useLegendaryMark, AutoBattleSettings battleSettings,
-        Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
-        => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken, targetName, useLegendaryMark, difficulty);
+    BattleScreenRecognizer battleScreen,
+    private static readonly TimeSpan MyTurnCheckInterval = TimeSpan.FromMilliseconds(500);
+    /// <summary>中间跳过的黄框阶段超时：黄框（轮到玩家）出现后等 AI 插入超过 5 秒即强制执行。</summary>
+    private const double SkipTurnTimeoutSeconds = 5;
+    /// <summary>开头跳过的最短等待：从跳过开始至少满 10 秒且箭头顺延才执行后续操作。</summary>
+    private const double HeadSkipMinimumSeconds = 10;
 
-    public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target, int runCount, AutoBattleSettings battleSettings,
-        Action<IndependentTaskProgress> progress,
-        CancellationToken cancellationToken)
-        => _ = await RunCoreAsync(state, target, runCount, battleSettings, progress, cancellationToken);
-
-    public Task<IReadOnlyList<FlowerSeedOption>> ScanAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
-        CancellationToken cancellationToken)
+        int difficulty, bool useLegendaryMark, bool atTargetLocation, AutoBattleSettings battleSettings,
+        => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken,
+            targetName, useLegendaryMark, difficulty, atTargetLocation: atTargetLocation);
+    public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target, int runCount, bool atTargetLocation,
+        bool preferCondensedMark, AutoBattleSettings battleSettings, Action<IndependentTaskProgress> progress,
+        => _ = await RunCoreAsync(state, target, runCount, battleSettings, progress, cancellationToken,
+            atTargetLocation: atTargetLocation, preferCondensedMark: preferCondensedMark);
         => RunCoreAsync(state, null, 0, state.Options.AutoBattleSettings, progress, cancellationToken);
 
     public async Task<IReadOnlyList<string>> ScanLegendaryAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
@@ -54,12 +49,14 @@ public sealed class ManualChallengeRunner(
         {
             settings.IsEnabled = true;
             settings.ReleaseSequence = legendary ? settings.LegendaryReleaseSequence : settings.FlowerSeedReleaseSequence;
-            settings.TurnSequence = AutoBattleSettings.DefaultTurnSequence;
-        }
-        var battle = new AutoBattleController();
-        var battleNumber = 0;
-        var window = state.TargetWindow;
-        var inputMethod = settings.KeyboardInputMethod;
+        var loggedSkipTurnWaiting = false;
+        var myTurnCache = false;
+        var myTurnCheckedAt = DateTimeOffset.MinValue;
+        DateTimeOffset? skipTurnHighlightAt = null;
+        byte[]? skillQueueBaseline = null;
+        var hasReleasedSkillInBattle = false;
+        DateTimeOffset? headSkipStartedAt = null;
+        var markClickAt = DateTimeOffset.MinValue;
         keyboard.EnsureReady(inputMethod);
         var lastScene = ManualChallengeScene.Unknown;
         (ManualChallengeScene Scene, BattleScreen? Screen, ManualChallengeAction Action)? lastObservation = null;
@@ -112,32 +109,162 @@ public sealed class ManualChallengeRunner(
                     logger.LogWarning("挑战失败，原地重试：连续失败 {Failures}/3，已成功 {Completed}/{Total} 次，触发画面 {Scene}",
                         flow.ConsecutiveFailures, flow.CompletedCount, runCount, screen.Scene);
                 if (flow.BattleNumber != battleNumber)
-                {
-                    battleNumber = flow.BattleNumber;
-                    battle.ResetBattle();
-                }
-                AutoBattlePlan? plan = null;
-                var switchingPet = decision.Action == ManualChallengeAction.Battle
+                    myTurnCache = false;
+                    myTurnCheckedAt = DateTimeOffset.MinValue;
+                    loggedSkipTurnWaiting = false;
+                    skipTurnHighlightAt = null;
+                    skillQueueBaseline = null;
+                    hasReleasedSkillInBattle = false;
+                    headSkipStartedAt = null;
                     && screen.BattleScreen is BattleScreen.PetSwitching or BattleScreen.PetSwitchConfirmation;
-                if (decision.Action == ManualChallengeAction.Battle && screen.BattleScreen == BattleScreen.SkillSelection)
+                    // 跳过回合步骤。序列开头：进战斗箭头先指第 1 个图标（本玩家可
+                    // 出招，跳过即不出招），AI 插队出招后箭头顺延到第 2 个图标，此时
+                    // 再执行后续技能。序列中间：等待第 1 个技能图标发生变化（出招队
+                    // 列前移、释放者标注更换，说明 AI 的执行插入了），3 秒等不到就
+                    // 直接执行（无人可插队时游戏要求必须出招）。
+                    var waitingForMyTurn = false;
+                    while (AutoBattleController.IsSkipTurnStep(battle.PeekReleaseStep(settings)))
+                    {
+                        // 开头跳过只在每场战斗的第一轮生效（未释放过任何技能）：
+                        // 序列循环回第一步时箭头可能仍停在第 2 位（上一轮顺延出招后的
+                        // 延续状态），若继续用"箭头顺延"判定会立即误通过。后续轮次
+                        // 的跳过与序列中间的跳过一样，走技能界面 + 图标变化逻辑。
+                        if (battle.RoundIndex > 0 || hasReleasedSkillInBattle)
+                        {
+                            // 中间跳过：进入技能选择界面即"轮到玩家"（本分支的前提
+                            // 就是 BattleScreen.SkillSelection）。玩家不出招，等第 1
+                            // 技能图标变化（AI 插入执行）；可操作状态累计 5 秒无人
+                            // 插入才超时强制执行。AI 动画期间界面离开本分支，
+                            // 计时重置、基线保留——回来时若图标已变即可完成。
+                            skipTurnHighlightAt ??= DateTimeOffset.UtcNow;
+                            if (skillQueueBaseline is null)
+                            {
+                                skillQueueBaseline = battleScreen.CaptureSkillQueueAnchor(state, frame, token);
+                                if (!loggedSkipTurnWaiting)
+                                {
+                                    loggedSkipTurnWaiting = true;
+                                    logger.LogInformation("手册挑战：已轮到玩家（技能选择界面），跳过本回合不出招，等待 AI 插入执行");
+                                }
+                            }
+                            else if (battleScreen.HasSkillQueueChanged(state, frame, skillQueueBaseline, token))
+                            {
+                                battle.SkipReleaseStep();
+                                skipTurnHighlightAt = null;
+                                skillQueueBaseline = null;
+                                myTurnCache = false;
+                                loggedSkipTurnWaiting = false;
+                                logger.LogInformation(
+                                    "手册挑战：技能图标已变化（AI 执行插入），跳过回合步骤完成，继续执行 {Step}",
+                                    AutoBattleSettingsRules.GetReleaseStepDisplay(battle.PeekReleaseStep(settings)));
+                                continue;
+                            }
+                            else if ((DateTimeOffset.UtcNow - skipTurnHighlightAt.Value).TotalSeconds >= SkipTurnTimeoutSeconds)
+                            {
+                                battle.SkipReleaseStep();
+                                skipTurnHighlightAt = null;
+                                skillQueueBaseline = null;
+                                myTurnCache = false;
+                                loggedSkipTurnWaiting = false;
+                                logger.LogInformation(
+                                    "手册挑战：可操作状态等待超过 {Seconds} 秒仍无人插入，跳过回合超时兜底，继续执行 {Step}",
+                                    SkipTurnTimeoutSeconds,
+                                    AutoBattleSettingsRules.GetReleaseStepDisplay(battle.PeekReleaseStep(settings)));
+                                continue;
+                            }
+
+                            waitingForMyTurn = true;
+                            break;
+                        }
+
+                        var myTurn = myTurnCache;
+                        if (!myTurn)
+                        {
+                            var check = DateTimeOffset.UtcNow;
+                            if (check - myTurnCheckedAt >= MyTurnCheckInterval)
+                            {
+                                myTurnCheckedAt = check;
+                                myTurn = myTurnCache = await battleScreen.IsMyTurnAsync(
+                                    state, frame, settings.PlayerNumber, token);
+                            }
+                        }
+
+                        // 开头跳过最短等待：从跳过开始计时，至少满 10 秒且箭头顺延才执行，
+                        // 避免 boss/AI 刚插入（动画进行中）就出招。
+                        headSkipStartedAt ??= DateTimeOffset.UtcNow;
+
+                        if (!myTurn || (DateTimeOffset.UtcNow - headSkipStartedAt.Value).TotalSeconds < HeadSkipMinimumSeconds)
+                        {
+                            waitingForMyTurn = true;
+                            if (!loggedSkipTurnWaiting)
+                            {
+                                loggedSkipTurnWaiting = true;
+                                logger.LogInformation(
+                                    myTurn
+                                        ? "手册挑战：箭头已顺延，但开头跳过最短等待 {Seconds} 秒未满，继续等待"
+                                        : "手册挑战：跳过回合，等待 AI 出招后箭头顺延（当前未轮到顺延位），期间不发送输入",
+                                    HeadSkipMinimumSeconds);
+                            }
+
+                            break;
+                        }
+
+                        battle.SkipReleaseStep();
+                        skipTurnHighlightAt = null;
+                        headSkipStartedAt = null;
+                        myTurnCache = false;
+                        loggedSkipTurnWaiting = false;
+                        logger.LogInformation(
+                            "手册挑战：箭头已顺延且最短等待 {Seconds} 秒已满，跳过回合步骤完成，继续执行 {Step}",
+                            HeadSkipMinimumSeconds,
+                            AutoBattleSettingsRules.GetReleaseStepDisplay(battle.PeekReleaseStep(settings)));
+                    }
+
+                    if (!waitingForMyTurn)
+                    {
+                        if (battle.Phase != AutoBattlePhase.SkillSelection)
+                            battle.BeginSkillSelection(settings, now);
+                        if (battle.ShouldRecoverAfterSkillFailure(settings, now))
+                            plan = new(AutoBattleAction.EnergyRecovery, "X", "技能未离开选择界面，回能 X，原技能延后", "X");
+                        else if (battle.CanAct(settings, now))
+                            plan = battle.PlanSkillSelection(settings, false, now);
+                    }
                 {
-                    var now = DateTimeOffset.UtcNow;
-                    if (battle.Phase != AutoBattlePhase.SkillSelection)
-                        battle.BeginSkillSelection(settings, now);
-                    if (battle.ShouldRecoverAfterSkillFailure(settings, now))
-                        plan = new(AutoBattleAction.EnergyRecovery, "X", "技能未离开选择界面，回能 X，原技能延后", "X");
-                    else if (battle.CanAct(settings, now))
-                        plan = battle.PlanSkillSelection(settings, false, now);
+                    // 中间跳过等待期间界面离开（AI 行动动画）：不可操作状态，重置
+                    // 5 秒计时；基线保留，界面回来时图标若已变化即可完成跳过。
+                    skipTurnHighlightAt = null;
                 }
-                else if (screen.Scene != ManualChallengeScene.Unknown)
-                    battle.CompleteSkillSelection();
-                if (switchingPet && battle.Phase != AutoBattlePhase.PetSwitching)
-                    battle.BeginPetSwitching(settings);
-                else if (screen.Scene != ManualChallengeScene.Unknown && !switchingPet)
-                    battle.ObservePetSwitching(false);
-                if (decision.Action == ManualChallengeAction.Capture)
-                    plan = new(AutoBattleAction.Capture, "1, Space", "使用专属球捕捉", "1, Space");
-                if (screen.Scene == ManualChallengeScene.FlowerList)
+                // 捕捉前优先使用凝练印记：紫星未选中即点击切换（不做数量判断，
+                // OCR 小数字不可靠）；出现"凝练印记不足"提示（数量耗尽）时改点
+                // 蓝星（契约印记）。点击后本帧不捕捉，等下一帧复查选中状态。
+                if (decision.Action == ManualChallengeAction.Capture
+                    && preferCondensedMark && !legendary)
+                {
+                    var (markSelected, markInsufficient) = await recognizer.ReadCondensedMarkAsync(
+                        frame, clientX, clientY, width, height, token);
+                    if (markInsufficient
+                        && (DateTimeOffset.UtcNow - markClickAt).TotalSeconds >= 2)
+                    {
+                        await mouse.ClickAsync(window.Hwnd,
+                            (int)Math.Round(width * .894),
+                            (int)Math.Round(height * .123),
+                            inputMethod, token);
+                        markClickAt = DateTimeOffset.UtcNow;
+                        logger.LogInformation("手册挑战：凝练印记不足（游戏提示），已点击蓝星改用契约印记，等待复查后捕捉");
+                        decision = new(ManualChallengeAction.None);
+                    }
+                    else if (!markInsufficient && !markSelected
+                        && (DateTimeOffset.UtcNow - markClickAt).TotalSeconds >= 2)
+                    {
+                        await mouse.ClickAsync(window.Hwnd,
+                            (int)Math.Round(width * .958),
+                            (int)Math.Round(height * .125),
+                            inputMethod, token);
+                        markClickAt = DateTimeOffset.UtcNow;
+                        logger.LogInformation("手册挑战：凝练印记未选中，已点击紫星切换，等待复查后捕捉");
+                        decision = new(ManualChallengeAction.None);
+                    }
+                }
+
                 {
                     if (!flow.IsTopConfirmed) previews.Clear();
                     else for (var i = 0; i < previews.Count; i++)

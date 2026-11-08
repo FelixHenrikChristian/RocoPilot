@@ -18,6 +18,9 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
 
     internal string Description { get; }
 
+    /// <summary>普通战斗没有出招队列，不能跳过回合；跳过步骤按钮仅在花种/传说战斗显示。</summary>
+    internal Visibility SkipTurnButtonVisibility { get; }
+
     internal AutoBattleReleaseConfigPage(
         AutoBattleConfigEditor editor,
         AutoBattleConfigWindow owner,
@@ -34,6 +37,9 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         Description = section is AutoBattleConfigSection.FlowerSeed or AutoBattleConfigSection.Legendary
             ? "轮到自己操作时按顺序释放技能，每场挑战从第一步开始，可插入公共执行序列。"
             : "按顺序循环执行每个技能回合的动作。";
+        SkipTurnButtonVisibility = section is AutoBattleConfigSection.FlowerSeed or AutoBattleConfigSection.Legendary
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         InitializeComponent();
     }
 

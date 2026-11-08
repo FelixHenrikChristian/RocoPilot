@@ -14,12 +14,13 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
     private const int ActionPauseMs = 900;
     private static readonly TimeSpan ResultPause = TimeSpan.FromSeconds(3);
 
-    public async Task RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
+    public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
         var input = state.Options.AutoBattleSettings;
         keyboard.EnsureReady(input.KeyboardInputMethod);
         var step = Step.OpenMap;
+        var outcome = "成功：已制造赛季球";
         var timer = Stopwatch.StartNew();
         var nextResultEscape = ResultPause;
         DateTimeOffset? lastResultFrame = null;
@@ -158,10 +159,25 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                     }
                     break;
                 case Step.SetAmount:
+                case Step.Make:
                     if (await SeasonTimer() is null) break;
+                    if (await Find("make-disabled", 1640, 1010, 1960, 1140) is not null)
+                    {
+                        outcome = "跳过：体力不足";
+                        await Key("Esc");
+                        step = Step.ExitDialogue;
+                        break;
+                    }
                     if (await Maximum() is not null)
-                        step = Step.Make;
-                    else if (await Find("handle", 1180, 970, 1305, 1070) is { } handle)
+                    {
+                        if (await MakeButton() is { } make)
+                        {
+                            await Click(make);
+                            step = Step.ConfirmMake;
+                        }
+                        break;
+                    }
+                    if (step == Step.SetAmount && await Find("handle", 1180, 970, 1305, 1070) is { } handle)
                     {
                         var px = handle.X + handle.Width / 2d;
                         var py = screen.ClientY(handle.Y + handle.Height / 2d);
@@ -169,14 +185,6 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                             input.KeyboardInputMethod, token);
                         await AfterInput();
                         step = Step.Make;
-                    }
-                    break;
-                case Step.Make:
-                    if (await SeasonTimer() is not null && await Maximum() is not null &&
-                        await MakeButton() is { } make)
-                    {
-                        await Click(make);
-                        step = Step.ConfirmMake;
                     }
                     break;
                 case Step.ConfirmMake:
@@ -200,7 +208,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                     else if (await Recipe() is not null) await Key("Esc");
                     break;
                 case Step.ReturnWorld:
-                    if (await screen.World(token) is not null) return;
+                    if (await screen.World(token) is not null) return outcome;
                     if (await Choices() is not null) await Key("Esc");
                     break;
             }

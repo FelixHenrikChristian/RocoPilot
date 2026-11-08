@@ -2,6 +2,11 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-08：赛季球体力不足
+
+- [用户原图](LocalScreenshots/2026-11-08/stamina-crafting/season-insufficient-stamina.png)，来源 codex-clipboard-3ce6ed48-59c5-4df2-ba66-98e1895db786.png，2048×1152。已选赛季球，体力 3/4、制造次数 0、制造按钮置灰。
+- 按钮模板取自客户区 (1754,1062,92,38)。体力合成回放验证跳过并返回大世界，沿用原有亮起按钮截图作为对照。这张图仅覆盖体力不足时选中赛季球的状态。
+
 ## 2026-11-08：晚风小憩活动
 
 - [推荐页，探索入口右上有红点](LocalScreenshots/2026-11-08/evening-rest/recommended.png)，来源 codex-clipboard-67c1464d-3c58-4109-8265-4f79b0827e45.png。

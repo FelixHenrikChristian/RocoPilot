@@ -12,7 +12,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
 {
     private enum Step { Open, Explore, CheckEvent, Teleport, Arrival, Monitor, Exit }
 
-    public async Task RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
+    public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
         var input = state.Options.AutoBattleSettings;
@@ -91,12 +91,12 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                     if (await Event() is null)
                     {
                         if (timer.Elapsed.TotalSeconds < 3) break;
-                        exitReason = "默认活动不是晚风小憩，跳过";
+                        exitReason = "跳过：默认活动不是晚风小憩";
                         step = Step.Exit;
                     }
                     else if (await Full() is not null)
                     {
-                        exitReason = "本日星光已达 1200/1200";
+                        exitReason = "成功：本日星光已达 1200/1200";
                         step = Step.Exit;
                     }
                     else if (arrived)
@@ -112,7 +112,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                     }
                     else if (timer.Elapsed.TotalSeconds >= 5)
                     {
-                        exitReason = "未找到晚风小憩的前往按钮，跳过";
+                        exitReason = "跳过：未找到前往按钮";
                         step = Step.Exit;
                     }
                     break;
@@ -125,7 +125,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                     }
                     break;
                 case Step.Exit:
-                    if (await screen.World(token) is not null) return;
+                    if (await screen.World(token) is not null) return exitReason;
                     if (await Explore() is not null) await Key("Esc");
                     break;
             }

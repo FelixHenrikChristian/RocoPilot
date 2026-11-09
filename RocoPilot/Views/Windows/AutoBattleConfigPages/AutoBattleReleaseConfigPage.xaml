@@ -201,26 +201,33 @@
                         </Grid>
 
                         <Grid MinHeight="64">
-                            <GridView ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
-                                      SelectionMode="None" CanDragItems="True" CanReorderItems="True" AllowDrop="True"
+                            <!-- GridView 鼠标拖拽在 WinUI3 不触发（已知问题），改用 ListView + ItemsWrapGrid 保持两行流式；
+                                 ItemsWrapGrid 不支持原生重排且需 SelectionMode=Single 才能启动拖拽，拖放事件手动重排。 -->
+                            <ListView x:Name="StepsGrid"
+                                      ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
+                                      SelectionMode="Single" CanDragItems="True" AllowDrop="True"
+                                      DragItemsStarting="StepsGrid_DragItemsStarting"
+                                      DragOver="StepsGrid_DragOver"
+                                      Drop="StepsGrid_Drop"
+                                      IsItemClickEnabled="False"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                       ScrollViewer.VerticalScrollMode="Disabled"
                                       ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                <GridView.ItemsPanel>
+                                <ListView.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <ItemsWrapGrid Orientation="Horizontal" />
                                     </ItemsPanelTemplate>
-                                </GridView.ItemsPanel>
-                                <GridView.ItemContainerStyle>
-                                    <Style TargetType="GridViewItem">
+                                </ListView.ItemsPanel>
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="Margin" Value="0,0,8,8" />
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                         <Setter Property="MinHeight" Value="0" />
                                     </Style>
-                                </GridView.ItemContainerStyle>
-                                <GridView.ItemTemplate>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="8"
                                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
@@ -246,8 +253,8 @@
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
-                                </GridView.ItemTemplate>
-                            </GridView>
+                                </ListView.ItemTemplate>
+                            </ListView>
                             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="添加上方技能，或从下方插入公共序列"

@@ -5,6 +5,9 @@ using Microsoft.UI.Xaml.Controls;
 using RocoPilot.Controls;
 using RocoPilot.Helpers;
 
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Foundation;
+
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
 
 public sealed partial class AutoBattleReleaseConfigPage : Page
@@ -66,6 +69,68 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         {
             Set.SelectedSequence.Items.Remove(item);
         }
+    }
+
+    // GridView 鼠标拖拽在 WinUI3 不触发（已知问题），改用 ListView + 拖放事件手动交换位置。
+    private AutoBattleReleaseEditorItem? _dragStepItem;
+
+    private void StepsGrid_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    {
+        _dragStepItem = e.Items.FirstOrDefault() as AutoBattleReleaseEditorItem;
+        Debug.WriteLine($"[战斗配置] 拖拽开始：{_dragStepItem?.StepTitle ?? "<null>"}");
+    }
+
+    private void StepsGrid_DragOver(object sender, DragEventArgs e)
+    {
+        if (_dragStepItem is not null)
+        {
+            e.AcceptedOperation = DataPackageOperation.Move;
+            e.Handled = true;
+        }
+    }
+
+    private void StepsGrid_Drop(object sender, DragEventArgs e)
+    {
+        e.Handled = true;
+        if (_dragStepItem is not { } item)
+        {
+            return;
+        }
+
+        _dragStepItem = null;
+        var sequence = Set.SelectedSequence;
+        var oldIndex = sequence.Items.IndexOf(item);
+        var targetIndex = FindStepDropIndex(e.GetPosition(StepsGrid));
+        StepsGrid.SelectedItem = null;
+        if (oldIndex < 0 || targetIndex < 0 || targetIndex == oldIndex)
+        {
+            return;
+        }
+
+        sequence.Items.Move(oldIndex, targetIndex);
+        Debug.WriteLine($"[战斗配置] 拖拽排序：{item.StepTitle} #{oldIndex + 1} -> #{targetIndex + 1}");
+    }
+
+    /// <summary>返回指针所在步骤卡片的索引；落在空白区域返回 -1。</summary>
+    private int FindStepDropIndex(Point position)
+    {
+        for (var index = 0; index < StepsGrid.Items.Count; index++)
+        {
+            if (StepsGrid.ContainerFromIndex(index) is not ListViewItem container)
+            {
+                continue;
+            }
+
+            var bounds = container
+                .TransformToVisual(StepsGrid)
+                .TransformBounds(new Rect(0, 0, container.ActualWidth, container.ActualHeight));
+            if (bounds.Contains(position))
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private void InsertPresetButton_Click(object sender, RoutedEventArgs e)

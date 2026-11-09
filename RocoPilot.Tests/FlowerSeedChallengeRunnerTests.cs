@@ -35,8 +35,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
-                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay(),
-                new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance))),
+                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
         var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
@@ -87,8 +86,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
-                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay(),
-                new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance))),
+                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
         var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
@@ -835,8 +833,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
             new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!),
-            new BattleScreenRecognizer(new RuntimeFrameRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, overlay ?? new Overlay(),
-                new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance))),
+            new BattleScreenRecognizer(new RuntimeFrameRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, overlay ?? new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
             overlay ?? new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);

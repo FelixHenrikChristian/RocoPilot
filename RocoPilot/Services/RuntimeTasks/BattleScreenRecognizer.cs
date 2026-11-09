@@ -153,8 +153,6 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
             BattleSkillTurnArrowRegionIds,
             BattleSkillTurnArrowTemplateName,
             BattleSkillTurnArrowMatchOptions,
-            "跳过回合轮次识别",
-            "行动位置箭头（第 2 技能图标）",
             cancellationToken);
     }
     private static readonly ImageMatchOptions BattleChatMatchOptions = new()

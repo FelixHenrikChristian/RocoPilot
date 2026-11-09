@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
@@ -26,7 +28,8 @@ internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOn
 
 /// <summary>界面控件用模板定位，动态名称和交互文字使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
-    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons)
+    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons,
+    ILogger<ManualChallengeScreenRecognizer>? logger = null)
 {
     // 首次定位与点击后的复查共用同一模板、区域和阈值。
     private static readonly Dictionary<string, (double Left, double Top, double Right, double Bottom, RecognitionAnchor Anchor)> ButtonAreas = new()
@@ -112,7 +115,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
                 var promptArea = Area(.31, .508, .70, .541, "契约印记不足弹窗正文");
                 var insufficientPrompt = await ocr.RecognizeAsync(frame, promptArea, TextRecognitionDefaults.Method, cancellationToken);
                 reportOcr?.Invoke(promptArea, string.IsNullOrWhiteSpace(insufficientPrompt.Text) ? "OCR：无文本" : $"OCR：{insufficientPrompt.Text}");
-                logger.LogDebug("契约印记不足弹窗正文：OCR={Raw}", insufficientPrompt.Text);
+                logger?.LogDebug("契约印记不足弹窗正文：OCR={Raw}", insufficientPrompt.Text);
                 if (TextMatchingHelper.CalculateSimilarity(insufficientPrompt.Text, "参与挑战将只能") >= .8)
                     return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
                         ExitButton: await Button("legendary-cancel"));
@@ -363,7 +366,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var promptArea = CreateArea(clientX, clientY, width, height, .33, .125, .68, .18);
         promptArea.Id = "凝练印记不足提示";
         var prompt = await images.MatchAsync(frame, promptArea, TemplatePath("condensed-insufficient"), options, token);
-        logger.LogDebug("凝练印记状态：选中={Selected}，不足提示={Insufficient}，得分={Score:F3}",
+        logger?.LogDebug("凝练印记状态：选中={Selected}，不足提示={Insufficient}，得分={Score:F3}",
             selected.IsMatch, prompt.IsMatch, prompt.Score);
         return (selected.IsMatch, prompt.IsMatch);
     }

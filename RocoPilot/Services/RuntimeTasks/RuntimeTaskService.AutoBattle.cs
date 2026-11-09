@@ -63,10 +63,9 @@ public sealed partial class RuntimeTaskService
         while (AutoBattleController.IsSkipTurnStep(_battle.PeekReleaseStep(settings)))
         {
             _battle.SkipReleaseStep();
-            LogAutoBattleTurnAction(
-                "普通战斗不支持跳过回合，该步骤已忽略，继续执行 " +
-                AutoBattleSettingsRules.GetReleaseStepDisplay(_battle.PeekReleaseStep(settings)),
-                forceInformation: true);
+            _logger.LogInformation(
+                "自动战斗：普通战斗不支持跳过回合，该步骤已忽略，继续执行 {Step}",
+                AutoBattleSettingsRules.GetReleaseStepDisplay(_battle.PeekReleaseStep(settings)));
         }
 
         if (_battle.Phase != AutoBattlePhase.SkillSelection)

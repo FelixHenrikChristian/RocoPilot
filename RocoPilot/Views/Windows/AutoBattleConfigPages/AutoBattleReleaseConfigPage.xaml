@@ -201,15 +201,10 @@
                         </Grid>
 
                         <Grid MinHeight="64">
-                            <!-- GridView 鼠标拖拽在 WinUI3 不触发（已知问题），改用 ListView + ItemsWrapGrid 保持两行流式；
-                                 ItemsWrapGrid 不支持原生重排且需 SelectionMode=Single 才能启动拖拽，拖放事件手动重排。 -->
+                            <!-- 平台拖拽（GridView 鼠标不触发、ItemsWrapGrid 无原生重排）不可靠，卡片自实现 Pointer 拖拽。 -->
                             <ListView x:Name="StepsGrid"
                                       ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
-                                      SelectionMode="Single" CanDragItems="True" AllowDrop="True"
-                                      DragItemsStarting="StepsGrid_DragItemsStarting"
-                                      DragOver="StepsGrid_DragOver"
-                                      Drop="StepsGrid_Drop"
-                                      IsItemClickEnabled="False"
+                                      SelectionMode="None"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                       ScrollViewer.VerticalScrollMode="Disabled"
@@ -232,6 +227,10 @@
                                         <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="8"
                                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                                 Opacity="{Binding CardOpacity}"
+                                                CanDrag="False" UseLayoutRounding="True"
+                                                PointerCaptureLost="StepCard_PointerCaptureLost"
+                                                PointerPressed="StepCard_PointerPressed"
+                                                PointerReleased="StepCard_PointerReleased"
                                                 ToolTipService.ToolTip="{Binding DetailText}">
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>

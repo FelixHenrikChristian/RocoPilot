@@ -2,10 +2,10 @@ using System.Diagnostics;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using RocoPilot.Controls;
 using RocoPilot.Helpers;
 
-using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
 
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
@@ -71,37 +71,43 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         }
     }
 
-    // GridView 鼠标拖拽在 WinUI3 不触发（已知问题），改用 ListView + 拖放事件手动交换位置。
-    private AutoBattleReleaseEditorItem? _dragStepItem;
+    // 平台拖拽（GridView 鼠标不触发 DragItemsStarting、ItemsWrapGrid 无原生重排）不可靠，
+    // 卡片自实现 Pointer 拖拽：按下捕获指针并半透明，松开时按指针落点交换位置。
+    private Border? _dragStepCard;
 
-    private void StepsGrid_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    private void StepCard_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
-        _dragStepItem = e.Items.FirstOrDefault() as AutoBattleReleaseEditorItem;
-        Debug.WriteLine($"[战斗配置] 拖拽开始：{_dragStepItem?.StepTitle ?? "<null>"}");
-    }
-
-    private void StepsGrid_DragOver(object sender, DragEventArgs e)
-    {
-        if (_dragStepItem is not null)
-        {
-            e.AcceptedOperation = DataPackageOperation.Move;
-            e.Handled = true;
-        }
-    }
-
-    private void StepsGrid_Drop(object sender, DragEventArgs e)
-    {
-        e.Handled = true;
-        if (_dragStepItem is not { } item)
+        if (sender is not Border { DataContext: AutoBattleReleaseEditorItem item } card)
         {
             return;
         }
 
-        _dragStepItem = null;
+        if (!e.GetCurrentPoint(card).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
+        _dragStepCard = card;
+        card.CapturePointer(e.Pointer);
+        card.Opacity = item.CardOpacity * 0.45;
+        e.Handled = true;
+    }
+
+    private void StepCard_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not Border { DataContext: AutoBattleReleaseEditorItem item } card || _dragStepCard is null)
+        {
+            return;
+        }
+
+        _dragStepCard = null;
+        card.Opacity = item.CardOpacity;
+        card.ReleasePointerCapture(e.Pointer);
+        e.Handled = true;
+
         var sequence = Set.SelectedSequence;
         var oldIndex = sequence.Items.IndexOf(item);
-        var targetIndex = FindStepDropIndex(e.GetPosition(StepsGrid));
-        StepsGrid.SelectedItem = null;
+        var targetIndex = FindStepDropIndex(e.GetCurrentPoint(StepsGrid).Position);
         if (oldIndex < 0 || targetIndex < 0 || targetIndex == oldIndex)
         {
             return;
@@ -109,6 +115,17 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
 
         sequence.Items.Move(oldIndex, targetIndex);
         Debug.WriteLine($"[战斗配置] 拖拽排序：{item.StepTitle} #{oldIndex + 1} -> #{targetIndex + 1}");
+    }
+
+    private void StepCard_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is not Border { DataContext: AutoBattleReleaseEditorItem item } card)
+        {
+            return;
+        }
+
+        _dragStepCard = null;
+        card.Opacity = item.CardOpacity;
     }
 
     /// <summary>返回指针所在步骤卡片的索引；落在空白区域返回 -1。</summary>

@@ -86,9 +86,9 @@ public class ActivationService : IActivationService
         {
             await _statisticsSyncService.DownloadRemoteChangesIfNeededAsync();
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            _logger.LogWarning(ex, "启动时同步云端统计数据失败，应用将继续使用本地数据。");
+            _logger.LogDebug("启动时继续使用本地统计数据。");
         }
     }
 }

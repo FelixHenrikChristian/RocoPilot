@@ -2,8 +2,6 @@ using System;
 using System.IO;
 using System.Reflection;
 
-using RocoPilot.Services.Logging;
-
 using Serilog;
 using Serilog.Events;
 
@@ -15,24 +13,22 @@ public static class LoggingHelper
 {
     public static string LogDirectory { get; } = ResolveLogDirectory();
 
-    public static InMemoryLogSink LogBuffer { get; } = new(2000);
-
-    public static void ConfigureSerilog()
+    internal static Serilog.Core.Logger CreateLogger(string directory)
     {
-        Directory.CreateDirectory(LogDirectory);
+        Directory.CreateDirectory(directory);
 
         const string outputTemplate =
             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-        Log.Logger = new LoggerConfiguration()
+        return new LoggerConfiguration()
             .MinimumLevel.Is(LogEventLevel.Debug)
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
             .Enrich.FromLogContext()
             .WriteTo.Debug(outputTemplate: outputTemplate)
-            .WriteTo.Sink(LogBuffer)
             .WriteTo.File(
-                path: Path.Combine(LogDirectory, "app-.log"),
+                path: Path.Combine(directory, "app-.log"),
+                restrictedToMinimumLevel: LogEventLevel.Information,
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 shared: true,
@@ -42,7 +38,7 @@ public static class LoggingHelper
 
     public static void CloseAndFlush() => Log.CloseAndFlush();
 
-    public static void LogStartupBanner()
+    public static void LogStartup()
     {
         var version = GetAppVersion();
         var isMsix = RuntimeHelper.IsMSIX;
@@ -50,11 +46,25 @@ public static class LoggingHelper
         var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
         var framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
 
-        Log.Information("==================== RocoPilot 启动 ====================");
-        Log.Information("版本: v{Version:l}  运行模式: {Mode:l}  架构: {Arch}", version, isMsix ? "MSIX" : "Unpackaged", arch);
-        Log.Information("运行时: {Framework:l}", framework);
-        Log.Information("操作系统: {OS:l}", os);
-        Log.Information("日志目录: {LogDirectory:l}", LogDirectory);
+        Log.ForContext(typeof(App)).Information("RocoPilot {Version:l} 启动，{Mode:l}，{Arch:l}，{Framework:l}，{OS:l}",
+            version, isMsix ? "MSIX" : "Unpackaged", arch, framework, os);
+    }
+
+    internal static string FormatLogText(string? text, int maximumLength = 120)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return "<empty>";
+        }
+
+        var normalized = string.Join(
+            " ",
+            text
+                .Trim()
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return normalized.Length <= maximumLength
+            ? normalized
+            : $"{normalized[..maximumLength]}...";
     }
 
     private static string GetAppVersion()

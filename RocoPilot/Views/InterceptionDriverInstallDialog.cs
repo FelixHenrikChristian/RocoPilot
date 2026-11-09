@@ -6,9 +6,9 @@ using Microsoft.UI.Xaml.Media;
 
 using RocoPilot.Controls;
 using RocoPilot.Contracts.Services;
-using RocoPilot.Helpers;
 
 using Windows.Foundation;
+using Windows.System;
 
 namespace RocoPilot.Views;
 
@@ -44,7 +44,7 @@ public static class InterceptionDriverInstallDialog
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Secondary)
         {
-            _ = ShellLaunchHelper.LaunchUri(releasePageUri);
+            await Launcher.LaunchUriAsync(releasePageUri);
         }
 
         return result;
@@ -124,7 +124,7 @@ public static class InterceptionDriverInstallDialog
         var dialog = CreateInstallFailedDialog(xamlRoot, errorMessage);
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
-            _ = ShellLaunchHelper.LaunchUri(releasePageUri);
+            await Launcher.LaunchUriAsync(releasePageUri);
         }
     }
 

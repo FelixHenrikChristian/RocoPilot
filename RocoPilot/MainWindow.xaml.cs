@@ -15,7 +15,7 @@ public sealed partial class MainWindow : WindowEx
 {
     private readonly WindowShutdownCoordinator _shutdownCoordinator;
 
-    private Microsoft.UI.Dispatching.DispatcherQueue? dispatcherQueue;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue dispatcherQueue;
 
     private UISettings? settings;
 
@@ -30,7 +30,7 @@ public sealed partial class MainWindow : WindowEx
             ShutdownAsync,
             callback => DispatcherQueue.TryEnqueue(() => callback()),
             Close,
-            exception => Log.Error(exception, "关闭主窗口时发生异常"));
+            exception => Log.ForContext(typeof(MainWindow)).Error(exception, "关闭主窗口时发生异常"));
 
         // Theme change code picked from https://github.com/microsoft/WinUI-Gallery/pull/1239
         dispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
@@ -47,15 +47,14 @@ public sealed partial class MainWindow : WindowEx
 
     private async Task ShutdownAsync()
     {
-        UnsubscribeThemeEvents();
-
         try
         {
             var runtimeTaskService = App.GetService<IRuntimeTaskService>();
             await runtimeTaskService.StopAsync();
         }
-        catch
+        catch (Exception ex)
         {
+            Log.ForContext(typeof(MainWindow)).Warning(ex, "关闭应用时停止实时任务失败");
         }
 
         try
@@ -64,60 +63,38 @@ public sealed partial class MainWindow : WindowEx
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "关闭云同步任务时发生异常");
+            Log.ForContext(typeof(MainWindow)).Warning(ex, "关闭云同步任务时发生异常");
         }
 
         try
         {
             App.GetService<IAppNotificationService>().Unregister();
         }
-        catch
+        catch (Exception ex)
         {
+            Log.ForContext(typeof(MainWindow)).Warning(ex, "注销 Windows 通知失败");
         }
-
-        LoggingHelper.CloseAndFlush();
     }
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
-        UnsubscribeWindowEvents();
-        UnsubscribeThemeEvents();
+        AppWindow.Closing -= AppWindow_Closing;
+        Closed -= MainWindow_Closed;
+        settings!.ColorValuesChanged -= Settings_ColorValuesChanged;
+        settings = null;
+        Log.ForContext(typeof(MainWindow)).Information("RocoPilot 已关闭");
+        LoggingHelper.CloseAndFlush();
     }
 
-    // this handles updating the caption button colors correctly when indows system theme is changed
-    // while the app is open
     private void Settings_ColorValuesChanged(UISettings sender, object args)
     {
-        var queue = dispatcherQueue;
-        if (_shutdownCoordinator.IsShutdownStarted || queue is null)
+        _ = dispatcherQueue.TryEnqueue(() =>
         {
-            return;
-        }
-
-        // This calls comes off-thread, hence we will need to dispatch it to current app's thread
-        _ = queue.TryEnqueue(() =>
-        {
-            if (!_shutdownCoordinator.IsShutdownStarted)
+            if (settings is not null && !_shutdownCoordinator.IsShutdownStarted)
             {
                 TitleBarHelper.ApplySystemThemeToCaptionButtons();
             }
         });
     }
 
-    private void UnsubscribeWindowEvents()
-    {
-        AppWindow.Closing -= AppWindow_Closing;
-        Closed -= MainWindow_Closed;
-    }
-
-    private void UnsubscribeThemeEvents()
-    {
-        if (settings is not null)
-        {
-            settings.ColorValuesChanged -= Settings_ColorValuesChanged;
-            settings = null;
-        }
-
-        dispatcherQueue = null;
-    }
 }

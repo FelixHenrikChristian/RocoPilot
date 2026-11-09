@@ -32,8 +32,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         var mouse = new Mouse { DuringScroll = () => scrolls++ };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
-            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55),
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
                 new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay(),
@@ -85,8 +84,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         } };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
-            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55),
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+            new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
                 new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay(),
@@ -836,7 +834,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     private static ManualChallengeRunner CreateRunner(IScreenCaptureService capture, Images images, Keyboard keyboard, Mouse mouse,
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
-            new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!, NullLogger<ManualChallengeScreenRecognizer>.Instance),
+            new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!),
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, overlay ?? new Overlay(),
                 new RuntimeDebugLogger(NullLogger<RuntimeDebugLogger>.Instance))),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
@@ -1116,6 +1114,8 @@ public sealed class FlowerSeedChallengeRunnerTests
 
     private sealed class Mouse : IMouseInputService
     {
+        public Task DragAsync(nint hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
+            CancellationToken cancellationToken) => throw new NotSupportedException();
         public int Clicks;
         public Action? DuringScroll;
         public Action<int, int>? DuringClick;

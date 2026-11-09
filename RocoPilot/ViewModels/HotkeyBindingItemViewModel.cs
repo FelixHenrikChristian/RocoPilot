@@ -66,6 +66,6 @@ public class HotkeyBindingItemViewModel : ObservableObject
         Action = descriptor.Action;
         Name = descriptor.Name;
         Description = descriptor.Description;
-        Glyph = descriptor.Glyph;
+        Glyph = (string)Application.Current.Resources[descriptor.GlyphResourceKey];
     }
 }

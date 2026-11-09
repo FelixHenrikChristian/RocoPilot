@@ -60,22 +60,6 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         Set.SelectedSequence.Items.Clear();
     }
 
-    private void MoveStepEarlier_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })
-        {
-            Set.SelectedSequence.MoveEarlier(item);
-        }
-    }
-
-    private void MoveStepLater_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })
-        {
-            Set.SelectedSequence.MoveLater(item);
-        }
-    }
-
     private void DeleteStep_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })

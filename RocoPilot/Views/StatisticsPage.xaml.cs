@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.Storage.Pickers;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -780,10 +781,13 @@ public sealed partial class StatisticsPage : Page
         string? filePath;
         try
         {
-            filePath = FileDialogHelper.PickOpenFile(
-                "导入统计数据",
-                "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            var picker = new FileOpenPicker(App.MainWindow.AppWindow.Id)
+            {
+                Title = "导入统计数据",
+                SuggestedStartFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                FileTypeFilter = { ".json", "*" }
+            };
+            filePath = (await picker.PickSingleFileAsync())?.Path;
         }
         catch (Exception ex)
         {
@@ -812,12 +816,15 @@ public sealed partial class StatisticsPage : Page
         string? filePath;
         try
         {
-            filePath = FileDialogHelper.PickSaveFile(
-                "导出统计数据",
-                "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                $"RocoPilot_Statistics_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.json",
-                ".json");
+            var picker = new FileSavePicker(App.MainWindow.AppWindow.Id)
+            {
+                Title = "导出统计数据",
+                SuggestedStartFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                SuggestedFileName = $"RocoPilot_Statistics_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.json",
+                DefaultFileExtension = ".json",
+                FileTypeChoices = { { "JSON 文件", new List<string> { ".json" } } }
+            };
+            filePath = (await picker.PickSaveFileAsync())?.Path;
         }
         catch (Exception ex)
         {

@@ -16,8 +16,7 @@ public sealed class LegendaryLocalScreenshotTests
         => new([new OnnxOcrV5TextRecognitionBackend(new OnnxOcrV5SingleLineTextRecognitionBackend())]);
 
     private static ManualChallengeScreenRecognizer CreateRecognizer()
-        => new(new ImageMatchingService(), CreateOcr(), null!, null!,
-            NullLogger<ManualChallengeScreenRecognizer>.Instance);
+        => new(new ImageMatchingService(), CreateOcr(), null!, null!);
 
     [TestMethod]
     [DataRow(960, 540)]

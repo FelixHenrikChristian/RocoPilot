@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Logging;
 using RocoPilot.Configuration;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
-using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
 
 namespace RocoPilot.Services;
 
@@ -15,15 +15,17 @@ public sealed partial class RuntimeTaskService
     private readonly SemaphoreSlim _autoBattleActionLock = new(1, 1);
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
     private readonly AutoBattleController _battle = new();
-    private bool _hasLoggedCurrentAutoBattleTurnAction;
-    private bool _hasLoggedCurrentAutoBattleCaptureButtonObservation;
     private bool _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
     public void SetAutoBattleSettings(AutoBattleSettings settings)
     {
+        var wasEnabled = _autoBattleSettings.IsEnabled;
         _autoBattleSettings = AutoBattleSettingsRules.Normalize(settings);
+        if (_autoBattleSettings.IsEnabled != wasEnabled)
+            _logger.LogInformation("自动战斗{State}，输入方式 {Method}", _autoBattleSettings.IsEnabled ? "已开启" : "已关闭",
+                _autoBattleSettings.KeyboardInputMethod);
         if (CurrentState is { } state)
         {
             state.Options.AutoBattleSettings.KeyboardInputMethod = _autoBattleSettings.KeyboardInputMethod;
@@ -84,12 +86,10 @@ public sealed partial class RuntimeTaskService
                 settings, EncounterBloodlineRecognition.IsAvailable(state.RecognitionRegionConfig), now);
             if (plan.Action == AutoBattleAction.Skill && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
             {
-                LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForUnconfirmedEncounterRelief");
                 return;
             }
             if (plan.Action == AutoBattleAction.None)
             {
-                LogEncounterCaptureButtonDecisionForCurrentTurn("HoldForBloodlineTip");
                 RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"wait:{turn.Id}",
                     RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "识别精灵血脉", string.Empty, now, completed: true));
                 return;
@@ -101,9 +101,8 @@ public sealed partial class RuntimeTaskService
                 RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"manual:{turn.Id}",
                     RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "等待手动操作", string.Empty, now, completed: true));
 
-            LogEncounterCaptureButtonDecisionForCurrentTurn(plan.Action.ToString());
-            if (plan.ShouldSendKeys || turn.Action != plan.Action)
-                LogAutoBattleTurnAction(plan.Description, plan.ShouldSendKeys ? plan.Sequence : null);
+            if (!plan.ShouldSendKeys && turn.Action != plan.Action)
+                _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}", turn.Number, plan.Description);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex) { _logger.LogWarning(ex, "自动战斗技能释放失败。"); }
@@ -235,7 +234,7 @@ public sealed partial class RuntimeTaskService
 
     private void BeginAutoBattleSkillSelectionTurn(AutoBattleSettings settings, DateTimeOffset now)
     {
-        ClearAutoBattleTurnWork();
+        _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
         var turn = _battle.BeginSkillSelection(settings, now);
         _overlayActivities.BeginTurn(turn.Id);
         _logger.LogDebug(
@@ -247,8 +246,7 @@ public sealed partial class RuntimeTaskService
     private void BeginAutoBattlePetSwitchingTurn(AutoBattleSettings settings)
     {
         var step = _battle.BeginPetSwitching(settings);
-        _hasLoggedCurrentAutoBattleTurnAction = false;
-        LogAutoBattleTurnAction($"切换精灵，本回合不释放技能，下回合继续 {AutoBattleSettingsRules.GetReleaseStepDisplay(step)}");
+        _logger.LogInformation("自动战斗：切换精灵，下回合继续 {Step}", AutoBattleSettingsRules.GetReleaseStepDisplay(step));
     }
 
     private async Task<bool> TryHandleAutoBattleSkillReleaseFailureAsync(
@@ -258,7 +256,7 @@ public sealed partial class RuntimeTaskService
         if (!_battle.ShouldRecoverAfterSkillFailure(_autoBattleSettings, DateTimeOffset.Now)) return false;
         QueueAutoBattleSkillFailureTipRecognition(state, frame, _battle.TurnNumber, cancellationToken);
         if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken)) return false;
-        LogAutoBattleTurnAction("技能未离开选择界面，临时回能 X，原技能延后", "X", forceInformation: true);
+        _logger.LogInformation("自动战斗：第 {Turn} 回合已临时回能，原技能延后", _battle.TurnNumber);
         return true;
     }
 
@@ -271,13 +269,11 @@ public sealed partial class RuntimeTaskService
         if (_isSuspended) return;
         if (_hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction)
         {
-            _logger.LogDebug("自动战斗技能失败提示 OCR 本次技能动作已触发过，本次跳过。");
             return;
         }
 
         if (Interlocked.Exchange(ref _queuedAutoBattleSkillFailureTipRecognition, 1) != 0)
         {
-            _logger.LogDebug("自动战斗技能失败提示 OCR 已有待处理任务，本次跳过。");
             return;
         }
 
@@ -305,11 +301,10 @@ public sealed partial class RuntimeTaskService
                             state,
                             frameReference,
                             BattleTipRegionIds,
-                            cancellationToken,
-                            "自动战斗技能失败");
+                            cancellationToken);
                         var failureReason = string.IsNullOrWhiteSpace(tipText)
                             ? "未识别到提示"
-                            : FormatLogText(tipText);
+                            : LoggingHelper.FormatLogText(tipText);
 
                         _logger.LogInformation(
                             "自动战斗：第 {TurnNumber} 回合，技能失败提示：{FailureReason}",
@@ -354,65 +349,18 @@ public sealed partial class RuntimeTaskService
         finally { _autoBattleActionLock.Release(); }
     }
 
-    private void LogAutoBattleTurnAction(
-        string description,
-        string? sequence = null,
-        bool forceInformation = false)
-    {
-        var turnNumber = Math.Max(1, _battle.TurnNumber);
-
-        if (!_hasLoggedCurrentAutoBattleTurnAction || forceInformation)
-        {
-            if (string.IsNullOrWhiteSpace(sequence))
-            {
-                _logger.LogInformation("自动战斗：第 {TurnNumber} 回合，{Description}", turnNumber, description);
-            }
-            else
-            {
-                _logger.LogInformation(
-                    "自动战斗：第 {TurnNumber} 回合，{Description}（序列 {Sequence}）",
-                    turnNumber,
-                    description,
-                    sequence);
-            }
-
-            _hasLoggedCurrentAutoBattleTurnAction = true;
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(sequence))
-        {
-            _logger.LogDebug("自动战斗：第 {TurnNumber} 回合重试，{Description}", turnNumber, description);
-        }
-        else
-        {
-            _logger.LogDebug(
-                "自动战斗：第 {TurnNumber} 回合重试，{Description}（序列 {Sequence}）",
-                turnNumber,
-                description,
-                sequence);
-        }
-    }
-
     private void CompleteAutoBattleSkillSelectionState()
     {
         _battle.CompleteSkillSelection();
-        ClearAutoBattleTurnWork();
+        _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
     }
 
     private void ResetAutoBattleBattleState()
     {
         _battle.ResetBattle();
         _overlayActivities.ResetBattle(_battle.BattleId);
-        ClearAutoBattleTurnWork();
+        _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
     }
 
     private void ResetAutoBattleEncounterRelievedActionState() => _battle.ResetEncounterRelief();
-
-    private void ClearAutoBattleTurnWork()
-    {
-        _hasLoggedCurrentAutoBattleTurnAction = false;
-        _hasLoggedCurrentAutoBattleCaptureButtonObservation = false;
-        _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction = false;
-    }
 }

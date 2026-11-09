@@ -2,6 +2,61 @@
 
 本索引供后续对话和识别逻辑维护使用。每次收到项目相关截图都保存原图并更新索引，流程见 [LOCAL_FIXTURES.md](LOCAL_FIXTURES.md)。原图位于被 Git 忽略的 `LocalScreenshots/`，只保存在当前机器；索引和测试代码可提交。不要把“索引存在”当作“本机原图存在”，使用前检查路径。
 
+## 2026-11-08：赛季球体力不足
+
+- [用户原图](LocalScreenshots/2026-11-08/stamina-crafting/season-insufficient-stamina.png)，来源 codex-clipboard-3ce6ed48-59c5-4df2-ba66-98e1895db786.png，2048×1152。已选赛季球，体力 3/4、制造次数 0、制造按钮置灰。
+- 按钮模板取自客户区 (1754,1062,92,38)。体力合成回放验证跳过并返回大世界，沿用原有亮起按钮截图作为对照。这张图仅覆盖体力不足时选中赛季球的状态。
+
+## 2026-11-08：晚风小憩活动
+
+- [推荐页，探索入口右上有红点](LocalScreenshots/2026-11-08/evening-rest/recommended.png)，来源 codex-clipboard-67c1464d-3c58-4109-8265-4f79b0827e45.png。
+- [探索页，晚风小憩 0/1200](LocalScreenshots/2026-11-08/evening-rest/event-0.png)，来源 codex-clipboard-91d432d3-c410-4199-a269-578f42dc5c13.png。
+- [星光庇护所传送详情](LocalScreenshots/2026-11-08/evening-rest/shelter-map.png)，来源 codex-clipboard-b2761132-3305-483c-a536-81f7ca32904b.png。
+- [48/1200](LocalScreenshots/2026-11-08/evening-rest/event-48.png)，来源 codex-clipboard-f1e31240-9d69-4219-8965-d844aafab343.png。
+- [864/1200](LocalScreenshots/2026-11-08/evening-rest/event-864.png)，来源 codex-clipboard-3122c68d-9106-45ab-90e0-711afc24364e.png。
+- [1200/1200](LocalScreenshots/2026-11-08/evening-rest/event-full.png)，来源 codex-clipboard-03b7fa68-fd2b-4f51-9246-403fb060639c.png。
+
+六张原图均为 2048×1152，用于验证探索入口、默认活动、前往、传送及满额判定。完成模板只取右下 1200/1200 数字区域，入口模板避开右上红点。原图为静帧，未记录加载耗时、活动未开放时的默认页及实际挂机时长。
+
+## 2026-11-08：体力合成停在批量制造结果
+
+- [用户原图](LocalScreenshots/2026-11-08/stamina-crafting/craft-result-bonus-61.png)，附件 codex-clipboard-70c69e24-0ce1-48f7-a6db-ff1c40febe8f.png，2048×1152。拼图球结算显示绿色 ×61 和特权额外获得 11，助手显示“等待制造结果”。
+- 配合 11 月 7 日白色 ×1 结果图回放。复查制造按钮消失后等待 3 秒按 ESC，以重新出现的炼金界面确认退出。StaminaCraftingTests 覆盖批量结果和首次 ESC 未生效后重新关闭。截图记录静态结果，不能测出游戏实际接受按键的时间。
+
+## 2026-11-07：体力合成
+
+- [map-continent](LocalScreenshots/2026-11-07/stamina-crafting/map-continent.png)，codex-clipboard-3d8072c3-4da5-4f97-b39f-614c068f04e5.png，(2048, 1152)。
+- [map-academy](LocalScreenshots/2026-11-07/stamina-crafting/map-academy.png)，codex-clipboard-5417a9b8-7396-4126-be17-f8450905f92a.png，(2048, 1152)。
+- [map-garden](LocalScreenshots/2026-11-07/stamina-crafting/map-garden.png)，codex-clipboard-8e6ac409-0cf9-48e3-8b27-777482eabf8c.png，(2048, 1152)。
+- [map-options](LocalScreenshots/2026-11-07/stamina-crafting/map-options.png)，codex-clipboard-89e9fcc4-d18b-4d93-b22d-6f97db9aa7a7.png，(2048, 1152)。
+- [garden-cauldron-marked](LocalScreenshots/2026-11-07/stamina-crafting/garden-cauldron-marked.png)，codex-clipboard-d1fa01cd-ee40-416c-bc87-101959afdd1a.png，(2048, 1152)。
+- [teleport](LocalScreenshots/2026-11-07/stamina-crafting/teleport.png)，codex-clipboard-2d1f8617-50dd-41de-a071-36fb43b91881.png，(2048, 1152)。
+- [world-arrival](LocalScreenshots/2026-11-07/stamina-crafting/world-arrival.png)，codex-clipboard-95e3283e-c3cc-4d35-80bf-554265c0ede4.png，(2048, 1152)。
+- [world-interaction](LocalScreenshots/2026-11-07/stamina-crafting/world-interaction.png)，codex-clipboard-f0c02719-d2f3-465b-a046-6270935f3f28.png，(2048, 1152)。
+- [dialogue](LocalScreenshots/2026-11-07/stamina-crafting/dialogue.png)，codex-clipboard-06ef667a-3f7d-4e65-b8a4-6e22ed6dfa1e.png，(2048, 1152)。
+- [choices](LocalScreenshots/2026-11-07/stamina-crafting/choices.png)，codex-clipboard-530236ca-7275-43bb-98f1-12a205b03d5f.png，(2048, 1152)。
+- [recipe-list-marked](LocalScreenshots/2026-11-07/stamina-crafting/recipe-list-marked.png)，codex-clipboard-08dafc2f-a2bf-48e7-aa6e-f8bff44039a8.png，(2052, 1199)。
+- [season-selected](LocalScreenshots/2026-11-07/stamina-crafting/season-selected.png)，codex-clipboard-02171c61-6e25-4c36-a20b-23b19513c111.png，(2048, 1152)。
+- [slider-maximum](LocalScreenshots/2026-11-07/stamina-crafting/slider-maximum.png)，codex-clipboard-5f6e5f04-2501-48e2-949c-53b38bb304d1.png，(2048, 1152)。
+- [craft-result](LocalScreenshots/2026-11-07/stamina-crafting/craft-result.png)，codex-clipboard-c1d3d1f7-480e-4ffc-9d26-8fcf6a4dad90.png，(2048, 1152)。
+
+用户提供，依次覆盖三张地图、地图选择、炼金釜定位与传送、大世界接近与交互、对话与选项、配方初选、赛季详情、最大数量与结果。第 5、11 张带标注，第 11 张含标题栏。用于体力合成截图回放，识别模板位于应用识别资源的 stamina-crafting 目录。单帧素材未覆盖体力不足、其他赛季及动画时长。
+
+回放入口为 `StaminaCraftingTests.DailyCraftsOnlyAfterSelectingSeasonAndMaximum`，直接读取上述本地原图。第 11 张回放取客户区 `(2,45,2048,1152)`。三种起始地图分别测试 2048×1152、1280×720、960×540，加客户区偏移 (12,30)。另用已有 `Fixtures/legendary-skip.png` 模拟两段动画的跳过提示。配方回放会先保留旧详情和未拉满的滑块，检验制造时机；1280×720 用例会交换两个配方格，检验点击位置是否跟随角标。切换地图的灰色“家园种植园”菜单模板依据图 4 选中行的字形及同图未选中行的颜色生成，尚缺该项未选中时的实拍展开菜单。
+
+## 2026-11-07：每日页传说挑战目标列表展开
+
+- [用户原图](LocalScreenshots/2026-11-07/daily/legendary-target-list-open.png)：附件 codex-clipboard-b01973c1-074c-4469-be02-7adeac70c0ad.png。每日页的传说挑战目标已展开，第二项带选中标记，第一项显示在上方。
+- 用于核对组合框弹层与配置行的对齐。单帧截图仅记录展开状态，无派生识别样本或自动化测试。
+
+## 2026-11-06：每日任务界面设计参考
+
+- [用户原图](LocalScreenshots/2026-11-06/daily-design/bettergi-one-dragon-task-list-reference.png)：附件 `codex-clipboard-5359a9b6-77e6-40e6-9d2e-3b18864d00c0.png`，尺寸 **900×600**，原样保存，未裁剪。SHA-256：`DBBFA9DA0BCA377A54D155EC0CC832268BF376DB8BC3F1AF6B6DD7689AC32893`。
+- 界面状态：BetterGI 0.66.0 的“一条龙”页面，左侧为带拖拽柄与开关的任务列表，右侧为配置选择及各任务设置。每日页参考其紧凑任务列表和右侧配置布局。
+- 用途：讨论 RocoPilot 在“任务”下方新增“每日”页面，使用一份通用配置，支持拖拽排序、启用子任务和整组启动。
+- 对应测试素材：未派生 OCR 或图像识别样本，无关联的自动化测试；后续用于界面需求核对。
+- 已知限制：截图来自其他应用，不代表 RocoPilot 当前或最终界面，也不能证明两者实际运行权限、拖拽行为或游戏任务执行结果。
+
 ## 2026-11-05：传说精灵多人挑战队伍不足提示
 
 - [用户原图](LocalScreenshots/2026-11-05/legendary/multiplayer-underfilled-team-confirmation.png)：附件 `codex-clipboard-222bdd23-ed55-45e6-92f3-9224b50fdd04.png`，尺寸 **2050×1184**，含标题栏和边框，原样保存。SHA-256 为 `44DD7EC843B229B418202422746470B1BF64F4729AD8237D59FBEC7C7179E828`。
@@ -218,6 +273,16 @@
 - 界面状态：“确认新赛季统计”弹窗，奇遇 1 项，未勾选。用户框出了选择按钮和次数输入框，两者为浅灰底，精灵名输入和赛季选择为深色底。
 - 原因与调整：选择控件实际为 `ToggleButton`，弹窗尚未统一其背景；`DialogNumberBoxStyle` 也缺少背景设置，而 TextBox 和 ComboBox 已使用 `SolidBackgroundFillColorBaseBrush`。在弹窗样式中统一 NumberBox 与 ToggleButton 的普通状态底色，沿用默认选中及交互状态模板。
 - 用途与限制：修改前视觉参考，不作为 OCR 素材；未派生识别测试样本。截图不能证明修复后的视觉表现。
+
+## 2026-11-07：任务页挑战图标消失
+
+- 用户原图：[首次进入，部分空白](LocalScreenshots/2026-11-07/task-icons/first-entry-partial.png)（附件 e3b21e26-867f-4fd2-839b-c79bc37a197a）和[再次进入，挑战图标全部空白](LocalScreenshots/2026-11-07/task-icons/second-entry-empty.png)（附件 83cf92a8-f84e-4a92-942a-914a6b999400）。已按字节核对原图。
+- 用途：对照深色主题下首次进入和往返导航时的显示状态。截图仅覆盖可见区域，用作视觉回归参照，未派生 OCR 测试素材。
+
+## 2026-11-07：任务页展开标题与内容图标的大小
+
+- [用户原图](LocalScreenshots/2026-11-07/task-icons/expanded-task-header-size-before.png)，来源 codex-clipboard-c1999428-5bc3-4b46-941a-12d6c4134bd5.png，SHA-256 729B116BFE9D4EC711CE8BAF0928DBE17F24EFDE00FDB26D6C466F1C1D0FE6A9。
+- 深色主题，花种挑战和传说精灵面板均已展开。用于对照标题图标放大前与内容行的视觉层级；截图仅显示任务页可见区域，未派生 OCR 素材。
 
 ## 2026-11-08：传说结算页契约印记不足弹窗
 

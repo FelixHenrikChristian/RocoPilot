@@ -156,12 +156,13 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
             await PersistCatalogAsync(source, document, progress, cancellationToken);
 
             var snapshot = CacheDocument(source, document);
+            _logger.LogInformation("图鉴同步完成：{Source}，共 {Count} 个编号", source.Id, document.Spirits.Count);
             progress?.Report(new SpiritCatalogSyncProgress(document.Spirits.Count, document.Spirits.Count, "图鉴数据同步完成"));
             return snapshot.CreateDocument();
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "同步精灵图鉴数据失败。");
+            _logger.LogWarning(ex, "同步精灵图鉴失败：{Source}", sourceId);
             throw;
         }
         finally
@@ -633,26 +634,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
             return;
         }
 
-        var avatarPath = await TryDownloadAvatarAsync(
-            item,
-            item.AvatarUrl,
-            avatarDirectory,
-            avatarPathPrefix,
-            logFailure: false,
-            cancellationToken);
-        if (avatarPath.Length > 0)
-        {
-            item.AvatarPath = avatarPath;
-            return;
-        }
-
-        item.AvatarPath = await TryDownloadAvatarAsync(
-            item,
-            item.AvatarUrl,
-            avatarDirectory,
-            avatarPathPrefix,
-            logFailure: true,
-            cancellationToken);
+        item.AvatarPath = await TryDownloadAvatarAsync(item, item.AvatarUrl, avatarDirectory, avatarPathPrefix, cancellationToken);
     }
 
     private async Task DownloadShinyAvatarAsync(
@@ -667,22 +649,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
             return;
         }
 
-        var avatarPath = await TryDownloadAvatarAsync(
-            item,
-            item.ShinyAvatarUrl,
-            avatarDirectory,
-            avatarPathPrefix,
-            logFailure: false,
-            cancellationToken);
-        item.ShinyAvatarPath = avatarPath.Length > 0
-            ? avatarPath
-            : await TryDownloadAvatarAsync(
-                item,
-                item.ShinyAvatarUrl,
-                avatarDirectory,
-                avatarPathPrefix,
-                logFailure: true,
-                cancellationToken);
+        item.ShinyAvatarPath = await TryDownloadAvatarAsync(item, item.ShinyAvatarUrl, avatarDirectory, avatarPathPrefix, cancellationToken);
     }
 
     private async Task<string> TryDownloadAvatarAsync(
@@ -690,30 +657,22 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
         string avatarUrl,
         string avatarDirectory,
         string avatarPathPrefix,
-        bool logFailure,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(avatarUrl))
-        {
-            return string.Empty;
-        }
-
         var fileName = BuildAvatarFileName(item.Id, item.Name, avatarUrl);
         var outputPath = Path.Combine(avatarDirectory, fileName);
-        if (!File.Exists(outputPath))
+        for (var attempt = 1; !File.Exists(outputPath); attempt++)
         {
             try
             {
                 var bytes = await _httpClient.GetByteArrayAsync(avatarUrl, cancellationToken);
                 await AtomicFileWriter.WriteAllBytesAsync(outputPath, bytes, cancellationToken);
+                break;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                if (logFailure)
-                {
-                    _logger.LogWarning(ex, "同步精灵头像失败：{SpiritName} {AvatarUrl}", item.Name, avatarUrl);
-                }
-
+                if (attempt == 1) continue;
+                _logger.LogWarning(ex, "同步精灵头像失败：{SpiritName} {AvatarUrl}", item.Name, avatarUrl);
                 return string.Empty;
             }
         }

@@ -6,10 +6,10 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Windows.Storage.Pickers;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
-using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 
 using Windows.Graphics;
@@ -238,13 +238,15 @@ public sealed partial class CapturePreviewWindow : WindowEx
         string? filePath;
         try
         {
-            filePath = FileDialogHelper.PickSaveFile(
-                "保存当前捕获帧",
-                "PNG 图片 (*.png)|*.png|所有文件 (*.*)|*.*",
-                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
-                $"RocoPilot_Capture_{DateTimeOffset.Now:yyyyMMdd_HHmmss_fff}.png",
-                ".png",
-                this);
+            var picker = new FileSavePicker(AppWindow.Id)
+            {
+                Title = "保存当前捕获帧",
+                SuggestedStartFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                SuggestedFileName = $"RocoPilot_Capture_{DateTimeOffset.Now:yyyyMMdd_HHmmss_fff}.png",
+                DefaultFileExtension = ".png",
+                FileTypeChoices = { { "PNG 图片", new List<string> { ".png" } } }
+            };
+            filePath = (await picker.PickSaveFileAsync())?.Path;
         }
         catch
         {

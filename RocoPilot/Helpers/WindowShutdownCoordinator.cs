@@ -1,33 +1,13 @@
 namespace RocoPilot.Helpers;
 
-internal sealed class WindowShutdownCoordinator
+internal sealed class WindowShutdownCoordinator(
+    Func<Task> shutdownAsync,
+    Func<Action, bool> tryEnqueue,
+    Action close,
+    Action<Exception> reportError)
 {
-    private readonly Func<Task> _shutdownAsync;
-    private readonly Func<Action, bool> _tryEnqueue;
-    private readonly Action _close;
-    private readonly Action<Exception> _reportError;
-
-    private bool _isShutdownStarted;
     private bool _isCloseAllowed;
-
-    public WindowShutdownCoordinator(
-        Func<Task> shutdownAsync,
-        Func<Action, bool> tryEnqueue,
-        Action close,
-        Action<Exception> reportError)
-    {
-        ArgumentNullException.ThrowIfNull(shutdownAsync);
-        ArgumentNullException.ThrowIfNull(tryEnqueue);
-        ArgumentNullException.ThrowIfNull(close);
-        ArgumentNullException.ThrowIfNull(reportError);
-
-        _shutdownAsync = shutdownAsync;
-        _tryEnqueue = tryEnqueue;
-        _close = close;
-        _reportError = reportError;
-    }
-
-    public bool IsShutdownStarted => _isShutdownStarted;
+    public bool IsShutdownStarted { get; private set; }
 
     public bool HandleCloseRequest()
     {
@@ -36,9 +16,9 @@ internal sealed class WindowShutdownCoordinator
             return false;
         }
 
-        if (!_isShutdownStarted)
+        if (!IsShutdownStarted)
         {
-            _isShutdownStarted = true;
+            IsShutdownStarted = true;
             _ = ShutdownAndQueueCloseAsync();
         }
 
@@ -49,7 +29,7 @@ internal sealed class WindowShutdownCoordinator
     {
         try
         {
-            await _shutdownAsync();
+            await shutdownAsync();
         }
         catch (Exception ex)
         {
@@ -58,7 +38,7 @@ internal sealed class WindowShutdownCoordinator
 
         try
         {
-            if (!_tryEnqueue(AllowAndClose))
+            if (!tryEnqueue(AllowAndClose))
             {
                 ReportError(new InvalidOperationException("无法将最终关闭操作加入 UI 调度队列。"));
             }
@@ -72,14 +52,14 @@ internal sealed class WindowShutdownCoordinator
     private void AllowAndClose()
     {
         _isCloseAllowed = true;
-        _close();
+        close();
     }
 
     private void ReportError(Exception exception)
     {
         try
         {
-            _reportError(exception);
+            reportError(exception);
         }
         catch
         {

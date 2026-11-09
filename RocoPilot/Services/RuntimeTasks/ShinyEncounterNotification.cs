@@ -29,8 +29,8 @@ public sealed class ShinyEncounterNotification(IAppNotificationService notificat
             }
             finally { pixels.Free(); }
             await File.WriteAllBytesAsync(path, png);
-            if (!await notifications.ShowAsync("发现异色精灵", "本场战斗已暂停自动操作，请返回游戏处理。", path))
-                logger.LogWarning("异色通知发送失败，截图已保存：{Path}", path);
+            logger.LogInformation("异色截图已保存：{Path}", path);
+            await notifications.ShowAsync("发现异色精灵", "本场战斗已暂停自动操作，请返回游戏处理。", path);
         }
         catch (Exception ex)
         {

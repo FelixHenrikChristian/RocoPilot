@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 using RocoPilot.Contracts.Services;
@@ -20,24 +21,41 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
     private readonly object _interceptionSyncRoot = new();
     private InterceptionMouseHook? _mouseHook;
 
-    public async Task ClickAsync(
+    public Task ClickAsync(
         IntPtr hwnd,
         int x,
         int y,
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
         CancellationToken cancellationToken = default)
+        => PressAsync(hwnd, x, y, null, method, cancellationToken);
+
+    public Task DragAsync(IntPtr hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
+        CancellationToken cancellationToken)
+        => PressAsync(hwnd, x, y, new WindowPoint { X = endX, Y = endY }, method, cancellationToken);
+
+    private async Task PressAsync(IntPtr hwnd, int x, int y, WindowPoint? end, KeyboardInputMethod method,
+        CancellationToken cancellationToken)
     {
         await _inputGate.WaitAsync(cancellationToken);
         try
         {
             var hook = GetMouseHook(method);
-            MoveCursorToClientPoint(hwnd, x, y);
+            MoveCursorToClientPoint(hook, hwnd, x, y);
             await Task.Delay(50, cancellationToken);
             EnsureForeground(hwnd);
             SendMouseInput(hook, MouseEventLeftDown, InterceptionMouseState.LeftButtonDown);
             try
             {
                 await Task.Delay(50, cancellationToken);
+                if (end is { } target)
+                {
+                    const int steps = 5;
+                    for (var i = 1; i <= steps; i++)
+                    {
+                        MoveCursorToClientPoint(hook, hwnd, x + (target.X - x) * i / steps, y + (target.Y - y) * i / steps);
+                        await Task.Delay(80, cancellationToken);
+                    }
+                }
             }
             finally
             {
@@ -84,7 +102,7 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
             var hook = GetMouseHook(method);
             if (point is { } clientPoint)
             {
-                MoveCursorToClientPoint(hwnd, clientPoint.X, clientPoint.Y);
+                MoveCursorToClientPoint(hook, hwnd, clientPoint.X, clientPoint.Y);
                 // 等游戏完成鼠标悬停更新，避免滚动仍落在上一次的奖励栏。
                 await Task.Delay(50, cancellationToken);
             }
@@ -135,7 +153,7 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
 
             if (InterceptionInput.Disposed && !InterceptionInput.Initialize())
             {
-                throw new InvalidOperationException("Interception 初始化失败。请确认驱动已安装，并以管理员身份启动 RocoPilot。");
+                throw new InvalidOperationException("Interception 初始化失败。请确认安装驱动后已重启电脑。");
             }
 
             var hook = new InterceptionMouseHook(InterceptionMouseFilter.None);
@@ -187,7 +205,7 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
         }
     }
 
-    private void MoveCursorToClientPoint(IntPtr hwnd, int x, int y)
+    private void MoveCursorToClientPoint(InterceptionMouseHook? hook, IntPtr hwnd, int x, int y)
     {
         EnsureForeground(hwnd);
         if (!IsWindowVisible(hwnd) || IsIconic(hwnd))
@@ -220,11 +238,35 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
                 throw new InvalidOperationException("鼠标目标位置被其他窗口遮挡，请切回游戏后重试。");
             }
 
-            if (!SetCursorPos(point.X, point.Y) || !GetCursorPos(out var actual)
-                || actual.X != point.X || actual.Y != point.Y)
+            if (hook is null)
             {
-                throw new InvalidOperationException("无法将鼠标移动到游戏内目标位置。");
+                if (!SetCursorPos(point.X, point.Y))
+                    throw new InvalidOperationException($"Windows 无法移动鼠标至屏幕 ({point.X}, {point.Y})。请检查游戏与助手的运行权限。");
             }
+            else
+            {
+                // 库内的绝对移动只映射主屏。驱动使用虚拟桌面坐标才能覆盖副屏和负坐标。
+                var stroke = new InputInterceptorNS.Stroke();
+                stroke.Mouse.Flags = InputInterceptorNS.MouseFlags.MoveAbsolute | InputInterceptorNS.MouseFlags.VirtualDesktop;
+                stroke.Mouse.X = AbsoluteCoordinate(point.X, GetSystemMetrics(76), GetSystemMetrics(78));
+                stroke.Mouse.Y = AbsoluteCoordinate(point.Y, GetSystemMetrics(77), GetSystemMetrics(79));
+                lock (_interceptionSyncRoot)
+                {
+                    var device = hook.Device == -1 ? hook.RandomDevice : hook.Device;
+                    if (InterceptionInput.Send(hook.Context, device, ref stroke, 1) != 1)
+                        throw new InvalidOperationException("Interception 鼠标移动发送失败。");
+                }
+            }
+
+            var timer = Stopwatch.StartNew();
+            WindowPoint actual;
+            do
+            {
+                if (!GetCursorPos(out actual)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (actual.X == point.X && actual.Y == point.Y) return;
+                Thread.Sleep(5);
+            } while (timer.ElapsedMilliseconds < 150);
+            throw new InvalidOperationException($"鼠标未到达目标：屏幕 ({point.X}, {point.Y})，实际 ({actual.X}, {actual.Y})。");
         }
         finally
         {
@@ -234,6 +276,12 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
             }
         }
     }
+
+    private static int AbsoluteCoordinate(int coordinate, int origin, int span)
+        => Math.Clamp((int)((coordinate - origin + 0.5) * 65536 / span), 0, 65535);
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern uint SendInput(uint count, InputEnvelope[] inputs, int size);

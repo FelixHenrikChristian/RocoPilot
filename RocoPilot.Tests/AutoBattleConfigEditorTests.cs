@@ -11,7 +11,7 @@ namespace RocoPilot.Tests;
 public sealed class AutoBattleConfigEditorTests
 {
     [TestMethod]
-    public void ReordersMixedStepsAndUpdatesMoveAvailability()
+    public void ReordersMixedStepsAndSavesTheirNewPositions()
     {
         var settings = AutoBattleSettings.CreateDefault();
         settings.TurnSequencePresets =
@@ -19,31 +19,24 @@ public sealed class AutoBattleConfigEditorTests
             new AutoBattleTurnSequencePreset { Name = "连招", Sequence = "1, Space" }
         ];
         var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
-        editor.NormalConfigs.SelectedSequence.Items.Clear();
-        editor.NormalConfigs.SelectedSequence.AppendSkill("1");
-        var skill = editor.NormalConfigs.SelectedSequence.Items.Single();
-        Assert.IsFalse(skill.CanMoveEarlier);
-        Assert.IsFalse(skill.CanMoveLater);
+        // 拖拽排序语义：直接对 Items 使用 Move 模拟重排，无移动按钮状态。
+        var sequence = editor.NormalConfigs.SelectedSequence;
+        sequence.Items.Clear();
+        sequence.AppendSkill("1");
+        var skill = sequence.Items.Single();
 
-        Assert.IsTrue(editor.TryInsertSharedPreset(editor.SharedPresetItems.Single(), editor.NormalConfigs.SelectedSequence, out _));
-        var preset = editor.NormalConfigs.SelectedSequence.Items[1];
-        editor.NormalConfigs.SelectedSequence.AppendSkill("4");
-        var last = editor.NormalConfigs.SelectedSequence.Items[2];
-        Assert.IsTrue(skill.CanMoveLater);
-        Assert.IsFalse(last.CanMoveLater);
+        Assert.IsTrue(editor.TryInsertSharedPreset(editor.SharedPresetItems.Single(), sequence, out _));
+        var preset = sequence.Items[1];
+        sequence.AppendSkill("4");
+        var last = sequence.Items[2];
 
-        editor.NormalConfigs.SelectedSequence.MoveEarlier(preset);
-        Assert.AreSame(preset, editor.NormalConfigs.SelectedSequence.Items[0]);
-        Assert.IsFalse(preset.CanMoveEarlier);
+        sequence.Items.Move(1, 0);
+        Assert.AreSame(preset, sequence.Items[0]);
         Assert.AreEqual(1, preset.Position);
-        editor.NormalConfigs.SelectedSequence.MoveEarlier(preset);
-        Assert.AreSame(preset, editor.NormalConfigs.SelectedSequence.Items[0]);
 
-        editor.NormalConfigs.SelectedSequence.MoveLater(skill);
-        Assert.AreSame(skill, editor.NormalConfigs.SelectedSequence.Items[2]);
-        Assert.IsFalse(skill.CanMoveLater);
-        editor.NormalConfigs.SelectedSequence.Items.Remove(skill);
-        Assert.IsFalse(last.CanMoveLater);
+        sequence.Items.Move(1, 2);
+        Assert.AreSame(skill, sequence.Items[2]);
+        sequence.Items.Remove(skill);
         Assert.AreEqual(2, last.Position);
 
         Assert.IsTrue(editor.TryBuildSettings(settings, out var result, out _));
@@ -139,8 +132,9 @@ public sealed class AutoBattleConfigEditorTests
             new() { Name = "连招", Sequence = "2" }
         ];
         var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
-        Assert.IsTrue(editor.TryInsertSharedPreset(editor.SharedPresetItems[1], editor.NormalConfigs.SelectedSequence, out _));
-        editor.NormalConfigs.SelectedSequence.MoveEarlier(editor.NormalConfigs.SelectedSequence.Items[^1]);
+        var sequence = editor.NormalConfigs.SelectedSequence;
+        Assert.IsTrue(editor.TryInsertSharedPreset(editor.SharedPresetItems[1], sequence, out _));
+        sequence.Items.Move(sequence.Items.Count - 1, sequence.Items.Count - 2);
         Assert.IsTrue(editor.TryBuildSettings(settings, out var saved, out _));
         var reloaded = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(saved))!;
         var reopened = new AutoBattleConfigEditor(reloaded, new KeyboardInputService());
@@ -240,7 +234,7 @@ public sealed class AutoBattleConfigEditorTests
         editor.FlowerSeedConfigs.SelectedSequence.Items.Clear();
         editor.FlowerSeedConfigs.SelectedSequence.AppendSkill("3");
         editor.FlowerSeedConfigs.SelectedSequence.AppendSkill("X");
-        editor.FlowerSeedConfigs.SelectedSequence.MoveEarlier(editor.FlowerSeedConfigs.SelectedSequence.Items[1]);
+        editor.FlowerSeedConfigs.SelectedSequence.Items.Move(1, 0);
         var current = source.Clone();
         current.KeyboardHoldDurationMs = 250;
         current.IsEnabled = true;

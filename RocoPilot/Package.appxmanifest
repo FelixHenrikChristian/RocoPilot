@@ -8,7 +8,9 @@
   xmlns:uap11="http://schemas.microsoft.com/appx/manifest/uap/windows10/11"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:genTemplate="http://schemas.microsoft.com/appx/developer/templatestudio"
-  IgnorableNamespaces="uap uap6 uap11 rescap genTemplate">
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap6 uap11 rescap genTemplate com desktop">
 
   <Identity
     Name="88efb6ea-9b2d-4c5c-b075-fcd9ba681757"
@@ -45,6 +47,19 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
+      <Extensions>
+          <desktop:Extension Category="windows.toastNotificationActivation">
+              <desktop:ToastNotificationActivation ToastActivatorCLSID="50d38d01-b4f4-4b35-a49f-9641babbbbaa" />
+          </desktop:Extension>
+
+          <com:Extension Category="windows.comServer">
+              <com:ComServer>
+                  <com:ExeServer Executable="RocoPilot.exe" Arguments="-ToastActivated" DisplayName="Toast activator">
+                      <com:Class Id="50d38d01-b4f4-4b35-a49f-9641babbbbaa" DisplayName="Toast activator"/>
+                  </com:ExeServer>
+              </com:ComServer>
+          </com:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

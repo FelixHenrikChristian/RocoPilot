@@ -335,7 +335,7 @@ public partial class TasksViewModel : ObservableRecipient
         IsTaskNotificationOpen = true;
     }
 
-    private static int ToRunCount(double value, int fallback)
+    internal static int ToRunCount(double value, int fallback)
     {
         return double.IsNaN(value) ? fallback : (int)Math.Round(value);
     }

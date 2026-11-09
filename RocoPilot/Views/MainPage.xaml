@@ -68,13 +68,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="20"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE768;" />
+                        <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource StartGlyph}" />
 
                         <StackPanel
                             Grid.Column="1"
@@ -228,13 +222,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <FontIcon
-                            Grid.Column="0"
-                            VerticalAlignment="Center"
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="20"
-                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
-                            Glyph="&#xE946;" />
+                        <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource OverlayInfoGlyph}" />
 
                         <StackPanel
                             Grid.Column="1"

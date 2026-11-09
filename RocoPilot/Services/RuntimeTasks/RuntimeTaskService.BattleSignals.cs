@@ -3,7 +3,6 @@ using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
-using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
 using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
@@ -41,7 +40,7 @@ public sealed partial class RuntimeTaskService
         _logger.LogInformation(
             "自动战斗：{Source}检测到异色精灵提示，本场战斗暂停所有自动操作，退出战斗后恢复。TipText={TipText}",
             source,
-            FormatLogText(tipText));
+            LoggingHelper.FormatLogText(tipText));
         return true;
     }
 }

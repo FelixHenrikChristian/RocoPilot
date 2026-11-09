@@ -81,7 +81,6 @@ public sealed class ManualChallengeRunner(
         var inputMethod = settings.KeyboardInputMethod;
         keyboard.EnsureReady(inputMethod);
         var lastScene = ManualChallengeScene.Unknown;
-        (ManualChallengeScene Scene, BattleScreen? Screen, ManualChallengeAction Action)? lastObservation = null;
         var creatureName = legendaryTarget ?? target?.Name ?? string.Empty;
         var lastProgress = new IndependentTaskProgress("准备启动");
         var lastAdvance = DateTimeOffset.UtcNow;
@@ -115,19 +114,13 @@ public sealed class ManualChallengeRunner(
                 var completedCount = flow.CompletedCount;
                 var failures = flow.ConsecutiveFailures;
                 var decision = flow.Next(screen, height);
-                var observation = (screen.Scene, screen.BattleScreen, decision.Action);
-                if (observation != lastObservation)
-                {
-                    lastObservation = observation;
-                    logger.LogDebug("挑战状态：{Scene}/{Screen}，动作 {Action}，第 {Battle} 场，战斗有效 {Active}，回合 {Turn}，匹配 {Template}，得分 {Score:F3}",
-                        screen.Scene, screen.BattleScreen, decision.Action, flow.BattleNumber, flow.IsBattleActive,
-                        battle.TurnNumber, screen.Button?.TemplatePath, screen.Button?.Score);
-                }
                 if (flow.Options.Count > count) lastAdvance = DateTimeOffset.UtcNow;
                 if (screen.Scene == ManualChallengeScene.Battle && flow.IsBattleActive
                     || flow.CompletedCount != completedCount || flow.ConsecutiveFailures != failures)
                     lastAdvance = DateTimeOffset.UtcNow;
-                if (flow.ConsecutiveFailures != failures)
+                if (flow.CompletedCount > completedCount)
+                    logger.LogInformation("挑战成功，已完成 {Completed}/{Total} 次", flow.CompletedCount, runCount);
+                if (flow.ConsecutiveFailures > failures)
                     logger.LogWarning("挑战失败，原地重试：连续失败 {Failures}/3，已成功 {Completed}/{Total} 次，触发画面 {Scene}",
                         flow.ConsecutiveFailures, flow.CompletedCount, runCount, screen.Scene);
                 if (flow.BattleNumber != battleNumber)
@@ -439,13 +432,13 @@ public sealed class ManualChallengeRunner(
                                         (sequence, completed) =>
                                         {
                                             Publish(lastProgress with { Operation = InfoOverlayIslandPresentation.BattleInputTitle(plan!), IsBattleWaiting = false });
-                                            logger.LogDebug("挑战按键：第 {Battle} 场，第 {Turn} 回合，{Action}，序列 {Sequence}，{Status}",
-                                                battleNumber, battle.TurnNumber, plan!.Action, sequence, completed ? "发送完成" : "开始发送");
+                                            if (completed) logger.LogInformation("手册挑战：第 {Battle} 场第 {Turn} 回合，{Action}，已发送 {Sequence}",
+                                                battleNumber, battle.TurnNumber, plan!.Description, sequence);
                                         }))
                                     break;
                                 if (decision.Action == ManualChallengeAction.Battle && battle.CurrentTurn is { } currentTurn)
                                     battle.RecordAction(currentTurn.Id, plan!.Action, DateTimeOffset.UtcNow);
-                                    hasReleasedSkillInBattle = true;
+                                hasReleasedSkillInBattle = true;
                                 logger.LogInformation("手册挑战：第 {Battle} 场，{Action}，序列 {Sequence}",
                                     battleNumber, plan!.Description, plan.Sequence);
                                 if (decision.Action == ManualChallengeAction.Capture)
@@ -620,11 +613,9 @@ public sealed class ManualChallengeRunner(
                     Publish(lastProgress with { Operation = operation });
                     if (action == ManualChallengeAction.OpenManual)
                     {
-                        logger.LogDebug("手册 F3：开始发送，原目标 {Template}", initial.TemplatePath);
                         await SendKey("F3", settings.KeyboardHoldDurationMs);
                         minimumFrameAt = DateTimeOffset.UtcNow;
                         attempts++;
-                        logger.LogDebug("手册 F3：发送完成，等待大世界 HUD 消失，输入完成时间 {InputCompletedAt:O}", minimumFrameAt);
                     }
                     else if (action == ManualChallengeAction.Escape)
                     {
@@ -640,8 +631,9 @@ public sealed class ManualChallengeRunner(
                         var y = (int)Math.Round((button.Y + button.Height / 2d - clientY) * nativeHeight / height);
                         await mouse.ClickAsync(window.Hwnd, x, y, inputMethod, token);
                         minimumFrameAt = DateTimeOffset.UtcNow;
+                        attempts++;
                         logger.LogDebug("挑战点击：{Operation}，第 {Attempt} 次，模板 {Template}，得分 {Score:F3}，客户区坐标 ({X},{Y})",
-                            operation, ++attempts, button.TemplatePath, button.Score, x, y);
+                            operation, attempts, button.TemplatePath, button.Score, x, y);
                     }
                 }
                 await Task.Delay(700, token);
@@ -655,9 +647,6 @@ public sealed class ManualChallengeRunner(
                 }
                 else button = await recognizer.FindClickTargetAsync(next, scene, initial.TemplatePath, rowY,
                     clientX, clientY, width, height, token, legendary);
-                if (action == ManualChallengeAction.OpenManual)
-                    logger.LogDebug("手册 F3 确认：截图时间 {CapturedAt:O}，HUD仍存在 {Visible}，得分 {Score:F3}",
-                        next.CapturedAt, button is not null, button?.Score);
                 // 消失这一帧也交给后续流程；WGC 静止画面未必立即产生另一张新帧。
                 if (button is null) pendingFrame = next.AddReference();
             }

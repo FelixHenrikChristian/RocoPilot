@@ -34,7 +34,7 @@
                 <FontIcon
                     Grid.Column="0"
                     VerticalAlignment="Center"
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontFamily="{StaticResource AppIconFont}"
                     FontSize="16"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Glyph="{Binding Content.Glyph}" />
@@ -62,7 +62,7 @@
                 <FontIcon
                     Grid.Column="0"
                     VerticalAlignment="Center"
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                    FontFamily="{StaticResource AppIconFont}"
                     FontSize="18"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     Glyph="{Binding Content.Glyph}" />
@@ -114,7 +114,7 @@
 
                     <Border Width="40" Height="40" CornerRadius="12" VerticalAlignment="Center"
                             Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                        <FontIcon FontSize="20" Glyph="&#xE765;"
+                        <FontIcon FontSize="20" FontFamily="{StaticResource AppIconFont}" Glyph="&#xF4B8;"
                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                     </Border>
 
@@ -176,7 +176,7 @@
                     </Grid>
                 </Border>
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="4,0,0,0">
-                    <FontIcon FontSize="12" Glyph="&#xE946;" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <FontIcon FontSize="12" FontFamily="{StaticResource AppIconFont}" Glyph="{StaticResource OverlayInfoGlyph}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Text="点击后按下新快捷键；按 Esc 清除当前绑定。" />
                 </StackPanel>

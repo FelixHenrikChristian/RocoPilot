@@ -11,6 +11,10 @@ public interface IIndependentTaskService
         get;
     }
 
+    bool IsDailyRunning { get; }
+
+    string StatusMessage { get; }
+
     IndependentTaskKind? RunningTaskKind
     {
         get;
@@ -32,4 +36,8 @@ public interface IIndependentTaskService
         CancellationToken cancellationToken = default);
 
     Task StopAsync();
+
+    Task<IndependentTaskStartResult> StartDailyAsync(
+        IReadOnlyList<IndependentTaskKind> tasks, IndependentTaskSettings challenges,
+        CancellationToken cancellationToken = default);
 }

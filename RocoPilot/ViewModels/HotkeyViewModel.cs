@@ -68,16 +68,16 @@ public class HotkeyViewModel : ObservableRecipient
         [
             new(
                 "基础功能",
-                "\uE713",
+                "\uF82E",
                 items.Where(item => item.Action is HotkeyAction.TakeScreenshot).ToList()),
             new(
                 "遮罩窗口",
-                "\uEABC",
+                "\uF8BC",
                 items.Where(item => item.Action
                     is HotkeyAction.ToggleInfoOverlay).ToList()),
             new(
                 "实时任务",
-                "\uE916",
+                "\uED88",
                 items.Where(item => item.Action
                     is HotkeyAction.ToggleEncounterStatistics
                     or HotkeyAction.ToggleAutoBattle).ToList())

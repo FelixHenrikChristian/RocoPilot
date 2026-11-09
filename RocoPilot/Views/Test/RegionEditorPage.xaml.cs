@@ -6,17 +6,18 @@ using System.Text;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Windows.Storage.Pickers;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.Recognition;
-using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Views.Windows;
 
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
+using Windows.System;
 
 namespace RocoPilot.Views.Test;
 
@@ -88,12 +89,12 @@ public sealed partial class RegionEditorPage : Page
         }
     }
 
-    private void OpenRegionScreenshotFolderButton_Click(object sender, RoutedEventArgs e)
+    private async void OpenRegionScreenshotFolderButton_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             Directory.CreateDirectory(RegionScreenshotDirectory);
-            var opened = ShellLaunchHelper.OpenFolder(RegionScreenshotDirectory);
+            var opened = await Launcher.LaunchFolderPathAsync(RegionScreenshotDirectory);
             if (!opened)
             {
                 ShowMessage($"无法打开截图文件夹：{RegionScreenshotDirectory}", InfoBarSeverity.Warning);
@@ -108,15 +109,18 @@ public sealed partial class RegionEditorPage : Page
         }
     }
 
-    private void BrowseConfigButton_Click(object sender, RoutedEventArgs e)
+    private async void BrowseConfigButton_Click(object sender, RoutedEventArgs e)
     {
         string? filePath;
         try
         {
-            filePath = FileDialogHelper.PickOpenFile(
-                "选择识别区域配置文件",
-                "JSON 文件 (*.json)|*.json|所有文件 (*.*)|*.*",
-                Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionRegions"));
+            var picker = new FileOpenPicker(App.MainWindow.AppWindow.Id)
+            {
+                Title = "选择识别区域配置文件",
+                SuggestedStartFolder = Path.Combine(AppContext.BaseDirectory, "Configuration", "RecognitionRegions"),
+                FileTypeFilter = { ".json", "*" }
+            };
+            filePath = (await picker.PickSingleFileAsync())?.Path;
         }
         catch (Exception ex)
         {

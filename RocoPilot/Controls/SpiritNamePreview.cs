@@ -83,7 +83,7 @@ internal static class SpiritNamePreview
             }
             catch (Exception ex)
             {
-                Serilog.Log.Warning(ex, "精灵头像预览加载失败");
+                Serilog.Log.ForContext(typeof(SpiritNamePreview)).Warning(ex, "精灵头像预览加载失败");
             }
         };
         UpdatePreview();

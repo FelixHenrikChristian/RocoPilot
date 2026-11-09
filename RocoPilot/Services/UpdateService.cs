@@ -33,7 +33,7 @@ public sealed class UpdateService : IUpdateService
 
     public async Task<UpdateCheckResult> CheckUpdateAsync(UpdateOption option)
     {
-        _logger.LogInformation("开始检查更新 (触发方式: {Trigger})", option.Trigger);
+        _logger.LogDebug("开始检查更新 (触发方式: {Trigger})", option.Trigger);
 
         try
         {
@@ -50,13 +50,15 @@ public sealed class UpdateService : IUpdateService
             }
 
             var currentVersion = GetCurrentAppVersion();
-            _logger.LogInformation("当前版本: {Current}, 最新版本: {Latest}", currentVersion, latestVersion);
 
             if (latestVersion <= currentVersion)
             {
+                if (option.Trigger == UpdateTrigger.Manual)
+                    _logger.LogInformation("手动检查更新完成，当前已是最新版本 {Version}", currentVersion);
                 return UpdateCheckResult.UpToDate("当前已安装最新版本。");
             }
 
+            _logger.LogInformation("发现新版本：{Current} → {Latest}", currentVersion, latestVersion);
             return await HandleUpdateDialogResultAsync(latestRelease);
         }
         catch (Exception ex)
@@ -131,7 +133,10 @@ public sealed class UpdateService : IUpdateService
             return githubRelease;
         }
 
-        return await GetLatestReleaseFromFallbackAsync();
+        var fallbackRelease = await GetLatestReleaseFromFallbackAsync();
+        if (fallbackRelease is not null)
+            _logger.LogInformation("已从备用更新源获取版本 {Version}", fallbackRelease.TagName);
+        return fallbackRelease;
     }
 
     private async Task<GitHubRelease?> GetLatestReleaseFromGitHubAsync()
@@ -139,18 +144,16 @@ public sealed class UpdateService : IUpdateService
         try
         {
             using var response = await HttpClient.GetAsync(GitHubApiUrl);
-            var json = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "GitHub API 请求失败: {StatusCode} {Reason} Body: {Body}",
+                    "GitHub API 请求失败: {StatusCode} {Reason}",
                     (int)response.StatusCode,
-                    response.ReasonPhrase,
-                    json);
+                    response.ReasonPhrase);
                 return null;
             }
 
-            return JsonSerializer.Deserialize<GitHubRelease>(json);
+            return JsonSerializer.Deserialize<GitHubRelease>(await response.Content.ReadAsStringAsync());
         }
         catch (HttpRequestException ex)
         {
@@ -174,26 +177,24 @@ public sealed class UpdateService : IUpdateService
         var metadataUrl = _sourceOptions.ReleaseMetadataUrl;
         if (string.IsNullOrWhiteSpace(metadataUrl))
         {
-            _logger.LogInformation("未配置备用更新元数据源，跳过备用源检查。");
+            _logger.LogDebug("未配置备用更新元数据源，跳过备用源检查。");
             return null;
         }
 
         try
         {
-            _logger.LogInformation("GitHub API 不可用，尝试从备用源获取更新元数据: {Url}", metadataUrl);
+            _logger.LogDebug("GitHub API 不可用，尝试从备用源获取更新元数据: {Url}", metadataUrl);
             using var response = await HttpClient.GetAsync(metadataUrl);
-            var json = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "备用更新元数据请求失败: {StatusCode} {Reason} Body: {Body}",
+                    "备用更新元数据请求失败: {StatusCode} {Reason}",
                     (int)response.StatusCode,
-                    response.ReasonPhrase,
-                    json);
+                    response.ReasonPhrase);
                 return null;
             }
 
-            return JsonSerializer.Deserialize<GitHubRelease>(json);
+            return JsonSerializer.Deserialize<GitHubRelease>(await response.Content.ReadAsStringAsync());
         }
         catch (HttpRequestException ex)
         {

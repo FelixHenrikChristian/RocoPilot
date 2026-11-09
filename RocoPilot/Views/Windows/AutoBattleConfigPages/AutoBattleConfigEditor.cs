@@ -667,18 +667,6 @@ internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
         }
     }
 
-    public void MoveEarlier(AutoBattleReleaseEditorItem item)
-    {
-        var index = Items.IndexOf(item);
-        if (index > 0) Items.Move(index, index - 1);
-    }
-
-    public void MoveLater(AutoBattleReleaseEditorItem item)
-    {
-        var index = Items.IndexOf(item);
-        if (index >= 0 && index < Items.Count - 1) Items.Move(index, index + 1);
-    }
-
     public void UpdatePreset(AutoBattlePresetEditorItem preset)
     {
         foreach (var item in Items.Where(item => item.PresetId == preset.Id))
@@ -694,7 +682,6 @@ internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
         for (var index = 0; index < Items.Count; index++)
         {
             Items[index].Position = index + 1;
-            Items[index].UpdateMoveAvailability(Items.Count);
         }
 
         OnPropertyChanged(nameof(EmptyVisibility));
@@ -788,27 +775,6 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
                 OnPropertyChanged(nameof(PositionText));
             }
         }
-    }
-
-    private bool _canMoveEarlier;
-    private bool _canMoveLater;
-
-    public bool CanMoveEarlier
-    {
-        get => _canMoveEarlier;
-        private set => SetProperty(ref _canMoveEarlier, value);
-    }
-
-    public bool CanMoveLater
-    {
-        get => _canMoveLater;
-        private set => SetProperty(ref _canMoveLater, value);
-    }
-
-    public void UpdateMoveAvailability(int count)
-    {
-        CanMoveEarlier = Position > 1;
-        CanMoveLater = Position < count;
     }
 
     public string StepTitle => IsCustom

@@ -4,13 +4,14 @@ using System.Runtime.InteropServices;
 
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.Windows.Storage.Pickers;
 
-using RocoPilot.Helpers;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.TextRecognition;
 
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Streams;
+using Windows.System;
 
 namespace RocoPilot.Views.Test;
 
@@ -52,10 +53,13 @@ public sealed partial class TextRecognitionTestPage : Page
         string? filePath;
         try
         {
-            filePath = FileDialogHelper.PickOpenFile(
-                "导入图像",
-                "图像文件 (*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.webp)|*.bmp;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.webp|所有文件 (*.*)|*.*",
-                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures));
+            var picker = new FileOpenPicker(App.MainWindow.AppWindow.Id)
+            {
+                Title = "导入图像",
+                SuggestedStartFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                FileTypeFilter = { ".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp", "*" }
+            };
+            filePath = (await picker.PickSingleFileAsync())?.Path;
         }
         catch (Exception ex)
         {
@@ -78,7 +82,7 @@ public sealed partial class TextRecognitionTestPage : Page
         }
     }
 
-    private void OpenScreenClipButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    private async void OpenScreenClipButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
     {
         var startClipboardSequence = GetClipboardSequenceNumber();
         _waitingForScreenClip = true;
@@ -87,7 +91,7 @@ public sealed partial class TextRecognitionTestPage : Page
 
         try
         {
-            var launched = ShellLaunchHelper.LaunchUri(new Uri("ms-screenclip:"));
+            var launched = await Launcher.LaunchUriAsync(new Uri("ms-screenclip:"));
             if (launched)
             {
                 return;

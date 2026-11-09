@@ -5,7 +5,6 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.Recognition;
-using static RocoPilot.Services.RuntimeTasks.RuntimeDebugLogger;
 using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services.RuntimeTasks;
@@ -22,7 +21,6 @@ public sealed class GameSceneRecognizer(
     RuntimeFrameRecognizer recognizer,
     IImageMatchingService imageMatching,
     IRecognitionOverlayService overlay,
-    RuntimeDebugLogger debugLog,
     BattleScreenRecognizer battleScreen)
 {
     public const int MagicPointSlotCount = 6;
@@ -76,14 +74,7 @@ public sealed class GameSceneRecognizer(
         var result = await imageMatching.FindMatchesAsync(
             frame, frameRegion, templatePath, MagicPointSlotCount, options,
             cancellationToken: cancellationToken);
-        var count = result.Matches.Count;
         overlay.ShowImageMatchResult(region.Id, result.BestScore);
-        debugLog.Write(
-            CreateDebugLogKey("game-state-magic-point", region.Id),
-            $"{count}/{MagicPointSlotCount}",
-            "状态识别目标结果：Target=大世界魔力点, Region={RegionId}, Count={Count}/{Maximum}, FrameRegion={X},{Y},{Width}x{Height}",
-            region.Id, count, MagicPointSlotCount,
-            frameRegion.X, frameRegion.Y, frameRegion.Width, frameRegion.Height);
-        return count;
+        return result.Matches.Count;
     }
 }

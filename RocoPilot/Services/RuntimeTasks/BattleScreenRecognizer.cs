@@ -187,8 +187,6 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
             BattleChangeRegionIds,
             BattleChangeTemplateName,
             BattleChangeMatchOptions,
-            "状态识别",
-            "切换精灵界面",
             cancellationToken))
         {
             return true;
@@ -200,8 +198,6 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
             BattleSkillRegionIds,
             BattleChangeTemplateName,
             BattleChangeMatchOptions,
-            "状态识别",
-            "技能区域切换精灵界面",
             cancellationToken);
     }
 
@@ -216,8 +212,6 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
             BattleSkillRegionIds,
             BattleSkillTemplateName,
             BattleSkillMatchOptions,
-            "状态识别",
-            "技能选择按钮",
             cancellationToken);
     }
 
@@ -232,8 +226,6 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
             BattleChatRegionIds,
             BattleChatTemplateName,
             BattleChatMatchOptions,
-            "状态识别",
-            "战斗聊天按钮",
             cancellationToken);
     }
 

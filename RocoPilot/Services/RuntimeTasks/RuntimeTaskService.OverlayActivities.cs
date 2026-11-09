@@ -20,7 +20,7 @@ public sealed partial class RuntimeTaskService
         if (!state.Options.InfoOverlayEnabled) return;
         var turnId = _battle.CurrentTurn?.Id;
         var rawText = await _frameRecognizer.RecognizeRegionTextAsync(
-            state, frame, BattleEnemyNameRegionIds, cancellationToken, "战斗精灵名");
+            state, frame, BattleEnemyNameRegionIds, cancellationToken);
         var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
         if (battleId != _battle.BattleId) return;
         RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(battleId, turnId, name, DateTimeOffset.Now));
@@ -54,9 +54,11 @@ public sealed partial class RuntimeTaskService
         }
     }
 
-    private void PublishBattleInputProgress(RuntimeTaskState state, long battleId, long turnId,
+    private void PublishBattleInputProgress(RuntimeTaskState state, long battleId, AutoBattleTurn turn,
         AutoBattlePlan plan, string sequence, bool completed)
     {
+        if (completed) _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}，已发送 {Sequence}",
+            turn.Number, plan.Description, sequence);
         if (_battle.IsSuspendedForShiny || !ReferenceEquals(CurrentState, state) || _isSuspended) return;
         var kind = plan.Action switch
         {
@@ -68,8 +70,8 @@ public sealed partial class RuntimeTaskService
         var description = plan.Action == AutoBattleAction.Capture
             ? $"血脉：{EncounterBloodlineRecognition.GetDisplayName(_battle.Bloodline)}"
             : isCustomSequence && plan.DisplayKey != plan.Sequence ? plan.DisplayKey : string.Empty;
-        RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turnId,
-            $"input:{turnId}:{plan.Action}:{sequence}", kind, InfoOverlayIslandPresentation.BattleInputTitle(plan),
+        RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turn.Id,
+            $"input:{turn.Id}:{plan.Action}:{sequence}", kind, InfoOverlayIslandPresentation.BattleInputTitle(plan),
             description,
             DateTimeOffset.Now, completed));
     }
@@ -82,7 +84,7 @@ public sealed partial class RuntimeTaskService
         try
         {
             return await _battleInput.ExecuteAsync(state.TargetWindow.Hwnd, settings, plan, token,
-                (sequence, completed) => PublishBattleInputProgress(state, battleId, turn.Id, plan, sequence, completed));
+                (sequence, completed) => PublishBattleInputProgress(state, battleId, turn, plan, sequence, completed));
         }
         catch (OperationCanceledException)
         {
@@ -90,10 +92,10 @@ public sealed partial class RuntimeTaskService
             _overlayActivities.Clear();
             throw;
         }
-        catch
+        catch (Exception ex)
         {
             RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turn.Id, $"error:{turn.Id}:{plan.Action}",
-                InfoOverlayActivityKind.Error, "按键发送未完成", "请查看日志中的失败原因", DateTimeOffset.Now, completed: true));
+                InfoOverlayActivityKind.Error, "按键发送未完成", ex.Message, DateTimeOffset.Now, completed: true));
             throw;
         }
     }

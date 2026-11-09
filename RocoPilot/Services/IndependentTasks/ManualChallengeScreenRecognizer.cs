@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
@@ -27,7 +26,7 @@ internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOn
 
 /// <summary>界面控件用模板定位，动态名称和交互文字使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
-    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons, ILogger<ManualChallengeScreenRecognizer> logger)
+    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons)
 {
     // 首次定位与点击后的复查共用同一模板、区域和阈值。
     private static readonly Dictionary<string, (double Left, double Top, double Right, double Bottom, RecognitionAnchor Anchor)> ButtonAreas = new()
@@ -256,9 +255,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         {
             options.MinimumScore = score;
             var result = await images.MatchAsync(frame, Area(left, top, right, bottom), TemplatePath(template), options, cancellationToken);
-            if (template == "manual-header")
-                logger.LogDebug("花种手册识别：匹配={Matched}，得分={Score:F3}，预计比例={Scale:F4}，目标=({X},{Y},{Width},{Height})",
-                    result.IsMatch, result.Score, scale, result.X, result.Y, result.Width, result.Height);
             options.MinimumScore = .94;
             return result.IsMatch ? result : null;
         }
@@ -267,8 +263,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             var result = await ocr.RecognizeAsync(frame, region, TextRecognitionDefaults.Method, cancellationToken);
             var name = string.IsNullOrWhiteSpace(result.Text) ? string.Empty
                 : await catalog.MatchSpiritNameAsync(result.Text, seasons.Load().SpiritNameMatchThreshold, cancellationToken);
-            logger.LogDebug("精灵名称识别：OCR={RawName}，图鉴={MatchedName}，区域=({X},{Y},{Width},{Height})",
-                result.Text, name, region.X, region.Y, region.Width, region.Height);
             reportOcr?.Invoke(region, $"OCR：{(string.IsNullOrWhiteSpace(result.Text) ? "无文本" : result.Text)} → 图鉴：{(string.IsNullOrEmpty(name) ? "未匹配" : name)}");
             return (legendary && string.IsNullOrEmpty(name) ? Normalize(result.Text) : name, result.Text);
         }
@@ -423,9 +417,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var result = await images.MatchAsync(frame, area,
             TemplatePath(template),
             new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
-        if (template == "manual-challenge")
-            logger.LogDebug("花种手册挑战入口：匹配={Matched}，得分={Score:F3}，目标=({X},{Y},{Width},{Height})",
-                result.IsMatch, result.Score, result.X, result.Y, result.Width, result.Height);
         return result.IsMatch ? result : null;
     }
 

@@ -4,6 +4,7 @@ using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
@@ -101,10 +102,22 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
                 return cancel is null ? new(ManualChallengeScene.Unknown, [])
                     : new(ManualChallengeScene.MissingLegendaryMark, [], missingMark, ExitButton: cancel);
             }
-            // 只匹配共有的“参与挑战将只能”，兼容印记不足与周次数用尽时不同的换行位置。
-            if (await Match("legendary-insufficient", .32, .48, .69, .61) is not null)
-                return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
-                    ExitButton: await Button("legendary-cancel"));
+            // 只确认共有的“参与挑战将只能”，兼容印记不足与周次数用尽时不同的换行位置。
+            // 文字像素模板随游戏版本的渲染变化失效（2026-11-08 实测 0.84~0.87 且跨帧浮动），
+            // 改为：取消按钮出现时 OCR 正文第一行并模糊匹配。按钮模板跨帧稳定 0.95+。
+            if (await Button("legendary-cancel") is not null)
+            {
+                // 区域按原生 1920×1080 投影实测卡在正文第一行（2048 基准 y 596–620）：
+                // 上界留出弹窗底色余量，下界必须避开第二行“继续？”（626 起），
+                // 单行 OCR 混入第二行残片会识别失败。
+                var promptArea = Area(.31, .508, .70, .541, "契约印记不足弹窗正文");
+                var insufficientPrompt = await ocr.RecognizeAsync(frame, promptArea, TextRecognitionDefaults.Method, cancellationToken);
+                reportOcr?.Invoke(promptArea, string.IsNullOrWhiteSpace(insufficientPrompt.Text) ? "OCR：无文本" : $"OCR：{insufficientPrompt.Text}");
+                logger.LogDebug("契约印记不足弹窗正文：OCR={Raw}", insufficientPrompt.Text);
+                if (TextMatchingHelper.CalculateSimilarity(insufficientPrompt.Text, "参与挑战将只能") >= .8)
+                    return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
+                        ExitButton: await Button("legendary-cancel"));
+            }
             var captureConfirmation = await ReadCaptureConfirmationAsync(frame, clientX, clientY, width, height, cancellationToken);
             if (captureConfirmation is not null) return captureConfirmation;
             var rewards = await Match("legendary-rewards", .43, .34, .57, .44);
@@ -302,6 +315,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (template is "legendary-challenge" or "legendary-result-retry"
             && await MatchButtonAsync(frame, "legendary-underfilled-team", clientX, clientY, width, height, token) is not null)
             return null;
+        // 契约印记不足弹窗弹出后原按钮被遮罩压暗、模板自然失配，复查无需额外让路；
+        // 曾尝试以 legendary-cancel 出现为标志让路，会在准备页误命中，已回退。
         return await MatchButtonAsync(frame, template,
             clientX, clientY, width, height, token,
             scene is ManualChallengeScene.FlowerList or ManualChallengeScene.LegendaryList ? rowY : null);

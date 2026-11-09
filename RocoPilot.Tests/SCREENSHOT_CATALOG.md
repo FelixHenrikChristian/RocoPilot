@@ -218,3 +218,30 @@
 - 界面状态：“确认新赛季统计”弹窗，奇遇 1 项，未勾选。用户框出了选择按钮和次数输入框，两者为浅灰底，精灵名输入和赛季选择为深色底。
 - 原因与调整：选择控件实际为 `ToggleButton`，弹窗尚未统一其背景；`DialogNumberBoxStyle` 也缺少背景设置，而 TextBox 和 ComboBox 已使用 `SolidBackgroundFillColorBaseBrush`。在弹窗样式中统一 NumberBox 与 ToggleButton 的普通状态底色，沿用默认选中及交互状态模板。
 - 用途与限制：修改前视觉参考，不作为 OCR 素材；未派生识别测试样本。截图不能证明修复后的视觉表现。
+
+## 2026-11-08：传说结算页契约印记不足弹窗
+
+- [用户原图](LocalScreenshots/2026-11-08/传说精灵/结算页契约印记不足弹窗.jpg)：附件 `clipboard-2026-11-08T13-40-25-267Z-37535e52.jpg`，1080×624，原样保存，未裁剪。SHA-256：`116D84C8FC89BDF67D8CDF602394C3CD69AB0534A0B8A3DAA5C8D9482F5A8450`。
+- 界面状态：传说任务捕捉成功结算页（“捕捉到了里奥”，本周契约印记捕捉次数 3/3），点“再次挑战”后弹出“提示”弹窗：“当前契约印记不足，参与挑战将只能使用传说印记捕捉精灵，是否继续？”，左“取消”右“确认”。弹窗不遮挡背景的退出/再次挑战按钮。
+- 问题定位：识别链路（legendary-insufficient 文字区、legendary-confirm/cancel 按钮区）对截图全部命中；卡点在 Runner 点击“再次挑战”后的复查——弹窗在场时背景 retry 按钮仍可匹配，`FindClickTargetAsync` 仅有队伍不足弹窗的让路分支，导致反复点击原按钮直至 10 秒超时，任务中止，永远到不了点“确认”。
+- 调整：复查 `legendary-challenge` / `legendary-result-retry` 时，检测到契约印记不足弹窗同样返回 null（已切换），交回主流程按印记策略点“确认”。
+- 派生素材：[result-insufficient.png](../RocoPilot.Tests/Fixtures/legendary-local/result-insufficient.png)——原图裁去顶部 16px 窗口边（客户区 (0,16,1080,624)）后缩放至 2048×1152；回放测试 `ResultScreenInsufficientPromptIsRecognizedAndConfirms`、`PreparationInsufficientPromptYieldsChallengeRecheck`。
+- 已知限制：素材为 1.9 倍上采样，清晰度低于原生截图；弹窗精灵名“里奥”不可核对，仅按场景命名。
+
+## 2026-11-08：契约印记不足弹窗模板失效与重制（第二次）
+
+- 接上条：复查让路修复部署后实测仍卡住，运行日志显示弹窗在屏时整帧识别为 Unknown（22:03:37 起持续 None 至手动停止），无超时异常——点击与复查环节均已正常。
+- 根因：`legendary/insufficient.png` 文字模板对当前游戏渲染匹配不上。用独立 OpenCV 诊断程序量化：旧模板对用户两张弹窗截图得分仅 0.843（阈值 0.94）；confirm/cancel 按钮模板 0.98+ 正常；其余场景模板全部低于 0.9 → ReadAsync 落到 Unknown。游戏更新改变了弹窗文字的抗锯齿渲染，旧模板（及 10 月旧素材）一并过期。
+- 重制：从 2026-11-08 用户截图素材裁“参与挑战将只能”7 字（893,594–1075,623 → 182×29），该段在“印记不足”与“周次数用尽”两种文案中均不跨行。交叉验证：对两张当前渲染截图 0.992 命中；对捕捉确认/准备/结算/缺印记等场景 0.78–0.82 不命中（隔离带约 0.08）。
+- 阈值：`ReadAsync` 与 `HasInsufficientMarkPromptAsync` 中 legendary-insufficient 匹配阈值 .94 → .90，容忍不同窗口分辨率下文字渲染差异。
+- 素材更新：`Fixtures/legendary-insufficient.png` 替换为当前渲染（结算页弹窗，与 legendary-local/result-insufficient.png 同源）；`Fixtures/legendary-exhausted.png` 仍为旧渲染（新模板 0.797 不命中），`FlowerSeedScreenRecognizerTests` 与 `FlowerSeedChallengeRunnerTests` 的 exhausted 用例已注释并标 TODO，待补当前渲染截图。
+- 待办：用户修完 AutoBattleConfigEditor 半成品代码后跑 `dotnet test`（LocalScreenshots + Legendary 相关）；实战复测；建议弹窗出现时用截图热键取原生分辨率弹窗图进一步校准，并补“周次数用尽”弹窗当前截图。
+
+## 2026-11-08：准备页弹窗与文字模板方案废弃（第三次）
+
+- [用户原图](LocalScreenshots/2026-11-08/传说精灵/准备页契约印记不足弹窗.jpg)：附件 `clipboard-2026-11-08T14-33-01-089Z-d6d59aed.jpg`，1080×608 纯客户区（无标题栏，与前两张 1080×624 含 16px 边框不同），原样保存。SHA-256：`EC11FF2653962FAD2146872F91EC01CF019C3EB32869645790BF676F06EA2C82`。
+- 界面状态：挑战准备页（圣羽翼王，印记可用次数 3/3）弹出同一“契约印记不足”提示，背景“开始挑战”按钮仍可见。用户反馈“一开始的挑战都进不去了”。
+- 定位：准备页点的是 start 模板（不在复查让路列表内，属修复遗漏）；且重制模板对此截图仅 0.868（阈值 0.90 不过），证明上采样文字模板跨帧浮动 0.84~0.99 不可靠。confirm/cancel 按钮模板 0.95+ 稳定。
+- 调整：废弃 `legendary/insufficient.png` 文字模板（已删除）；弹窗判定改为取消按钮命中时 OCR 正文第一行模糊匹配“参与挑战将只能”；复查让路（start/legendary-challenge/legendary-result-retry）改为检测 underfilled-team 或 legendary-cancel 按钮。
+- 派生素材：[preparation-insufficient.png](../RocoPilot.Tests/Fixtures/legendary-local/preparation-insufficient.png)——原图整幅 1080×608 缩放至 2048×1152；回放测试 `PreparationInsufficientPromptIsRecognizedAndStartRecheckYields`。LegendaryLocalScreenshotTests 全部改用真实 OCR 服务。
+- 已知限制：仍未实测（RocoPilot.exe 运行中锁定输出目录）；OCR 判定区域按结算页弹窗第一行（y .518~.538）设定，若弹窗布局变化需同步调整。

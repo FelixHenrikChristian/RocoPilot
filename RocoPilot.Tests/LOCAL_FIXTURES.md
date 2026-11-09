@@ -13,7 +13,7 @@
 
 ## 传说精灵回放素材
 
-大幅游戏截图放在 `RocoPilot.Tests/Fixtures/legendary-local/`，该目录由 `.gitignore` 排除，不提交到 Git，也不随应用发布。测试构建时复制到测试输出目录；缺少某张素材时，对应测试显示为跳过，不会被算作通过。测试代码、本文档和应用必需的小型识别模板仍纳入版本管理。
+大幅游戏截图放在 `RocoPilot.Tests/Fixtures/legendary-local/`，该目录由 `.gitignore` 排除，不提交到 Git，也不随应用发布。契约印记不足弹窗的两张核心素材（识别回归必需、换机器必须可跑）不放此处，已作为正式素材入库 `Fixtures/legendary-result-insufficient.png`（挑战后·结算页弹窗，原生 1920×1080）与 `Fixtures/legendary-preparation-insufficient.png`（挑战前·准备页弹窗）。测试构建时复制到测试输出目录；缺少某张素材时，对应测试显示为跳过，不会被算作通过。测试代码、本文档和应用必需的小型识别模板仍纳入版本管理。
 
 当前素材来自 2026-10-25 和 2026-11-03 的用户截图。10 月 25 日捕捉确认截图已裁去窗口边框，保留 `(1, 44, 2048, 1152)` 客户区；准备界面截图原本就是客户区，原样复制。11 月 3 日单卡片截图的客户区为 `(1, 31, 2048, 1152)`。文件内容为 2048×1152 PNG，测试还会缩放到 1280×720 并添加窗口偏移验证。
 
@@ -29,6 +29,9 @@
 | preparation-start-stalled.png | 准备界面停滞时用户提供的无光标截图；验证开始按钮及点击后的复查，不等同于真实鼠标悬停验证 |
 | capture-contract-only.png | 2026-11-03 用户截图；传说印记为 0，仅有居中的契约印记卡片，契约印记 100、周次数 3；验证识别后可确认并继续捕捉 |
 | multiplayer-underfilled-team.png | 2026-11-05 用户截图的客户区 `(1,31,2048,1152)`；验证整行浅底正文、右侧“是”、点击重试及后续弹窗切换 |
+| result-insufficient.png | 2026-11-08 用户截图（结算页契约印记不足弹窗）的客户区 `(0,16,1080,624)` 缩放至 2048×1152；验证结算页弹窗识别、确认/取消按钮定位，以及“再次挑战”复查在弹窗在场时让路 |
+
+2026-11-08 更新（第三次迭代）：文字像素模板对弹窗正文的匹配在同渲染不同帧间浮动 0.84~0.99，不可靠，`legendary/insufficient.png` 模板已删除。弹窗判定改为：取消按钮命中（跨帧稳定 0.95+）时 OCR 正文第一行（区域 .32/.51~.69/.553），用 `TextMatchingHelper.CalculateSimilarity` 模糊匹配“参与挑战将只能”（≥0.8），兼容印记不足与周次数用尽两种文案且不跨行。复查让路（start/legendary-challenge/legendary-result-retry）改为检测 underfilled-team 或 legendary-cancel 按钮出现。`Fixtures/legendary-insufficient.png` 保持原版（挑战前准备页弹窗，OCR 判定不依赖渲染版本）；结算页（挑战后）弹窗由 `legendary-local/result-insufficient.png`（原生 1920×1080 截图派生）覆盖；`legendary-exhausted.png` 仍为旧渲染，相关用例已注释标 TODO，待补当前渲染的“周次数用尽”弹窗截图后恢复。
 
 常驻精灵的弹窗没有显示精灵名，文件按可核对的场景命名，避免仅凭截图猜测名称。
 

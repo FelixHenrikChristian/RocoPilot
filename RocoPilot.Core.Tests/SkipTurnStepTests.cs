@@ -105,11 +105,14 @@ public sealed class SkipTurnStepTests
     public void Normalize_ChallengeSequencesKeepSkipStep()
     {
         var settings = CreateSettings("S", "1");
-        settings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("S"), AutoBattleReleaseStep.CreateSkill("2")];
+        // 扁平序列由选中配置生成：修改步骤需写入配置本身。
+        settings.FlowerSeedReleaseConfigs[0].Steps =
+            [AutoBattleReleaseStep.CreateSkill("S"), AutoBattleReleaseStep.CreateSkill("2")];
 
         var normalized = AutoBattleSettingsRules.Normalize(settings);
 
         Assert.AreEqual("S", normalized.FlowerSeedReleaseSequence[0].SkillKey);
         Assert.AreEqual("2", normalized.FlowerSeedReleaseSequence[1].SkillKey);
+        Assert.AreEqual("S", normalized.FlowerSeedReleaseConfigs[0].Steps[0].SkillKey);
     }
 }

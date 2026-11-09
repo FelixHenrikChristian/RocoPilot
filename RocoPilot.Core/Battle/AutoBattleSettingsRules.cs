@@ -80,12 +80,35 @@ public static class AutoBattleSettingsRules
         }
 
         normalized.TurnSequencePresets = NormalizePresets(normalized.TurnSequencePresets);
-        ResolvePresetReferences(normalized);
         normalized.ReleaseSequence = ResolveReleaseSequence(normalized)
             .Select(step => step.Clone())
             .ToList();
         normalized.FlowerSeedReleaseSequence = NormalizeChallengeSequence(normalized.FlowerSeedReleaseSequence);
         normalized.LegendaryReleaseSequence = NormalizeChallengeSequence(normalized.LegendaryReleaseSequence);
+        // 三种战斗类型各管各的配置：已有配置列表直接使用，没有则由各自扁平序列生成默认配置。
+        normalized.NormalReleaseConfigs = NormalizeReleaseConfigs(
+            MigratePerTypeConfigs(normalized.NormalReleaseConfigs, normalized.ReleaseSequence),
+            normalized.ReleaseSequence).Configs;
+        normalized.FlowerSeedReleaseConfigs = NormalizeReleaseConfigs(
+            MigratePerTypeConfigs(normalized.FlowerSeedReleaseConfigs, normalized.FlowerSeedReleaseSequence),
+            normalized.FlowerSeedReleaseSequence).Configs;
+        normalized.LegendaryReleaseConfigs = NormalizeReleaseConfigs(
+            MigratePerTypeConfigs(normalized.LegendaryReleaseConfigs, normalized.LegendaryReleaseSequence),
+            normalized.LegendaryReleaseSequence).Configs;
+        ResolvePresetReferences(normalized);
+        normalized.SelectedNormalReleaseConfigId = SelectReleaseConfigId(
+            normalized.NormalReleaseConfigs, normalized.SelectedNormalReleaseConfigId);
+        normalized.SelectedFlowerSeedReleaseConfigId = SelectReleaseConfigId(
+            normalized.FlowerSeedReleaseConfigs, normalized.SelectedFlowerSeedReleaseConfigId);
+        normalized.SelectedLegendaryReleaseConfigId = SelectReleaseConfigId(
+            normalized.LegendaryReleaseConfigs, normalized.SelectedLegendaryReleaseConfigId);
+        // 各类型的运行时扁平序列 = 该类型选中配置的步骤。
+        normalized.ReleaseSequence = CloneSteps(
+            FindSelectedConfig(normalized.NormalReleaseConfigs, normalized.SelectedNormalReleaseConfigId));
+        normalized.FlowerSeedReleaseSequence = CloneSteps(
+            FindSelectedConfig(normalized.FlowerSeedReleaseConfigs, normalized.SelectedFlowerSeedReleaseConfigId));
+        normalized.LegendaryReleaseSequence = CloneSteps(
+            FindSelectedConfig(normalized.LegendaryReleaseConfigs, normalized.SelectedLegendaryReleaseConfigId));
         if (!Enum.IsDefined(normalized.EncounterRelievedAction))
         {
             normalized.EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy;
@@ -231,8 +254,12 @@ public static class AutoBattleSettingsRules
 
     private static void ResolvePresetReferences(AutoBattleSettings settings)
     {
-        foreach (var step in settings.ReleaseSequence.Concat(settings.FlowerSeedReleaseSequence)
-                     .Concat(settings.LegendaryReleaseSequence).Where(step => step.IsCustom))
+        var allSteps = settings.ReleaseSequence.Concat(settings.FlowerSeedReleaseSequence)
+            .Concat(settings.LegendaryReleaseSequence)
+            .Concat(settings.NormalReleaseConfigs.SelectMany(config => config.Steps))
+            .Concat(settings.FlowerSeedReleaseConfigs.SelectMany(config => config.Steps))
+            .Concat(settings.LegendaryReleaseConfigs.SelectMany(config => config.Steps));
+        foreach (var step in allSteps.Where(step => step.IsCustom))
         {
             var preset = FindPreset(settings.TurnSequencePresets, step.PresetId);
             if (string.IsNullOrWhiteSpace(step.PresetId))
@@ -252,6 +279,124 @@ public static class AutoBattleSettingsRules
                 step.Sequence = preset.Sequence;
             }
         }
+    }
+
+    private sealed record ReleaseConfigsResult(List<AutoBattleReleaseConfig> Configs);
+
+    /// <summary>
+    /// 规范化某战斗类型的配置列表：至少保留一个配置；空列表时由扁平序列迁移生成「配置1」。
+    /// </summary>
+    private static ReleaseConfigsResult NormalizeReleaseConfigs(
+        IEnumerable<AutoBattleReleaseConfig>? configs,
+        IReadOnlyList<AutoBattleReleaseStep> fallbackSequence)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+        var normalized = new List<AutoBattleReleaseConfig>();
+        foreach (var config in configs ?? [])
+        {
+            if (config is null)
+            {
+                continue;
+            }
+
+            var name = config.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = CreateDefaultConfigName(usedNames);
+            }
+
+            usedNames.Add(name);
+            var steps = (config.Steps ?? [])
+                .Select(NormalizeReleaseStep)
+                .OfType<AutoBattleReleaseStep>()
+                .ToList();
+            if (steps.Count == 0)
+            {
+                steps = AutoBattleSettings.CreateDefaultReleaseSequence();
+            }
+
+            normalized.Add(new AutoBattleReleaseConfig
+            {
+                Id = !string.IsNullOrWhiteSpace(config.Id) && ids.Add(config.Id.Trim())
+                    ? config.Id.Trim()
+                    : CreatePresetId(ids),
+                Name = name,
+                Steps = steps
+            });
+        }
+
+        if (normalized.Count == 0)
+        {
+            // 兜底：由扁平序列生成一个默认配置（正常流程不会走到，迁移逻辑总会产出配置）。
+            normalized.Add(new AutoBattleReleaseConfig
+            {
+                Id = CreatePresetId(ids),
+                Name = "默认配置",
+                Steps = fallbackSequence.Select(step => step.Clone()).ToList()
+            });
+        }
+
+        return new ReleaseConfigsResult(normalized);
+    }
+
+    /// <summary>取未被占用的最小「配置x」名称。</summary>
+    public static string CreateDefaultConfigName(IEnumerable<string>? existingNames)
+    {
+        var used = (existingNames ?? []).Select(name => name?.Trim()).Where(name => !string.IsNullOrEmpty(name)).ToHashSet(StringComparer.Ordinal);
+        for (var index = 1; ; index++)
+        {
+            var candidate = $"配置{index}";
+            if (used.Add(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    /// <summary>迁移到各类型的配置列表：已有配置直接使用；没有则由该类型的旧扁平序列生成「默认配置」。</summary>
+    private static List<AutoBattleReleaseConfig> MigratePerTypeConfigs(
+        IEnumerable<AutoBattleReleaseConfig>? perTypeConfigs,
+        IReadOnlyList<AutoBattleReleaseStep> flatFallback)
+    {
+        var own = (perTypeConfigs ?? []).Where(config => config is not null).ToList();
+        if (own.Count > 0)
+        {
+            return own;
+        }
+
+        return
+        [
+            new AutoBattleReleaseConfig
+            {
+                Name = "默认配置",
+                Steps = flatFallback.Select(step => step.Clone()).ToList()
+            }
+        ];
+    }
+
+    /// <summary>选中配置校验：无效时回退到第一个配置。</summary>
+    private static string SelectReleaseConfigId(
+        IReadOnlyList<AutoBattleReleaseConfig> configs,
+        string? selectedId)
+    {
+        var id = selectedId?.Trim();
+        return configs.Any(config => config.Id == id)
+            ? id!
+            : configs[0].Id;
+    }
+
+    private static AutoBattleReleaseConfig FindSelectedConfig(
+        IReadOnlyList<AutoBattleReleaseConfig> configs,
+        string selectedId)
+    {
+        return configs.FirstOrDefault(config => config.Id == selectedId)
+            ?? configs[0];
+    }
+
+    private static List<AutoBattleReleaseStep> CloneSteps(AutoBattleReleaseConfig config)
+    {
+        return config.Steps.Select(step => step.Clone()).ToList();
     }
 
     public static string? NormalizeSkillKey(string? skillKey)

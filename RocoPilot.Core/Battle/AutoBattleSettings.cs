@@ -58,6 +58,48 @@ public sealed class AutoBattleSettings
         set;
     } = [];
 
+    /// <summary>普通战斗的配置列表（各类型独立管理）。</summary>
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<AutoBattleReleaseConfig> NormalReleaseConfigs
+    {
+        get;
+        set;
+    } = [];
+
+    public string SelectedNormalReleaseConfigId
+    {
+        get;
+        set;
+    } = string.Empty;
+
+    /// <summary>花种战斗的配置列表（各类型独立管理）。</summary>
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<AutoBattleReleaseConfig> FlowerSeedReleaseConfigs
+    {
+        get;
+        set;
+    } = [];
+
+    public string SelectedFlowerSeedReleaseConfigId
+    {
+        get;
+        set;
+    } = string.Empty;
+
+    /// <summary>传说精灵战斗的配置列表（各类型独立管理）。</summary>
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<AutoBattleReleaseConfig> LegendaryReleaseConfigs
+    {
+        get;
+        set;
+    } = [];
+
+    public string SelectedLegendaryReleaseConfigId
+    {
+        get;
+        set;
+    } = string.Empty;
+
     public AutoBattleEncounterRelievedAction EncounterRelievedAction
     {
         get;
@@ -127,6 +169,9 @@ public sealed class AutoBattleSettings
             FlowerSeedReleaseSequence = CreateDefaultReleaseSequence(),
             LegendaryReleaseSequence = CreateDefaultReleaseSequence(),
             TurnSequencePresets = [],
+            NormalReleaseConfigs = [],
+            FlowerSeedReleaseConfigs = [],
+            LegendaryReleaseConfigs = [],
             EncounterRelievedAction = AutoBattleEncounterRelievedAction.RecoverEnergy,
             PlayerNumber = 1,
             KeyboardInputMethod = KeyboardInputMethod.PostMessage,
@@ -162,6 +207,12 @@ public sealed class AutoBattleSettings
             FlowerSeedReleaseSequence = (FlowerSeedReleaseSequence ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList(),
             LegendaryReleaseSequence = (LegendaryReleaseSequence ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList(),
             TurnSequencePresets = (TurnSequencePresets ?? []).OfType<AutoBattleTurnSequencePreset>().Select(preset => preset.Clone()).ToList(),
+            NormalReleaseConfigs = CloneReleaseConfigs(NormalReleaseConfigs),
+            SelectedNormalReleaseConfigId = SelectedNormalReleaseConfigId,
+            FlowerSeedReleaseConfigs = CloneReleaseConfigs(FlowerSeedReleaseConfigs),
+            SelectedFlowerSeedReleaseConfigId = SelectedFlowerSeedReleaseConfigId,
+            LegendaryReleaseConfigs = CloneReleaseConfigs(LegendaryReleaseConfigs),
+            SelectedLegendaryReleaseConfigId = SelectedLegendaryReleaseConfigId,
             EncounterRelievedAction = EncounterRelievedAction,
             PlayerNumber = Math.Clamp(PlayerNumber, 1, 4),
             KeyboardInputMethod = KeyboardInputMethod,
@@ -171,6 +222,42 @@ public sealed class AutoBattleSettings
             KeyboardIntervalMs = KeyboardIntervalMs,
             CaptureKeyboardIntervalMs = CaptureKeyboardIntervalMs,
             BloodlineCaptureFilter = (BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone()
+        };
+    }
+
+    private static List<AutoBattleReleaseConfig> CloneReleaseConfigs(IEnumerable<AutoBattleReleaseConfig> configs)
+    {
+        return (configs ?? []).OfType<AutoBattleReleaseConfig>().Select(config => config.Clone()).ToList();
+    }
+}
+
+/// <summary>
+/// 命名释放配置，可导入导出。各战斗类型独立维护自己的配置列表，运行时执行选中配置的步骤。
+/// </summary>
+public sealed class AutoBattleReleaseConfig
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+    public string Name
+    {
+        get;
+        set;
+    } = string.Empty;
+
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<AutoBattleReleaseStep> Steps
+    {
+        get;
+        set;
+    } = [];
+
+    public AutoBattleReleaseConfig Clone()
+    {
+        return new AutoBattleReleaseConfig
+        {
+            Id = Id,
+            Name = Name,
+            Steps = (Steps ?? []).OfType<AutoBattleReleaseStep>().Select(step => step.Clone()).ToList()
         };
     }
 }

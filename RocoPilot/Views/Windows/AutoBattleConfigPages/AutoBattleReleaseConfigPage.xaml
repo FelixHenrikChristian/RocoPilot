@@ -201,8 +201,13 @@
                         </Grid>
 
                         <Grid MinHeight="64">
-                            <GridView ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
-                                      SelectionMode="None" CanDragItems="True" CanReorderItems="True" AllowDrop="True"
+                            <!-- ItemsWrapGrid 不支持鼠标原生重排（WinUI3 已知限制），拖放事件手动重排。 -->
+                            <GridView x:Name="StepsGrid"
+                                      ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
+                                      SelectionMode="None" CanDragItems="True" AllowDrop="True"
+                                      DragItemsStarting="StepsGrid_DragItemsStarting"
+                                      DragOver="StepsGrid_DragOver"
+                                      Drop="StepsGrid_Drop"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                       ScrollViewer.VerticalScrollMode="Disabled"

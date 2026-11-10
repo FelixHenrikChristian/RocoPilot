@@ -105,6 +105,7 @@ public static class AutoBattleSettingsRules
         // 各类型的运行时扁平序列 = 该类型选中配置的步骤。
         normalized.ReleaseSequence = CloneSteps(
             FindSelectedConfig(normalized.NormalReleaseConfigs, normalized.SelectedNormalReleaseConfigId));
+        normalized.ReleaseSequence.RemoveAll(AutoBattleController.IsSkipTurnStep);
         normalized.FlowerSeedReleaseSequence = CloneSteps(
             FindSelectedConfig(normalized.FlowerSeedReleaseConfigs, normalized.SelectedFlowerSeedReleaseConfigId));
         normalized.LegendaryReleaseSequence = CloneSteps(

@@ -299,7 +299,7 @@
 - 根因：`legendary/insufficient.png` 文字模板对当前游戏渲染匹配不上。用独立 OpenCV 诊断程序量化：旧模板对用户两张弹窗截图得分仅 0.843（阈值 0.94）；confirm/cancel 按钮模板 0.98+ 正常；其余场景模板全部低于 0.9 → ReadAsync 落到 Unknown。游戏更新改变了弹窗文字的抗锯齿渲染，旧模板（及 10 月旧素材）一并过期。
 - 重制：从 2026-11-08 用户截图素材裁“参与挑战将只能”7 字（893,594–1075,623 → 182×29），该段在“印记不足”与“周次数用尽”两种文案中均不跨行。交叉验证：对两张当前渲染截图 0.992 命中；对捕捉确认/准备/结算/缺印记等场景 0.78–0.82 不命中（隔离带约 0.08）。
 - 阈值：`ReadAsync` 与 `HasInsufficientMarkPromptAsync` 中 legendary-insufficient 匹配阈值 .94 → .90，容忍不同窗口分辨率下文字渲染差异。
-- 素材更新：`Fixtures/legendary-insufficient.png` 替换为当前渲染（结算页弹窗，与 legendary-local/result-insufficient.png 同源）；`Fixtures/legendary-exhausted.png` 仍为旧渲染（新模板 0.797 不命中），`FlowerSeedScreenRecognizerTests` 与 `FlowerSeedChallengeRunnerTests` 的 exhausted 用例已注释并标 TODO，待补当前渲染截图。
+- 素材更新：`Fixtures/legendary-insufficient.png` 替换为当前渲染（结算页弹窗，与 legendary-local/result-insufficient.png 同源）；`Fixtures/legendary-exhausted.png` 仍为旧渲染（新模板 0.797 不命中），`FlowerSeedScreenRecognizerTests` 与 `FlowerSeedChallengeRunnerTests` 的 exhausted 用例已注释并标 TODO，当时计划补当前渲染截图。
 - 待办：用户修完 AutoBattleConfigEditor 半成品代码后跑 `dotnet test`（LocalScreenshots + Legendary 相关）；实战复测；建议弹窗出现时用截图热键取原生分辨率弹窗图进一步校准，并补“周次数用尽”弹窗当前截图。
 
 ## 2026-11-08：准备页弹窗与文字模板方案废弃（第三次）
@@ -310,3 +310,5 @@
 - 调整：废弃 `legendary/insufficient.png` 文字模板（已删除）；弹窗判定改为取消按钮命中时 OCR 正文第一行模糊匹配“参与挑战将只能”；复查让路（start/legendary-challenge/legendary-result-retry）改为检测 underfilled-team 或 legendary-cancel 按钮。
 - 派生素材：[preparation-insufficient.png](../RocoPilot.Tests/Fixtures/legendary-local/preparation-insufficient.png)——原图整幅 1080×608 缩放至 2048×1152；回放测试 `PreparationInsufficientPromptIsRecognizedAndStartRecheckYields`。LegendaryLocalScreenshotTests 全部改用真实 OCR 服务。
 - 已知限制：仍未实测（RocoPilot.exe 运行中锁定输出目录）；OCR 判定区域按结算页弹窗第一行（y .518~.538）设定，若弹窗布局变化需同步调整。
+
+2026-11-10 复查：恢复 `Fixtures/legendary-exhausted.png` 的 OCR 识别和两条挑战流程回放，用于验证周次数用尽时依配置继续或退出。

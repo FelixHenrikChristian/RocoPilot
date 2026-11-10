@@ -12,7 +12,9 @@ public sealed class SkipTurnStepTests
         settings.ReleaseSequence = keys.Select(AutoBattleReleaseStep.CreateSkill).ToList();
         settings.FlowerSeedReleaseSequence = settings.ReleaseSequence.Select(step => step.Clone()).ToList();
         settings.LegendaryReleaseSequence = settings.ReleaseSequence.Select(step => step.Clone()).ToList();
-        return AutoBattleSettingsRules.Normalize(settings);
+        var normalized = AutoBattleSettingsRules.Normalize(settings);
+        normalized.ReleaseSequence = normalized.FlowerSeedReleaseSequence;
+        return normalized;
     }
 
     [TestMethod]

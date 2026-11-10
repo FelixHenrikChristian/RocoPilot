@@ -30,7 +30,7 @@ public sealed class IndependentTaskSettings
     /// <summary>花种挑战：已手动传送到目标场景，跳过列表导航与地图传送。</summary>
     public bool FlowerSeedAtTargetLocation { get; set; }
 
-    /// <summary>花种挑战：捕捉前优先使用凝练印记（紫色星星）；数量 ≥20 时先确保其选中。</summary>
+    /// <summary>花种挑战：捕捉前优先使用凝练印记（紫色星星）；不足时改用契约印记。</summary>
     public bool FlowerSeedPreferCondensedMark { get; set; } = true;
 
     /// <summary>传说精灵挑战：已手动传送到目标场景，跳过列表导航与地图传送。</summary>

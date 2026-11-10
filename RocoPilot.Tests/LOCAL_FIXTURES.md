@@ -31,7 +31,7 @@
 | multiplayer-underfilled-team.png | 2026-11-05 用户截图的客户区 `(1,31,2048,1152)`；验证整行浅底正文、右侧“是”、点击重试及后续弹窗切换 |
 | result-insufficient.png | 2026-11-08 用户截图（结算页契约印记不足弹窗）的客户区 `(0,16,1080,624)` 缩放至 2048×1152；验证结算页弹窗识别、确认/取消按钮定位，以及“再次挑战”复查在弹窗在场时让路 |
 
-2026-11-08 更新（第三次迭代）：文字像素模板对弹窗正文的匹配在同渲染不同帧间浮动 0.84~0.99，不可靠，`legendary/insufficient.png` 模板已删除。弹窗判定改为：取消按钮命中（跨帧稳定 0.95+）时 OCR 正文第一行（区域 .32/.51~.69/.553），用 `TextMatchingHelper.CalculateSimilarity` 模糊匹配“参与挑战将只能”（≥0.8），兼容印记不足与周次数用尽两种文案且不跨行。复查让路（start/legendary-challenge/legendary-result-retry）改为检测 underfilled-team 或 legendary-cancel 按钮出现。`Fixtures/legendary-insufficient.png` 保持原版（挑战前准备页弹窗，OCR 判定不依赖渲染版本）；结算页（挑战后）弹窗由 `legendary-local/result-insufficient.png`（原生 1920×1080 截图派生）覆盖；`legendary-exhausted.png` 仍为旧渲染，相关用例已注释标 TODO，待补当前渲染的“周次数用尽”弹窗截图后恢复。
+契约印记不足弹窗通过取消按钮定位，并对正文第一行做 OCR，匹配“参与挑战将只能”。准备页和结算页分别使用上面列出的两张正式素材。周次数用尽使用已有的 `Fixtures/legendary-exhausted.png`，覆盖两种分辨率的弹窗识别以及允许或禁止使用传说印记的挑战流程。
 
 常驻精灵的弹窗没有显示精灵名，文件按可核对的场景命名，避免仅凭截图猜测名称。
 

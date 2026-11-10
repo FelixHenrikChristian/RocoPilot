@@ -213,7 +213,7 @@
                                     Margin="0,2,0,0"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="捕捉前优先选中凝练印记（紫色星星）；数量不足 20 时使用当前默认。"
+                                    Text="捕捉前优先选中凝练印记（紫色星星）；出现不足提示时改用契约印记。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
                             <CheckBox

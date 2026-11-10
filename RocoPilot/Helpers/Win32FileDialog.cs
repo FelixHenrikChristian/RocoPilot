@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace RocoPilot.Helpers;
 
@@ -78,20 +77,7 @@ internal static class Win32FileDialog
         var fileBuffer = Marshal.AllocCoTaskMem(MaxPathBuffer * 2);
         try
         {
-            if (!string.IsNullOrEmpty(suggestedFileName))
-            {
-                // WriteString 不写 null 终止符，手动补齐避免读取越界。
-                var bytes = Encoding.Unicode.GetBytes(suggestedFileName);
-                Marshal.Copy(bytes, 0, fileBuffer, bytes.Length);
-                Marshal.WriteByte(fileBuffer, bytes.Length, 0);
-                Marshal.WriteByte(fileBuffer, bytes.Length + 1, 0);
-            }
-            else
-            {
-                Marshal.WriteByte(fileBuffer, 0, 0);
-                Marshal.WriteByte(fileBuffer, 1, 0);
-            }
-
+            WriteSuggestedName(fileBuffer, suggestedFileName);
             var ofn = BuildDialog(ownerHwnd, filterLabel, extension, fileBuffer);
             ofn.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
             return GetSaveFileNameW(ref ofn) ? Marshal.PtrToStringUni(fileBuffer) : null;
@@ -100,6 +86,13 @@ internal static class Win32FileDialog
         {
             Marshal.FreeCoTaskMem(fileBuffer);
         }
+    }
+
+    internal static void WriteSuggestedName(IntPtr buffer, string name)
+    {
+        var length = Math.Min(name.Length, MaxPathBuffer - 1);
+        Marshal.Copy(name.ToCharArray(0, length), 0, buffer, length);
+        Marshal.WriteInt16(buffer, length * sizeof(char), 0);
     }
 
     private static OPENFILENAME BuildDialog(

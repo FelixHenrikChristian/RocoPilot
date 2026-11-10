@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 
@@ -10,6 +11,37 @@ namespace RocoPilot.Tests;
 [TestClass]
 public sealed class AutoBattleConfigEditorTests
 {
+    [TestMethod]
+    public void LongExportNameFitsDialogBufferIncludingTerminator()
+    {
+        var name = new string('名', 2048);
+        var buffer = Marshal.AllocCoTaskMem((name.Length + 1) * sizeof(char));
+        try
+        {
+            Marshal.WriteInt16(buffer, 1024 * sizeof(char), 42);
+            RocoPilot.Helpers.Win32FileDialog.WriteSuggestedName(buffer, name);
+            Assert.AreEqual(name[..1023], Marshal.PtrToStringUni(buffer));
+            Assert.AreEqual((short)42, Marshal.ReadInt16(buffer, 1024 * sizeof(char)));
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(buffer);
+        }
+    }
+
+    [TestMethod]
+    public void RejectsOrdinaryBattleWithOnlySkippedSteps()
+    {
+        var settings = AutoBattleSettings.CreateDefault();
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+        var sequence = editor.NormalConfigs.SelectedSequence;
+        sequence.Items.Clear();
+        sequence.AppendSkill("S");
+        Assert.IsFalse(editor.TryBuildSettings(settings, out _, out var error));
+        Assert.AreEqual(AutoBattleConfigSection.Normal, error.Section);
+        StringAssert.Contains(error.Message, "至少保留一个可执行");
+    }
+
     [TestMethod]
     public void ReordersMixedStepsAndSavesTheirNewPositions()
     {

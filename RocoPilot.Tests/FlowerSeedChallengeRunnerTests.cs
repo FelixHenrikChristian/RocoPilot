@@ -53,10 +53,8 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(true, false, 1, "insufficient", false)]
     [DataRow(false, false, 2, "insufficient", false)]
     [DataRow(true, true, 3, "insufficient", false)]
-    // TODO 游戏更新后弹窗文字渲染已变，旧 exhausted 素材匹配不上新模板；
-    // 待补充当前渲染的“周次数用尽”弹窗截图后恢复以下两行。
-    // [DataRow(false, false, 1, "exhausted", false)]
-    // [DataRow(true, false, 3, "exhausted", false)]
+    [DataRow(false, false, 1, "exhausted", false)]
+    [DataRow(true, false, 3, "exhausted", false)]
     [DataRow(true, false, 3, "insufficient", true)]
     [DataRow(false, false, 3, "insufficient", true)]
     [DataRow(true, false, 3, "missing-mark", true)]
@@ -507,6 +505,66 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.IsFalse(updates.Any(update => update.Operation.Contains('（') || update.Operation.Contains("已发送", StringComparison.Ordinal)));
         Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
         Assert.AreEqual(1, overlay.Hides);
+    }
+
+    [TestMethod]
+    public async Task ShortageAfterCaptureSwitchesToContractMarkBeforeRetry()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var capture = new ChallengeCapture();
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        var purpleClicked = false;
+        var blueClicked = false;
+        var purpleFrames = 0;
+        var shortage = false;
+        var images = new Images { MarkMatches = template => template switch
+        {
+            "condensed-selected" => purpleClicked && !blueClicked && ++purpleFrames >= 3,
+            "condensed-insufficient" => shortage && !blueClicked,
+            _ => false
+        } };
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            if (sequence == "1, Space" && !blueClicked)
+            {
+                Assert.IsTrue(purpleFrames >= 3 && !shortage);
+                shortage = true;
+            }
+            else capture.OnKey(sequence);
+        } };
+        var mouse = new Mouse { DuringClick = (x, y) =>
+        {
+            if (capture.Scene != 15) capture.OnClick(x, y);
+            else if (x == 92 && !purpleClicked) purpleClicked = true;
+            else if (x == 86 && shortage) blueClicked = true;
+            else Assert.Fail($"意外的印记点击 ({x},{y})");
+        } };
+        var runner = CreateRunner(capture, images, keyboard, mouse,
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, true,
+            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+        Assert.IsTrue(blueClicked);
+        Assert.AreEqual(2, keyboard.Keys.Count(key => key.Key == "1, Space"));
+        Assert.AreEqual(1, capture.RewardsClosed);
+    }
+
+    [TestMethod]
+    public async Task MissingHeadSkipArrowStopsChallenge()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+        var state = CreateState();
+        state.RecognitionRegionConfig.Regions.Add(new RecognitionRegion { Id = RocoPilot.Configuration.RecognitionRegionIds.BattleSkillTurnArrowMine, Enabled = true });
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence =
+            [AutoBattleReleaseStep.CreateSkill("S"), AutoBattleReleaseStep.CreateSkill("4")];
+        var capture = new ChallengeCapture();
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
+        var runner = CreateRunner(capture, new Images(), keyboard, new Mouse { DuringClick = capture.OnClick },
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => runner.RunAsync(state,
+            new FlowerSeedOption(1, "友爱星飞"), 1, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+        StringAssert.Contains(error.Message, "未识别到顺延箭头");
+        Assert.IsFalse(keyboard.Keys.Any(key => key.Key == "4"));
     }
 
     [TestMethod]
@@ -1023,6 +1081,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public bool IntermittentSkills;
         public int SkillFrames;
         public bool HideMapHeader;
+        public Func<string, bool>? MarkMatches;
         public int MapButtonX = 55;
         public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
         public string TemplateDirectory => "";
@@ -1055,6 +1114,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 (12, "battle-button-skill") => true,
                 (13, "battle-chat") => true,
                 (15, "capture-exclusive" or "capture-button") => true,
+                (15, "condensed-selected" or "condensed-insufficient") => MarkMatches?.Invoke(Path.GetFileNameWithoutExtension(templatePath)) == true,
                 (17, "result-retry" or "result-exit") => true,
                 _ => false
             };

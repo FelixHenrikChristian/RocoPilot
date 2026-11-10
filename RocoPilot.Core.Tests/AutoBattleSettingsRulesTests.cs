@@ -281,11 +281,13 @@ public sealed class AutoBattleSettingsRulesTests
         };
 
         var normalized = AutoBattleSettingsRules.Normalize(source);
-        // 配置保留跳过步骤；普通战斗运行时由控制器忽略。
+        // 编辑配置保留跳过步骤，普通战斗执行序列仅包含可执行步骤。
         CollectionAssert.AreEqual(
-            new[] { "S", "2" },
+            new[] { "2" },
             normalized.ReleaseSequence.Select(step => step.SkillKey).ToArray());
         Assert.AreEqual("S", normalized.NormalReleaseConfigs[0].Steps[0].SkillKey);
+        source.NormalReleaseConfigs[0].Steps.RemoveAt(1);
+        Assert.AreEqual(0, AutoBattleSettingsRules.Normalize(source).ReleaseSequence.Count);
     }
 
     [TestMethod]

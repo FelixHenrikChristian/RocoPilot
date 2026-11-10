@@ -424,11 +424,11 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
                 return false;
             }
 
-            if (item.Sequence.Items.Count == 0)
+            if (!item.Sequence.Items.Any(step => section != AutoBattleConfigSection.Normal || !step.IsSkipStep))
             {
                 error = new AutoBattleConfigValidationError(
                     "释放顺序为空",
-                    $"请为{battleTypeName}的配置「{name}」至少保留一个释放动作。",
+                    $"请为{battleTypeName}的配置「{name}」至少保留一个可执行的释放动作。",
                     section);
                 return false;
             }

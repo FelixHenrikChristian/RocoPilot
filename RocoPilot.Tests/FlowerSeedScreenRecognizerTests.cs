@@ -128,9 +128,7 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("difficulty-2", nameof(ManualChallengeScene.LegendaryConfirmation))]
     [DataRow("difficulty-3", nameof(ManualChallengeScene.LegendaryConfirmation))]
     [DataRow("insufficient", nameof(ManualChallengeScene.InsufficientContractMark))]
-    // TODO 游戏更新后弹窗文字渲染已变，旧 exhausted 素材匹配不上新模板；
-    // 待补充当前渲染的“周次数用尽”弹窗截图后恢复该用例。
-    // [DataRow("exhausted", nameof(ManualChallengeScene.InsufficientContractMark))]
+    [DataRow("exhausted", nameof(ManualChallengeScene.InsufficientContractMark))]
     [DataRow("preparation", nameof(ManualChallengeScene.Preparation))]
     [DataRow("battle", nameof(ManualChallengeScene.Battle))]
     [DataRow("pet-switching", nameof(ManualChallengeScene.Battle))]

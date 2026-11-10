@@ -76,6 +76,7 @@ public sealed class ManualChallengeRunner(
         var hasReleasedSkillInBattle = false;
         DateTimeOffset? headSkipStartedAt = null;
         var markClickAt = DateTimeOffset.MinValue;
+        var useContractMark = false;
         var battleNumber = 0;
         var window = state.TargetWindow;
         var inputMethod = settings.KeyboardInputMethod;
@@ -127,6 +128,8 @@ public sealed class ManualChallengeRunner(
                 {
                     battleNumber = flow.BattleNumber;
                     battle.ResetBattle();
+                    useContractMark = false;
+                    markClickAt = DateTimeOffset.MinValue;
                     myTurnCache = false;
                     myTurnCheckedAt = DateTimeOffset.MinValue;
                     loggedSkipTurnWaiting = false;
@@ -216,6 +219,9 @@ public sealed class ManualChallengeRunner(
                         // 避免 boss/AI 刚插入（动画进行中）就出招。
                         headSkipStartedAt ??= DateTimeOffset.UtcNow;
 
+                        if (!myTurn && now - headSkipStartedAt.Value >= TimeSpan.FromSeconds(30))
+                            throw new TimeoutException("首步跳过等待超时：30 秒内未识别到顺延箭头。");
+
                         if (!myTurn || (DateTimeOffset.UtcNow - headSkipStartedAt.Value).TotalSeconds < HeadSkipMinimumSeconds)
                         {
                             waitingForMyTurn = true;
@@ -272,27 +278,20 @@ public sealed class ManualChallengeRunner(
                 {
                     var (markSelected, markInsufficient) = await recognizer.ReadCondensedMarkAsync(
                         frame, clientX, clientY, width, height, token);
-                    if (markInsufficient
-                        && (DateTimeOffset.UtcNow - markClickAt).TotalSeconds >= 2)
+                    useContractMark |= markInsufficient;
+                    if (markInsufficient || markSelected == useContractMark)
                     {
-                        await mouse.ClickAsync(window.Hwnd,
-                            (int)Math.Round(width * .894),
-                            (int)Math.Round(height * .123),
-                            inputMethod, token);
-                        markClickAt = DateTimeOffset.UtcNow;
-                        logger.LogInformation("手册挑战：凝练印记不足（游戏提示），已点击蓝星改用契约印记，等待复查后捕捉");
                         decision = new(ManualChallengeAction.None);
-                    }
-                    else if (!markInsufficient && !markSelected
-                        && (DateTimeOffset.UtcNow - markClickAt).TotalSeconds >= 2)
-                    {
-                        await mouse.ClickAsync(window.Hwnd,
-                            (int)Math.Round(width * .958),
-                            (int)Math.Round(height * .125),
-                            inputMethod, token);
-                        markClickAt = DateTimeOffset.UtcNow;
-                        logger.LogInformation("手册挑战：凝练印记未选中，已点击紫星切换，等待复查后捕捉");
-                        decision = new(ManualChallengeAction.None);
+                        if (DateTimeOffset.UtcNow - markClickAt >= TimeSpan.FromSeconds(2)
+                            && keyboard.IsWindowForeground(window.Hwnd))
+                        {
+                            var point = RecognitionRegionImageHelper.MapReferenceArea(0, 0,
+                                window.ClientWidth > 0 ? window.ClientWidth : width,
+                                window.ClientHeight > 0 ? window.ClientHeight : height,
+                                2048, 1152, useContractMark ? 1831 : 1962, 143, 1, 1);
+                            await mouse.ClickAsync(window.Hwnd, point.X, point.Y, inputMethod, token);
+                            markClickAt = minimumFrameAt = DateTimeOffset.UtcNow;
+                        }
                     }
                 }
 
@@ -521,7 +520,8 @@ public sealed class ManualChallengeRunner(
         {
             minimumFrameAt = DateTimeOffset.UtcNow;
             Publish(lastProgress with { Operation = "等待捕捉结算", IsBattleWaiting = false });
-            await Task.Delay(3000, token);
+            var watchForShortage = preferCondensedMark && !legendary && !useContractMark;
+            if (!watchForShortage) await Task.Delay(3000, token);
             // 奖励页并入捕捉动作；固定点击推进，用结果页按钮确认整段结算完成。
             var timer = Stopwatch.StartNew();
             while (true)
@@ -534,6 +534,21 @@ public sealed class ManualChallengeRunner(
                     pendingFrame = next.AddReference();
                     lastAdvance = DateTimeOffset.UtcNow;
                     return;
+                }
+                if (watchForShortage)
+                {
+                    var mark = await recognizer.ReadCondensedMarkAsync(next, x, y, width, height, token);
+                    if (mark.Insufficient)
+                    {
+                        useContractMark = true;
+                        pendingFrame = next.AddReference();
+                        return;
+                    }
+                    if (timer.Elapsed < TimeSpan.FromSeconds(3))
+                    {
+                        await Task.Delay(180, token);
+                        continue;
+                    }
                 }
                 if (keyboard.IsWindowForeground(window.Hwnd))
                 {

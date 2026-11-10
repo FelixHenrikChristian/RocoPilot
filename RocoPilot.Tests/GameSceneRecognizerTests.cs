@@ -24,6 +24,7 @@ public sealed class GameSceneRecognizerTests
         var matching = new ImageMatchingService();
         var recognizer = new BattleScreenRecognizer(new RuntimeFrameRecognizer(matching, null!, new OverlayStub()));
         var samplePath = Path.Combine(AppContext.BaseDirectory, "Fixtures", sample);
+        if (!File.Exists(samplePath)) Assert.Inconclusive("缺少本地截图素材，请按 SCREENSHOT_TESTING.md 放置素材后重新构建。");
         using var crop = Cv2.ImRead(samplePath, ImreadModes.Unchanged);
         Assert.IsFalse(crop.Empty(), $"未读取到测试样本：{samplePath}");
         Assert.AreEqual(4, crop.Channels());

@@ -878,8 +878,8 @@ public sealed class FlowerSeedScreenRecognizerTests
         Action<Mat>? transform = null)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", fileName);
-        if (fileName.StartsWith("legendary-local/", StringComparison.Ordinal) && !File.Exists(path))
-            Assert.Inconclusive($"缺少本地截图素材：{fileName}，请按 LOCAL_FIXTURES.md 放置素材后重新构建。");
+        if (!File.Exists(path))
+            Assert.Inconclusive($"缺少本地截图素材：{fileName}，请按 SCREENSHOT_TESTING.md 放置素材后重新构建。");
         using var source = Cv2.ImRead(path, ImreadModes.Color);
         Assert.IsFalse(source.Empty(), $"未读取到测试样本：{fileName}");
         transform?.Invoke(source);

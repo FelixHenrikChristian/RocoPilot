@@ -15,7 +15,9 @@ public sealed class ImageMatchingServiceTests
     [TestMethod]
     public async Task ScaleSearchFindsBothTitlesWithoutCountingDifferentScalesTwice()
     {
-        using var screenshot = Cv2.ImRead(Path.Combine(AppContext.BaseDirectory, "Fixtures", "flower-seed-manual-1080p.png"));
+        var path = Path.Combine(AppContext.BaseDirectory, "Fixtures", "flower-seed-manual-1080p.png");
+        if (!File.Exists(path)) Assert.Inconclusive("缺少本地截图素材，请按 SCREENSHOT_TESTING.md 放置素材后重新构建。");
+        using var screenshot = Cv2.ImRead(path);
         using var title = new Mat(screenshot, new Rect(180, 10, 135, 45));
         using var canvas = new Mat(65, 340, MatType.CV_8UC3, Scalar.All(240));
         foreach (var x in new[] { 10, 180 })

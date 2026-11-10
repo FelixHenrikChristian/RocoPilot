@@ -385,5 +385,15 @@ Agents.md
 
 # Original user screenshots, indexed in RocoPilot.Tests/SCREENSHOT_CATALOG.md
 /RocoPilot.Tests/LocalScreenshots/
+
+# Private screenshot fixtures and their local provenance records
+/RocoPilot.Tests/Fixtures/**/*.png
+/RocoPilot.Tests/Fixtures/**/*.jpg
+/RocoPilot.Tests/Fixtures/**/*.jpeg
+/RocoPilot.Tests/Fixtures/**/*.webp
+/RocoPilot.Tests/SCREENSHOT_CATALOG.md
+/RocoPilot.Tests/LOCAL_FIXTURES.md
+/website/public/screenshots/statistics-overview.png
+/website/public/screenshots/statistics-shiny-detail.png
 .idea/
 build/

@@ -66,6 +66,10 @@ public sealed class FlowerSeedChallengeRunnerTests
     public async Task LegendaryScreenshotReplayCompletesOrStopsAccordingToMarkSetting(
         bool allowMarks, bool switchPet, int difficulty, string shortage, bool directTeleport)
     {
+        // 在异常断言之外检查素材，避免将缺图的跳过结果当成挑战异常。
+        var firstImage = directTeleport ? "legendary-list-season4.png" : "legendary-list.png";
+        if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "Fixtures", firstImage)))
+            Assert.Inconclusive("缺少本地截图素材，请按 SCREENSHOT_TESTING.md 放置素材后重新构建。");
         using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         var underfilled = shortage.StartsWith("underfilled-", StringComparison.Ordinal);

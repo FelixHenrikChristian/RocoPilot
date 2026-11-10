@@ -18,11 +18,14 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private readonly IKeyboardInputService _keyboardInputService;
     private readonly HashSet<AutoBattlePresetEditorItem> _observedPresets = [];
 
-    public AutoBattleReleaseSequenceEditor NormalRelease { get; } = new();
+    internal IKeyboardInputService KeyboardInputService => _keyboardInputService;
 
-    public AutoBattleReleaseSequenceEditor FlowerSeedRelease { get; } = new();
+    /// <summary>三种战斗类型各管各的配置，互不干扰。普通战斗无出招队列，跳过步骤仅展示不执行。</summary>
+    public AutoBattleReleaseConfigSet NormalConfigs { get; } = new(supportsSkipTurn: false);
 
-    public AutoBattleReleaseSequenceEditor LegendaryRelease { get; } = new();
+    public AutoBattleReleaseConfigSet FlowerSeedConfigs { get; } = new(supportsSkipTurn: true);
+
+    public AutoBattleReleaseConfigSet LegendaryConfigs { get; } = new(supportsSkipTurn: true);
 
     public ObservableCollection<AutoBattlePresetEditorItem> SharedPresetItems
     {
@@ -184,6 +187,24 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         });
     }
 
+    /// <summary>导入的配置加入指定战斗类型的列表并选中；名称为空时取默认「配置x」。</summary>
+    public AutoBattleReleaseConfigEditorItem AddImportedConfig(
+        AutoBattleReleaseConfigSet set,
+        AutoBattleReleaseConfig config)
+    {
+        var item = set.AddConfig(string.IsNullOrWhiteSpace(config.Name) ? null : config.Name);
+        item.Sequence.Items.Clear();
+        foreach (var step in config.Steps)
+        {
+            item.Sequence.Items.Add(CreateReleaseEditorItem(
+                step,
+                AutoBattleSettings.DefaultTurnSequence,
+                set.SupportsSkipTurn));
+        }
+
+        return item;
+    }
+
     public void RemoveSharedPreset(AutoBattlePresetEditorItem preset)
     {
         SharedPresetItems.Remove(preset);
@@ -218,30 +239,36 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     {
         settings = source.Clone();
 
-        if (!TryBuildReleaseSequence(
-                NormalRelease.Items,
+        if (!TryBuildReleaseConfigs(
+                NormalConfigs,
                 "普通战斗",
                 AutoBattleConfigSection.Normal,
+                out var normalConfigs,
+                out var normalSelectedId,
                 out var releaseSequence,
                 out error))
         {
             return false;
         }
 
-        if (!TryBuildReleaseSequence(
-                FlowerSeedRelease.Items,
+        if (!TryBuildReleaseConfigs(
+                FlowerSeedConfigs,
                 "花种战斗",
                 AutoBattleConfigSection.FlowerSeed,
+                out var flowerSeedConfigs,
+                out var flowerSeedSelectedId,
                 out var flowerSeedReleaseSequence,
                 out error))
         {
             return false;
         }
 
-        if (!TryBuildReleaseSequence(
-                LegendaryRelease.Items,
+        if (!TryBuildReleaseConfigs(
+                LegendaryConfigs,
                 "传说精灵战斗",
                 AutoBattleConfigSection.Legendary,
+                out var legendaryConfigs,
+                out var legendarySelectedId,
                 out var legendaryReleaseSequence,
                 out error))
         {
@@ -281,6 +308,12 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         settings.ReleaseSequence = releaseSequence;
         settings.FlowerSeedReleaseSequence = flowerSeedReleaseSequence;
         settings.LegendaryReleaseSequence = legendaryReleaseSequence;
+        settings.NormalReleaseConfigs = normalConfigs;
+        settings.SelectedNormalReleaseConfigId = normalSelectedId;
+        settings.FlowerSeedReleaseConfigs = flowerSeedConfigs;
+        settings.SelectedFlowerSeedReleaseConfigId = flowerSeedSelectedId;
+        settings.LegendaryReleaseConfigs = legendaryConfigs;
+        settings.SelectedLegendaryReleaseConfigId = legendarySelectedId;
         settings.TurnSequencePresets = presets;
         settings.BloodlineCaptureFilter = new BloodlineCaptureFilterSettings
         {
@@ -297,20 +330,21 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     private void LoadSettings(AutoBattleSettings settings)
     {
-        foreach (var step in settings.ReleaseSequence)
-        {
-            NormalRelease.Items.Add(CreateReleaseEditorItem(step, settings.TurnSequence));
-        }
-
-        foreach (var step in settings.FlowerSeedReleaseSequence)
-        {
-            FlowerSeedRelease.Items.Add(CreateReleaseEditorItem(step, AutoBattleSettings.DefaultTurnSequence));
-        }
-
-        foreach (var step in settings.LegendaryReleaseSequence)
-        {
-            LegendaryRelease.Items.Add(CreateReleaseEditorItem(step, AutoBattleSettings.DefaultTurnSequence));
-        }
+        LoadReleaseConfigs(
+            settings.NormalReleaseConfigs,
+            settings.SelectedNormalReleaseConfigId,
+            NormalConfigs,
+            settings.TurnSequence);
+        LoadReleaseConfigs(
+            settings.FlowerSeedReleaseConfigs,
+            settings.SelectedFlowerSeedReleaseConfigId,
+            FlowerSeedConfigs,
+            AutoBattleSettings.DefaultTurnSequence);
+        LoadReleaseConfigs(
+            settings.LegendaryReleaseConfigs,
+            settings.SelectedLegendaryReleaseConfigId,
+            LegendaryConfigs,
+            AutoBattleSettings.DefaultTurnSequence);
 
         foreach (var preset in settings.TurnSequencePresets ?? [])
         {
@@ -330,6 +364,103 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         CaptureBloodlineWuRan = bloodlineFilter.CaptureWuRan;
         CaptureBloodlineNormal = bloodlineFilter.CaptureNormal;
         CaptureBloodlineUnrecognized = bloodlineFilter.CaptureUnrecognized;
+    }
+
+    private static void LoadReleaseConfigs(
+        IEnumerable<AutoBattleReleaseConfig> configs,
+        string selectedId,
+        AutoBattleReleaseConfigSet set,
+        string turnSequence)
+    {
+        foreach (var config in configs)
+        {
+            var item = new AutoBattleReleaseConfigEditorItem(set.SupportsSkipTurn)
+            {
+                Id = config.Id,
+                Name = config.Name
+            };
+            foreach (var step in config.Steps)
+            {
+                item.Sequence.Items.Add(CreateReleaseEditorItem(step, turnSequence, set.SupportsSkipTurn));
+            }
+
+            set.Items.Add(item);
+        }
+
+        set.Selected = set.Items.FirstOrDefault(item => item.Id == selectedId) ?? set.Items[0];
+    }
+
+    /// <summary>构建某战斗类型的配置列表；返回选中配置的步骤作为该类型的运行时扁平序列。</summary>
+    private bool TryBuildReleaseConfigs(
+        AutoBattleReleaseConfigSet set,
+        string battleTypeName,
+        AutoBattleConfigSection section,
+        out List<AutoBattleReleaseConfig> configs,
+        out string selectedConfigId,
+        out List<AutoBattleReleaseStep> selectedSteps,
+        out AutoBattleConfigValidationError error)
+    {
+        configs = [];
+        selectedSteps = [];
+        selectedConfigId = string.Empty;
+        if (set.Items.Count == 0)
+        {
+            error = new AutoBattleConfigValidationError(
+                "配置为空",
+                $"请为{battleTypeName}至少保留一个配置。",
+                section);
+            return false;
+        }
+
+        foreach (var item in set.Items)
+        {
+            var name = item.Name.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                error = new AutoBattleConfigValidationError(
+                    "配置名称为空",
+                    $"请为{battleTypeName}的配置填写名称。",
+                    section);
+                return false;
+            }
+
+            if (!item.Sequence.Items.Any(step => section != AutoBattleConfigSection.Normal || !step.IsSkipStep))
+            {
+                error = new AutoBattleConfigValidationError(
+                    "释放顺序为空",
+                    $"请为{battleTypeName}的配置「{name}」至少保留一个可执行的释放动作。",
+                    section);
+                return false;
+            }
+
+            if (!TryBuildReleaseSequence(
+                    item.Sequence.Items,
+                    battleTypeName,
+                    section,
+                    out var steps,
+                    out error))
+            {
+                return false;
+            }
+
+            configs.Add(new AutoBattleReleaseConfig
+            {
+                Id = item.Id,
+                Name = name,
+                Steps = steps
+            });
+        }
+
+        var selected = set.Selected ?? set.Items[0];
+        // out 参数不能被 lambda 捕获，先拷贝到局部变量。
+        var selectedId = selected.Id;
+        selectedConfigId = selectedId;
+        selectedSteps = configs
+            .First(config => config.Id == selectedId)
+            .Steps.Select(step => step.Clone())
+            .ToList();
+        error = default;
+        return true;
     }
 
     private bool TryBuildReleaseSequence(
@@ -454,14 +585,19 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             return;
         }
 
-        NormalRelease.UpdatePreset(preset);
-        FlowerSeedRelease.UpdatePreset(preset);
-        LegendaryRelease.UpdatePreset(preset);
+        foreach (var set in new[] { NormalConfigs, FlowerSeedConfigs, LegendaryConfigs })
+        {
+            foreach (var item in set.Items)
+            {
+                item.Sequence.UpdatePreset(preset);
+            }
+        }
     }
 
     private static AutoBattleReleaseEditorItem CreateReleaseEditorItem(
         AutoBattleReleaseStep step,
-        string turnSequence)
+        string turnSequence,
+        bool supportsSkipTurn)
     {
         if (step.IsCustom)
         {
@@ -480,7 +616,9 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
                 AutoBattleSettingsRules.BuildTurnSequence(turnSequence, skillKey));
         }
 
-        return AutoBattleReleaseEditorItem.CreateSkill(skillKey);
+        return AutoBattleReleaseEditorItem.CreateSkill(
+            skillKey,
+            skipIgnored: !supportsSkipTurn && skillKey == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey);
     }
 
     private static string BuildRoundOrder(IEnumerable<AutoBattleReleaseStep> releaseSequence)
@@ -500,6 +638,8 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
 internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
 {
+    private readonly bool _supportsSkipTurn;
+
     public ObservableCollection<AutoBattleReleaseEditorItem> Items { get; } = [];
 
     public Visibility EmptyVisibility => Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -509,8 +649,10 @@ internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
         : $"{string.Join(" → ", Items.Take(8).Select(item => item.DisplayText))} · "
             + (Items.Count > 8 ? $"等 {Items.Count} 步" : $"{Items.Count} 步");
 
-    public AutoBattleReleaseSequenceEditor()
+    /// <param name="supportsSkipTurn">普通战斗传 false：跳过步骤仅展示并标注执行时忽略。</param>
+    public AutoBattleReleaseSequenceEditor(bool supportsSkipTurn)
     {
+        _supportsSkipTurn = supportsSkipTurn;
         Items.CollectionChanged += Items_CollectionChanged;
     }
 
@@ -518,7 +660,10 @@ internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
     {
         if (AutoBattleSettingsRules.NormalizeSkillKey(skillKey) is { } key)
         {
-            Items.Add(AutoBattleReleaseEditorItem.CreateSkill(key));
+            Items.Add(AutoBattleReleaseEditorItem.CreateSkill(
+                key,
+                skipIgnored: !_supportsSkipTurn
+                    && key == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey));
         }
     }
 
@@ -578,6 +723,17 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
         private init;
     } = string.Empty;
 
+    /// <summary>是否为跳过回合步骤（技能键 S）。</summary>
+    public bool IsSkipStep => !IsCustom
+        && SkillKey == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey;
+
+    /// <summary>普通战斗上下文中该跳过步骤仅展示、不执行。</summary>
+    public bool SkipIgnored
+    {
+        get;
+        private set;
+    }
+
     public string Name
     {
         get => _name;
@@ -621,7 +777,14 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
         }
     }
 
-    public string StepTitle => IsCustom ? $"公共序列 · {Name}" : $"技能 {SkillKey}";
+    public string StepTitle => IsCustom
+        ? $"公共序列 · {Name}"
+        : SkillKey == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey
+            ? SkipIgnored ? "跳过回合（普通战斗忽略）" : "跳过回合"
+            : $"技能 {SkillKey}";
+
+    /// <summary>普通战斗中被忽略的跳过步骤整卡置灰。</summary>
+    public double CardOpacity => SkipIgnored ? 0.45 : 1.0;
 
     public Visibility SequenceVisibility => IsCustom ? Visibility.Visible : Visibility.Collapsed;
 
@@ -629,16 +792,23 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 
     public string DisplayText => IsCustom ? Name : SkillKey;
 
-    public string DetailText => IsCustom ? Sequence : "技能键";
+    public string DetailText => IsCustom
+        ? Sequence
+        : SkillKey == RocoPilot.Core.Battle.AutoBattleSettingsRules.SkipTurnSkillKey
+            ? SkipIgnored
+                ? "普通战斗无出招队列，执行时自动跳过"
+                : "等待轮到本玩家（P 角标）后继续"
+            : "技能键";
 
-    public static AutoBattleReleaseEditorItem CreateSkill(string skillKey)
+    public static AutoBattleReleaseEditorItem CreateSkill(string skillKey, bool skipIgnored = false)
     {
         return new AutoBattleReleaseEditorItem
         {
             IsCustom = false,
             SkillKey = skillKey,
             Name = skillKey,
-            Sequence = string.Empty
+            Sequence = string.Empty,
+            SkipIgnored = skipIgnored
         };
     }
 
@@ -672,6 +842,94 @@ internal sealed class AutoBattlePresetEditorItem : ObservableObject
     {
         get => _sequence;
         set => SetProperty(ref _sequence, value);
+    }
+}
+
+/// <summary>一个命名战斗配置的编辑草稿；各类型配置独立，切换配置不丢失未保存修改。</summary>
+internal sealed class AutoBattleReleaseConfigEditorItem : ObservableObject
+{
+    private string _name = string.Empty;
+
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
+
+    public AutoBattleReleaseSequenceEditor Sequence { get; }
+
+    public AutoBattleReleaseConfigEditorItem(bool supportsSkipTurn)
+    {
+        Sequence = new AutoBattleReleaseSequenceEditor(supportsSkipTurn);
+    }
+}
+
+/// <summary>某战斗类型下的配置集合，与其他类型互不干扰；选中配置即该类型运行时应用的配置。</summary>
+internal sealed class AutoBattleReleaseConfigSet : ObservableObject
+{
+    private readonly bool _supportsSkipTurn;
+    private AutoBattleReleaseConfigEditorItem _selected = null!;
+
+    public ObservableCollection<AutoBattleReleaseConfigEditorItem> Items { get; } = [];
+
+    public AutoBattleReleaseConfigEditorItem Selected
+    {
+        get => _selected;
+        set
+        {
+            // ComboBox 的 SelectedItem 在列表变化时会短暂回写 null，忽略以避免绑定链路出现空引用。
+            if (value is null || SetProperty(ref _selected, value))
+            {
+                OnPropertyChanged(nameof(SelectedSequence));
+            }
+        }
+    }
+
+    public AutoBattleReleaseSequenceEditor SelectedSequence => Selected.Sequence;
+
+    public bool SupportsSkipTurn => _supportsSkipTurn;
+
+    /// <summary>至少保留一个配置，否则不允许删除。</summary>
+    public bool CanRemove => Items.Count > 1;
+
+    public AutoBattleReleaseConfigSet(bool supportsSkipTurn)
+    {
+        _supportsSkipTurn = supportsSkipTurn;
+        Items.CollectionChanged += (_, _) => OnPropertyChanged(nameof(CanRemove));
+    }
+
+    public AutoBattleReleaseConfigEditorItem AddConfig(string? name = null)
+    {
+        var item = new AutoBattleReleaseConfigEditorItem(_supportsSkipTurn)
+        {
+            Name = string.IsNullOrWhiteSpace(name)
+                ? AutoBattleSettingsRules.CreateDefaultConfigName(Items.Select(existing => existing.Name))
+                : name.Trim()
+        };
+        item.Sequence.AppendSkill("1");
+        Items.Add(item);
+        Selected = item;
+        return item;
+    }
+
+    public void RemoveConfig(AutoBattleReleaseConfigEditorItem item)
+    {
+        var index = Items.IndexOf(item);
+        if (index < 0 || Items.Count <= 1)
+        {
+            return;
+        }
+
+        // 先把选中项切走再删除：删除触发 ComboBox 更新时会将 SelectedItem 回写 null，
+        // 若此时被删项仍是选中项，绑定链路会出现空引用导致崩溃。
+        if (ReferenceEquals(Selected, item))
+        {
+            Selected = Items[index + 1 < Items.Count ? index + 1 : index - 1];
+        }
+
+        Items.RemoveAt(index);
     }
 }
 

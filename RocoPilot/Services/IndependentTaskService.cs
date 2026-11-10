@@ -282,7 +282,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     break;
                 case IndependentTaskKind.LegendaryChallenge:
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
-                        settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient, battleSettings, UpdateProgress, taskCts.Token);
+                        settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient,
+                        settings.LegendaryAtTargetLocation, battleSettings, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
                     outcome = $"成功：{settings.LegendaryTargetName}，{settings.LegendaryChallengeRunCount} 次";
                     _logger.LogInformation("传说精灵挑战完成：{Target}，成功 {Count} 次", settings.LegendaryTargetName, settings.LegendaryChallengeRunCount);
@@ -291,7 +292,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 case IndependentTaskKind.FlowerSeedChallenge:
                     await _challengeRunner.RunAsync(state,
                         settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
-                        settings.FlowerSeedRunCount, battleSettings,
+                        settings.FlowerSeedRunCount, settings.FlowerSeedAtTargetLocation,
+                        settings.FlowerSeedPreferCondensedMark, battleSettings,
                         UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
                     outcome = $"成功：花种 {settings.FlowerSeedTargetNumber}，{settings.FlowerSeedRunCount} 次";

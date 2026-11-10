@@ -1,8 +1,11 @@
+using Microsoft.Extensions.Logging;
+
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services.Encounters;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
@@ -11,7 +14,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, CaptureBallMissing, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -25,7 +28,8 @@ internal sealed record ManualChallengeScreen(ManualChallengeScene Scene, IReadOn
 
 /// <summary>界面控件用模板定位，动态名称和交互文字使用默认 OCR 确认。</summary>
 public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images, ITextRecognitionService ocr,
-    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons)
+    ISpiritCatalogService catalog, IEncounterSeasonConfigService seasons,
+    ILogger<ManualChallengeScreenRecognizer>? logger = null)
 {
     // 首次定位与点击后的复查共用同一模板、区域和阈值。
     private static readonly Dictionary<string, (double Left, double Top, double Right, double Bottom, RecognitionAnchor Anchor)> ButtonAreas = new()
@@ -100,10 +104,22 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
                 return cancel is null ? new(ManualChallengeScene.Unknown, [])
                     : new(ManualChallengeScene.MissingLegendaryMark, [], missingMark, ExitButton: cancel);
             }
-            // 只匹配共有的“参与挑战将只能”，兼容印记不足与周次数用尽时不同的换行位置。
-            if (await Match("legendary-insufficient", .32, .48, .69, .61) is not null)
-                return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
-                    ExitButton: await Button("legendary-cancel"));
+            // 只确认共有的“参与挑战将只能”，兼容印记不足与周次数用尽时不同的换行位置。
+            // 文字像素模板随游戏版本的渲染变化失效（2026-11-08 实测 0.84~0.87 且跨帧浮动），
+            // 改为：取消按钮出现时 OCR 正文第一行并模糊匹配。按钮模板跨帧稳定 0.95+。
+            if (await Button("legendary-cancel") is not null)
+            {
+                // 区域按原生 1920×1080 投影实测卡在正文第一行（2048 基准 y 596–620）：
+                // 上界留出弹窗底色余量，下界必须避开第二行“继续？”（626 起），
+                // 单行 OCR 混入第二行残片会识别失败。
+                var promptArea = Area(.31, .508, .70, .541, "契约印记不足弹窗正文");
+                var insufficientPrompt = await ocr.RecognizeAsync(frame, promptArea, TextRecognitionDefaults.Method, cancellationToken);
+                reportOcr?.Invoke(promptArea, string.IsNullOrWhiteSpace(insufficientPrompt.Text) ? "OCR：无文本" : $"OCR：{insufficientPrompt.Text}");
+                logger?.LogDebug("契约印记不足弹窗正文：OCR={Raw}", insufficientPrompt.Text);
+                if (TextMatchingHelper.CalculateSimilarity(insufficientPrompt.Text, "参与挑战将只能") >= .8)
+                    return new(ManualChallengeScene.InsufficientContractMark, [], await Button("legendary-confirm"),
+                        ExitButton: await Button("legendary-cancel"));
+            }
             var captureConfirmation = await ReadCaptureConfirmationAsync(frame, clientX, clientY, width, height, cancellationToken);
             if (captureConfirmation is not null) return captureConfirmation;
             var rewards = await Match("legendary-rewards", .43, .34, .57, .44);
@@ -153,11 +169,12 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var result = await ReadResultAsync(frame, clientX, clientY, width, height, cancellationToken, legendary);
         if (result is not null) return result;
         var exclusive = await Match("capture-exclusive", .08, .2, .23, .4);
-        if (exclusive is not null)
-        {
-            var capture = await Match("capture-button", .88, .84, 1, 1);
-            if (capture is not null) return new(ManualChallengeScene.Capture, [], capture);
-        }
+        var captureButton = await Match("capture-button", .88, .84, 1, 1);
+        if (exclusive is not null && captureButton is not null)
+            return new(ManualChallengeScene.Capture, [], captureButton);
+        // 捕捉按钮在但专属球标记不在：球列表停留在普通球，需要滚轮切出专属球。
+        if (exclusive is null && captureButton is not null)
+            return new(ManualChallengeScene.CaptureBallMissing, [], captureButton);
         // 交互菜单必须同时具有大世界 HUD，结束动画中的浅色图形不能判为挑战失败。
         var world = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
         var prompt = world.IsMatch ? await Match("interaction-f", .42, .24, .84, .9) : null;
@@ -295,6 +312,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (template is "legendary-challenge" or "legendary-result-retry"
             && await MatchButtonAsync(frame, "legendary-underfilled-team", clientX, clientY, width, height, token) is not null)
             return null;
+        // 契约印记不足弹窗弹出后原按钮被遮罩压暗、模板自然失配，复查无需额外让路；
+        // 曾尝试以 legendary-cancel 出现为标志让路，会在准备页误命中，已回退。
         return await MatchButtonAsync(frame, template,
             clientX, clientY, width, height, token,
             scene is ManualChallengeScene.FlowerList or ManualChallengeScene.LegendaryList ? rowY : null);
@@ -320,6 +339,37 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
 
     private static string TemplatePath(string name) => name.StartsWith("legendary-", StringComparison.Ordinal)
         ? $"2048x1152/legendary/{name[10..]}.png" : $"2048x1152/flower-seed/{name}.png";
+
+    /// <summary>
+    /// 读取捕捉界面右上角的凝练印记（紫色星星）状态：
+    /// 是否已选中（白色高亮胶囊）与是否弹出"凝练印记不足，无法捕捉"提示
+    /// （数量耗尽的直接标志）。不做数量 OCR——小数字识别不可靠，
+    /// 不足时由游戏提示兜底切换蓝星。
+    /// </summary>
+    internal async Task<(bool Selected, bool Insufficient)> ReadCondensedMarkAsync(
+        CapturedFrame frame, int clientX, int clientY, int width, int height, CancellationToken token)
+    {
+        var scale = Math.Min(width / 2048d, height / 1152d);
+        var options = new ImageMatchOptions
+        {
+            // 选中/未选中实测约 0.98 / 0.13，窗口等比缩放误差会压低选中得分，取 0.85 留余量。
+            MinimumScore = .85,
+            TemplateScaleX = scale,
+            TemplateScaleY = scale
+        };
+        // 坐标基于原生窗口截图校准（用户截图含 17.4px 标题栏已扣除）：
+        // 紫星按钮窗口位 (1795-1884, 111-159) → 2048 基准 (1914-2010, 119-170)。
+        var selectedArea = CreateArea(clientX, clientY, width, height, .925, .098, .99, .155);
+        selectedArea.Id = "凝练印记选择";
+        var selected = await images.MatchAsync(frame, selectedArea, TemplatePath("condensed-selected"), options, token);
+        // 不足提示：屏幕上方居中的"凝练印记不足，无法捕捉"横条（实测 0.99 / 0.10 区分）。
+        var promptArea = CreateArea(clientX, clientY, width, height, .33, .125, .68, .18);
+        promptArea.Id = "凝练印记不足提示";
+        var prompt = await images.MatchAsync(frame, promptArea, TemplatePath("condensed-insufficient"), options, token);
+        logger?.LogDebug("凝练印记状态：选中={Selected}，不足提示={Insufficient}，得分={Score:F3}",
+            selected.IsMatch, prompt.IsMatch, prompt.Score);
+        return (selected.IsMatch, prompt.IsMatch);
+    }
 
     private async Task<ManualChallengeScreen?> ReadCaptureConfirmationAsync(CapturedFrame frame, int x, int y,
         int width, int height, CancellationToken token)

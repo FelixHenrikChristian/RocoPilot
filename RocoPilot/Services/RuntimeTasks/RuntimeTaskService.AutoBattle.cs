@@ -59,6 +59,8 @@ public sealed partial class RuntimeTaskService
         if (_isSuspended) return;
         var now = DateTimeOffset.Now;
         var settings = _autoBattleSettings;
+        if (settings.ReleaseSequence.Count == 0) return;
+
         if (_battle.Phase != AutoBattlePhase.SkillSelection)
         {
             BeginAutoBattleSkillSelectionTurn(settings, now);
@@ -110,7 +112,7 @@ public sealed partial class RuntimeTaskService
     {
         if (_isSuspended) return;
         var settings = _autoBattleSettings;
-        if (!settings.IsEnabled)
+        if (!settings.IsEnabled || settings.ReleaseSequence.Count == 0)
         {
             _battle.ObservePetSwitching(true);
             return;

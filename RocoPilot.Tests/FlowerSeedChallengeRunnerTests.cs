@@ -34,6 +34,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
             new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
+            new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
+                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
         var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
@@ -81,6 +83,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
             new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
+            new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
+                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
         var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
@@ -89,7 +93,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         state.Options.AutoBattleSettings.LegendaryReleaseSequence =
             [AutoBattleReleaseStep.CreateSkill("4"), AutoBattleReleaseStep.CreateSkill("2")];
         var run = runner.RunLegendaryAsync(state, directTeleport ? "银月狼王" : "圣羽翼王", 2, difficulty, allowMarks,
-            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+            false, state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
         if (shortage == "contract-only" || allowMarks && shortage != "missing-mark")
         {
             await run;
@@ -327,7 +331,7 @@ public sealed class FlowerSeedChallengeRunnerTests
 
         var state = CreateState();
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"),
-            6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+            6, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(1, images.FramesRead);
         Assert.AreEqual(0, keyboard.Keys.Count);
@@ -346,7 +350,7 @@ public sealed class FlowerSeedChallengeRunnerTests
 
         var state = CreateState();
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"),
-            6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+            6, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         CollectionAssert.AreEqual(new[] { "F3" }, keyboard.Keys.Select(key => key.Key).ToArray());
         Assert.AreEqual(175, keyboard.Keys[0].Options.HoldDurationMs);
@@ -368,7 +372,7 @@ public sealed class FlowerSeedChallengeRunnerTests
 
         var state = CreateState(enabled, hasBorder: true);
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(
-            state, new FlowerSeedOption(1, "友爱星飞"), 6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+            state, new FlowerSeedOption(1, "友爱星飞"), 6, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(1, ocr.Calls);
         Assert.AreEqual(1, overlay.Hides);
@@ -450,7 +454,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         var runner = CreateRunner(capture, new Images(), new Keyboard(), new Mouse(), overlay, ocr);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(
-            state, new FlowerSeedOption(1, "友爱星飞"), 6, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+            state, new FlowerSeedOption(1, "友爱星飞"), 6, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(1, ocr.Calls);
         Assert.HasCount(0, overlay.Shown);
@@ -478,7 +482,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         List<IndependentTaskProgress> updates = [];
 
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 2,
-            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+            false, false, state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
 
         CollectionAssert.AreEqual(new[] { "F", "4", "1, Space", "4", "1, Space" },
             keyboard.Keys.Select(key => key.Key).ToArray());
@@ -504,6 +508,66 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     [TestMethod]
+    public async Task ShortageAfterCaptureSwitchesToContractMarkBeforeRetry()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var capture = new ChallengeCapture();
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        var purpleClicked = false;
+        var blueClicked = false;
+        var purpleFrames = 0;
+        var shortage = false;
+        var images = new Images { MarkMatches = template => template switch
+        {
+            "condensed-selected" => purpleClicked && !blueClicked && ++purpleFrames >= 3,
+            "condensed-insufficient" => shortage && !blueClicked,
+            _ => false
+        } };
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            if (sequence == "1, Space" && !blueClicked)
+            {
+                Assert.IsTrue(purpleFrames >= 3 && !shortage);
+                shortage = true;
+            }
+            else capture.OnKey(sequence);
+        } };
+        var mouse = new Mouse { DuringClick = (x, y) =>
+        {
+            if (capture.Scene != 15) capture.OnClick(x, y);
+            else if (x == 92 && !purpleClicked) purpleClicked = true;
+            else if (x == 86 && shortage) blueClicked = true;
+            else Assert.Fail($"意外的印记点击 ({x},{y})");
+        } };
+        var runner = CreateRunner(capture, images, keyboard, mouse,
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, true,
+            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+        Assert.IsTrue(blueClicked);
+        Assert.AreEqual(2, keyboard.Keys.Count(key => key.Key == "1, Space"));
+        Assert.AreEqual(1, capture.RewardsClosed);
+    }
+
+    [TestMethod]
+    public async Task MissingHeadSkipArrowStopsChallenge()
+    {
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(50));
+        var state = CreateState();
+        state.RecognitionRegionConfig.Regions.Add(new RecognitionRegion { Id = RocoPilot.Configuration.RecognitionRegionIds.BattleSkillTurnArrowMine, Enabled = true });
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence =
+            [AutoBattleReleaseStep.CreateSkill("S"), AutoBattleReleaseStep.CreateSkill("4")];
+        var capture = new ChallengeCapture();
+        var keyboard = new Keyboard { DuringSequence = capture.OnKey };
+        var runner = CreateRunner(capture, new Images(), keyboard, new Mouse { DuringClick = capture.OnClick },
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => runner.RunAsync(state,
+            new FlowerSeedOption(1, "友爱星飞"), 1, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+        StringAssert.Contains(error.Message, "未识别到顺延箭头");
+        Assert.IsFalse(keyboard.Keys.Any(key => key.Key == "4"));
+    }
+
+    [TestMethod]
     public async Task SlowSkillResponseDoesNotSendRecoveryOrChangeOverlayToRecovery()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -525,7 +589,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
         List<IndependentTaskProgress> updates = [];
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
-            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+            false, false, state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
         Assert.IsNotNull(delayedSkill);
         await delayedSkill;
         CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
@@ -545,7 +609,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
 
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
-            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+            false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
 
         CollectionAssert.AreEqual(new[] { "F", "4", "2", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
         Assert.AreEqual(1, capture.BattlesStarted);
@@ -581,7 +645,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
 
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
-            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+            false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
 
         CollectionAssert.AreEqual(new[] { (60, 50), (70, 50) }, mapClicks.ToArray());
         Assert.AreEqual(1, capture.Teleports);
@@ -644,7 +708,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         var state = CreateState();
 
         var error = await Assert.ThrowsAsync<TimeoutException>(() => runner.RunAsync(state,
-            new FlowerSeedOption(1, "友爱星飞"), 1, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+            new FlowerSeedOption(1, "友爱星飞"), 1, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.IsTrue(error.Message.Contains("map-teleport", StringComparison.Ordinal));
         Assert.IsTrue(mapClicks >= 2);
@@ -675,7 +739,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
         Task? userReturn = null;
 
-        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, state.Options.AutoBattleSettings, update =>
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, false, state.Options.AutoBattleSettings, update =>
         {
             if (update.Operation != "已暂停，等待切回游戏" || userReturn is not null) return;
             userReturn = Task.Run(async () =>
@@ -728,7 +792,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 }
             });
         Task? userReturn = null;
-        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, state.Options.AutoBattleSettings, update =>
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, false, state.Options.AutoBattleSettings, update =>
         {
             if (update.Operation != "已暂停，等待切回游戏" || userReturn is not null) return;
             Assert.AreEqual(duringRecognition ? 0 : 2, keyboard.Keys.Count);
@@ -764,7 +828,7 @@ public sealed class FlowerSeedChallengeRunnerTests
             ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
 
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
-            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+            false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
 
         CollectionAssert.AreEqual(new[] { "F", "4", "1, Space" }, keyboard.Keys.Select(key => key.Key).ToArray());
         Assert.IsTrue(images.SkillFrames >= 4);
@@ -786,7 +850,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         List<IndependentTaskProgress> updates = [];
 
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1,
-            state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+            false, false, state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
 
         CollectionAssert.AreEqual(new[] { "F", "4", "F", "4", "1, Space" },
             keyboard.Keys.Select(key => key.Key).ToArray());
@@ -815,7 +879,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync(state,
-            new FlowerSeedOption(1, "友爱星飞"), 1, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
+            new FlowerSeedOption(1, "友爱星飞"), 1, false, false, state.Options.AutoBattleSettings, _ => { }, cancellation.Token));
 
         Assert.AreEqual(0, capture.RewardsClosed);
         Assert.AreEqual(0, capture.Retries);
@@ -827,6 +891,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         Overlay? overlay = null, ITextRecognitionService? ocr = null)
         => new(capture, keyboard, mouse,
             new ManualChallengeScreenRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, null!, null!),
+            new BattleScreenRecognizer(new RuntimeFrameRecognizer(images, ocr ?? new InteractionOcr { Text = string.Empty }, overlay ?? new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance),
             overlay ?? new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
@@ -1016,6 +1081,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public bool IntermittentSkills;
         public int SkillFrames;
         public bool HideMapHeader;
+        public Func<string, bool>? MarkMatches;
         public int MapButtonX = 55;
         public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
         public string TemplateDirectory => "";
@@ -1048,6 +1114,7 @@ public sealed class FlowerSeedChallengeRunnerTests
                 (12, "battle-button-skill") => true,
                 (13, "battle-chat") => true,
                 (15, "capture-exclusive" or "capture-button") => true,
+                (15, "condensed-selected" or "condensed-insufficient") => MarkMatches?.Invoke(Path.GetFileNameWithoutExtension(templatePath)) == true,
                 (17, "result-retry" or "result-exit") => true,
                 _ => false
             };

@@ -86,6 +86,15 @@ public partial class TasksViewModel : ObservableRecipient
     public partial double FlowerSeedRunCount { get; set; }
 
     [ObservableProperty]
+    public partial bool FlowerSeedAtTargetLocation { get; set; }
+
+    [ObservableProperty]
+    public partial bool FlowerSeedPreferCondensedMark { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool LegendaryAtTargetLocation { get; set; }
+
+    [ObservableProperty]
     public partial bool IsTaskNotificationOpen { get; set; }
 
     [ObservableProperty]
@@ -211,6 +220,9 @@ public partial class TasksViewModel : ObservableRecipient
     partial void OnSelectedLegendaryTargetChanged(string value) => SaveSettingsIfLoaded();
     partial void OnSelectedLegendaryDifficultyIndexChanged(int value) => SaveSettingsIfLoaded();
     partial void OnUseLegendaryMarkWhenInsufficientChanged(bool value) => SaveSettingsIfLoaded();
+    partial void OnFlowerSeedAtTargetLocationChanged(bool value) => SaveSettingsIfLoaded();
+    partial void OnFlowerSeedPreferCondensedMarkChanged(bool value) => SaveSettingsIfLoaded();
+    partial void OnLegendaryAtTargetLocationChanged(bool value) => SaveSettingsIfLoaded();
 
     partial void OnFlowerSeedRunCountChanged(double value)
     {
@@ -249,6 +261,9 @@ public partial class TasksViewModel : ObservableRecipient
                 FlowerSeedRunCount,
                 IndependentTaskSettings.DefaultFlowerSeedRunCount),
             FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
+            FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
+            FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
+            LegendaryAtTargetLocation = LegendaryAtTargetLocation,
             FlowerSeedOptions = [.. FlowerSeedOptions]
         };
     }
@@ -268,6 +283,9 @@ public partial class TasksViewModel : ObservableRecipient
             SelectedLegendaryDifficultyIndex = settings.LegendaryDifficulty - 1;
             UseLegendaryMarkWhenInsufficient = settings.UseLegendaryMarkWhenInsufficient;
             FlowerSeedRunCount = settings.FlowerSeedRunCount;
+            FlowerSeedAtTargetLocation = settings.FlowerSeedAtTargetLocation;
+            FlowerSeedPreferCondensedMark = settings.FlowerSeedPreferCondensedMark;
+            LegendaryAtTargetLocation = settings.LegendaryAtTargetLocation;
             if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))
             {
                 FlowerSeedOptions.Clear();

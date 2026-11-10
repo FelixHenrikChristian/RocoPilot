@@ -385,3 +385,5 @@ Agents.md
 
 # Original user screenshots, indexed in RocoPilot.Tests/SCREENSHOT_CATALOG.md
 /RocoPilot.Tests/LocalScreenshots/
+.idea/
+build/

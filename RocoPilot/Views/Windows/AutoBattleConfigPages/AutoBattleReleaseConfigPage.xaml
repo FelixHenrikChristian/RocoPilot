@@ -76,6 +76,77 @@
                     </Grid>
 
                     <StackPanel Style="{StaticResource DialogSectionBodyStyle}">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                FontWeight="SemiBold"
+                                Text="选择配置" />
+                            <ComboBox
+                                Grid.Column="1"
+                                MinWidth="180"
+                                DisplayMemberPath="Name"
+                                ItemsSource="{x:Bind Set.Items, Mode=OneWay}"
+                                SelectedItem="{x:Bind Set.Selected, Mode=TwoWay}"
+                                ToolTipService.ToolTip="切换当前战斗类型应用的配置；配置按战斗类型独立管理" />
+                            <StackPanel
+                                Grid.Column="2"
+                                Orientation="Horizontal"
+                                Spacing="6">
+                                <Button
+                                    Click="NewConfigButton_Click"
+                                    AutomationProperties.Name="新建配置"
+                                    ToolTipService.ToolTip="新建配置（默认名：配置x）">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="13" Glyph="&#xE710;" />
+                                        <TextBlock Text="新建" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    Click="RenameConfigButton_Click"
+                                    AutomationProperties.Name="重命名配置"
+                                    ToolTipService.ToolTip="重命名当前配置">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="13" Glyph="&#xE70F;" />
+                                        <TextBlock Text="重命名" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    Click="DeleteConfigButton_Click"
+                                    AutomationProperties.Name="删除配置"
+                                    IsEnabled="{x:Bind Set.CanRemove, Mode=OneWay}"
+                                    ToolTipService.ToolTip="删除当前配置；每种战斗类型至少保留一个配置，仅剩一个时不可删">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="13" Glyph="&#xE74D;" />
+                                        <TextBlock Text="删除" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    Click="ImportConfigButton_Click"
+                                    AutomationProperties.Name="导入配置"
+                                    ToolTipService.ToolTip="从 JSON 文件导入配置到当前战斗类型">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="13" Glyph="&#xE896;" />
+                                        <TextBlock Text="导入" />
+                                    </StackPanel>
+                                </Button>
+                                <Button
+                                    Click="ExportConfigButton_Click"
+                                    AutomationProperties.Name="导出配置"
+                                    ToolTipService.ToolTip="将当前配置导出为 JSON 文件">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon FontSize="13" Glyph="&#xE898;" />
+                                        <TextBlock Text="导出" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -84,7 +155,7 @@
                             <TextBlock
                                 VerticalAlignment="Center"
                                 Style="{StaticResource ConfigSummaryTextStyle}"
-                                Text="{x:Bind ReleaseEditor.Summary, Mode=OneWay}" />
+                                Text="{x:Bind Set.SelectedSequence.Summary, Mode=OneWay}" />
                             <StackPanel
                                 Grid.Column="1"
                                 Orientation="Horizontal"
@@ -119,33 +190,47 @@
                                     Content="X"
                                     Style="{StaticResource SkillKeyButtonStyle}"
                                     Tag="X" />
+                                <Button
+                                    Click="AppendSkillButton_Click"
+                                    Content="跳过"
+                                    Style="{StaticResource SkillKeyButtonStyle}"
+                                    Tag="S"
+                                    Visibility="{x:Bind SkipTurnButtonVisibility}"
+                                    ToolTipService.ToolTip="跳过回合：等待轮到本玩家（出招队列顺延）后再执行后续步骤" />
                             </StackPanel>
                         </Grid>
 
                         <Grid MinHeight="64">
-                            <GridView ItemsSource="{x:Bind ReleaseEditor.Items, Mode=OneWay}"
-                                      SelectionMode="None" CanDragItems="True" CanReorderItems="True" AllowDrop="True"
+                            <!-- 平台拖拽（GridView 鼠标不触发、ItemsWrapGrid 无原生重排）不可靠，卡片自实现 Pointer 拖拽。 -->
+                            <ListView x:Name="StepsGrid"
+                                      ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
+                                      SelectionMode="None"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                       ScrollViewer.VerticalScrollMode="Disabled"
                                       ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                <GridView.ItemsPanel>
+                                <ListView.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <ItemsWrapGrid Orientation="Horizontal" />
                                     </ItemsPanelTemplate>
-                                </GridView.ItemsPanel>
-                                <GridView.ItemContainerStyle>
-                                    <Style TargetType="GridViewItem">
+                                </ListView.ItemsPanel>
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="Margin" Value="0,0,8,8" />
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                         <Setter Property="MinHeight" Value="0" />
                                     </Style>
-                                </GridView.ItemContainerStyle>
-                                <GridView.ItemTemplate>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
                                     <DataTemplate>
                                         <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="8"
                                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                Opacity="{Binding CardOpacity}"
+                                                CanDrag="False" UseLayoutRounding="True"
+                                                PointerCaptureLost="StepCard_PointerCaptureLost"
+                                                PointerPressed="StepCard_PointerPressed"
+                                                PointerReleased="StepCard_PointerReleased"
                                                 ToolTipService.ToolTip="{Binding DetailText}">
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
@@ -167,12 +252,12 @@
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
-                                </GridView.ItemTemplate>
-                            </GridView>
+                                </ListView.ItemTemplate>
+                            </ListView>
                             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="添加上方技能，或从下方插入公共序列"
-                                       Visibility="{x:Bind ReleaseEditor.EmptyVisibility, Mode=OneWay}" />
+                                       Visibility="{x:Bind Set.SelectedSequence.EmptyVisibility, Mode=OneWay}" />
                         </Grid>
                     </StackPanel>
                 </StackPanel>

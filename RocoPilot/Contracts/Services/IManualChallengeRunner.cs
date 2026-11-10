@@ -15,6 +15,7 @@ public interface IManualChallengeRunner
         int runCount,
         int difficulty,
         bool useLegendaryMark,
+        bool atTargetLocation,
         AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress,
         CancellationToken cancellationToken);
@@ -23,6 +24,8 @@ public interface IManualChallengeRunner
         RuntimeTaskState state,
         FlowerSeedOption target,
         int runCount,
+        bool atTargetLocation,
+        bool preferCondensedMark,
         AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress,
         CancellationToken cancellationToken);

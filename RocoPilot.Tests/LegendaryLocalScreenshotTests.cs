@@ -2,6 +2,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using RocoPilot.Services.ImageMatching;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.TextRecognition;
+using RocoPilot.Services.TextRecognition.Backends;
 
 namespace RocoPilot.Tests;
 
@@ -9,6 +11,13 @@ namespace RocoPilot.Tests;
 [TestCategory("LocalScreenshots")]
 public sealed class LegendaryLocalScreenshotTests
 {
+    // 契约印记不足弹窗判定依赖 OCR 正文匹配，全部测试使用真实 OCR 服务。
+    private static TextRecognitionService CreateOcr()
+        => new([new OnnxOcrV5TextRecognitionBackend(new OnnxOcrV5SingleLineTextRecognitionBackend())]);
+
+    private static ManualChallengeScreenRecognizer CreateRecognizer()
+        => new(new ImageMatchingService(), CreateOcr(), null!, null!);
+
     [TestMethod]
     [DataRow(960, 540)]
     [DataRow(1024, 576)]
@@ -29,7 +38,7 @@ public sealed class LegendaryLocalScreenshotTests
                 using var area = new OpenCvSharp.Mat(source, new OpenCvSharp.Rect(1430, 1045, start.Width, start.Height));
                 start.CopyTo(area);
             });
-        var recognizer = new ManualChallengeScreenRecognizer(images, null!, null!, null!);
+        var recognizer = CreateRecognizer();
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.UnderfilledTeam, screen.Scene);
         Assert.IsNotNull(screen.Button);
@@ -55,7 +64,7 @@ public sealed class LegendaryLocalScreenshotTests
     {
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/capture-contract-only.png",
             width, height, 12, 30);
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!);
+        var recognizer = CreateRecognizer();
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.CaptureConfirmation, screen.Scene);
         Assert.IsNotNull(screen.Marks);
@@ -74,11 +83,78 @@ public sealed class LegendaryLocalScreenshotTests
     [TestMethod]
     [DataRow(2048, 1152)]
     [DataRow(1280, 720)]
+    public async Task ResultScreenInsufficientPromptIsRecognizedAndConfirms(int width, int height)
+    {
+        // 2026-11-08 用户截图：结算页点“再次挑战”后弹出契约印记不足提示，
+        // 背景仍可见退出/再次挑战按钮；弹窗须优先于背景结算页识别。
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-result-insufficient.png",
+            width, height, 12, 30);
+        var recognizer = CreateRecognizer();
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.InsufficientContractMark, screen.Scene);
+        Assert.IsNotNull(screen.Button);
+        Assert.IsTrue(screen.Button.IsMatch);
+        var confirmX = (screen.Button.X + screen.Button.Width / 2d - 12) / width;
+        var confirmY = (screen.Button.Y + screen.Button.Height / 2d - 30) / height;
+        Assert.IsTrue(confirmX is > .5 and < .68 && confirmY is > .74 and < .92,
+            $"确认按钮位置异常：({confirmX:F3}, {confirmY:F3})");
+        Assert.IsNotNull(screen.ExitButton);
+        Assert.IsTrue(screen.ExitButton.IsMatch);
+        // 点击前的复查：同一帧应重新定位到同一个确认按钮。
+        Assert.AreEqual(screen.Button, await recognizer.FindClickTargetAsync(frame, screen.Scene,
+            screen.Button.TemplatePath, 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+        // 回归：契约印记不足弹窗不遮挡背景的"再次挑战"按钮，复查 retry
+        // 必须识别到弹窗并返回 null（已切换），否则 Runner 会反复点原按钮直至超时。
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.Result,
+            "2048x1152/legendary/result-retry.png", 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+    }
+
+    [TestMethod]
+    [DataRow(2048, 1152)]
+    [DataRow(1280, 720)]
+    public async Task PreparationInsufficientPromptIsRecognizedAndStartRecheckYields(int width, int height)
+    {
+        // 2026-11-08 用户截图：挑战准备页点“开始挑战”后弹出契约印记不足提示，
+        // 背景的“开始挑战”按钮仍可见；准备页点击的是 start 模板（非 legendary-challenge），
+        // 复查同样必须识别弹窗并让路，否则反复点原按钮直至超时。
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-preparation-insufficient.png",
+            width, height, 12, 30);
+        var recognizer = CreateRecognizer();
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.InsufficientContractMark, screen.Scene);
+        Assert.IsNotNull(screen.Button);
+        Assert.IsTrue(screen.Button.IsMatch);
+        Assert.IsNotNull(screen.ExitButton);
+        Assert.IsTrue(screen.ExitButton.IsMatch);
+        // start 复查让路：弹窗在场（取消按钮出现）时视为已切换，返回 null 交给主流程。
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.Preparation,
+            "2048x1152/flower-seed/start.png", 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+    }
+
+    [TestMethod]
+    [DataRow(2048, 1152)]
+    [DataRow(1280, 720)]
+    public async Task InsufficientPromptIsRecognizedAndDoesNotMatchChallengeButton(int width, int height)
+    {
+        // legendary-insufficient.png 已更新为 2026-11-08 当前渲染（结算页弹窗）；
+        // 同时验证“开始挑战”按钮模板不会误命中弹窗画面（弹窗期间 challenge 复查为空）。
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-insufficient.png",
+            width, height, 12, 30);
+        var recognizer = CreateRecognizer();
+        var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
+        Assert.AreEqual(ManualChallengeScene.InsufficientContractMark, screen.Scene);
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, ManualChallengeScene.LegendaryConfirmation,
+            "2048x1152/legendary/challenge.png", 0, 12, 30, width, height, CancellationToken.None, legendary: true));
+    }
+
+    [TestMethod]
+    [DataRow(2048, 1152)]
+    [DataRow(1280, 720)]
     public async Task PreparationStartIsRecognizedWithoutCursor(int width, int height)
     {
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture("legendary-local/preparation-start-stalled.png",
             width, height, 12, 30);
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!);
+        var recognizer = CreateRecognizer();
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.Preparation, screen.Scene);
         Assert.IsNotNull(screen.Button);
@@ -99,7 +175,7 @@ public sealed class LegendaryLocalScreenshotTests
     [DataRow("bones-mark", true)]
     public async Task CaptureConfirmationRecognizesBothChoices(string sample, bool markSelected)
     {
-        var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), null!, null!, null!);
+        var recognizer = CreateRecognizer();
         foreach (var (width, height) in new[] { (2048, 1152), (1280, 720) })
         {
             using var frame = FlowerSeedScreenRecognizerTests.LoadFixture($"legendary-local/{sample}.png",

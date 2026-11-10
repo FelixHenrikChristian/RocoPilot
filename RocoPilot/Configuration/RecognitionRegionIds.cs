@@ -6,6 +6,10 @@ internal static class RecognitionRegionIds
     public const string BattleEnemyName = "battle-enemy-name";
     public const string BattleChatButton = "battle-button-chat";
     public const string BattleSkillButton = "battle-button-skill";
+    public const string BattleSkillPlayerBadge = "battle-skill-player-badge";
+    public const string BattleSkillTurnArrowMine = "battle-skill-turn-arrow-mine";
+    public const string BattleSkillQueueAnchor = "battle-skill-queue-anchor";
+    public const string BattleSkillSecondBadge = "battle-skill-second-badge";
     public const string BattleChangeButton = "battle-button-change";
     public const string BattleCaptureButton = "battle-button-capture";
     public const string BattleMessageTip = "battle-tip-message";

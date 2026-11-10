@@ -743,12 +743,13 @@ public sealed class IndependentTaskServiceTests
         }
 
         public Task RunLegendaryAsync(RuntimeTaskState state, string targetName, int runCount,
-            int difficulty, bool useLegendaryMark, AutoBattleSettings battleSettings,
+            int difficulty, bool useLegendaryMark, bool atTargetLocation, AutoBattleSettings battleSettings,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
         {
             UseLegendaryMark = useLegendaryMark;
             Difficulty = difficulty;
-            return RunAsync(state, new(0, targetName), runCount, battleSettings, progress, cancellationToken);
+            return RunAsync(state, new(0, targetName), runCount, atTargetLocation, preferCondensedMark: false,
+                battleSettings, progress, cancellationToken);
         }
 
         public bool UseLegendaryMark;
@@ -764,7 +765,7 @@ public sealed class IndependentTaskServiceTests
         public TaskCompletionSource ChallengeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target,
-            int runCount, AutoBattleSettings battleSettings,
+            int runCount, bool atTargetLocation, bool preferCondensedMark, AutoBattleSettings battleSettings,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
         {
             Assert.IsTrue(runtime.IsSuspended && runtime.Drained);
@@ -772,11 +773,16 @@ public sealed class IndependentTaskServiceTests
             Target = target;
             RunCount = runCount;
             BattleSettings = battleSettings;
+            AtTargetLocation = atTargetLocation;
+            PreferCondensedMark = preferCondensedMark;
             progress(new("魔法师手册", "点击挑战页", "学院作业"));
             ChallengeStarted.TrySetResult();
             if (Failure is not null) throw new InvalidOperationException(Failure);
             if (Hold) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }
+
+        public bool AtTargetLocation;
+        public bool PreferCondensedMark;
 
         public async Task<IReadOnlyList<FlowerSeedOption>> ScanAsync(RuntimeTaskState state,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)

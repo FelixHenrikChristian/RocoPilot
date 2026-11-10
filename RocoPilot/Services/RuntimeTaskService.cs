@@ -47,6 +47,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private RuntimeSession? _session;
     private int _queuedAutoBattleSkillFailureTipRecognition;
     private bool _settingsLoaded;
+    private bool _infoOverlayEncounterPanelEnabled = true;
     private volatile GameScene _scene;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
     private volatile bool _isSuspended;
@@ -161,6 +162,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             var savedEncounterStatisticsEnabled =
                 await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.EncounterStatisticsEnabled);
             _encounterStatisticsEnabled = savedEncounterStatisticsEnabled ?? true;
+
+            var savedInfoOverlayEncounterPanelEnabled =
+                await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.InfoOverlayEncounterPanelEnabled);
+            _infoOverlayEncounterPanelEnabled = savedInfoOverlayEncounterPanelEnabled ?? true;
 
             var savedAutoBattleSettings =
                 await _localSettingsService.ReadSettingAsync<AutoBattleSettings>(SettingsKeys.AutoBattleSettings);
@@ -306,6 +311,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 recognitionRegionConfig,
                 options,
                 DateTimeOffset.Now);
+            // 面板开关以服务端字段为准：未运行时用户切换会即时更新该字段并持久化，
+            // 但历史版本保存值可能晚于 options 构造，这里统一回填避免启动后面板状态错乱。
+            options.InfoOverlayEncounterPanelEnabled = _infoOverlayEncounterPanelEnabled;
+            state.Options.InfoOverlayEncounterPanelEnabled = _infoOverlayEncounterPanelEnabled;
             var session = new RuntimeSession(state, _screenCaptureService);
             _session = session;
             preparingWindow = null;

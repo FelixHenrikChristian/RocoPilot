@@ -55,6 +55,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private bool _isClosed;
     private bool _isDragging;
     private bool _isOverlayVisible;
+    private bool _isEncounterPanelVisible = true;
 
     public InfoOverlayWindow(
         CaptureTargetWindow targetWindow,
@@ -128,12 +129,24 @@ public sealed partial class InfoOverlayWindow : WindowEx
         UpdateOverlayState(forceMove: true);
     }
 
+    public void SetEncounterPanelVisible(bool isVisible)
+    {
+        if (_isClosed || _isIsland) return;
+        _isEncounterPanelVisible = isVisible;
+        if (EncounterPanel.Visibility == (isVisible ? Visibility.Visible : Visibility.Collapsed)) return;
+        EncounterPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+        RecentRecordTimeText.Visibility = Visibility.Collapsed;
+        // 面板显隐改变内容高度，立即重测窗口尺寸并贴回游戏窗口。
+        UpdateOverlayState(forceMove: true);
+    }
+
     public void UpdateSnapshot(InfoOverlaySnapshot snapshot)
     {
         if (_isClosed) return;
         if (_isIsland) { UpdateIslandSnapshot(snapshot); return; }
         var recordTime = snapshot.LatestRecordUpdatedAt;
-        RecentRecordTimeText.Visibility = recordTime.HasValue ? Visibility.Visible : Visibility.Collapsed;
+        RecentRecordTimeText.Visibility = recordTime.HasValue && _isEncounterPanelVisible
+            ? Visibility.Visible : Visibility.Collapsed;
         RecentRecordTimeText.Text = recordTime.HasValue
             ? $"最新记录更新于 {recordTime.Value.ToLocalTime():HH:mm:ss}"
             : string.Empty;
@@ -207,6 +220,8 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private bool UpdateOverlayState(bool forceMove = false)
     {
         if (_isClosed
+            // 奇遇计数面板关闭后，记录窗口无任何内容，整窗隐藏。
+            || (!_isIsland && !_isEncounterPanelVisible)
             || !TransparentOverlayWindowHelper.ShouldShowOverlay(_targetWindow.Hwnd, _targetWindow.ProcessId, _isOverlayVisible)
             || !TransparentOverlayWindowHelper.TryGetClientScreenBounds(_targetWindow.Hwnd, out var clientBounds)
             || clientBounds.Width <= 0

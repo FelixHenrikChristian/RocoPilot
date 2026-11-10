@@ -822,6 +822,7 @@ public sealed class RuntimeTaskStartupTests
         public void Hide() { }
         public void ResetPosition() { }
         public void SetLocked(bool isLocked) { }
+        public void SetEncounterPanelVisible(bool isVisible) { }
         public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled) { }
         public void UpdateSnapshot(InfoOverlaySnapshot snapshot) => Snapshot = snapshot;
         public void ShowOcrResult(string regionId, string text) { }

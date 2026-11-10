@@ -13,6 +13,8 @@ public interface IInfoOverlayService
 
     void SetLocked(bool isLocked);
 
+    void SetEncounterPanelVisible(bool isVisible);
+
     void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled);
 
     void UpdateSnapshot(InfoOverlaySnapshot snapshot);

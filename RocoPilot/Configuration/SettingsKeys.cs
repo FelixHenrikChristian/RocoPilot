@@ -14,6 +14,8 @@ internal static class SettingsKeys
 
     public const string EncounterStatisticsEnabled = "EncounterStatisticsEnabled";
 
+    public const string InfoOverlayEncounterPanelEnabled = "InfoOverlayEncounterPanelEnabled";
+
     public const string DismissedEncounterSeasonReminder = "DismissedEncounterSeasonReminder";
 
     public const string SpiritCatalogSourceId = "SpiritCatalogSourceId";

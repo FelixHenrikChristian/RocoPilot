@@ -117,6 +117,7 @@ public sealed class RuntimeCoordinatorTests
         public bool IsRunning => CurrentState is not null;
         public RuntimeTaskState? CurrentState { get; private set; }
         public bool EncounterStatisticsEnabled => true;
+        public bool InfoOverlayEncounterPanelEnabled => true;
         public AutoBattleSettings AutoBattleSettings => AutoBattleSettings.CreateDefault();
         public Task<RuntimeTaskStartResult> StartAsync(RuntimeTaskStartOptions options, CancellationToken cancellationToken = default)
         {
@@ -133,6 +134,7 @@ public sealed class RuntimeCoordinatorTests
         public void SetRecognitionOverlayEnabled(bool isEnabled) { }
         public void SetInfoOverlayEnabled(bool isEnabled) { }
         public void SetInfoOverlayLocked(bool isLocked) { }
+        public void SetInfoOverlayEncounterPanelEnabled(bool isEnabled) { }
         public void SetAutoBattleSettings(AutoBattleSettings settings) { }
     }
 }

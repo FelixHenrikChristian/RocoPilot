@@ -70,6 +70,14 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         });
     }
 
+    public void SetEncounterPanelVisible(bool isVisible)
+    {
+        RunOnDispatcher(() =>
+        {
+            _overlayWindow?.SetEncounterPanelVisible(isVisible);
+        });
+    }
+
     public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled)
     {
         RunOnDispatcher(() =>
@@ -126,6 +134,7 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
                 state.Options.AutoBattleSettings.IsEnabled);
             var records = _overlayWindow;
             records.Closed += (_, _) => { if (ReferenceEquals(_overlayWindow, records)) _overlayWindow = null; };
+            records.SetEncounterPanelVisible(state.Options.InfoOverlayEncounterPanelEnabled);
             _islandWindow = new InfoOverlayWindow(state.TargetWindow, state.Options.InfoOverlayLocked,
                 state.Options.EncounterStatisticsEnabled, state.Options.AutoBattleSettings.IsEnabled, isIsland: true);
             var island = _islandWindow;

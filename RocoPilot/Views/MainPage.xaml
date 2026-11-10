@@ -266,6 +266,41 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Glyph="&#xE8A0;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="奇遇计数面板" TextWrapping="Wrap" />
+                            <TextBlock
+                                Margin="0,2,0,0"
+                                FontSize="12"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="在信息遮罩窗口中显示最近捕捉列表和奇遇次数。"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleSwitch
+                            Grid.Column="2"
+                            MinWidth="0"
+                            VerticalAlignment="Center"
+                            IsOn="{x:Bind ViewModel.IsInfoOverlayEncounterPanelEnabled, Mode=TwoWay}"
+                            OffContent=""
+                            OnContent="" />
+                    </Grid>
+
+                    <Border
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="0,1,0,0" />
+
+                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            Grid.Column="0"
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE72E;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="锁定位置" TextWrapping="Wrap" />

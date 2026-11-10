@@ -11,20 +11,22 @@
                 BorderThickness="1" CornerRadius="14">
             <Grid RowSpacing="10">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Grid ColumnSpacing="8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="最近捕捉" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="1" Text="奇遇次数" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
-                </Grid>
-                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
-                              VerticalScrollBarVisibility="Hidden" VerticalScrollMode="Auto">
-                    <StackPanel x:Name="CounterList" Spacing="7" />
-                </ScrollViewer>
-                <TextBlock x:Name="RecentRecordTimeText" Grid.Row="2" HorizontalAlignment="Right"
+                <StackPanel x:Name="EncounterPanel" Spacing="10">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="最近捕捉" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="奇遇次数" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
+                    </Grid>
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"
+                                  VerticalScrollBarVisibility="Hidden" VerticalScrollMode="Auto">
+                        <StackPanel x:Name="CounterList" Spacing="7" />
+                    </ScrollViewer>
+                </StackPanel>
+                <TextBlock x:Name="RecentRecordTimeText" Grid.Row="1" HorizontalAlignment="Right"
                            FontSize="10" Foreground="#878391" Visibility="Collapsed" />
             </Grid>
         </Border>

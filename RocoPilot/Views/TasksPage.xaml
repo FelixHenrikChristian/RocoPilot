@@ -177,20 +177,26 @@
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Glyph="&#xE707;" />
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="已到目标位置" />
+                                <TextBlock Text="跳过导航与传送" />
                                 <TextBlock
                                     Margin="0,2,0,0"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="勾选后跳过列表导航与地图传送，直接从当前场景开始挑战。"
+                                    Text="开启后跳过列表导航与地图传送，请先手动到达目标场景。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
-                            <CheckBox
+                            <ToggleSwitch
                                 Grid.Column="2"
+                                Width="44"
+                                MinWidth="44"
+                                HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
-                                AutomationProperties.Name="花种挑战已到目标位置"
+                                Padding="0"
+                                AutomationProperties.Name="花种挑战跳过导航与传送"
                                 IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
-                                IsChecked="{x:Bind ViewModel.FlowerSeedAtTargetLocation, Mode=TwoWay}" />
+                                IsOn="{x:Bind ViewModel.FlowerSeedAtTargetLocation, Mode=TwoWay}"
+                                OffContent=""
+                                OnContent="" />
                         </Grid>
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
@@ -216,12 +222,18 @@
                                     Text="捕捉前优先选中凝练印记（紫色星星）；出现不足提示时改用契约印记。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
-                            <CheckBox
+                            <ToggleSwitch
                                 Grid.Column="2"
+                                Width="44"
+                                MinWidth="44"
+                                HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
+                                Padding="0"
                                 AutomationProperties.Name="花种挑战优先使用凝练印记"
                                 IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
-                                IsChecked="{x:Bind ViewModel.FlowerSeedPreferCondensedMark, Mode=TwoWay}" />
+                                IsOn="{x:Bind ViewModel.FlowerSeedPreferCondensedMark, Mode=TwoWay}"
+                                OffContent=""
+                                OnContent="" />
                         </Grid>
                     </StackPanel>
                 </Expander>
@@ -464,20 +476,26 @@
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                 Glyph="&#xE707;" />
                             <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="已到目标位置" />
+                                <TextBlock Text="跳过导航与传送" />
                                 <TextBlock
                                     Margin="0,2,0,0"
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="勾选后跳过列表导航与地图传送，直接从当前场景开始挑战。"
+                                    Text="开启后跳过列表导航与地图传送，请先手动到达目标场景。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
-                            <CheckBox
+                            <ToggleSwitch
                                 Grid.Column="2"
+                                Width="44"
+                                MinWidth="44"
+                                HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
-                                AutomationProperties.Name="传说精灵挑战已到目标位置"
+                                Padding="0"
+                                AutomationProperties.Name="传说精灵挑战跳过导航与传送"
                                 IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
-                                IsChecked="{x:Bind ViewModel.LegendaryAtTargetLocation, Mode=TwoWay}" />
+                                IsOn="{x:Bind ViewModel.LegendaryAtTargetLocation, Mode=TwoWay}"
+                                OffContent=""
+                                OnContent="" />
                         </Grid>
                     </StackPanel>
                 </Expander>

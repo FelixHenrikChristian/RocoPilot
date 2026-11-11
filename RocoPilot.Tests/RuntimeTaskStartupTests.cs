@@ -804,6 +804,8 @@ public sealed class RuntimeTaskStartupTests
 
     private sealed class HotkeyStub : IHotkeyService
     {
+        public string? UnavailableReason => null;
+        public void Dispose() { }
         public event EventHandler? SettingsChanged { add { } remove { } }
         public event EventHandler<HotkeyTriggeredEventArgs>? HotkeyTriggered;
         public void Trigger(HotkeyAction action) => HotkeyTriggered?.Invoke(this, new(action));

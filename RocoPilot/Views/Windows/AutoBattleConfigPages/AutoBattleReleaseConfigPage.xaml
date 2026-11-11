@@ -201,36 +201,34 @@
                         </Grid>
 
                         <Grid MinHeight="64">
-                            <!-- 平台拖拽（GridView 鼠标不触发、ItemsWrapGrid 无原生重排）不可靠，卡片自实现 Pointer 拖拽。 -->
-                            <ListView x:Name="StepsGrid"
-                                      ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
+                            <GridView ItemsSource="{x:Bind Set.SelectedSequence.Items, Mode=OneWay}"
                                       SelectionMode="None"
+                                      CanDragItems="True"
+                                      CanReorderItems="True"
+                                      AllowDrop="True"
                                       ScrollViewer.HorizontalScrollMode="Disabled"
                                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                       ScrollViewer.VerticalScrollMode="Disabled"
                                       ScrollViewer.VerticalScrollBarVisibility="Disabled">
-                                <ListView.ItemsPanel>
+                                <GridView.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <ItemsWrapGrid Orientation="Horizontal" />
                                     </ItemsPanelTemplate>
-                                </ListView.ItemsPanel>
-                                <ListView.ItemContainerStyle>
-                                    <Style TargetType="ListViewItem">
+                                </GridView.ItemsPanel>
+                                <GridView.ItemContainerStyle>
+                                    <Style TargetType="GridViewItem">
                                         <Setter Property="Padding" Value="0" />
                                         <Setter Property="Margin" Value="0,0,8,8" />
                                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                         <Setter Property="MinHeight" Value="0" />
                                     </Style>
-                                </ListView.ItemContainerStyle>
-                                <ListView.ItemTemplate>
+                                </GridView.ItemContainerStyle>
+                                <GridView.ItemTemplate>
                                     <DataTemplate>
                                         <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="8"
                                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                                 Opacity="{Binding CardOpacity}"
-                                                CanDrag="False" UseLayoutRounding="True"
-                                                PointerCaptureLost="StepCard_PointerCaptureLost"
-                                                PointerPressed="StepCard_PointerPressed"
-                                                PointerReleased="StepCard_PointerReleased"
+                                                UseLayoutRounding="True"
                                                 ToolTipService.ToolTip="{Binding DetailText}">
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>
@@ -252,8 +250,8 @@
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
-                                </ListView.ItemTemplate>
-                            </ListView>
+                                </GridView.ItemTemplate>
+                            </GridView>
                             <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        Text="添加上方技能，或从下方插入公共序列"

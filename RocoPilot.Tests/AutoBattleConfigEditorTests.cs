@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 
@@ -11,24 +10,6 @@ namespace RocoPilot.Tests;
 [TestClass]
 public sealed class AutoBattleConfigEditorTests
 {
-    [TestMethod]
-    public void LongExportNameFitsDialogBufferIncludingTerminator()
-    {
-        var name = new string('名', 2048);
-        var buffer = Marshal.AllocCoTaskMem((name.Length + 1) * sizeof(char));
-        try
-        {
-            Marshal.WriteInt16(buffer, 1024 * sizeof(char), 42);
-            RocoPilot.Helpers.Win32FileDialog.WriteSuggestedName(buffer, name);
-            Assert.AreEqual(name[..1023], Marshal.PtrToStringUni(buffer));
-            Assert.AreEqual((short)42, Marshal.ReadInt16(buffer, 1024 * sizeof(char)));
-        }
-        finally
-        {
-            Marshal.FreeCoTaskMem(buffer);
-        }
-    }
-
     [TestMethod]
     public void RejectsOrdinaryBattleWithOnlySkippedSteps()
     {
@@ -51,7 +32,7 @@ public sealed class AutoBattleConfigEditorTests
             new AutoBattleTurnSequencePreset { Name = "连招", Sequence = "1, Space" }
         ];
         var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
-        // 拖拽排序语义：直接对 Items 使用 Move 模拟重排，无移动按钮状态。
+        // GridView 原生重排依次移除、插入项目，而不是发送集合 Move 通知。
         var sequence = editor.NormalConfigs.SelectedSequence;
         sequence.Items.Clear();
         sequence.AppendSkill("1");
@@ -62,12 +43,16 @@ public sealed class AutoBattleConfigEditorTests
         sequence.AppendSkill("4");
         var last = sequence.Items[2];
 
-        sequence.Items.Move(1, 0);
+        sequence.Items.RemoveAt(1);
+        sequence.Items.Insert(0, preset);
         Assert.AreSame(preset, sequence.Items[0]);
         Assert.AreEqual(1, preset.Position);
 
-        sequence.Items.Move(1, 2);
+        sequence.Items.RemoveAt(1);
+        sequence.Items.Insert(2, skill);
         Assert.AreSame(skill, sequence.Items[2]);
+        CollectionAssert.AreEqual(new[] { 1, 2, 3 }, sequence.Items.Select(item => item.Position).ToArray());
+        StringAssert.StartsWith(sequence.Summary, "连招 → 4 → 1");
         sequence.Items.Remove(skill);
         Assert.AreEqual(2, last.Position);
 

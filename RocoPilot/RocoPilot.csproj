@@ -40,7 +40,6 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.8" />
     <PackageReference Include="InputInterceptor" Version="2.2.1" />
     <PackageReference Include="Markdig" Version="1.2.0" />

@@ -1,8 +1,6 @@
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
-using CommunityToolkit.WinUI.Notifications;
-using Windows.Data.Xml.Dom;
-using Windows.UI.Notifications;
+using Microsoft.Windows.AppNotifications;
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 
@@ -10,7 +8,7 @@ namespace RocoPilot.Notifications;
 
 public class AppNotificationService(ILocalSettingsService settings, ILogger<AppNotificationService> logger) : IAppNotificationService
 {
-    private ToastNotifierCompat? _notifier;
+    private AppNotificationManager? _manager;
 
     public bool IsEnabled { get; private set; } = true;
     public bool IsSoundEnabled { get; private set; } = true;
@@ -32,22 +30,33 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
     public async Task InitializeAsync()
     {
         await LoadSettingsAsync();
-        if (_notifier is not null) return;
+        if (_manager is not null) return;
         try
         {
-            var notifier = ToastNotificationManagerCompat.CreateToastNotifier();
-            ToastNotificationManagerCompat.OnActivated += OnNotificationInvoked;
-            _notifier = notifier;
+            if (!AppNotificationManager.IsSupported())
+            {
+                LastError = "当前运行模式不支持 Windows 通知，请以普通用户身份启动 RocoPilot。";
+                return;
+            }
+
+            _manager = AppNotificationManager.Default;
+            _manager.NotificationInvoked += OnNotificationInvoked;
+            _manager.Register();
             LastError = null;
         }
         catch (Exception ex)
         {
+            if (_manager is not null)
+            {
+                _manager.NotificationInvoked -= OnNotificationInvoked;
+                _manager = null;
+            }
             LastError = $"Windows 通知初始化失败：{ex.Message}";
             logger.LogWarning(ex, "Windows 通知初始化失败。");
         }
     }
 
-    private static void OnNotificationInvoked(ToastNotificationActivatedEventArgsCompat args)
+    private static void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
     {
         App.MainWindow.DispatcherQueue.TryEnqueue(() => App.MainWindow.BringToFront());
     }
@@ -67,15 +76,21 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
     public Task<bool> ShowAsync(string title, string message, string? imagePath = null)
     {
         if (!IsEnabled) return Task.FromResult(false);
+        if (_manager is null)
+        {
+            LastError ??= "Windows 通知尚未初始化。";
+            return Task.FromResult(false);
+        }
         try
         {
-            var notifier = _notifier ?? throw new InvalidOperationException("Windows 通知尚未初始化。");
-            if (notifier.Setting != NotificationSetting.Enabled)
-                throw new InvalidOperationException($"Windows 通知不可用：{notifier.Setting}");
+            var setting = _manager.Setting;
+            if (setting != AppNotificationSetting.Enabled)
+                throw new InvalidOperationException($"Windows 通知不可用：{setting}");
 
-            var xml = new XmlDocument();
-            xml.LoadXml(BuildPayload(title, message, IsSoundEnabled, imagePath));
-            notifier.Show(new ToastNotification(xml));
+            var notification = new AppNotification(BuildPayload(title, message, IsSoundEnabled, imagePath));
+            _manager.Show(notification);
+            if (notification.Id == 0)
+                throw new InvalidOperationException("Windows 未接收此通知。");
             LastError = null;
             return Task.FromResult(true);
         }
@@ -101,8 +116,9 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
 
     public void Unregister()
     {
-        if (_notifier is null) return;
-        ToastNotificationManagerCompat.OnActivated -= OnNotificationInvoked;
-        _notifier = null;
+        if (_manager is null) return;
+        _manager.NotificationInvoked -= OnNotificationInvoked;
+        _manager.Unregister();
+        _manager = null;
     }
 }

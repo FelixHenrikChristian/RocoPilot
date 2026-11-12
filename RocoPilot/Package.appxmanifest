@@ -54,7 +54,7 @@
 
           <com:Extension Category="windows.comServer">
               <com:ComServer>
-                  <com:ExeServer Executable="RocoPilot.exe" Arguments="-ToastActivated" DisplayName="Toast activator">
+                  <com:ExeServer Executable="RocoPilot.exe" Arguments="----AppNotificationActivated:" DisplayName="Toast activator">
                       <com:Class Id="50d38d01-b4f4-4b35-a49f-9641babbbbaa" DisplayName="Toast activator"/>
                   </com:ExeServer>
               </com:ComServer>

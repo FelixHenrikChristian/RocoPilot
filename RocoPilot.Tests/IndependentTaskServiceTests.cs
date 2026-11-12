@@ -76,6 +76,31 @@ public sealed class IndependentTaskServiceTests
     }
 
     [TestMethod]
+    public async Task DailyNativeReorderSavesFinalOrderOnce()
+    {
+        var fixture = new Fixture();
+        var vm = new RocoPilot.ViewModels.DailyViewModel(fixture.Service, fixture.Store,
+            NullLogger<RocoPilot.ViewModels.DailyViewModel>.Instance);
+        await vm.LoadAsync();
+        Assert.IsTrue(vm.CanReorder);
+        var first = vm.Items[0];
+        var second = vm.Items[1];
+        var count = vm.Items.Count;
+        var savesBefore = fixture.Store.SaveCount;
+
+        // ListView 原生拖动排序先移除再插入，移除后的中间状态不应保存。
+        vm.Items.RemoveAt(0);
+        Assert.AreEqual(savesBefore, fixture.Store.SaveCount);
+        vm.Items.Insert(2, first);
+
+        Assert.AreEqual(savesBefore + 1, fixture.Store.SaveCount);
+        var saved = fixture.Store.ReadSaved<DailyTaskSettings>(SettingsKeys.DailyTaskSettings)!;
+        Assert.AreEqual(count, saved.Tasks.Count);
+        Assert.AreEqual(second.Kind, saved.Tasks[0].Kind);
+        Assert.AreEqual(first.Kind, saved.Tasks[2].Kind);
+    }
+
+    [TestMethod]
     public async Task DailyChallengeUsesDailyTargetAndCountWithScannedOptions()
     {
         var fixture = new Fixture();

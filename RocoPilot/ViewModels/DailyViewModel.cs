@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -36,6 +37,9 @@ public partial class DailyViewModel : ObservableObject
     public partial bool CanStartOrStop { get; set; }
 
     [ObservableProperty]
+    public partial bool CanReorder { get; set; }
+
+    [ObservableProperty]
     public partial string? SelectedLegendaryTarget { get; set; }
 
     [ObservableProperty]
@@ -61,6 +65,7 @@ public partial class DailyViewModel : ObservableObject
         _settings = settings;
         _logger = logger;
         _tasks.StateChanged += Tasks_StateChanged;
+        Items.CollectionChanged += Items_CollectionChanged;
     }
 
     public async Task LoadAsync()
@@ -154,13 +159,10 @@ public partial class DailyViewModel : ObservableObject
         Refresh();
     }
 
-    internal void Move(DailyTaskItemViewModel? item, int offset)
+    private void Items_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
-        if (item is null || _tasks.IsRunning) return;
-        var index = Items.IndexOf(item);
-        var target = index + offset;
-        if (index < 0 || target < 0 || target >= Items.Count) return;
-        Items.Move(index, target);
+        // ListView 原生拖动排序先移除再插入；清单成员固定，加载后的插入即代表一次排序完成。
+        if (!_loaded || e.Action is not (NotifyCollectionChangedAction.Add or NotifyCollectionChangedAction.Move)) return;
         Refresh();
         _ = SaveAsync();
     }
@@ -204,6 +206,7 @@ public partial class DailyViewModel : ObservableObject
         IsRunning = _tasks.IsDailyRunning;
         var enabled = Items.Count(item => item.IsEnabled && item.IsAvailable);
         CanStartOrStop = _loaded && (IsRunning || !_tasks.IsRunning && enabled > 0);
+        CanReorder = _loaded && !_tasks.IsRunning;
         foreach (var item in Items)
         {
             item.CanToggle = item.IsAvailable && !_tasks.IsRunning;

@@ -31,35 +31,41 @@
                     ToolTipService.ToolTip="恢复每日任务的默认顺序、开关和挑战配置" />
         </Grid>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl x:Name="TaskRows" ItemsSource="{x:Bind ViewModel.Items}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:DailyTaskItemViewModel">
-                        <Border Margin="0,0,0,5" Padding="6,0,10,0" MinHeight="48" CornerRadius="5"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                            <Grid ColumnSpacing="7" ToolTipService.ToolTip="{x:Bind Status, Mode=OneWay}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="20" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Border Background="Transparent" Tag="{x:Bind}" ManipulationMode="None"
-                                        PointerPressed="Handle_Pressed" PointerMoved="Handle_Moved"
-                                        PointerReleased="Handle_Released" PointerCaptureLost="Handle_CaptureLost"
-                                        ToolTipService.ToolTip="拖动排序">
-                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="⠿"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </Border>
-                                <TextBlock Grid.Column="1" Width="78" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" Text="{x:Bind Title}" />
-                                <ToggleSwitch Grid.Column="2" MinWidth="0" OnContent="" OffContent=""
-                                              VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Title}"
-                                              IsEnabled="{x:Bind CanToggle, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.Items}"
+                  SelectionMode="None" IsItemClickEnabled="False"
+                  CanDragItems="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+                  CanReorderItems="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+                  AllowDrop="True">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="0,0,0,5" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:DailyTaskItemViewModel">
+                    <Border Padding="6,0,10,0" MinHeight="48" CornerRadius="5"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <Grid ColumnSpacing="7" ToolTipService.ToolTip="{x:Bind Status, Mode=OneWay}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="⠿"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       ToolTipService.ToolTip="拖动排序" />
+                            <TextBlock Grid.Column="1" Width="78" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" Text="{x:Bind Title}" />
+                            <ToggleSwitch Grid.Column="2" MinWidth="0" OnContent="" OffContent=""
+                                          VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Title}"
+                                          IsEnabled="{x:Bind CanToggle, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
 
         <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="8">

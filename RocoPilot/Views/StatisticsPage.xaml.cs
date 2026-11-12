@@ -402,7 +402,7 @@ public sealed partial class StatisticsPage : Page
             Height = 42,
             VerticalAlignment = VerticalAlignment.Center,
             Background = GetResourceBrush("ControlFillColorDefaultBrush", new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))),
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = (CornerRadius)Application.Current.Resources["OverlayCornerRadius"],
             Child = CreateDialogAvatarContent(
                 item.Avatar,
                 "\uE77B",

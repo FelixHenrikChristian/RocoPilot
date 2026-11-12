@@ -8,7 +8,7 @@
           PointerMoved="OverlayRoot_PointerMoved" PointerPressed="OverlayRoot_PointerPressed"
           PointerReleased="OverlayRoot_PointerReleased">
         <Border x:Name="InfoPanel" Padding="14" Background="#EB202026" BorderBrush="#28FFFFFF"
-                BorderThickness="1" CornerRadius="14">
+                BorderThickness="1" CornerRadius="{StaticResource OverlayCornerRadius}">
             <Grid RowSpacing="10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" />
@@ -53,7 +53,7 @@
                 </Grid>
                 <Grid x:Name="IslandDetails" Grid.Row="1" ColumnSpacing="12" Visibility="Collapsed" Opacity="0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                    <Border x:Name="IslandAvatar" Width="42" Height="42" CornerRadius="12" Background="#18DEA6EA" VerticalAlignment="Center" />
+                    <Border x:Name="IslandAvatar" Width="42" Height="42" CornerRadius="{StaticResource OverlayCornerRadius}" Background="#18DEA6EA" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                         <TextBlock x:Name="IslandCategoryText" FontSize="10" Foreground="#9B9BAA" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis" />
                         <TextBlock x:Name="IslandTitleText" FontSize="15" FontWeight="SemiBold" Foreground="#F5F3F7" TextWrapping="NoWrap" MaxLines="1" TextTrimming="CharacterEllipsis" />

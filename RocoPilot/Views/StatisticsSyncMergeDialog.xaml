@@ -4,6 +4,7 @@
     xmlns:controls="using:RocoPilot.Controls"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="合并云端数据"
+    TitleGlyph="&#xE753;"
     PrimaryButtonText="合并"
     PrimaryButtonStyle="{StaticResource DialogButtonStyle}"
     CloseButtonText="取消"
@@ -17,26 +18,12 @@
         <StackPanel x:Name="RulesContent" Spacing="12">
             <Border Style="{StaticResource DialogCardStyle}" Padding="16">
                 <StackPanel Spacing="14">
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Width="36" Height="36" CornerRadius="8"
-                                VerticalAlignment="Center"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}">
-                            <FontIcon Glyph="&#xE753;" FontSize="18"
-                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                      Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-                            <TextBlock Text="按账号合并统计数据"
-                                       Style="{StaticResource DialogSectionTitleStyle}" />
-                            <TextBlock Text="按账号版本判断先后，冲突时由你核对选择。" FontSize="12"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Grid>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="按账号合并统计数据"
+                                   Style="{StaticResource DialogSectionTitleStyle}" />
+                        <TextBlock Text="按账号版本判断先后，冲突时由你核对选择。"
+                                   Style="{StaticResource DialogCaptionTextStyle}" />
+                    </StackPanel>
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
                     <TextBlock Text="清零、删除和新增都属于账号修改：" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"

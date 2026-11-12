@@ -50,7 +50,7 @@ public static class StatisticsUidConfirmationDialog
         {
             Width = 36,
             Height = 36,
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = (CornerRadius)Application.Current.Resources["ControlCornerRadius"],
             VerticalAlignment = VerticalAlignment.Center,
             Background = GetBrush("ControlFillColorDefaultBrush"),
             Child = new FontIcon
@@ -88,6 +88,7 @@ public static class StatisticsUidConfirmationDialog
         {
             XamlRoot = xamlRoot,
             Title = "确认统计账号",
+            TitleGlyph = DialogGlyphs.Contact,
             Content = new ScrollViewer
             {
                 MaxHeight = Math.Min(440, Math.Max(120, xamlRoot.Size.Height - 200)),

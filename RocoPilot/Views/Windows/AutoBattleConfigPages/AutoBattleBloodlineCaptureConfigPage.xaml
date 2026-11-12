@@ -35,7 +35,7 @@
                 <Setter Property="HorizontalContentAlignment" Value="Center" />
                 <Setter Property="MinHeight" Value="36" />
                 <Setter Property="Padding" Value="14,8" />
-                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
                 <Setter Property="FontSize" Value="13" />
             </Style>
             <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource SystemAccentColor}" Opacity="0.16" />
@@ -57,7 +57,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Width="40" Height="40" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                <Border Width="40" Height="40" CornerRadius="{StaticResource ControlCornerRadius}" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                     <FontIcon Glyph="&#xE8D7;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">

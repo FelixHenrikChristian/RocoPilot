@@ -69,7 +69,7 @@
                     Background="{ThemeResource ControlFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                     BorderThickness="1"
-                    CornerRadius="8">
+                    CornerRadius="{StaticResource ControlCornerRadius}">
                     <TextBlock
                         x:Name="StatusText"
                         Style="{StaticResource DialogDescriptionTextStyle}"
@@ -83,7 +83,7 @@
             Background="{ThemeResource LayerFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="14">
+            CornerRadius="{StaticResource OverlayCornerRadius}">
             <Grid>
                 <Image
                     x:Name="PreviewImage"

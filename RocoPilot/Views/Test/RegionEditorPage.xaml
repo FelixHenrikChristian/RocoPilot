@@ -75,7 +75,7 @@
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
                                 BorderThickness="1"
-                                CornerRadius="6">
+                                CornerRadius="{StaticResource ControlCornerRadius}">
                                 <TextBlock
                                     x:Name="SelectedConfigFileText"
                                     VerticalAlignment="Center"

@@ -103,7 +103,14 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         var dialog = new AppContentDialog
         {
             Title = $"重命名{BattleTypeName}配置",
-            Content = textBox,
+            TitleGlyph = DialogGlyphs.Rename,
+            Content = new Border
+            {
+                Style = (Style)Application.Current.Resources["DialogCardStyle"],
+                Padding = new Thickness(16),
+                MinWidth = 320,
+                Child = textBox
+            },
             PrimaryButtonText = "确定",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
@@ -127,16 +134,19 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         var dialog = new AppContentDialog
         {
             Title = "删除配置",
+            TitleGlyph = DialogGlyphs.Delete,
+            Tone = AppDialogTone.Critical,
             Content = new TextBlock
             {
                 Text = $"确定删除{BattleTypeName}的配置「{selected.Name}」？该配置的步骤将一并删除。",
-                TextWrapping = TextWrapping.Wrap
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 360
             },
             PrimaryButtonText = "删除",
             CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close,
             XamlRoot = _owner.Content.XamlRoot
         };
+        dialog.UseDestructiveButtons();
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
             Set.RemoveConfig(selected);

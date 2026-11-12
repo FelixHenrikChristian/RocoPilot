@@ -24,14 +24,14 @@
     </Style>
     <Style TargetType="CalendarDatePicker">
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
     <Style TargetType="DatePicker">
         <Setter Property="FontSize" Value="13" />
     </Style>
     <Style TargetType="TimePicker">
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
     <Style TargetType="HyperlinkButton">
         <Setter Property="FontSize" Value="13" />

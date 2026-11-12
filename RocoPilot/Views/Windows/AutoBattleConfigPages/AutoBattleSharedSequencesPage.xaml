@@ -23,7 +23,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border Width="40" Height="40" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+            <Border Width="40" Height="40" CornerRadius="{StaticResource ControlCornerRadius}" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                 <FontIcon Glyph="&#xE8F1;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
             </Border>
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
@@ -150,7 +150,7 @@
                     Margin="16,0,16,14"
                     Padding="12,10"
                     Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                    CornerRadius="8">
+                    CornerRadius="{StaticResource OverlayCornerRadius}">
                     <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

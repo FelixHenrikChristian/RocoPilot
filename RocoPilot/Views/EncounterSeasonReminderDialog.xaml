@@ -4,6 +4,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="赛季资料已到期"
+    TitleGlyph="&#xE787;"
+    Tone="Caution"
     CloseButtonText="本次关闭"
     CloseButtonStyle="{StaticResource DialogPrimaryButtonStyle}"
     DefaultButton="Close"
@@ -18,26 +20,12 @@
         <StackPanel x:Name="ReminderContent" Spacing="12">
             <Border Style="{StaticResource DialogCardStyle}" Padding="16">
                 <StackPanel Spacing="14">
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Border Width="36" Height="36" CornerRadius="8"
-                                VerticalAlignment="Center"
-                                Background="{ThemeResource ControlFillColorDefaultBrush}">
-                            <FontIcon Glyph="&#xE783;" FontSize="18"
-                                      FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                      Foreground="{ThemeResource SystemFillColorCautionBrush}" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-                            <TextBlock Text="{x:Bind ConfiguredSeasonDisplay}"
-                                       Style="{StaticResource DialogSectionTitleStyle}" />
-                            <TextBlock Text="{x:Bind EndDateDisplay}" FontSize="12"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Grid>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="{x:Bind ConfiguredSeasonDisplay}"
+                                   Style="{StaticResource DialogSectionTitleStyle}" />
+                        <TextBlock Text="{x:Bind EndDateDisplay}"
+                                   Style="{StaticResource DialogCaptionTextStyle}" />
+                    </StackPanel>
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
                     <TextBlock Text="{x:Bind Reminder.ImpactMessage}" FontSize="13"
                                LineHeight="20" TextWrapping="Wrap" />
@@ -49,13 +37,9 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <FontIcon Glyph="&#xE82D;" FontSize="16" VerticalAlignment="Center"
-                              FontFamily="{StaticResource SymbolThemeFontFamily}"
-                              Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <FontIcon Glyph="&#xE82D;" Style="{StaticResource DialogRowIconStyle}" />
                     <TextBlock Grid.Column="1" Text="{x:Bind Reminder.CatalogHint}"
-                               FontSize="12" LineHeight="18"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               TextWrapping="Wrap" />
+                               Style="{StaticResource DialogCaptionTextStyle}" />
                 </Grid>
             </Border>
         </StackPanel>

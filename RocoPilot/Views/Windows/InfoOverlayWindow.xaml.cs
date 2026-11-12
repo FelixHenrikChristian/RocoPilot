@@ -371,7 +371,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
             Width = size,
             Height = size,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(size > 30 ? 10 : 6),
+            CornerRadius = (CornerRadius)Application.Current.Resources[size > 30 ? "OverlayCornerRadius" : "ControlCornerRadius"],
             Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)),
             Child = CreateAvatarPlaceholder(size)
         };

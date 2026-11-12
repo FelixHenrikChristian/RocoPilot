@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Controls;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 using RocoPilot.Services.Encounters;
@@ -158,33 +159,67 @@ public sealed partial class ShellPage : Page
                 return;
             }
 
-            var title = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
-            title.Children.Add(new FontIcon
+            var warningIcon = new FontIcon
             {
                 Glyph = "\uE7BA",
-                FontFamily = (FontFamily)Application.Current.Resources["SymbolThemeFontFamily"],
-                FontSize = 20,
-                Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
-                VerticalAlignment = VerticalAlignment.Center
-            });
-            title.Children.Add(new TextBlock
+                Style = (Style)Application.Current.Resources["DialogRowIconStyle"],
+                Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"]
+            };
+            var message = new TextBlock
             {
-                Text = "警告",
-                FontSize = 20,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center
+                Text = "热键助手以管理员权限启动失败，游戏热键可能失效。",
+                FontSize = 13,
+                LineHeight = 20,
+                TextWrapping = TextWrapping.Wrap
+            };
+            var body = new Grid { ColumnSpacing = 10 };
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(message, 1);
+            body.Children.Add(warningIcon);
+            body.Children.Add(message);
+
+            var hintIcon = new FontIcon
+            {
+                Glyph = DialogGlyphs.Info,
+                Style = (Style)Application.Current.Resources["DialogRowIconStyle"]
+            };
+            var hintText = new TextBlock
+            {
+                Text = "可尝试重启应用，并在 UAC 提示中选择“是”。",
+                Style = (Style)Application.Current.Resources["DialogCaptionTextStyle"]
+            };
+            var hint = new Grid { ColumnSpacing = 10 };
+            hint.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            hint.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(hintText, 1);
+            hint.Children.Add(hintIcon);
+            hint.Children.Add(hintText);
+
+            var content = new StackPanel { Spacing = 12, MaxWidth = 380 };
+            content.Children.Add(new Border
+            {
+                Style = (Style)Application.Current.Resources["DialogCardStyle"],
+                Padding = new Thickness(16),
+                Child = body
+            });
+            content.Children.Add(new Border
+            {
+                Style = (Style)Application.Current.Resources["ConfigHintBarStyle"],
+                Child = hint
             });
 
-            var dialog = new ContentDialog
+            var dialog = new AppContentDialog
             {
                 XamlRoot = XamlRoot,
                 RequestedTheme = ActualTheme,
-                Title = title,
-                Content = "热键助手以管理员权限启动失败，以下功能可能失效：\n• 游戏热键\n\n可尝试重启应用，并在 UAC 提示中选择“是”。",
-                CloseButtonText = "确定",
+                Title = "热键助手未启动",
+                TitleGlyph = DialogGlyphs.Warning,
+                Tone = AppDialogTone.Caution,
+                Content = content,
+                CloseButtonText = "知道了",
                 DefaultButton = ContentDialogButton.Close
             };
-            AutomationProperties.SetName(dialog, "警告");
 
             await dialog.ShowAsync();
         }

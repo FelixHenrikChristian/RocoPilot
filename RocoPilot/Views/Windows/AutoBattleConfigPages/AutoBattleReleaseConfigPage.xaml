@@ -32,7 +32,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Width="40" Height="40" CornerRadius="12" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                <Border Width="40" Height="40" CornerRadius="{StaticResource ControlCornerRadius}" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                     <FontIcon Glyph="&#xE768;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
@@ -225,7 +225,7 @@
                                 </GridView.ItemContainerStyle>
                                 <GridView.ItemTemplate>
                                     <DataTemplate>
-                                        <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="8"
+                                        <Border Width="124" Height="68" Padding="10,6,6,6" CornerRadius="{StaticResource OverlayCornerRadius}"
                                                 Background="{ThemeResource SubtleFillColorSecondaryBrush}"
                                                 Opacity="{Binding CardOpacity}"
                                                 UseLayoutRounding="True"

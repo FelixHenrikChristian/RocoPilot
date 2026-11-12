@@ -41,7 +41,14 @@ public sealed partial class TasksPage : Page
             {
                 XamlRoot = XamlRoot,
                 Title = "无法启动花种挑战",
-                Content = "请先点击目标花种右侧的刷新按钮扫描花种，并选择要挑战的目标。",
+                TitleGlyph = DialogGlyphs.Warning,
+                Tone = AppDialogTone.Caution,
+                Content = new TextBlock
+                {
+                    Text = "请先点击目标花种右侧的刷新按钮扫描花种，并选择要挑战的目标。",
+                    TextWrapping = TextWrapping.Wrap,
+                    MaxWidth = 360
+                },
                 CloseButtonText = "确定",
                 DefaultButton = ContentDialogButton.Close
             }.ShowAsync();

@@ -212,24 +212,12 @@ public static class InterceptionDriverInstallDialog
         string glyph, string iconBrush, string? hint = null, string hintGlyph = "\uE946",
         string hintBrush = "TextFillColorSecondaryBrush", UIElement? detail = null)
     {
-        var header = new Grid { ColumnSpacing = 12 };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.Children.Add(new Border
-        {
-            Width = 36, Height = 36, CornerRadius = new CornerRadius(8),
-            VerticalAlignment = VerticalAlignment.Center,
-            Background = Resource<Brush>("ControlFillColorDefaultBrush"),
-            Child = CreateIcon(glyph, iconBrush, 18)
-        });
-        var summary = new StackPanel { Spacing = 3, VerticalAlignment = VerticalAlignment.Center };
+        var summary = new StackPanel { Spacing = 3 };
         summary.Children.Add(new TextBlock { Text = heading, Style = Resource<Style>("DialogSectionTitleStyle") });
         summary.Children.Add(CreateText(subtitle, secondary: true));
-        Grid.SetColumn(summary, 1);
-        header.Children.Add(summary);
 
         var cardContent = new StackPanel { Spacing = 14 };
-        cardContent.Children.Add(header);
+        cardContent.Children.Add(summary);
         if (description is not null || detail is not null)
         {
             cardContent.Children.Add(new Border { Height = 1, Background = Resource<Brush>("DividerStrokeColorDefaultBrush") });
@@ -256,7 +244,20 @@ public static class InterceptionDriverInstallDialog
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto
         };
-        var dialog = new DriverContentDialog { XamlRoot = xamlRoot, Title = title, Content = scrollViewer };
+        var dialog = new AppContentDialog
+        {
+            XamlRoot = xamlRoot,
+            Title = title,
+            TitleGlyph = glyph,
+            Tone = iconBrush switch
+            {
+                "SystemFillColorSuccessBrush" => AppDialogTone.Success,
+                "SystemFillColorCautionBrush" => AppDialogTone.Caution,
+                "SystemFillColorCriticalBrush" => AppDialogTone.Critical,
+                _ => AppDialogTone.Accent
+            },
+            Content = scrollViewer
+        };
         dialog.Loaded += (_, _) =>
         {
             content.Width = Math.Min(400, Math.Max(240, xamlRoot.Size.Width - 96));
@@ -284,24 +285,6 @@ public static class InterceptionDriverInstallDialog
             LineHeight = secondary ? 18 : 20,
             Foreground = Resource<Brush>(secondary ? "TextFillColorSecondaryBrush" : "TextFillColorPrimaryBrush")
         };
-    }
-
-    private sealed class DriverContentDialog : AppContentDialog
-    {
-        protected override void OnApplyTemplate()
-        {
-            base.OnApplyTemplate();
-            // Default-button visual states replace Style, so preserve geometry with local values.
-            foreach (var name in new[] { "PrimaryButton", "SecondaryButton", "CloseButton" })
-            {
-                if (GetTemplateChild(name) is not Button button) continue;
-                button.FontSize = 13;
-                button.MinHeight = 34;
-                button.MinWidth = 96;
-                button.Padding = new Thickness(14, 6, 14, 6);
-                button.CornerRadius = new CornerRadius(8);
-            }
-        }
     }
 
     private static async Task WaitForDialogToCloseAsync(IAsyncOperation<ContentDialogResult> dialogOperation)

@@ -13,22 +13,6 @@ public sealed partial class StatisticsClearDialog : AppContentDialog
         Loaded += (_, _) => UpdateContentBounds();
     }
 
-    protected override void OnApplyTemplate()
-    {
-        base.OnApplyTemplate();
-
-        // WinUI replaces the default button's Style; local values preserve geometry.
-        foreach (var name in new[] { "PrimaryButton", "CloseButton" })
-        {
-            if (GetTemplateChild(name) is not Button button) continue;
-            button.FontSize = 13;
-            button.MinHeight = 34;
-            button.MinWidth = 96;
-            button.Padding = new Thickness(14, 6, 14, 6);
-            button.CornerRadius = new CornerRadius(8);
-        }
-    }
-
     private void UpdateContentBounds()
     {
         if (XamlRoot is null) return;

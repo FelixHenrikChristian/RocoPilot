@@ -17,7 +17,7 @@
             <Setter Property="MaxWidth" Value="240" />
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="12,5" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
             <Setter Property="BorderThickness" Value="1,1,1,3" />
         </Style>
         <DataTemplate x:Key="HotkeyGroupTemplate">
@@ -92,7 +92,7 @@
                                        TextWrapping="NoWrap" />
                         </StackPanel>
                     </Button>
-                    <Border CornerRadius="6" BorderThickness="2" IsHitTestVisible="False"
+                    <Border CornerRadius="{StaticResource ControlCornerRadius}" BorderThickness="2" IsHitTestVisible="False"
                             BorderBrush="{ThemeResource AccentTextFillColorPrimaryBrush}"
                             Visibility="{Binding CaptureIndicatorVisibility, Mode=OneWay}" />
                 </Grid>
@@ -112,7 +112,7 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Width="40" Height="40" CornerRadius="12" VerticalAlignment="Center"
+                    <Border Width="40" Height="40" CornerRadius="{StaticResource ControlCornerRadius}" VerticalAlignment="Center"
                             Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                         <FontIcon FontSize="20" FontFamily="{StaticResource AppIconFont}" Glyph="&#xF4B8;"
                                   Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />

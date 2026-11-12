@@ -19,7 +19,7 @@
                 x:Name="CoverContainer"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="8"
+                CornerRadius="{StaticResource OverlayCornerRadius}"
                 SizeChanged="CoverContainer_SizeChanged">
                 <Border.Background>
                     <ImageBrush

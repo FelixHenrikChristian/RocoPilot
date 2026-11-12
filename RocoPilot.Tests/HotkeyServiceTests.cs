@@ -59,21 +59,26 @@ public sealed class HotkeyServiceTests
     }
 
     [TestMethod]
-    public async Task CancelledElevationKeepsTheSavedBindingAndRequestsOnlyTheHostRole()
+    public async Task CancelledStartupKeepsBindingsAndDoesNotRetryElevationWhenTheyChange()
     {
         var store = new ControlledSettingsStore();
+        store.Seed(SettingsKeys.HotkeySettings, SettingsFor(54, []));
         ProcessStartInfo? launch = null;
+        var starts = 0;
         using var service = CreateService(store, info =>
         {
+            starts++;
             launch = info;
             throw new Win32Exception(1223);
         });
-        var failure = await Assert.ThrowsExactlyAsync<InvalidOperationException>(() =>
-            service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 54)));
-        StringAssert.Contains(failure.Message, "绑定已保存");
+        await service.LoadSettingsAsync();
+        await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 55));
+        await service.SetBindingAsync(HotkeyAction.ToggleInfoOverlay, HotkeyBinding.Create([17], 53));
+        await service.LoadSettingsAsync();
+        Assert.AreEqual(1, starts);
         StringAssert.Contains(service.UnavailableReason!, "已取消管理员授权");
-        Assert.AreEqual(54, service.Settings.GetBinding(HotkeyAction.TakeScreenshot)!.Key);
-        Assert.AreEqual(54, store.ReadSaved<HotkeySettings>(SettingsKeys.HotkeySettings)!.Bindings.Single().Binding!.Key);
+        Assert.AreEqual(55, service.Settings.GetBinding(HotkeyAction.TakeScreenshot)!.Key);
+        Assert.AreEqual(55, store.ReadSaved<HotkeySettings>(SettingsKeys.HotkeySettings)!.GetBinding(HotkeyAction.TakeScreenshot)!.Key);
         Assert.AreEqual("runas", launch!.Verb);
         Assert.AreEqual(ProcessWindowStyle.Hidden, launch.WindowStyle);
         Assert.AreEqual(HotkeyHost.Argument, launch.ArgumentList[0]);
@@ -102,6 +107,27 @@ public sealed class HotkeyServiceTests
     }
 
     [TestMethod]
+    public async Task FirstBindingOnlyRequestsElevationAfterRestart()
+    {
+        var store = new ControlledSettingsStore();
+        using (var service = CreateService(store, _ => throw new AssertFailedException("绑定时不应请求授权。")))
+        {
+            await service.LoadSettingsAsync();
+            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 54));
+            Assert.AreEqual(54, store.ReadSaved<HotkeySettings>(SettingsKeys.HotkeySettings)!.Bindings.Single().Binding!.Key);
+        }
+
+        var starts = 0;
+        using var restarted = CreateService(store, _ =>
+        {
+            starts++;
+            throw new Win32Exception(1223);
+        });
+        await restarted.LoadSettingsAsync();
+        Assert.AreEqual(1, starts);
+    }
+
+    [TestMethod]
     public async Task FailedSaveDoesNotApplyAnUnpersistedBindingOrLaunchTheHost()
     {
         var store = new ControlledSettingsStore { BeforeSave = _ => throw new IOException("写入失败") };
@@ -113,11 +139,13 @@ public sealed class HotkeyServiceTests
 
     [TestMethod]
     [Timeout(20_000)]
-    public async Task BindingUpdatesReuseOneHostAndClearingAllBindingsExitsIt()
+    public async Task BindingUpdatesReuseOneHostAndDoNotRestartItAfterClearing()
     {
         Process? host = null;
         var starts = 0;
-        using var service = CreateService(new ControlledSettingsStore(), info =>
+        var store = new ControlledSettingsStore();
+        store.Seed(SettingsKeys.HotkeySettings, SettingsFor(54, []));
+        using var service = CreateService(store, info =>
         {
             starts++;
             host = StartHost(info.ArgumentList);
@@ -125,7 +153,7 @@ public sealed class HotkeyServiceTests
         });
         try
         {
-            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 54));
+            await service.LoadSettingsAsync();
             Assert.AreEqual(IntPtr.Zero, host!.MainWindowHandle);
             await service.SetBindingAsync(HotkeyAction.ToggleInfoOverlay, HotkeyBinding.Create([17], 53));
             Assert.AreEqual(1, starts);
@@ -137,7 +165,9 @@ public sealed class HotkeyServiceTests
             await service.SetBindingAsync(HotkeyAction.ToggleInfoOverlay, null);
             await WaitForHostExitAsync(host!);
             Assert.AreEqual(0, host!.ExitCode);
+            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 55));
             Assert.AreEqual(1, starts);
+            Assert.AreEqual(55, store.ReadSaved<HotkeySettings>(SettingsKeys.HotkeySettings)!.Bindings.Single().Binding!.Key);
         }
         finally
         {
@@ -152,6 +182,7 @@ public sealed class HotkeyServiceTests
     {
         Process? host = null;
         var store = new ControlledSettingsStore();
+        store.Seed(SettingsKeys.HotkeySettings, SettingsFor(54, []));
         using var service = CreateService(store, info =>
         {
             host = StartHost(info.ArgumentList);
@@ -159,7 +190,7 @@ public sealed class HotkeyServiceTests
         });
         try
         {
-            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 54));
+            await service.LoadSettingsAsync();
             service.Dispose();
             await WaitForHostExitAsync(host!);
             Assert.AreEqual(0, host!.ExitCode);
@@ -170,11 +201,13 @@ public sealed class HotkeyServiceTests
 
     [TestMethod]
     [Timeout(20_000)]
-    public async Task UnexpectedHostExitReportsFailureAndRebindingRestartsIt()
+    public async Task UnexpectedHostExitDoesNotRequestElevationAgainWhenRebinding()
     {
         Process? host = null;
         var starts = 0;
-        using var service = CreateService(new ControlledSettingsStore(), info =>
+        var store = new ControlledSettingsStore();
+        store.Seed(SettingsKeys.HotkeySettings, SettingsFor(54, []));
+        using var service = CreateService(store, info =>
         {
             starts++;
             host = StartHost(info.ArgumentList);
@@ -187,16 +220,16 @@ public sealed class HotkeyServiceTests
         };
         try
         {
-            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 54));
+            await service.LoadSettingsAsync();
             host!.Kill();
             await disconnected.Task.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.AreEqual(54, service.Settings.Bindings.Single().Binding!.Key);
-            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 54));
-            Assert.AreEqual(2, starts);
-            Assert.IsNull(service.UnavailableReason);
+            await service.SetBindingAsync(HotkeyAction.TakeScreenshot, HotkeyBinding.Create([], 55));
+            Assert.AreEqual(1, starts);
+            Assert.IsNotNull(service.UnavailableReason);
+            Assert.AreEqual(55, store.ReadSaved<HotkeySettings>(SettingsKeys.HotkeySettings)!.Bindings.Single().Binding!.Key);
             service.Dispose();
             await WaitForHostExitAsync(host!);
-            Assert.AreEqual(0, host!.ExitCode);
         }
         finally
         {

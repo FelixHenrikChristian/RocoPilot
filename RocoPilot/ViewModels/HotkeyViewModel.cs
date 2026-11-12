@@ -57,10 +57,6 @@ public class HotkeyViewModel : ObservableRecipient
 
     public bool IsCapturing => _capturingItem is not null;
 
-    public string ListenerStatus => _hotkeyService.UnavailableReason is { } reason
-        ? $"热键监听不可用：{reason}"
-        : "启用热键后，启动时需单独授权监听；主界面保持普通权限。";
-
     public HotkeyViewModel(IHotkeyService hotkeyService)
     {
         var items = HotkeyActionDescriptor.CreateDefault()
@@ -193,7 +189,6 @@ public class HotkeyViewModel : ObservableRecipient
 
     private void ApplySettings(HotkeySettings settings)
     {
-        OnPropertyChanged(nameof(ListenerStatus));
         foreach (var item in Items)
         {
             item.Binding = settings.GetBinding(item.Action);

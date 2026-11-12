@@ -72,7 +72,7 @@ public sealed class HotkeyService : IHotkeyService
             _settingsLoaded = true;
             try
             {
-                await ConfigureHostAsync(Settings, cancellationToken);
+                await ConfigureHostAsync(Settings, allowStart: true, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -115,7 +115,7 @@ public sealed class HotkeyService : IHotkeyService
             lock (_stateLock) _settings = next;
             try
             {
-                await ConfigureHostAsync(next, cancellationToken);
+                await ConfigureHostAsync(next, allowStart: false, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -130,7 +130,7 @@ public sealed class HotkeyService : IHotkeyService
         }
     }
 
-    private async Task ConfigureHostAsync(HotkeySettings settings, CancellationToken cancellationToken)
+    private async Task ConfigureHostAsync(HotkeySettings settings, bool allowStart, CancellationToken cancellationToken)
     {
         if (settings.Bindings.Count == 0)
         {
@@ -152,6 +152,7 @@ public sealed class HotkeyService : IHotkeyService
                 await HotkeyHost.WriteMessageAsync(pipe, configuration, timeout.Token);
                 return;
             }
+            if (!allowStart) return;
 
             var pipeName = $"RocoPilot.Hotkeys.{Guid.NewGuid():N}";
             // 服务端由普通用户创建，仅允许该用户访问；提权客户端不使用
@@ -188,8 +189,8 @@ public sealed class HotkeyService : IHotkeyService
         {
             StopHost();
             UnavailableReason = ex is Win32Exception { NativeErrorCode: 1223 }
-                ? "已取消管理员授权。重新设置任一热键可重试。"
-                : $"{ex.Message} 重新设置任一热键可重试。";
+                ? "已取消管理员授权。请重启应用。"
+                : $"{ex.Message} 请重启应用。";
             throw;
         }
     }
@@ -223,7 +224,7 @@ public sealed class HotkeyService : IHotkeyService
                     if (ReferenceEquals(_pipe, pipe))
                     {
                         _pipe = null;
-                        UnavailableReason = "热键监听已断开。重新设置任一热键可重试。";
+                        UnavailableReason = "热键监听已断开。请重启应用。";
                         _logger.LogWarning("热键辅助进程已断开。");
                     }
                 }

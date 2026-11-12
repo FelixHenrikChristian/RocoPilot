@@ -24,6 +24,7 @@ public sealed partial class ShellPage : Page
     }
 
     private readonly IUpdateService _updateService;
+    private readonly IHotkeyService _hotkeyService;
     private readonly EncounterSeasonReminderService _seasonReminderService;
     private readonly ILogger<ShellPage> _logger;
     private bool _areStartupChecksStarted;
@@ -31,11 +32,13 @@ public sealed partial class ShellPage : Page
     public ShellPage(
         ShellViewModel viewModel,
         IUpdateService updateService,
+        IHotkeyService hotkeyService,
         EncounterSeasonReminderService seasonReminderService,
         ILogger<ShellPage> logger)
     {
         ViewModel = viewModel;
         _updateService = updateService;
+        _hotkeyService = hotkeyService;
         _seasonReminderService = seasonReminderService;
         _logger = logger;
         InitializeComponent();
@@ -140,8 +143,55 @@ public sealed partial class ShellPage : Page
 
         _areStartupChecksStarted = true;
 
+        await ShowHotkeyStartupWarningAsync();
         await ShowSeasonReminderOnStartupAsync();
         await CheckForUpdatesOnStartupAsync();
+    }
+
+    private async Task ShowHotkeyStartupWarningAsync()
+    {
+        try
+        {
+            await _hotkeyService.LoadSettingsAsync();
+            if (_hotkeyService.UnavailableReason is null || XamlRoot is null)
+            {
+                return;
+            }
+
+            var title = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+            title.Children.Add(new FontIcon
+            {
+                Glyph = "\uE7BA",
+                FontFamily = (FontFamily)Application.Current.Resources["SymbolThemeFontFamily"],
+                FontSize = 20,
+                Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"],
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            title.Children.Add(new TextBlock
+            {
+                Text = "警告",
+                FontSize = 20,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme,
+                Title = title,
+                Content = "热键助手以管理员权限启动失败，以下功能可能失效：\n• 游戏热键\n\n可尝试重启应用，并在 UAC 提示中选择“是”。",
+                CloseButtonText = "确定",
+                DefaultButton = ContentDialogButton.Close
+            };
+            AutomationProperties.SetName(dialog, "警告");
+
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "启动时显示热键助手提示失败。");
+        }
     }
 
     private async Task ShowSeasonReminderOnStartupAsync()

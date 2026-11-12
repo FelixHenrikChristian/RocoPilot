@@ -269,6 +269,58 @@ public sealed partial class StatisticsPage : Page
         e.Handled = true;
     }
 
+    private void PollutionCountItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { DataContext: SpiritCountItem item } target
+            || ViewModel.Overview.SelectedAccount is not { } account)
+            return;
+
+        var menu = new MenuFlyout();
+        if (item.Season == EncounterSeasonTimeline.PendingSeasonId)
+        {
+            menu.Items.Add(CreateStatisticMenuItem("确认归入正式赛季", () => ShowEncounterDetailsAsync(item.Season, item)));
+        }
+        else
+        {
+            menu.Items.Add(CreateStatisticMenuItem("详情", () => ShowEncounterDetailsAsync(item.Season, item)));
+            menu.Items.Add(CreateStatisticMenuItem("编辑", () => EditEncounterAsync(account.Uid, item.Season, item)));
+            menu.Items.Add(CreateStatisticMenuItem("删除", () => DeleteEncounterAsync(account.Uid, item.Season, item)));
+        }
+        menu.ShowAt(target, e.GetPosition(target));
+    }
+
+    private void ShinyCountItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is not FrameworkElement { DataContext: SpiritCountItem item } target
+            || ViewModel.Overview.SelectedAccount is not { } account)
+            return;
+
+        var records = ViewModel.Overview.GetShinyCaptureDetails(item);
+        if (records.Count == 0) return;
+
+        var menu = new MenuFlyout();
+        menu.Items.Add(CreateStatisticMenuItem("详情", () => ShowShinyDetailsAsync(item)));
+        menu.Items.Add(CreateRecordAction("编辑", record => EditShinyCaptureAsync(account.Uid, record)));
+        menu.Items.Add(CreateRecordAction("删除", record => DeleteShinyCaptureAsync(account.Uid, record)));
+        menu.ShowAt(target, e.GetPosition(target));
+
+        MenuFlyoutItemBase CreateRecordAction(string label, Func<ShinyCaptureDetailItem, Task> action)
+        {
+            if (records.Count == 1)
+                return CreateStatisticMenuItem(label, () => action(records[0]));
+
+            var submenu = new MenuFlyoutSubItem { Text = label };
+            foreach (var record in records)
+            {
+                var text = $"{record.Position}. {record.SeasonDisplay} · {record.CapturedDateDisplay} {record.CapturedTimeDisplay}";
+                submenu.Items.Add(CreateStatisticMenuItem(text, () => action(record)));
+            }
+            return submenu;
+        }
+    }
+
     private void PollutionBlank_RightTapped(object sender, RightTappedRoutedEventArgs e)
     {
         if (sender is not FrameworkElement target || target.DataContext is not SeasonStatisticsGroup season)
@@ -278,8 +330,8 @@ public sealed partial class StatisticsPage : Page
 
         var flyout = season.Id == EncounterSeasonTimeline.PendingSeasonId
             ? CreateAddStatisticMenu(() => ShowTemporaryStatisticsAsync(shiny: false), "确认归入正式赛季")
-            : CreateAddStatisticMenu(async () => await AddEncounterAsync(season.Id));
-        flyout.ShowAt(target);
+            : CreateAddStatisticMenu(() => AddEncounterAsync(season.Id));
+        flyout.ShowAt(target, e.GetPosition(target));
         e.Handled = true;
     }
 
@@ -292,22 +344,23 @@ public sealed partial class StatisticsPage : Page
 
         var flyout = ViewModel.Overview.DefaultShinyAddSeasonId == EncounterSeasonTimeline.PendingSeasonId
             ? CreateAddStatisticMenu(() => ShowTemporaryStatisticsAsync(shiny: true), "确认归入正式赛季")
-            : CreateAddStatisticMenu(async () => await AddShinyAsync());
-        flyout.ShowAt(target);
+            : CreateAddStatisticMenu(AddShinyAsync);
+        flyout.ShowAt(target, e.GetPosition(target));
         e.Handled = true;
     }
 
     private MenuFlyout CreateAddStatisticMenu(Func<Task> addHandler, string label = "新增条目")
     {
-        var addItem = new MenuFlyoutItem
-        {
-            Text = label
-        };
-        addItem.Click += async (_, _) => await ViewModel.RunOperationAsync("新增条目失败", addHandler);
-
         var flyout = new MenuFlyout();
-        flyout.Items.Add(addItem);
+        flyout.Items.Add(CreateStatisticMenuItem(label, addHandler));
         return flyout;
+    }
+
+    private MenuFlyoutItem CreateStatisticMenuItem(string label, Func<Task> action)
+    {
+        var item = new MenuFlyoutItem { Text = label };
+        item.Click += async (_, _) => await ViewModel.RunOperationAsync($"{label}失败", action);
+        return item;
     }
 
     private async Task AddEncounterAsync(string seasonId)

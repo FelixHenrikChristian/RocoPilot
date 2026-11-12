@@ -24,12 +24,13 @@
                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="{StaticResource ControlCornerRadius}">
+                CornerRadius="{StaticResource ControlCornerRadius}"
+                DoubleTapped="PollutionCountItem_DoubleTapped"
+                RightTapped="PollutionCountItem_RightTapped">
                 <Grid
                     MinHeight="28"
                     Background="Transparent"
-                    ColumnSpacing="8"
-                    DoubleTapped="PollutionCountItem_DoubleTapped">
+                    ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="24" />
                         <ColumnDefinition Width="*" />
@@ -109,12 +110,13 @@
                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="{StaticResource ControlCornerRadius}">
+                CornerRadius="{StaticResource ControlCornerRadius}"
+                DoubleTapped="ShinyCountItem_DoubleTapped"
+                RightTapped="ShinyCountItem_RightTapped">
                 <Grid
                     MinHeight="28"
                     Background="Transparent"
-                    ColumnSpacing="8"
-                    DoubleTapped="ShinyCountItem_DoubleTapped">
+                    ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="24" />
                         <ColumnDefinition Width="*" />
@@ -704,6 +706,7 @@
                         Grid.Row="2"
                         HorizontalScrollBarVisibility="Disabled"
                         HorizontalScrollMode="Disabled"
+                        Background="Transparent"
                         RightTapped="ShinyBlank_RightTapped"
                         VerticalScrollBarVisibility="Hidden"
                         ViewChanged="CardScrollViewer_ViewChanged"
@@ -821,6 +824,7 @@
                                     Grid.Row="2"
                                     HorizontalScrollBarVisibility="Disabled"
                                     HorizontalScrollMode="Disabled"
+                                    Background="Transparent"
                                     RightTapped="PollutionBlank_RightTapped"
                                     VerticalScrollBarVisibility="Hidden"
                                     ViewChanged="CardScrollViewer_ViewChanged"

@@ -266,23 +266,27 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE72E;" />
+                            Glyph="&#xE7C2;" />
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="锁定位置" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="关闭后允许用户拖动信息遮罩窗口。"
+                                Text="解锁后可拖动信息遮罩窗口。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch
+                        <Button
                             Grid.Column="2"
-                            MinWidth="0"
                             VerticalAlignment="Center"
-                            IsOn="{x:Bind ViewModel.IsInfoOverlayLocked, Mode=TwoWay}"
-                            OffContent=""
-                            OnContent="" />
+                            AutomationProperties.Name="{x:Bind GetLockAction(ViewModel.IsInfoOverlayLocked), Mode=OneWay}"
+                            Command="{x:Bind ViewModel.ToggleInfoOverlayLockCommand}"
+                            ToolTipService.ToolTip="{x:Bind GetLockAction(ViewModel.IsInfoOverlayLocked), Mode=OneWay}">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="16"
+                                Glyph="{x:Bind GetLockGlyph(ViewModel.IsInfoOverlayLocked), Mode=OneWay}" />
+                        </Button>
                     </Grid>
 
                     <Border

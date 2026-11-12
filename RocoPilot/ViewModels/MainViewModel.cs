@@ -185,6 +185,9 @@ public partial class MainViewModel : ObservableRecipient
     }
 
     [RelayCommand]
+    private void ToggleInfoOverlayLock() => IsInfoOverlayLocked = !IsInfoOverlayLocked;
+
+    [RelayCommand]
     private void ResetInfoOverlayPosition()
     {
         _infoOverlayService.ResetPosition();

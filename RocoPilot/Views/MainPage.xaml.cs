@@ -26,6 +26,10 @@ public sealed partial class MainPage : Page
         InitializeComponent();
     }
 
+    private string GetLockGlyph(bool isLocked) => isLocked ? "\uE72E" : "\uE785";
+
+    private string GetLockAction(bool isLocked) => isLocked ? "解锁位置" : "锁定位置";
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         Loaded -= OnLoaded;

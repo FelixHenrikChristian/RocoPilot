@@ -167,7 +167,7 @@ public sealed partial class ShellPage : Page
             };
             var message = new TextBlock
             {
-                Text = "热键助手以管理员权限启动失败，游戏热键可能失效。",
+                Text = "管理员授权失败，游戏热键可能失效。",
                 FontSize = 13,
                 LineHeight = 20,
                 TextWrapping = TextWrapping.Wrap
@@ -213,7 +213,7 @@ public sealed partial class ShellPage : Page
             {
                 XamlRoot = XamlRoot,
                 RequestedTheme = ActualTheme,
-                Title = "热键助手未启动",
+                Title = "未获得管理员权限",
                 TitleGlyph = DialogGlyphs.Warning,
                 Tone = AppDialogTone.Caution,
                 Content = content,

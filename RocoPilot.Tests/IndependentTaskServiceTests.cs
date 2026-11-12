@@ -255,7 +255,7 @@ public sealed class IndependentTaskServiceTests
         Assert.AreEqual("新传说精灵", fixture.Runner.Target!.Name);
 
         var restarted = new IndependentTaskService(fixture.Runtime, fixture.Store, fixture.Runner,
-            fixture.Notifications, fixture.Window, null!, null!, NullLogger<IndependentTaskService>.Instance);
+            fixture.Notifications, fixture.Window, null!, null!, null!, NullLogger<IndependentTaskService>.Instance);
         await restarted.LoadSettingsAsync();
         CollectionAssert.AreEqual(IndependentTaskSettings.LegendaryTargets.ToArray(), restarted.LegendaryTargets.ToArray());
         Assert.AreEqual("龙息帕尔", restarted.Settings.LegendaryTargetName);
@@ -696,7 +696,7 @@ public sealed class IndependentTaskServiceTests
                 FlowerSeedOptions = [new(1, "友爱星飞"), new(2, "旧花种")],
                 FlowerSeedTargetNumber = 1
             });
-            Service = new(Runtime, Store, Runner, Notifications, Window, null!, null!, logger ?? NullLogger<IndependentTaskService>.Instance);
+            Service = new(Runtime, Store, Runner, Notifications, Window, null!, null!, null!, logger ?? NullLogger<IndependentTaskService>.Instance);
         }
     }
 

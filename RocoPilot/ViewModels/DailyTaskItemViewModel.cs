@@ -10,6 +10,7 @@ public partial class DailyTaskItemViewModel(DailyTaskKind kind) : ObservableObje
 
     public IndependentTaskKind? TaskKind => Kind switch
     {
+        DailyTaskKind.Mail => IndependentTaskKind.Mail,
         DailyTaskKind.EveningRest => IndependentTaskKind.EveningRest,
         DailyTaskKind.StaminaCrafting => IndependentTaskKind.StaminaCrafting,
         DailyTaskKind.LegendaryChallenge => IndependentTaskKind.LegendaryChallenge,

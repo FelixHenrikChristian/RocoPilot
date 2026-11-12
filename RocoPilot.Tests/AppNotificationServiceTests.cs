@@ -1,6 +1,7 @@
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.Windows.ApplicationModel.DynamicDependency;
 using RocoPilot.Notifications;
 using RocoPilot.Tests.TestDoubles;
 
@@ -27,18 +28,42 @@ public sealed class AppNotificationServiceTests
     }
 
     [TestMethod]
-    [DataRow(true)]
-    [DataRow(false)]
-    public void PayloadPreservesTextAndOptionalScreenshot(bool sound)
+    [DataRow(true, true)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(false, false)]
+    public void NotificationUsesLogoOrHeroAndRespectsSound(bool sound, bool withScreenshot)
+    {
+        // VSTest runs outside the application's WinRT activation manifest.
+        Bootstrap.Initialize(0x00020001); // Windows App SDK 2.1
+        try
+        {
+            VerifyNotificationLayout(sound, withScreenshot);
+        }
+        finally
+        {
+            Bootstrap.Shutdown();
+        }
+    }
+
+    private static void VerifyNotificationLayout(bool sound, bool withScreenshot)
     {
         var title = "发现 <异色> & 精灵";
         var message = "已暂停\n返回游戏处理";
         var path = Path.Combine(Path.GetTempPath(), "截图 空格 & test.png");
-        var toast = XDocument.Parse(AppNotificationService.BuildPayload(title, message, sound, path));
+        var toast = XDocument.Parse(AppNotificationService.BuildNotification(title, message, sound, withScreenshot ? path : null).Payload);
         CollectionAssert.AreEqual(new[] { title, message }, toast.Descendants("text").Select(x => x.Value).ToArray());
-        Assert.AreEqual(new Uri(path).AbsoluteUri, toast.Descendants("image").Single().Attribute("src")!.Value);
+        var image = toast.Descendants("image").Single();
+        Assert.AreEqual(withScreenshot ? "hero" : "appLogoOverride", (string?)image.Attribute("placement"));
+        var source = new Uri(image.Attribute("src")!.Value);
+        if (withScreenshot)
+            Assert.AreEqual(path, source.LocalPath);
+        else
+        {
+            Assert.AreEqual("circle", (string?)image.Attribute("hint-crop"));
+            Assert.IsTrue(File.Exists(source.LocalPath), source.LocalPath);
+        }
         Assert.AreEqual(sound ? null : "true", (string?)toast.Root!.Element("audio")?.Attribute("silent"));
-        Assert.IsFalse(XDocument.Parse(AppNotificationService.BuildPayload(title, message, sound)).Descendants("image").Any());
     }
 
     [TestMethod]

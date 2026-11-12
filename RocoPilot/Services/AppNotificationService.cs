@@ -1,6 +1,6 @@
-using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Windows.AppNotifications;
+using Microsoft.Windows.AppNotifications.Builder;
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 
@@ -87,7 +87,7 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
             if (setting != AppNotificationSetting.Enabled)
                 throw new InvalidOperationException($"Windows 通知不可用：{setting}");
 
-            var notification = new AppNotification(BuildPayload(title, message, IsSoundEnabled, imagePath));
+            var notification = BuildNotification(title, message, IsSoundEnabled, imagePath);
             _manager.Show(notification);
             if (notification.Id == 0)
                 throw new InvalidOperationException("Windows 未接收此通知。");
@@ -102,16 +102,19 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
         }
     }
 
-    internal static string BuildPayload(string title, string message, bool sound, string? imagePath = null)
+    internal static AppNotification BuildNotification(string title, string message, bool sound, string? imagePath = null)
     {
-        var binding = new XElement("binding", new XAttribute("template", "ToastGeneric"),
-            new XElement("text", title), new XElement("text", message));
-        if (imagePath is not null)
-            binding.Add(new XElement("image", new XAttribute("src", new Uri(Path.GetFullPath(imagePath)).AbsoluteUri),
-                new XAttribute("alt", "发现异色精灵时的游戏截图")));
-        var toast = new XElement("toast", new XElement("visual", binding));
-        if (!sound) toast.Add(new XElement("audio", new XAttribute("silent", "true")));
-        return toast.ToString(SaveOptions.DisableFormatting);
+        var builder = new AppNotificationBuilder().AddText(title).AddText(message);
+        var path = imagePath ?? Path.Combine(AppContext.BaseDirectory, "Assets", "Square150x150Logo.scale-200.png");
+        // SDK 2.1 writes image URIs directly into the notification XML.
+        var uri = new Uri(System.Security.SecurityElement.Escape(Path.GetFullPath(path))!);
+        if (imagePath is null)
+            builder.SetAppLogoOverride(uri, AppNotificationImageCrop.Circle);
+        else
+            builder.SetHeroImage(uri);
+
+        if (!sound) builder.MuteAudio();
+        return builder.BuildNotification();
     }
 
     public void Unregister()

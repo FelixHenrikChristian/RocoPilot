@@ -76,6 +76,20 @@
     <InternalsVisibleTo Include="RocoPilot.Tests" />
   </ItemGroup>
 
+  <!-- AppNotificationManager.Register needs this framework resource, omitted by the 2.1.3 self-contained payload. -->
+  <Target Name="IncludeAppNotificationRuntimeResource" BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="GetWindowsAppSDKNativePlatform" Condition="'$(WindowsAppSDKSelfContained)' == 'true'">
+    <PropertyGroup>
+      <NotificationResourceDll>Microsoft.WindowsAppRuntime.Insights.Resource.dll</NotificationResourceDll>
+    </PropertyGroup>
+    <Unzip SourceFiles="$(PkgMicrosoft_WindowsAppSDK_Runtime)\tools\MSIX\win10-$(NativePlatform)\Microsoft.WindowsAppRuntime.2.msix"
+           DestinationFolder="$(IntermediateOutputPath)NotificationRuntime" Include="$(NotificationResourceDll)" />
+    <ItemGroup>
+      <Content Include="$(IntermediateOutputPath)NotificationRuntime\$(NotificationResourceDll)"
+               Link="$(NotificationResourceDll)" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
   <!-- WindowsAppSDK self-contained payload includes WinUI MUI files for every supported language. -->
   <Target Name="ExcludeWinUIMuiFilesFromWindowsAppSDKPayload"
           BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents"

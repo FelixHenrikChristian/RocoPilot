@@ -713,7 +713,7 @@
                         ViewChanging="CardScrollViewer_ViewChanging"
                         VerticalScrollMode="Auto">
                         <ItemsControl
-                            Margin="0,0,10,0"
+                            Margin="0,0,10,40"
                             ItemTemplate="{StaticResource ShinyCountRowTemplate}"
                             ItemsSource="{x:Bind ViewModel.Overview.SelectedShinyCounts, Mode=OneWay}" />
                     </ScrollViewer>
@@ -831,7 +831,7 @@
                                     ViewChanging="CardScrollViewer_ViewChanging"
                                     VerticalScrollMode="Auto">
                                     <ItemsControl
-                                        Margin="0,0,10,0"
+                                        Margin="0,0,10,40"
                                         ItemTemplate="{StaticResource PollutionCountRowTemplate}"
                                         ItemsSource="{Binding PollutionCounts}" />
                                 </ScrollViewer>

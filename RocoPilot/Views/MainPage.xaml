@@ -276,13 +276,31 @@
                                 Text="在信息遮罩窗口中显示最近捕捉列表和奇遇次数。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch
+                        <ToggleButton
                             Grid.Column="2"
-                            MinWidth="0"
                             VerticalAlignment="Center"
-                            IsOn="{x:Bind ViewModel.IsInfoOverlayEncounterPanelEnabled, Mode=TwoWay}"
-                            OffContent=""
-                            OnContent="" />
+                            AutomationProperties.Name="奇遇计数面板可见"
+                            IsChecked="{x:Bind ViewModel.IsInfoOverlayEncounterPanelEnabled, Mode=TwoWay}"
+                            ToolTipService.ToolTip="{x:Bind GetEncounterPanelAction(ViewModel.IsInfoOverlayEncounterPanelEnabled), Mode=OneWay}">
+                            <ToggleButton.Resources>
+                                <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="ToggleButtonBackground" />
+                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="ToggleButtonBackgroundPointerOver" />
+                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="ToggleButtonBackgroundPressed" />
+                                <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="ToggleButtonForeground" />
+                                <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="ToggleButtonForegroundPointerOver" />
+                                <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="ToggleButtonForegroundPressed" />
+                                <StaticResource x:Key="ToggleButtonBorderBrushChecked" ResourceKey="ToggleButtonBorderBrush" />
+                                <StaticResource x:Key="ToggleButtonBorderBrushCheckedPointerOver" ResourceKey="ToggleButtonBorderBrushPointerOver" />
+                                <StaticResource x:Key="ToggleButtonBorderBrushCheckedPressed" ResourceKey="ToggleButtonBorderBrushPressed" />
+                            </ToggleButton.Resources>
+                            <Grid Width="16" Height="16">
+                                <FontIcon x:Name="EncounterPanelEye" FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                          FontSize="16" Glyph="&#xE890;" />
+                                <Line x:Name="HiddenPanelSlash" x:Load="{x:Bind !ViewModel.IsInfoOverlayEncounterPanelEnabled, Mode=OneWay}"
+                                      X1="1" Y1="1" X2="15" Y2="15" StrokeThickness="1.5"
+                                      Stroke="{Binding Foreground, ElementName=EncounterPanelEye}" />
+                            </Grid>
+                        </ToggleButton>
                     </Grid>
 
                     <Border

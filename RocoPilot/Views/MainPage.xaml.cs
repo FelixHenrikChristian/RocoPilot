@@ -26,6 +26,8 @@ public sealed partial class MainPage : Page
         InitializeComponent();
     }
 
+    private string GetEncounterPanelAction(bool isVisible) => isVisible ? "隐藏奇遇计数面板" : "显示奇遇计数面板";
+
     private string GetLockGlyph(bool isLocked) => isLocked ? "\uE72E" : "\uE785";
 
     private string GetLockAction(bool isLocked) => isLocked ? "解锁位置" : "锁定位置";

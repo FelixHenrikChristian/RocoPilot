@@ -132,12 +132,12 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
         Func<string, BitmapImage?>? shinyAvatarResolver = null)
     {
         var seasonId = SelectedSeason?.Id;
-        var shinySeasonId = Seasons.Count == 0 ? seasonConfig.CurrentSeasonId : SelectedShinyScopeSeasonId;
         var accounts = StatisticsProjection.BuildAccounts(document);
         var account = document.Accounts.FirstOrDefault(item =>
             string.Equals(item.Uid, selectedUid, StringComparison.OrdinalIgnoreCase)) ?? document.Accounts.FirstOrDefault();
         shinyAvatarResolver ??= avatarResolver;
         var seasons = StatisticsProjection.BuildSeasons(account, seasonConfig, avatarResolver, shinyAvatarResolver);
+        var shinySeasonId = Seasons.Count == 0 ? seasons.FirstOrDefault()?.Id : SelectedShinyScopeSeasonId;
         var scopes = StatisticsProjection.BuildShinyScopes(seasons);
         var shinyCounts = StatisticsProjection.BuildAllShinyCounts(account, shinyAvatarResolver);
         var pendingCaptures = StatisticsProjection.BuildPendingShinyCaptures(account, shinyAvatarResolver);

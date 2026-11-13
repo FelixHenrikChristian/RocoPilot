@@ -512,6 +512,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
             if (!_isSettingsLoaded)
             {
                 var savedSettings = await _localSettingsService.ReadSettingAsync<StatisticsSyncSettings>(SettingsKeys.StatisticsSyncSettings);
+                _shutdown.Token.ThrowIfCancellationRequested();
                 cancellationToken.ThrowIfCancellationRequested();
                 _settings = NormalizeSettings(savedSettings ?? CreateDefaultSettings());
                 _isSettingsLoaded = true;

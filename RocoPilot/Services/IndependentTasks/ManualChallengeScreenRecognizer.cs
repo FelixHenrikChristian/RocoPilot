@@ -14,7 +14,7 @@ using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, CaptureBallMissing, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark }
+internal enum ManualChallengeScene { Unknown, World, Manual, ChallengePage, FlowerList, Map, Interaction, Confirmation, Preparation, Battle, MedalConfirmation, Capture, CaptureBallMissing, Result, LegendaryList, LegendaryConfirmation, UnderfilledTeam, InsufficientContractMark, CaptureConfirmation, LegendaryRewards, SkippableAnimation, MissingLegendaryMark, RewardSettlement }
 internal sealed record LegendaryCaptureMarks(bool LegendarySelected,
     ImageMatchResult ContractButton, ImageMatchResult LegendaryButton);
 internal sealed record ManualChallengeRow(string Name, ImageMatchResult Button, string RawName = "")
@@ -53,7 +53,9 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         ["legendary-confirm"] = (.5, .75, .65, .9, RecognitionAnchor.Center),
         ["legendary-cancel"] = (.35, .75, .49, .9, RecognitionAnchor.Center),
         ["legendary-result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
-        ["legendary-result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter)
+        ["legendary-result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter),
+        // 单排奖励比双排少一行，居中排列使标题向下移动约 70 像素。
+        ["rewards"] = (.108, .395, .204, .515, RecognitionAnchor.Auto)
     };
 
     internal async Task<ManualChallengeScreen> ReadAsync(CapturedFrame frame, int clientX, int clientY,
@@ -243,6 +245,9 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             var battle = await images.MatchAsync(frame, region, "2048x1152/" + template + ".png", options, cancellationToken);
             if (battle.IsMatch) return new(ManualChallengeScene.Battle, [], battle, BattleScreen: screen);
         }
+        // 奖励弹窗放在正向匹配之后兜底，避免雪地等低纹理画面误判。
+        if (!legendary && await Button("rewards") is { } rewardHeader)
+            return new(ManualChallengeScene.RewardSettlement, [], rewardHeader);
         return new(ManualChallengeScene.Unknown, []);
 
         Task<ImageMatchResult?> Button(string template)
@@ -318,6 +323,11 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             clientX, clientY, width, height, token,
             scene is ManualChallengeScene.FlowerList or ManualChallengeScene.LegendaryList ? rowY : null);
     }
+
+    /// <summary>识别获得奖励弹窗标题。</summary>
+    internal Task<ImageMatchResult?> FindRewardsHeaderAsync(CapturedFrame frame, int clientX, int clientY,
+        int width, int height, CancellationToken token)
+        => MatchButtonAsync(frame, "rewards", clientX, clientY, width, height, token);
 
     private async Task<ImageMatchResult?> ReadLegendaryTabAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken token)
@@ -419,7 +429,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var scale = Math.Min(width / 2048d, height / 1152d);
         var result = await images.MatchAsync(frame, area,
             TemplatePath(template),
-            new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
+            new ImageMatchOptions { MinimumScore = template == "rewards" ? .98 : .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
         return result.IsMatch ? result : null;
     }
 

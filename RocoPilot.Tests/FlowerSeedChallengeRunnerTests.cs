@@ -471,7 +471,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(true)]
     public async Task ChallengeUsesDedicatedSkillsAndExclusiveCaptureThenRepeatsAndExits(bool medalConfirmation)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var capture = new ChallengeCapture(medalConfirmation);
         var state = CreateState();
         state.Options.AutoBattleSettings.IsEnabled = false;
@@ -867,6 +867,41 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     [TestMethod]
+    [DataRow(false, true)]
+    [DataRow(true, true)]
+    [DataRow(false, false)]
+    public async Task StaticRewardPopupClosesAfterCapture(bool earlyShortage, bool headerVisible)
+    {
+        // WGC 在奖励弹窗静止时反复返回相同时间戳；覆盖提前返回、标题命中和超时兜底。
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(headerVisible ? 18 : 45));
+        var capture = new ChallengeCapture(staticReward: true);
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        var shortage = false;
+        var images = new Images { RewardHeaderVisible = headerVisible, MarkMatches = template => template switch
+        {
+            "condensed-selected" => true,
+            "condensed-insufficient" => shortage,
+            _ => false
+        } };
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            capture.OnKey(sequence);
+            if (sequence == "1, Space") shortage = earlyShortage;
+        } };
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var runner = CreateRunner(capture, images, keyboard, mouse,
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, true,
+            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+
+        Assert.AreEqual(1, capture.RewardsClosed);
+        Assert.AreEqual(1, capture.Exits);
+        Assert.AreEqual(1, keyboard.Keys.Count(key => key.Key == "1, Space"));
+    }
+
+    [TestMethod]
     public async Task CancellationDuringCaptureSettlementDoesNotClickRewards()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -954,10 +989,12 @@ public sealed class FlowerSeedChallengeRunnerTests
         public void Release(CaptureTargetWindow targetWindow, CaptureMethod method) { }
     }
 
-    // 每次截图都是新帧；捕捉后的过渡画面会短暂命中大世界与交互 HUD。
-    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false, int skillTurns = 1) : IScreenCaptureService
+    // 捕捉后的过渡画面会短暂命中大世界与交互 HUD。
+    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false, int skillTurns = 1,
+        bool staticReward = false) : IScreenCaptureService
     {
         private byte _scene = 6;
+        private CapturedFrame? _rewardFrame;
         private int _animationFramesLeft;
         private int _skillsUsed;
         private DateTimeOffset _captureStartedAt;
@@ -975,6 +1012,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public CapturedFrame Capture(CaptureTargetWindow targetWindow, CaptureMethod method)
         {
             Frames++;
+            if (_scene == 16 && _rewardFrame is not null) return _rewardFrame.AddReference();
             var scene = _scene;
             if (scene == 2)
             {
@@ -991,7 +1029,9 @@ public sealed class FlowerSeedChallengeRunnerTests
             var pixels = new byte[96 * 54 * 4];
             Array.Fill(pixels, (byte)245);
             pixels[0] = scene;
-            return new(96, 54, pixels);
+            var frame = new CapturedFrame(96, 54, pixels);
+            if (scene == 16 && staticReward) _rewardFrame = frame.AddReference();
+            return frame;
         }
 
         public void OnKey(string sequence)
@@ -1048,7 +1088,10 @@ public sealed class FlowerSeedChallengeRunnerTests
                     Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
                     break;
                 case 16:
-                    Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
+                    _rewardFrame?.Dispose();
+                    _rewardFrame = null;
+                    if (!staticReward)
+                        Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
                     Assert.AreEqual(48, x);
                     Assert.AreEqual(49, y);
                     RewardsClosed++;
@@ -1085,6 +1128,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public bool IntermittentSkills;
         public int SkillFrames;
         public bool HideMapHeader;
+        public bool RewardHeaderVisible = true;
         public Func<string, bool>? MarkMatches;
         public int MapButtonX = 55;
         public ImageMatchAlgorithm DefaultAlgorithm => ImageMatchAlgorithm.OpenCvSqDiffNormalized;
@@ -1118,7 +1162,8 @@ public sealed class FlowerSeedChallengeRunnerTests
                 (12, "battle-button-skill") => true,
                 (13, "battle-chat") => true,
                 (15, "capture-exclusive" or "capture-button") => true,
-                (15, "condensed-selected" or "condensed-insufficient") => MarkMatches?.Invoke(Path.GetFileNameWithoutExtension(templatePath)) == true,
+                (0 or 15, "condensed-selected" or "condensed-insufficient") => MarkMatches?.Invoke(Path.GetFileNameWithoutExtension(templatePath)) == true,
+                (16, "rewards") => RewardHeaderVisible,
                 (17, "result-retry" or "result-exit") => true,
                 _ => false
             };

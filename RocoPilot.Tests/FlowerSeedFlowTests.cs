@@ -495,6 +495,25 @@ public sealed class FlowerSeedFlowTests
         Assert.AreEqual(0, flow.CompletedCount);
     }
 
+    [TestMethod]
+    public void RewardSettlementPopupIsClickedDuringCaptureSettlement()
+    {
+        var flow = ReadyChallenge(1);
+        StartBattle(flow);
+        Assert.AreEqual(ManualChallengeAction.Capture, flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152).Action);
+        // 捕捉结算弹窗：识别器合成的固定点击位置。
+        var click = Button with { TemplatePath = "2048x1152/flower-seed/rewards.png" };
+        var decision = flow.Next(new(ManualChallengeScene.RewardSettlement, [], click), 1152);
+        Assert.AreEqual(ManualChallengeAction.Click, decision.Action);
+        Assert.AreSame(click, decision.Button);
+        // 弹窗关闭后结果页仍正常计数退出。
+        flow.Next(new(ManualChallengeScene.Result, [], Button, ExitButton: Button), 1152);
+        Assert.AreEqual(1, flow.CompletedCount);
+        // 导航阶段不响应奖励弹窗。
+        Assert.AreEqual(ManualChallengeAction.None,
+            new ManualChallengeFlow(null).Next(new(ManualChallengeScene.RewardSettlement, [], Button), 1152).Action);
+    }
+
     private static ManualChallengeFlow ReadyChallenge(int runCount = 6, bool startPreparation = true)
     {
         var flow = new ManualChallengeFlow(new FlowerSeedOption(1, "友爱星飞"), runCount);

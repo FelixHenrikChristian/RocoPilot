@@ -564,7 +564,10 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("flower-seed-rewards-single-row.png", 1280, 720)]
     [DataRow("flower-seed-rewards-single-row.png", 1600, 900)]
     [DataRow("flower-seed-rewards-single-row.png", 2048, 1152)]
-    public async Task RewardLayoutsDoNotRequireOcrAtDifferentResolutions(string fixture, int width, int height)
+    [DataRow("flower-seed-rewards-event.png", 1280, 720)]
+    [DataRow("flower-seed-rewards-event.png", 1600, 900)]
+    [DataRow("flower-seed-rewards-event.png", 1920, 1080)]
+    public async Task RewardSettlementIsRecognizedWithoutOcrAtDifferentResolutions(string fixture, int width, int height)
     {
         var ocr = new NameOcr();
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70));
@@ -574,9 +577,24 @@ public sealed class FlowerSeedScreenRecognizerTests
         var screen = await recognizer.ReadAsync(frame, 12, 30, width, height, CancellationToken.None,
             (region, text) => previews.Add((region, text)));
 
-        Assert.AreEqual(ManualChallengeScene.Unknown, screen.Scene);
+        Assert.AreEqual(ManualChallengeScene.RewardSettlement, screen.Scene, fixture);
         Assert.HasCount(0, ocr.Calls);
         Assert.HasCount(0, previews);
+        // 弹窗无可见按钮：点击目标固定在客户区底部中央。
+        Assert.AreEqual(12 + (int)Math.Round(width * .5), screen.Button!.X);
+        Assert.AreEqual(30 + (int)Math.Round(height * .9), screen.Button.Y);
+
+        // 标题在时复查返回固定点击位置；标题被抹掉后不再返回。
+        var recheck = await recognizer.FindClickTargetAsync(frame, screen.Scene, screen.Button.TemplatePath, 0,
+            12, 30, width, height, CancellationToken.None);
+        Assert.IsNotNull(recheck);
+        Assert.AreEqual((screen.Button.X, screen.Button.Y), (recheck.X, recheck.Y));
+        var header = await recognizer.FindRewardsHeaderAsync(frame, 12, 30, width, height, CancellationToken.None);
+        Assert.IsNotNull(header);
+        for (var y = header.Y; y < header.Y + header.Height; y++)
+            Array.Clear(frame.Pixels, (y * frame.Width + header.X) * 4, header.Width * 4);
+        Assert.IsNull(await recognizer.FindClickTargetAsync(frame, screen.Scene, screen.Button.TemplatePath, 0,
+            12, 30, width, height, CancellationToken.None));
     }
 
     [TestMethod]

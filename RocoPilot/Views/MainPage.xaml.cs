@@ -28,6 +28,9 @@ public sealed partial class MainPage : Page
 
     private string GetEncounterPanelAction(bool isVisible) => isVisible ? "隐藏奇遇计数面板" : "显示奇遇计数面板";
 
+    // x:Load 不能用 ! 取反的 x:Bind 表达式（XamlCompiler 解析报 token recognition error），改由方法返回。
+    private bool IsEncounterPanelHidden(bool isVisible) => !isVisible;
+
     private string GetLockGlyph(bool isLocked) => isLocked ? "\uE72E" : "\uE785";
 
     private string GetLockAction(bool isLocked) => isLocked ? "解锁位置" : "锁定位置";

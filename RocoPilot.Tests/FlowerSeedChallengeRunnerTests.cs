@@ -867,6 +867,38 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     [TestMethod]
+    public async Task RewardPopupAfterShortageEarlyReturnIsClosedByMainLoop()
+    {
+        // 演出横幅误判印记不足提前返回后，弹窗由主循环关闭。
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var capture = new ChallengeCapture(instantRewardClick: true);
+        var state = CreateState();
+        state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
+        var shortage = false;
+        var images = new Images { MarkMatches = template => template switch
+        {
+            "condensed-selected" => true,
+            "condensed-insufficient" => shortage,
+            _ => false
+        } };
+        var keyboard = new Keyboard { DuringSequence = sequence =>
+        {
+            capture.OnKey(sequence);
+            if (sequence == "1, Space") shortage = true;
+        } };
+        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var runner = CreateRunner(capture, images, keyboard, mouse,
+            ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
+
+        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, true,
+            state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
+
+        Assert.AreEqual(1, capture.RewardsClosed);
+        Assert.AreEqual(1, capture.Exits);
+        Assert.AreEqual(1, keyboard.Keys.Count(key => key.Key == "1, Space"));
+    }
+
+    [TestMethod]
     public async Task CancellationDuringCaptureSettlementDoesNotClickRewards()
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
@@ -955,7 +987,9 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     // 每次截图都是新帧；捕捉后的过渡画面会短暂命中大世界与交互 HUD。
-    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false, int skillTurns = 1) : IScreenCaptureService
+    // instantRewardClick：结算弹窗点击不要求距捕捉 3 秒（用于复现印记提示误判提前返回后由主循环关弹窗）。
+    private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false, int skillTurns = 1,
+        bool instantRewardClick = false) : IScreenCaptureService
     {
         private byte _scene = 6;
         private int _animationFramesLeft;
@@ -1048,7 +1082,8 @@ public sealed class FlowerSeedChallengeRunnerTests
                     Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
                     break;
                 case 16:
-                    Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
+                    if (!instantRewardClick)
+                        Assert.IsTrue(DateTimeOffset.UtcNow - _captureStartedAt >= TimeSpan.FromSeconds(3));
                     Assert.AreEqual(48, x);
                     Assert.AreEqual(49, y);
                     RewardsClosed++;
@@ -1118,7 +1153,8 @@ public sealed class FlowerSeedChallengeRunnerTests
                 (12, "battle-button-skill") => true,
                 (13, "battle-chat") => true,
                 (15, "capture-exclusive" or "capture-button") => true,
-                (15, "condensed-selected" or "condensed-insufficient") => MarkMatches?.Invoke(Path.GetFileNameWithoutExtension(templatePath)) == true,
+                (15 or 16, "condensed-selected" or "condensed-insufficient") => MarkMatches?.Invoke(Path.GetFileNameWithoutExtension(templatePath)) == true,
+                (16, "rewards") => true,
                 (17, "result-retry" or "result-exit") => true,
                 _ => false
             };

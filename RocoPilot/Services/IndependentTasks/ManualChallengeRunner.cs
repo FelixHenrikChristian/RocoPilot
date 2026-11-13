@@ -522,11 +522,13 @@ public sealed class ManualChallengeRunner(
             Publish(lastProgress with { Operation = "等待捕捉结算", IsBattleWaiting = false });
             var watchForShortage = preferCondensedMark && !legendary && !useContractMark;
             if (!watchForShortage) await Task.Delay(3000, token);
-            // 奖励页并入捕捉动作；固定点击推进，用结果页按钮确认整段结算完成。
-            var timer = Stopwatch.StartNew();
+            // 结算演出可达 15 秒：不传 10 秒计时，由外层 90 秒兜底；
+            // 印记不足提示只在捕捉后立刻出现，限定 3 秒窗口避免演出横幅误判提前返回。
+            var shortageWindow = Stopwatch.StartNew();
+            var total = Stopwatch.StartNew();
             while (true)
             {
-                using var next = await CaptureNextFrameAsync(timer, "关闭捕捉奖励");
+                using var next = await CaptureNextFrameAsync(null, "关闭捕捉奖励");
                 _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(next, window,
                     out var x, out var y, out var width, out var height);
                 if (await recognizer.ReadResultAsync(next, x, y, width, height, token, legendary) is not null)
@@ -535,7 +537,7 @@ public sealed class ManualChallengeRunner(
                     lastAdvance = DateTimeOffset.UtcNow;
                     return;
                 }
-                if (watchForShortage)
+                if (watchForShortage && shortageWindow.Elapsed < TimeSpan.FromSeconds(3))
                 {
                     var mark = await recognizer.ReadCondensedMarkAsync(next, x, y, width, height, token);
                     if (mark.Insufficient)
@@ -544,20 +546,22 @@ public sealed class ManualChallengeRunner(
                         pendingFrame = next.AddReference();
                         return;
                     }
-                    if (timer.Elapsed < TimeSpan.FromSeconds(3))
-                    {
-                        await Task.Delay(180, token);
-                        continue;
-                    }
+                    await Task.Delay(180, token);
+                    continue;
                 }
-                if (keyboard.IsWindowForeground(window.Hwnd))
+                // 识别到弹窗才点击；25 秒后固定点击兜底。
+                var rewards = await recognizer.FindRewardsHeaderAsync(next, x, y, width, height, token);
+                if (rewards is not null || total.Elapsed >= TimeSpan.FromSeconds(25))
                 {
-                    Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
-                    var nativeWidth = window.ClientWidth > 0 ? window.ClientWidth : width;
-                    var nativeHeight = window.ClientHeight > 0 ? window.ClientHeight : height;
-                    await mouse.ClickAsync(window.Hwnd, (int)Math.Round(nativeWidth * .5),
-                        (int)Math.Round(nativeHeight * .9), inputMethod, token);
-                    minimumFrameAt = DateTimeOffset.UtcNow;
+                    if (keyboard.IsWindowForeground(window.Hwnd))
+                    {
+                        Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
+                        var nativeWidth = window.ClientWidth > 0 ? window.ClientWidth : width;
+                        var nativeHeight = window.ClientHeight > 0 ? window.ClientHeight : height;
+                        await mouse.ClickAsync(window.Hwnd, (int)Math.Round(nativeWidth * .5),
+                            (int)Math.Round(nativeHeight * .9), inputMethod, token);
+                        minimumFrameAt = DateTimeOffset.UtcNow;
+                    }
                 }
                 await Task.Delay(700, token);
             }
@@ -698,6 +702,7 @@ public sealed class ManualChallengeRunner(
         ManualChallengeScene.MissingLegendaryMark => "缺少专属印记提示",
         ManualChallengeScene.CaptureConfirmation => "选择捕捉印记",
         ManualChallengeScene.LegendaryRewards => "印记奖励",
+        ManualChallengeScene.RewardSettlement => "获得奖励",
         ManualChallengeScene.Confirmation => "确认花种挑战",
         ManualChallengeScene.Preparation => "挑战准备",
         ManualChallengeScene.MedalConfirmation => "确认奖牌提示",
@@ -738,6 +743,7 @@ public sealed class ManualChallengeRunner(
             ManualChallengeScene.Preparation => "点击开始",
             ManualChallengeScene.MedalConfirmation => "确认奖牌提示，点击开始",
             ManualChallengeScene.Result => "选择再次挑战或退出",
+            ManualChallengeScene.RewardSettlement => "点击关闭获得奖励",
             _ => "点击匹配按钮"
         },
         _ => "等待界面就绪"

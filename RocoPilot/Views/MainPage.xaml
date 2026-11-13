@@ -296,7 +296,7 @@
                             <Grid Width="16" Height="16">
                                 <FontIcon x:Name="EncounterPanelEye" FontFamily="{StaticResource SymbolThemeFontFamily}"
                                           FontSize="16" Glyph="&#xE890;" />
-                                <Line x:Name="HiddenPanelSlash" x:Load="{x:Bind !ViewModel.IsInfoOverlayEncounterPanelEnabled, Mode=OneWay}"
+                                <Line x:Name="HiddenPanelSlash" x:Load="{x:Bind IsEncounterPanelHidden(ViewModel.IsInfoOverlayEncounterPanelEnabled), Mode=OneWay}"
                                       X1="1" Y1="1" X2="15" Y2="15" StrokeThickness="1.5"
                                       Stroke="{Binding Foreground, ElementName=EncounterPanelEye}" />
                             </Grid>

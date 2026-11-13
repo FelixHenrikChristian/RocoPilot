@@ -21,6 +21,11 @@ public interface IRuntimeTaskService
         get;
     }
 
+    bool InfoOverlayEncounterPanelEnabled
+    {
+        get;
+    }
+
     AutoBattleSettings AutoBattleSettings
     {
         get;
@@ -39,6 +44,8 @@ public interface IRuntimeTaskService
     void SetInfoOverlayEnabled(bool isEnabled);
 
     void SetInfoOverlayLocked(bool isLocked);
+
+    void SetInfoOverlayEncounterPanelEnabled(bool isEnabled);
 
     void SetAutoBattleSettings(AutoBattleSettings settings);
 

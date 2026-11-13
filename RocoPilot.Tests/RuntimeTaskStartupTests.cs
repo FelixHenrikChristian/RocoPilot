@@ -30,6 +30,31 @@ namespace RocoPilot.Tests;
 public sealed class RuntimeTaskStartupTests
 {
     [TestMethod]
+    public async Task EncounterPanelPreferenceSurvivesRestartAndCanChangeWhileRunning()
+    {
+        var settings = new ControlledSettingsStore();
+        using (var first = new StartupFixture(settings: settings))
+        {
+            await first.Runtime.LoadSettingsAsync();
+            Assert.IsTrue(first.Runtime.InfoOverlayEncounterPanelEnabled);
+            first.Runtime.SetInfoOverlayEncounterPanelEnabled(false);
+        }
+
+        using var restarted = new StartupFixture(settings: settings);
+        Assert.IsTrue((await restarted.Runtime.StartAsync(Options(enabled: false))).Success);
+        try
+        {
+            Assert.IsFalse(restarted.Runtime.InfoOverlayEncounterPanelEnabled);
+            Assert.IsFalse(restarted.Runtime.CurrentState!.Options.InfoOverlayEncounterPanelEnabled);
+            restarted.Runtime.SetInfoOverlayEncounterPanelEnabled(true);
+            Assert.AreEqual(true, restarted.Overlay.EncounterPanelVisible);
+            Assert.IsTrue(restarted.Runtime.CurrentState.Options.InfoOverlayEncounterPanelEnabled);
+            Assert.AreEqual(true, settings.ReadSaved<bool?>(SettingsKeys.InfoOverlayEncounterPanelEnabled));
+        }
+        finally { await restarted.Runtime.StopAsync(); }
+    }
+
+    [TestMethod]
     public async Task ScreenshotHotkeySavesClientAreaWithoutStartingRealtimeTask()
     {
         using var fixture = new StartupFixture();
@@ -580,9 +605,9 @@ public sealed class RuntimeTaskStartupTests
         public AppNotificationStub Notifications { get; } = new();
         public AutoBattleController Battle => (AutoBattleController)GetField("_battle")!;
 
-        public StartupFixture(bool sceneRecognition = false, bool battleRecognition = false, RocoPilot.Contracts.Services.Encounters.IEncounterSeasonConfigService? seasonConfig = null)
+        public StartupFixture(bool sceneRecognition = false, bool battleRecognition = false, RocoPilot.Contracts.Services.Encounters.IEncounterSeasonConfigService? seasonConfig = null, ControlledSettingsStore? settings = null)
         {
-            var settings = new ControlledSettingsStore();
+            settings ??= new ControlledSettingsStore();
             Statistics = new(settings, NullLogger<StatisticsService>.Instance, seasonConfig);
             Uid = new(Detection, Statistics, Notice, NullLogger<StatisticsUidCoordinatorService>.Instance);
             Matching = new(sceneRecognition);
@@ -824,6 +849,8 @@ public sealed class RuntimeTaskStartupTests
         public void Hide() { }
         public void ResetPosition() { }
         public void SetLocked(bool isLocked) { }
+        public bool? EncounterPanelVisible { get; private set; }
+        public void SetEncounterPanelVisible(bool isVisible) => EncounterPanelVisible = isVisible;
         public void UpdateTaskIndicators(bool isEncounterStatisticsEnabled, bool isAutoBattleEnabled) { }
         public void UpdateSnapshot(InfoOverlaySnapshot snapshot) => Snapshot = snapshot;
         public void ShowOcrResult(string regionId, string text) { }

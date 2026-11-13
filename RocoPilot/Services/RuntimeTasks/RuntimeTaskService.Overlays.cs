@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 
+using RocoPilot.Configuration;
+
 namespace RocoPilot.Services;
 
 public sealed partial class RuntimeTaskService
@@ -85,6 +87,35 @@ public sealed partial class RuntimeTaskService
         if (changed)
         {
             NotifySettingsChanged();
+        }
+    }
+
+    public bool InfoOverlayEncounterPanelEnabled => _infoOverlayEncounterPanelEnabled;
+
+    public void SetInfoOverlayEncounterPanelEnabled(bool isEnabled)
+    {
+        if (_infoOverlayEncounterPanelEnabled == isEnabled) return;
+        _infoOverlayEncounterPanelEnabled = isEnabled;
+        if (CurrentState is { } state)
+        {
+            state.Options.InfoOverlayEncounterPanelEnabled = isEnabled;
+        }
+
+        _infoOverlayService.SetEncounterPanelVisible(isEnabled);
+        _logger.LogInformation("奇遇计数面板{State}", isEnabled ? "已开启" : "已关闭");
+        _ = SaveInfoOverlayEncounterPanelEnabledAsync(isEnabled);
+        NotifySettingsChanged();
+    }
+
+    private async Task SaveInfoOverlayEncounterPanelEnabledAsync(bool isEnabled)
+    {
+        try
+        {
+            await _localSettingsService.SaveSettingAsync(SettingsKeys.InfoOverlayEncounterPanelEnabled, isEnabled);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "保存奇遇计数面板开关状态失败。");
         }
     }
 

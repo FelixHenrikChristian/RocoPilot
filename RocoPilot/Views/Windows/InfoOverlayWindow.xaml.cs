@@ -55,6 +55,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private bool _isClosed;
     private bool _isDragging;
     private bool _isOverlayVisible;
+    private bool _isEncounterPanelVisible = true;
 
     public InfoOverlayWindow(
         CaptureTargetWindow targetWindow,
@@ -125,6 +126,13 @@ public sealed partial class InfoOverlayWindow : WindowEx
         }
 
         ApplyLockState(show: _isOverlayVisible);
+        UpdateOverlayState(forceMove: true);
+    }
+
+    public void SetEncounterPanelVisible(bool isVisible)
+    {
+        if (_isClosed || _isIsland || _isEncounterPanelVisible == isVisible) return;
+        _isEncounterPanelVisible = isVisible;
         UpdateOverlayState(forceMove: true);
     }
 
@@ -207,6 +215,8 @@ public sealed partial class InfoOverlayWindow : WindowEx
     private bool UpdateOverlayState(bool forceMove = false)
     {
         if (_isClosed
+            // 奇遇计数面板关闭后，记录窗口无任何内容，整窗隐藏。
+            || (!_isIsland && !_isEncounterPanelVisible)
             || !TransparentOverlayWindowHelper.ShouldShowOverlay(_targetWindow.Hwnd, _targetWindow.ProcessId, _isOverlayVisible)
             || !TransparentOverlayWindowHelper.TryGetClientScreenBounds(_targetWindow.Hwnd, out var clientBounds)
             || clientBounds.Width <= 0

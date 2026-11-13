@@ -32,6 +32,12 @@ public sealed class RuntimeTaskStartOptions
         set;
     }
 
+    public bool InfoOverlayEncounterPanelEnabled
+    {
+        get;
+        internal set;
+    } = true;
+
     public bool EncounterStatisticsEnabled
     {
         get;

@@ -68,6 +68,9 @@ public partial class MainViewModel : ObservableRecipient
     public partial bool IsInfoOverlayLocked { get; set; }
 
     [ObservableProperty]
+    public partial bool IsInfoOverlayEncounterPanelEnabled { get; set; }
+
+    [ObservableProperty]
     public partial bool IsLaunchNotificationOpen { get; set; }
 
     [ObservableProperty]
@@ -107,6 +110,7 @@ public partial class MainViewModel : ObservableRecipient
         LaunchNotificationMessage = string.Empty;
         SelectedCaptureMethod = CaptureMethods[0];
         SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
+        IsInfoOverlayEncounterPanelEnabled = _runtimeTaskService.InfoOverlayEncounterPanelEnabled;
         IsRealtimeCaptureRunning = _runtimeTaskService.IsRunning;
         if (_runtimeTaskService.CurrentState is { } currentState)
         {
@@ -218,6 +222,14 @@ public partial class MainViewModel : ObservableRecipient
         }
     }
 
+    partial void OnIsInfoOverlayEncounterPanelEnabledChanged(bool value)
+    {
+        if (!_isApplyingRuntimeTaskSettings)
+        {
+            _runtimeTaskService.SetInfoOverlayEncounterPanelEnabled(value);
+        }
+    }
+
     partial void OnSelectedKeyboardInputMethodChanged(KeyboardInputMethodOption? value)
     {
         if (_isApplyingRuntimeTaskSettings || value is null)
@@ -247,6 +259,7 @@ public partial class MainViewModel : ObservableRecipient
         try
         {
             SelectedKeyboardInputMethod = FindKeyboardInputMethod(_runtimeTaskService.AutoBattleSettings.KeyboardInputMethod);
+            IsInfoOverlayEncounterPanelEnabled = _runtimeTaskService.InfoOverlayEncounterPanelEnabled;
             if (_runtimeTaskService.CurrentState is { } state)
             {
                 IsMaskOverlayEnabled = state.Options.RecognitionOverlayEnabled;

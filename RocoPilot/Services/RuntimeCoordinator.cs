@@ -20,6 +20,7 @@ public sealed class RuntimeCoordinator(
     public bool IsRunning => runtime.IsRunning;
     public RuntimeTaskState? CurrentState => runtime.CurrentState;
     public bool EncounterStatisticsEnabled => runtime.EncounterStatisticsEnabled;
+    public bool InfoOverlayEncounterPanelEnabled => runtime.InfoOverlayEncounterPanelEnabled;
     public AutoBattleSettings AutoBattleSettings => runtime.AutoBattleSettings;
 
     public async Task<RuntimeTaskStartResult> StartAsync(RuntimeTaskStartOptions options, CancellationToken cancellationToken = default)
@@ -70,5 +71,6 @@ public sealed class RuntimeCoordinator(
     public void SetRecognitionOverlayEnabled(bool isEnabled) => runtime.SetRecognitionOverlayEnabled(isEnabled);
     public void SetInfoOverlayEnabled(bool isEnabled) => runtime.SetInfoOverlayEnabled(isEnabled);
     public void SetInfoOverlayLocked(bool isLocked) => runtime.SetInfoOverlayLocked(isLocked);
+    public void SetInfoOverlayEncounterPanelEnabled(bool isEnabled) => runtime.SetInfoOverlayEncounterPanelEnabled(isEnabled);
     public void SetAutoBattleSettings(AutoBattleSettings settings) => runtime.SetAutoBattleSettings(settings);
 }

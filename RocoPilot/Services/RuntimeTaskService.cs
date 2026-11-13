@@ -47,6 +47,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private RuntimeSession? _session;
     private int _queuedAutoBattleSkillFailureTipRecognition;
     private bool _settingsLoaded;
+    private bool _infoOverlayEncounterPanelEnabled = true;
     private volatile GameScene _scene;
     private DateTimeOffset? _unrecognizedStateDetectedAt;
     private volatile bool _isSuspended;
@@ -161,6 +162,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             var savedEncounterStatisticsEnabled =
                 await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.EncounterStatisticsEnabled);
             _encounterStatisticsEnabled = savedEncounterStatisticsEnabled ?? true;
+
+            var savedInfoOverlayEncounterPanelEnabled =
+                await _localSettingsService.ReadSettingAsync<bool?>(SettingsKeys.InfoOverlayEncounterPanelEnabled);
+            _infoOverlayEncounterPanelEnabled = savedInfoOverlayEncounterPanelEnabled ?? true;
 
             var savedAutoBattleSettings =
                 await _localSettingsService.ReadSettingAsync<AutoBattleSettings>(SettingsKeys.AutoBattleSettings);
@@ -301,6 +306,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             if (!_frameRecognizer.TemplateExists(markerTemplate))
                 _logger.LogWarning("缺少捕捉按钮模板，本次会话无法识别奇遇效果解除：{Template}", markerTemplate);
 
+            options.InfoOverlayEncounterPanelEnabled = InfoOverlayEncounterPanelEnabled;
             var state = new RuntimeTaskState(
                 targetWindow,
                 recognitionRegionConfig,

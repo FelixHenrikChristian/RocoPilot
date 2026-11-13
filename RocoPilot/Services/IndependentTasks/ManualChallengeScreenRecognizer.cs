@@ -54,8 +54,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         ["legendary-cancel"] = (.35, .75, .49, .9, RecognitionAnchor.Center),
         ["legendary-result-retry"] = (.49, .88, .65, .98, RecognitionAnchor.BottomCenter),
         ["legendary-result-exit"] = (.35, .88, .49, .98, RecognitionAnchor.BottomCenter),
-        // 获得奖励弹窗标题（礼盒图标+文字）位于弹窗左侧中部，捕捉结算专属。
-        ["rewards"] = (.09, .385, .23, .455, RecognitionAnchor.Auto)
+        // 单排奖励比双排少一行，居中排列使标题向下移动约 70 像素。
+        ["rewards"] = (.108, .395, .204, .515, RecognitionAnchor.Auto)
     };
 
     internal async Task<ManualChallengeScreen> ReadAsync(CapturedFrame frame, int clientX, int clientY,
@@ -246,8 +246,8 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             if (battle.IsMatch) return new(ManualChallengeScene.Battle, [], battle, BattleScreen: screen);
         }
         // 奖励弹窗放在正向匹配之后兜底，避免雪地等低纹理画面误判。
-        if (!legendary && await Button("rewards") is not null)
-            return new(ManualChallengeScene.RewardSettlement, [], RewardsClickPoint(clientX, clientY, width, height));
+        if (!legendary && await Button("rewards") is { } rewardHeader)
+            return new(ManualChallengeScene.RewardSettlement, [], rewardHeader);
         return new(ManualChallengeScene.Unknown, []);
 
         Task<ImageMatchResult?> Button(string template)
@@ -304,11 +304,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
                 ?? await MatchButtonAsync(frame, "flower-tab-inactive", clientX, clientY, width, height, token);
             return tab is not null && !IsTabSelected(frame, tab) ? tab : null;
         }
-        if (scene == ManualChallengeScene.RewardSettlement)
-        {
-            return await FindRewardsHeaderAsync(frame, clientX, clientY, width, height, token) is not null
-                ? RewardsClickPoint(clientX, clientY, width, height) : null;
-        }
         var template = Path.GetFileNameWithoutExtension(templatePath);
         if (templatePath.Replace('\\', '/').Contains("/legendary/")) template = "legendary-" + template;
         if (scene == ManualChallengeScene.UnderfilledTeam)
@@ -333,12 +328,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
     internal Task<ImageMatchResult?> FindRewardsHeaderAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken token)
         => MatchButtonAsync(frame, "rewards", clientX, clientY, width, height, token);
-
-    // 弹窗无按钮，点击底部中央（客户区 50%/90%）即可关闭。
-    private static ImageMatchResult RewardsClickPoint(int clientX, int clientY, int width, int height)
-        => new(true, 1, clientX + (int)Math.Round(width * .5) - 1, clientY + (int)Math.Round(height * .9) - 1,
-            2, 2, TemplatePath("rewards"));
-    
 
     private async Task<ImageMatchResult?> ReadLegendaryTabAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken token)
@@ -440,7 +429,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         var scale = Math.Min(width / 2048d, height / 1152d);
         var result = await images.MatchAsync(frame, area,
             TemplatePath(template),
-            new ImageMatchOptions { MinimumScore = .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
+            new ImageMatchOptions { MinimumScore = template == "rewards" ? .98 : .94, TemplateScaleX = scale, TemplateScaleY = scale }, token);
         return result.IsMatch ? result : null;
     }
 

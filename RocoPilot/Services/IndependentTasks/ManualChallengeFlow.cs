@@ -181,7 +181,7 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 return new(ManualChallengeAction.ScrollBalls);
             case ManualChallengeScene.RewardSettlement when _challengePhase == ChallengePhase.Settlement:
                 return Click(screen.Button);
-        case ManualChallengeScene.Result when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement or ChallengePhase.Result:
+            case ManualChallengeScene.Result when _challengePhase is ChallengePhase.Battle or ChallengePhase.Settlement or ChallengePhase.Result:
                 if (_challengePhase != ChallengePhase.Result)
                 {
                     if (!_captureSeen) return default;

@@ -469,7 +469,8 @@ public sealed class ManualChallengeRunner(
             overlay.Hide();
         }
 
-        async Task<CapturedFrame> CaptureNextFrameAsync(Stopwatch? actionTimer = null, string? actionDescription = null)
+        async Task<CapturedFrame> CaptureNextFrameAsync(Stopwatch? actionTimer = null, string? actionDescription = null,
+            bool allowRepeatedFrame = false)
         {
             while (true)
             {
@@ -505,7 +506,7 @@ public sealed class ManualChallengeRunner(
                     await Task.Delay(200, token);
                     continue;
                 }
-                if (frame.CapturedAt <= lastFrameTime || frame.CapturedAt < minimumFrameAt)
+                if ((!allowRepeatedFrame && frame.CapturedAt <= lastFrameTime) || frame.CapturedAt < minimumFrameAt)
                 {
                     frame.Dispose();
                     await Task.Delay(120, token);
@@ -521,14 +522,12 @@ public sealed class ManualChallengeRunner(
             minimumFrameAt = DateTimeOffset.UtcNow;
             Publish(lastProgress with { Operation = "等待捕捉结算", IsBattleWaiting = false });
             var watchForShortage = preferCondensedMark && !legendary && !useContractMark;
+            var elapsed = Stopwatch.StartNew();
             if (!watchForShortage) await Task.Delay(3000, token);
-            // 结算演出可达 15 秒：不传 10 秒计时，由外层 90 秒兜底；
-            // 印记不足提示只在捕捉后立刻出现，限定 3 秒窗口避免演出横幅误判提前返回。
-            var shortageWindow = Stopwatch.StartNew();
-            var total = Stopwatch.StartNew();
             while (true)
             {
-                using var next = await CaptureNextFrameAsync(null, "关闭捕捉奖励");
+                // 静止弹窗可能只有一帧。允许复用本次输入之后的画面，才能按时执行兜底。
+                using var next = await CaptureNextFrameAsync(allowRepeatedFrame: true);
                 _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(next, window,
                     out var x, out var y, out var width, out var height);
                 if (await recognizer.ReadResultAsync(next, x, y, width, height, token, legendary) is not null)
@@ -537,7 +536,17 @@ public sealed class ManualChallengeRunner(
                     lastAdvance = DateTimeOffset.UtcNow;
                     return;
                 }
-                if (watchForShortage && shortageWindow.Elapsed < TimeSpan.FromSeconds(3))
+                var rewards = !legendary && await recognizer.FindRewardsHeaderAsync(next, x, y, width, height, token) is not null;
+                if (rewards || legendary || elapsed.Elapsed >= TimeSpan.FromSeconds(30))
+                {
+                    if (keyboard.IsWindowForeground(window.Hwnd))
+                    {
+                        Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
+                        await ClickCaptureRewardsAsync(width, height);
+                        minimumFrameAt = DateTimeOffset.UtcNow;
+                    }
+                }
+                else if (watchForShortage && elapsed.Elapsed < TimeSpan.FromSeconds(3))
                 {
                     var mark = await recognizer.ReadCondensedMarkAsync(next, x, y, width, height, token);
                     if (mark.Insufficient)
@@ -549,22 +558,16 @@ public sealed class ManualChallengeRunner(
                     await Task.Delay(180, token);
                     continue;
                 }
-                // 识别到弹窗才点击；25 秒后固定点击兜底。
-                var rewards = await recognizer.FindRewardsHeaderAsync(next, x, y, width, height, token);
-                if (rewards is not null || total.Elapsed >= TimeSpan.FromSeconds(25))
-                {
-                    if (keyboard.IsWindowForeground(window.Hwnd))
-                    {
-                        Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
-                        var nativeWidth = window.ClientWidth > 0 ? window.ClientWidth : width;
-                        var nativeHeight = window.ClientHeight > 0 ? window.ClientHeight : height;
-                        await mouse.ClickAsync(window.Hwnd, (int)Math.Round(nativeWidth * .5),
-                            (int)Math.Round(nativeHeight * .9), inputMethod, token);
-                        minimumFrameAt = DateTimeOffset.UtcNow;
-                    }
-                }
                 await Task.Delay(700, token);
             }
+        }
+
+        async Task ClickCaptureRewardsAsync(int width, int height)
+        {
+            var nativeWidth = window.ClientWidth > 0 ? window.ClientWidth : width;
+            var nativeHeight = window.ClientHeight > 0 ? window.ClientHeight : height;
+            await mouse.ClickAsync(window.Hwnd, (int)Math.Round(nativeWidth * .5),
+                (int)Math.Round(nativeHeight * .9), inputMethod, token);
         }
 
         async Task SwitchPetAsync(BattleScreen phase)
@@ -633,14 +636,14 @@ public sealed class ManualChallengeRunner(
                     if (action == ManualChallengeAction.OpenManual)
                     {
                         await SendKey("F3", settings.KeyboardHoldDurationMs);
-                        minimumFrameAt = DateTimeOffset.UtcNow;
-                        attempts++;
                     }
                     else if (action == ManualChallengeAction.Escape)
                     {
                         await SendKey("Esc", settings.KeyboardHoldDurationMs);
-                        minimumFrameAt = DateTimeOffset.UtcNow;
-                        attempts++;
+                    }
+                    else if (scene == ManualChallengeScene.RewardSettlement)
+                    {
+                        await ClickCaptureRewardsAsync(width, height);
                     }
                     else
                     {
@@ -649,11 +652,11 @@ public sealed class ManualChallengeRunner(
                         var x = (int)Math.Round((button.X + button.Width / 2d - clientX) * nativeWidth / width);
                         var y = (int)Math.Round((button.Y + button.Height / 2d - clientY) * nativeHeight / height);
                         await mouse.ClickAsync(window.Hwnd, x, y, inputMethod, token);
-                        minimumFrameAt = DateTimeOffset.UtcNow;
-                        attempts++;
                         logger.LogDebug("挑战点击：{Operation}，第 {Attempt} 次，模板 {Template}，得分 {Score:F3}，客户区坐标 ({X},{Y})",
-                            operation, attempts, button.TemplatePath, button.Score, x, y);
+                            operation, attempts + 1, button.TemplatePath, button.Score, x, y);
                     }
+                    minimumFrameAt = DateTimeOffset.UtcNow;
+                    attempts++;
                 }
                 await Task.Delay(700, token);
                 using var next = await CaptureNextFrameAsync(timer, $"{operation}（{initial.TemplatePath}，已输入 {attempts} 次）");

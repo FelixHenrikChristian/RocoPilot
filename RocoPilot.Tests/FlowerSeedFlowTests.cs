@@ -501,7 +501,7 @@ public sealed class FlowerSeedFlowTests
         var flow = ReadyChallenge(1);
         StartBattle(flow);
         Assert.AreEqual(ManualChallengeAction.Capture, flow.Next(new(ManualChallengeScene.Capture, [], Button), 1152).Action);
-        // 捕捉结算弹窗：识别器合成的固定点击位置。
+        // 捕捉结算弹窗：标题匹配作为关闭弹窗的依据。
         var click = Button with { TemplatePath = "2048x1152/flower-seed/rewards.png" };
         var decision = flow.Next(new(ManualChallengeScene.RewardSettlement, [], click), 1152);
         Assert.AreEqual(ManualChallengeAction.Click, decision.Action);

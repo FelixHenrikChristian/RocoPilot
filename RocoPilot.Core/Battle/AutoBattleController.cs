@@ -30,6 +30,7 @@ public sealed record AutoBattlePlan(
 public sealed class AutoBattleController
 {
     private static readonly TimeSpan BloodlineWaitTimeout = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan EnemyNameWaitTimeout = TimeSpan.FromSeconds(4);
     private readonly object _gate = new();
     private long _battleId;
     private long _nextTurnId;
@@ -42,6 +43,8 @@ public sealed class AutoBattleController
     private EncounterBloodlineKind _bloodline = EncounterBloodlineKind.Unrecognized;
     private DateTimeOffset? _bloodlineWaitStartedAt;
     private (EncounterBloodlineKind Kind, bool Capture)? _captureDecision;
+    private string? _enemyName;
+    private DateTimeOffset? _enemyNameWaitStartedAt;
 
     public long BattleId { get { lock (_gate) return _battleId; } }
     public int RoundIndex { get { lock (_gate) return _roundIndex; } }
@@ -183,6 +186,18 @@ public sealed class AutoBattleController
         }
     }
 
+    /// <summary>奇遇解除后识别到的敌方精灵图鉴名（上层已做图鉴匹配）。重复注入返回 false。</summary>
+    public bool ObserveEnemyName(long battleId, string name)
+    {
+        lock (_gate)
+        {
+            if (battleId != _battleId || _enemyName is not null || string.IsNullOrWhiteSpace(name)) return false;
+            _enemyName = name;
+            _enemyNameWaitStartedAt = null;
+            return true;
+        }
+    }
+
     public void ResetEncounterRelief()
     {
         lock (_gate)
@@ -191,6 +206,8 @@ public sealed class AutoBattleController
             _bloodline = EncounterBloodlineKind.Unrecognized;
             _bloodlineWaitStartedAt = null;
             _captureDecision = null;
+            _enemyName = null;
+            _enemyNameWaitStartedAt = null;
         }
     }
 
@@ -238,6 +255,30 @@ public sealed class AutoBattleController
     private AutoBattlePlan PlanCapture(AutoBattleSettings settings, AutoBattleReleaseStep step, bool available, DateTimeOffset now)
     {
         var filter = settings.BloodlineCaptureFilter;
+        var policy = settings.EncounterCapturePolicy;
+        // 名单优先于血脉筛选；识别失败默认捕捉。
+        if (policy.IsEnabled)
+        {
+            if (_enemyName is null)
+            {
+                _enemyNameWaitStartedAt ??= now;
+                if (now - _enemyNameWaitStartedAt.Value < EnemyNameWaitTimeout)
+                    return new(AutoBattleAction.None, "", "等待识别敌方精灵名", "-");
+            }
+            var rule = _enemyName is null ? null : policy.FindRule(_enemyName);
+            if (rule is { Action: EncounterCaptureRuleAction.Defeat })
+                return PlanSkill(settings, step) with { Description = $"精灵名单：{_enemyName} 直接击败，释放战技" };
+            if (rule is not null)
+                return new(AutoBattleAction.Capture, "W, 1, Space",
+                    $"奇遇解除后捕捉（{_enemyName}）W, 1, Space", "W, 1, Space");
+            if (_enemyName is null)
+                return new(AutoBattleAction.Capture, "W, 1, Space", "奇遇解除后捕捉（精灵名未识别）W, 1, Space", "W, 1, Space");
+            if (policy.OnlyListedSpirits)
+                return PlanSkill(settings, step)
+                    with { Description = $"精灵名单：{_enemyName} 不在捕捉名单，释放战技" };
+            // 名单外且未开白名单模式：继续走下方血脉筛选。
+        }
+
         if (!filter.IsEnabled)
             return new(AutoBattleAction.Capture, "W, 1, Space", "奇遇解除后捕捉 W, 1, Space", "W, 1, Space");
 

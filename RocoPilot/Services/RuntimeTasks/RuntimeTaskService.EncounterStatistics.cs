@@ -161,6 +161,7 @@ public sealed partial class RuntimeTaskService
             : Task.CompletedTask;
         await Task.WhenAll(shinyTipTask, previewTask, bloodlineTipTask);
         if (battleId != _battle.BattleId) return;
+        await TryObserveEnemyNameForCapturePolicyAsync(state, frame, battleId, cancellationToken);
         await TryRecordEncounterAfterRelievedAsync(
             state,
             frame,
@@ -169,6 +170,36 @@ public sealed partial class RuntimeTaskService
             cancellationToken);
         await TryCompletePendingShinyNameAsync(state, frame, battleId, cancellationToken);
         await UpdateRuntimeSpiritNameAsync(state, frame, battleId, cancellationToken);
+    }
+
+    /// <summary>名单启用且奇遇已解除时，OCR 敌方精灵名注入战斗状态；识别失败交给控制器超时兜底。</summary>
+    private async Task TryObserveEnemyNameForCapturePolicyAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        long battleId,
+        CancellationToken cancellationToken)
+    {
+        if (!_autoBattleSettings.EncounterCapturePolicy.IsEnabled
+            || _autoBattleSettings.EncounterRelievedAction != Core.Battle.AutoBattleEncounterRelievedAction.Capture
+            || !_battle.IsEncounterRelieved
+            || DateTimeOffset.Now - _enemyNameOcrAt < TimeSpan.FromMilliseconds(800))
+        {
+            return;
+        }
+        _enemyNameOcrAt = DateTimeOffset.Now;
+        var enemyNameText = await _frameRecognizer.RecognizeRegionTextAsync(
+            state,
+            frame,
+            BattleEnemyNameRegionIds,
+            cancellationToken);
+        if (battleId != _battle.BattleId) return;
+        var enemyName = await MatchRecognizedSpiritNameAsync(enemyNameText, cancellationToken);
+        if (battleId != _battle.BattleId) return;
+        if (enemyName.Length > 0 && _battle.ObserveEnemyName(battleId, enemyName))
+        {
+            _logger.LogInformation("自动战斗：奇遇解除后识别敌方精灵：{SpiritName}（OCR：{Raw}）",
+                enemyName, LoggingHelper.FormatLogText(enemyNameText));
+        }
     }
 
     private async Task RecognizeAndApplyBloodlineTipAsync(

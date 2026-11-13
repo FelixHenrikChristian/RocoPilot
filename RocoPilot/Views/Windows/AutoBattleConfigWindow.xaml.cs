@@ -54,7 +54,8 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
             [AutoBattleConfigSection.FlowerSeed] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.FlowerSeed),
             [AutoBattleConfigSection.Legendary] = new AutoBattleReleaseConfigPage(_editor, this, AutoBattleConfigSection.Legendary),
             [AutoBattleConfigSection.SharedSequences] = new AutoBattleSharedSequencesPage(_editor),
-            [AutoBattleConfigSection.BloodlineCapture] = new AutoBattleBloodlineCaptureConfigPage(_editor)
+            [AutoBattleConfigSection.BloodlineCapture] = new AutoBattleBloodlineCaptureConfigPage(_editor),
+            [AutoBattleConfigSection.SpiritCapturePolicy] = new AutoBattleSpiritCaptureConfigPage(_editor)
         };
     }
 
@@ -95,6 +96,7 @@ public sealed partial class AutoBattleConfigWindow : WindowEx
             AutoBattleConfigSection.Legendary => LegendaryBattleNavigationItem,
             AutoBattleConfigSection.SharedSequences => SharedSequencesNavigationItem,
             AutoBattleConfigSection.BloodlineCapture => BloodlineCaptureNavigationItem,
+            AutoBattleConfigSection.SpiritCapturePolicy => SpiritCapturePolicyNavigationItem,
             _ => NormalBattleNavigationItem
         };
     }

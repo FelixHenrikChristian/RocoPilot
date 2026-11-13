@@ -16,6 +16,7 @@ public sealed partial class RuntimeTaskService
     private AutoBattleSettings _autoBattleSettings = AutoBattleSettings.CreateDefault();
     private readonly AutoBattleController _battle = new();
     private bool _hasQueuedAutoBattleSkillFailureTipRecognitionForCurrentAction;
+    private DateTimeOffset _enemyNameOcrAt = DateTimeOffset.MinValue;
 
     public AutoBattleSettings AutoBattleSettings => _autoBattleSettings.Clone();
 
@@ -83,12 +84,15 @@ public sealed partial class RuntimeTaskService
             if (plan.Action == AutoBattleAction.None)
             {
                 RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"wait:{turn.Id}",
-                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "识别精灵血脉", string.Empty, now, completed: true));
+                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "识别精灵血脉或名单比对", string.Empty, now, completed: true));
                 return;
             }
             if (plan.ShouldSendKeys
                 && !await ExecuteBattleInputWithOverlayAsync(state, settings, plan, turn, cancellationToken)) return;
             if (!_battle.RecordAction(turn.Id, plan.Action, DateTimeOffset.Now)) return;
+            if (plan.Action == AutoBattleAction.Capture && turn.Action != plan.Action)
+                _logger.LogInformation("自动战斗：第 {Turn} 回合，捕捉，已发送 {Sequence}（{Description}）",
+                    turn.Number, plan.Sequence, plan.Description);
             if (!plan.ShouldSendKeys)
                 RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"manual:{turn.Id}",
                     RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "等待手动操作", string.Empty, now, completed: true));

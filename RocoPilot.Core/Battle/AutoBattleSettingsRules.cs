@@ -145,7 +145,27 @@ public static class AutoBattleSettingsRules
         normalized.BloodlineCaptureFilter =
             (normalized.BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault())
             .Clone();
+        normalized.EncounterCapturePolicy = NormalizeEncounterCapturePolicy(
+            normalized.EncounterCapturePolicy ?? EncounterCapturePolicySettings.CreateDefault());
 
+        return normalized;
+    }
+
+    private static EncounterCapturePolicySettings NormalizeEncounterCapturePolicy(EncounterCapturePolicySettings policy)
+    {
+        var normalized = policy.Clone();
+        normalized.Rules =
+        [
+            .. normalized.Rules
+                .Select(rule =>
+                {
+                    var clone = rule.Clone();
+                    clone.SpiritName = clone.SpiritName?.Trim() ?? string.Empty;
+                    return clone;
+                })
+                .Where(rule => rule.SpiritName.Length > 0)
+                .DistinctBy(rule => rule.SpiritName, StringComparer.OrdinalIgnoreCase)
+        ];
         return normalized;
     }
 

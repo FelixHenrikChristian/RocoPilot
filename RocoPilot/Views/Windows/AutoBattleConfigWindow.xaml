@@ -55,6 +55,14 @@
                         <FontIcon Glyph="&#xE8D7;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem
+                    x:Name="SpiritCapturePolicyNavigationItem"
+                    Content="精灵捕捉名单"
+                    Tag="SpiritCapturePolicy">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE716;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItemHeader Content="战斗类型" />
                 <NavigationViewItem
                     x:Name="NormalBattleNavigationItem"

@@ -158,6 +158,13 @@ public sealed class AutoBattleSettings
         set;
     } = BloodlineCaptureFilterSettings.CreateDefault();
 
+    /// <summary>奇遇解除捕捉的精灵名单（见 EncounterCapturePolicySettings）。</summary>
+    public EncounterCapturePolicySettings EncounterCapturePolicy
+    {
+        get;
+        set;
+    } = EncounterCapturePolicySettings.CreateDefault();
+
     public static AutoBattleSettings CreateDefault()
     {
         return new AutoBattleSettings
@@ -180,7 +187,8 @@ public sealed class AutoBattleSettings
             KeyboardHoldDurationMs = DefaultKeyboardHoldDurationMs,
             KeyboardIntervalMs = DefaultKeyboardIntervalMs,
             CaptureKeyboardIntervalMs = DefaultCaptureKeyboardIntervalMs,
-            BloodlineCaptureFilter = BloodlineCaptureFilterSettings.CreateDefault()
+            BloodlineCaptureFilter = BloodlineCaptureFilterSettings.CreateDefault(),
+            EncounterCapturePolicy = EncounterCapturePolicySettings.CreateDefault()
         };
     }
 
@@ -221,7 +229,8 @@ public sealed class AutoBattleSettings
             KeyboardHoldDurationMs = KeyboardHoldDurationMs,
             KeyboardIntervalMs = KeyboardIntervalMs,
             CaptureKeyboardIntervalMs = CaptureKeyboardIntervalMs,
-            BloodlineCaptureFilter = (BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone()
+            BloodlineCaptureFilter = (BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone(),
+            EncounterCapturePolicy = (EncounterCapturePolicy ?? EncounterCapturePolicySettings.CreateDefault()).Clone()
         };
     }
 
@@ -268,6 +277,86 @@ public enum AutoBattleEncounterRelievedAction
     RecoverEnergy = 1,
     ReleaseSkill = 2,
     Capture = 3
+}
+
+/// <summary>
+/// 奇遇解除捕捉的精灵名单：白名单（捕捉）/黑名单（击败）。
+/// 仅在 EncounterRelievedAction 为 Capture 时生效；异色由全局异色保护暂停。
+/// </summary>
+public sealed class EncounterCapturePolicySettings
+{
+    public bool IsEnabled
+    {
+        get;
+        set;
+    }
+
+    /// <summary>仅捕捉白名单内精灵：名单外的精灵不捕捉，继续释放战技。</summary>
+    public bool OnlyListedSpirits
+    {
+        get;
+        set;
+    } = true;
+
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<EncounterCaptureRuleSettings> Rules
+    {
+        get;
+        set;
+    } = [];
+
+    public static EncounterCapturePolicySettings CreateDefault()
+    {
+        return new EncounterCapturePolicySettings();
+    }
+
+    public EncounterCapturePolicySettings Clone()
+    {
+        return new EncounterCapturePolicySettings
+        {
+            IsEnabled = IsEnabled,
+            OnlyListedSpirits = OnlyListedSpirits,
+            Rules = Rules.OfType<EncounterCaptureRuleSettings>().Select(rule => rule.Clone()).ToList()
+        };
+    }
+
+    /// <summary>按图鉴名查找规则。</summary>
+    public EncounterCaptureRuleSettings FindRule(string spiritName)
+    {
+        return Rules.FirstOrDefault(rule => string.Equals(rule.SpiritName?.Trim(), spiritName?.Trim(),
+            StringComparison.OrdinalIgnoreCase));
+    }
+}
+
+public sealed class EncounterCaptureRuleSettings
+{
+    /// <summary>精灵图鉴名。</summary>
+    public string SpiritName
+    {
+        get;
+        set;
+    } = string.Empty;
+
+    public EncounterCaptureRuleAction Action
+    {
+        get;
+        set;
+    } = EncounterCaptureRuleAction.Capture;
+
+    public EncounterCaptureRuleSettings Clone()
+    {
+        return new EncounterCaptureRuleSettings
+        {
+            SpiritName = SpiritName,
+            Action = Action
+        };
+    }
+}
+
+public enum EncounterCaptureRuleAction
+{
+    Capture = 0,
+    Defeat = 1
 }
 
 /// <summary>

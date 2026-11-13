@@ -196,6 +196,113 @@ public sealed class AutoBattleControllerTests
         Assert.IsFalse(battle.ShouldRecoverAfterSkillFailure(settings, Now.AddSeconds(10)));
     }
 
+    [TestMethod]
+    public void SpiritCaptureListWaitsForEnemyNameThenCapturesOnlyListedSpirits()
+    {
+        var settings = Settings();
+        settings.EncounterCapturePolicy.IsEnabled = true;
+        settings.EncounterCapturePolicy.OnlyListedSpirits = true;
+        settings.EncounterCapturePolicy.Rules.Add(new EncounterCaptureRuleSettings { SpiritName = "吸泥鸥" });
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        // 敌名未识别：先等待，超时后默认捕捉。
+        Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
+        var unrecognized = battle.PlanSkillSelection(settings, true, Now.AddSeconds(4));
+        Assert.AreEqual(AutoBattleAction.Capture, unrecognized.Action);
+        Assert.IsTrue(unrecognized.Description.Contains("未识别", StringComparison.Ordinal));
+        // 名单内精灵：捕捉。
+        battle.ObserveEnemyName(battle.BattleId, "吸泥鸥");
+        var capture = battle.PlanSkillSelection(settings, true, Now.AddSeconds(5));
+        Assert.AreEqual(AutoBattleAction.Capture, capture.Action);
+        Assert.IsTrue(capture.Description.Contains("吸泥鸥", StringComparison.Ordinal));
+        // 名单外精灵：不捕捉。
+        var other = new AutoBattleController();
+        other.BeginSkillSelection(settings, Now);
+        other.ObserveEncounterRelieved(settings);
+        other.ObserveEnemyName(other.BattleId, "恶魔狼");
+        var defeat = other.PlanSkillSelection(settings, true, Now.AddSeconds(1));
+        Assert.AreEqual(AutoBattleAction.Skill, defeat.Action);
+        Assert.IsTrue(defeat.Description.Contains("不在捕捉名单", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void DefeatRuleBeatsWhitelistModeAndBlocksCapture()
+    {
+        // 黑名单（击败）在白名单模式下同样生效：即使精灵在白名单中也不重复配置，
+        // 黑名单命中即击败；白名单外的仍不捕捉。
+        var settings = Settings();
+        settings.EncounterCapturePolicy.IsEnabled = true;
+        settings.EncounterCapturePolicy.OnlyListedSpirits = true;
+        settings.EncounterCapturePolicy.Rules.Add(new EncounterCaptureRuleSettings { SpiritName = "吸泥鸥" });
+        settings.EncounterCapturePolicy.Rules.Add(new EncounterCaptureRuleSettings
+        {
+            SpiritName = "花影羚羊",
+            Action = EncounterCaptureRuleAction.Defeat
+        });
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        battle.ObserveEnemyName(battle.BattleId, "花影羚羊");
+        var defeat = battle.PlanSkillSelection(settings, true, Now);
+        Assert.AreEqual(AutoBattleAction.Skill, defeat.Action);
+        Assert.IsTrue(defeat.Description.Contains("直接击败", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void SpiritCaptureListWithoutWhitelistFallsBackToBloodlineFilter()
+    {
+        var settings = Settings();
+        settings.EncounterCapturePolicy.IsEnabled = true;
+        settings.EncounterCapturePolicy.OnlyListedSpirits = false;
+        settings.EncounterCapturePolicy.Rules.Add(new EncounterCaptureRuleSettings { SpiritName = "吸泥鸥" });
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        battle.ObserveEnemyName(battle.BattleId, "恶魔狼");
+        // 名单外且未开白名单：按血脉筛选（赛季无血脉识别时立即捕捉）。
+        Assert.AreEqual(AutoBattleAction.Capture, battle.PlanSkillSelection(settings, false, Now).Action);
+    }
+
+    [TestMethod]
+    public void DefeatRuleReleasesSkillInsteadOfCapturing()
+    {
+        var settings = Settings();
+        settings.EncounterCapturePolicy.IsEnabled = true;
+        settings.EncounterCapturePolicy.OnlyListedSpirits = false;
+        settings.EncounterCapturePolicy.Rules.Add(new EncounterCaptureRuleSettings
+        {
+            SpiritName = "恶魔狼",
+            Action = EncounterCaptureRuleAction.Defeat
+        });
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        battle.ObserveEnemyName(battle.BattleId, "恶魔狼");
+        var plan = battle.PlanSkillSelection(settings, true, Now);
+        Assert.AreEqual(AutoBattleAction.Skill, plan.Action);
+        Assert.IsTrue(plan.Description.Contains("直接击败", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void EnemyNameOnlyAppliesToCurrentBattleAfterReliefReset()
+    {
+        var settings = Settings();
+        settings.EncounterCapturePolicy.IsEnabled = true;
+        settings.EncounterCapturePolicy.OnlyListedSpirits = true;
+        settings.EncounterCapturePolicy.Rules.Add(new EncounterCaptureRuleSettings { SpiritName = "吸泥鸥" });
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        battle.ObserveEnemyName(battle.BattleId, "吸泥鸥");
+        Assert.AreEqual(AutoBattleAction.Capture, battle.PlanSkillSelection(settings, true, Now).Action);
+        battle.ResetBattle();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        // 新战斗未识别敌名：回到等待。
+        Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
+    }
+
     private static AutoBattleSettings Settings() => AutoBattleSettingsRules.Normalize(new AutoBattleSettings
     {
         IsEnabled = true,

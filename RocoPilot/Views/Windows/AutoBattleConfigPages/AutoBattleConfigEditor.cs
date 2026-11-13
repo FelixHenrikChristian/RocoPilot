@@ -5,8 +5,10 @@ using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Spirits;
 using RocoPilot.Models.Runtime;
 
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
@@ -16,6 +18,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private const string SkillPlaceholder = "{skill}";
 
     private readonly IKeyboardInputService _keyboardInputService;
+    private readonly ISpiritCatalogService _spiritCatalogService;
     private readonly HashSet<AutoBattlePresetEditorItem> _observedPresets = [];
 
     internal IKeyboardInputService KeyboardInputService => _keyboardInputService;
@@ -38,6 +41,139 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private bool _captureBloodlineWuRan = true;
     private bool _captureBloodlineNormal;
     private bool _captureBloodlineUnrecognized = true;
+    private bool _capturePolicyEnabled;
+    private bool _captureOnlyListedSpirits = true;
+
+    /// <summary>奇遇捕捉名单（白名单/黑名单）。</summary>
+    public ObservableCollection<EncounterCaptureRuleEditorItem> CaptureRuleItems
+    {
+        get;
+    } = [];
+
+    public bool CapturePolicyEnabled
+    {
+        get => _capturePolicyEnabled;
+        set
+        {
+            if (SetProperty(ref _capturePolicyEnabled, value))
+            {
+                OnPropertyChanged(nameof(CapturePolicyOptionsEnabled));
+                OnPropertyChanged(nameof(CapturePolicySummary));
+            }
+        }
+    }
+
+    public bool CaptureOnlyListedSpirits
+    {
+        get => _captureOnlyListedSpirits;
+        set
+        {
+            if (SetProperty(ref _captureOnlyListedSpirits, value))
+            {
+                OnPropertyChanged(nameof(CapturePolicySummary));
+            }
+        }
+    }
+
+    public bool CapturePolicyOptionsEnabled => CapturePolicyEnabled;
+
+    public string CapturePolicySummary
+    {
+        get
+        {
+            if (!CapturePolicyEnabled)
+            {
+                return "已关闭：奇遇解除捕捉不按精灵名单筛选";
+            }
+
+            var captures = CaptureRuleItems.Count(item => !item.IsDefeat);
+            var defeats = CaptureRuleItems.Count(item => item.IsDefeat);
+            var capturePart = CaptureOnlyListedSpirits
+                ? $"仅捕捉白名单 {captures} 个精灵"
+                : $"白名单 {captures} 个精灵优先捕捉";
+            return defeats > 0
+                ? $"{capturePart}，黑名单 {defeats} 个直接击败，其余{(CaptureOnlyListedSpirits ? "不捕捉" : "按血脉筛选")}"
+                : $"{capturePart}，其余{(CaptureOnlyListedSpirits ? "不捕捉" : "按血脉筛选")}";
+        }
+    }
+
+    /// <summary>添加名单条目；重名时不重复添加。返回是否添加成功。</summary>
+    public bool AddCaptureRule(string spiritName, bool isDefeat = false)
+    {
+        var name = spiritName.Trim();
+        if (name.Length == 0) return false;
+        if (CaptureRuleItems.Any(item => string.Equals(item.SpiritName, name, StringComparison.OrdinalIgnoreCase))) return false;
+        var item = new EncounterCaptureRuleEditorItem
+        {
+            SpiritName = name,
+            IsDefeat = isDefeat
+        };
+        CaptureRuleItems.Add(item);
+        _ = LoadCaptureRuleAvatarsAsync([item]);
+        OnPropertyChanged(nameof(CapturePolicySummary));
+        return true;
+    }
+
+    public void RemoveCaptureRule(EncounterCaptureRuleEditorItem item)
+    {
+        if (CaptureRuleItems.Remove(item))
+        {
+            OnPropertyChanged(nameof(CapturePolicySummary));
+        }
+    }
+
+    /// <summary>搜索图鉴精灵名，供联想下拉使用。</summary>
+    public async Task<IReadOnlyList<SpiritSearchSuggestionItem>> SearchSpiritsAsync(
+        string text, CancellationToken cancellationToken = default)
+    {
+        if (_spiritCatalogService is null || string.IsNullOrWhiteSpace(text)) return [];
+        try
+        {
+            var keyword = text.Trim();
+            var document = await _spiritCatalogService.LoadAsync(cancellationToken);
+            return document.Spirits
+                .Where(item => !string.IsNullOrWhiteSpace(item.Name)
+                    && (item.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase)
+                        || (!string.IsNullOrWhiteSpace(item.BaseName)
+                            && item.BaseName.Contains(keyword, StringComparison.OrdinalIgnoreCase))))
+                .DistinctBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+                .Take(12)
+                .Select(item => new SpiritSearchSuggestionItem
+                {
+                    Name = item.Name,
+                    AvatarPath = _spiritCatalogService.ResolveAvatarPath(item.AvatarPath) ?? string.Empty
+                })
+                .ToList();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>异步解析名单条目的图鉴头像并回填。</summary>
+    private async Task LoadCaptureRuleAvatarsAsync(IReadOnlyList<EncounterCaptureRuleEditorItem> items)
+    {
+        if (_spiritCatalogService is null || items.Count == 0) return;
+        try
+        {
+            var document = await _spiritCatalogService.LoadAsync();
+            foreach (var item in items)
+            {
+                var match = document.Spirits.FirstOrDefault(candidate =>
+                        string.Equals(candidate.Name, item.SpiritName, StringComparison.OrdinalIgnoreCase))
+                    ?? document.Spirits.FirstOrDefault(candidate =>
+                        string.Equals(candidate.BaseName, item.SpiritName, StringComparison.OrdinalIgnoreCase));
+                item.AvatarPath = match is null
+                    ? string.Empty
+                    : _spiritCatalogService.ResolveAvatarPath(match.AvatarPath) ?? string.Empty;
+            }
+        }
+        catch
+        {
+            // 头像加载失败不影响名单编辑。
+        }
+    }
 
     public bool BloodlineCaptureFilterEnabled
     {
@@ -169,13 +305,17 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     public AutoBattleConfigEditor(
         AutoBattleSettings settings,
-        IKeyboardInputService keyboardInputService)
+        IKeyboardInputService keyboardInputService,
+        ISpiritCatalogService? spiritCatalogService = null)
     {
         _keyboardInputService = keyboardInputService;
+        _spiritCatalogService = spiritCatalogService ?? App.GetService<ISpiritCatalogService>();
 
         SharedPresetItems.CollectionChanged += SharedPresetItems_CollectionChanged;
 
         LoadSettings(AutoBattleSettingsRules.Normalize(settings));
+        // 头像异步填充，避免 UI 线程死锁。
+        _ = LoadCaptureRuleAvatarsAsync(CaptureRuleItems.ToArray());
     }
 
     public void AddSharedPreset()
@@ -324,6 +464,19 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
             CaptureNormal = CaptureBloodlineNormal,
             CaptureUnrecognized = CaptureBloodlineUnrecognized
         };
+        settings.EncounterCapturePolicy = new EncounterCapturePolicySettings
+        {
+            IsEnabled = CapturePolicyEnabled,
+            OnlyListedSpirits = CaptureOnlyListedSpirits,
+            Rules = CaptureRuleItems
+                .Where(item => !string.IsNullOrWhiteSpace(item.SpiritName))
+                .Select(item => new EncounterCaptureRuleSettings
+                {
+                    SpiritName = item.SpiritName.Trim(),
+                    Action = item.Action
+                })
+                .ToList()
+        };
         error = default;
         return true;
     }
@@ -364,6 +517,17 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         CaptureBloodlineWuRan = bloodlineFilter.CaptureWuRan;
         CaptureBloodlineNormal = bloodlineFilter.CaptureNormal;
         CaptureBloodlineUnrecognized = bloodlineFilter.CaptureUnrecognized;
+        var capturePolicy = settings.EncounterCapturePolicy ?? EncounterCapturePolicySettings.CreateDefault();
+        CapturePolicyEnabled = capturePolicy.IsEnabled;
+        CaptureOnlyListedSpirits = capturePolicy.OnlyListedSpirits;
+        foreach (var rule in capturePolicy.Rules)
+        {
+            CaptureRuleItems.Add(new EncounterCaptureRuleEditorItem
+            {
+                SpiritName = rule.SpiritName,
+                IsDefeat = rule.Action == EncounterCaptureRuleAction.Defeat
+            });
+        }
     }
 
     private static void LoadReleaseConfigs(
@@ -695,7 +859,83 @@ internal enum AutoBattleConfigSection
     FlowerSeed,
     Legendary,
     SharedSequences,
-    BloodlineCapture
+    BloodlineCapture,
+    SpiritCapturePolicy
+}
+
+/// <summary>奇遇捕捉名单条目的编辑草稿；动作区分白名单（捕捉）与黑名单（击败）。</summary>
+internal sealed class EncounterCaptureRuleEditorItem : ObservableObject
+{
+    private string _spiritName = string.Empty;
+    private bool _isDefeat;
+    private string _avatarPath = string.Empty;
+
+    public string SpiritName
+    {
+        get => _spiritName;
+        set => SetProperty(ref _spiritName, value);
+    }
+
+    /// <summary>true=黑名单（直接击败）；false=白名单（捕捉）。</summary>
+    public bool IsDefeat
+    {
+        get => _isDefeat;
+        set
+        {
+            if (SetProperty(ref _isDefeat, value))
+            {
+                OnPropertyChanged(nameof(ActionDisplay));
+            }
+        }
+    }
+
+    public EncounterCaptureRuleAction Action => IsDefeat ? EncounterCaptureRuleAction.Defeat : EncounterCaptureRuleAction.Capture;
+
+    public string ActionDisplay => IsDefeat ? "击败" : "捕捉";
+
+    /// <summary>图鉴头像本地路径。</summary>
+    public string AvatarPath
+    {
+        get => _avatarPath;
+        set
+        {
+            if (SetProperty(ref _avatarPath, value))
+            {
+                OnPropertyChanged(nameof(AvatarImage));
+            }
+        }
+    }
+
+    public BitmapImage? AvatarImage => CreateAvatarImage(AvatarPath);
+
+    private static BitmapImage? CreateAvatarImage(string? path)
+    {
+        return string.IsNullOrWhiteSpace(path) || !File.Exists(path)
+            ? null
+            : new BitmapImage(new Uri(path, UriKind.Absolute));
+    }
+}
+
+/// <summary>精灵搜索联想条目。</summary>
+internal sealed class SpiritSearchSuggestionItem
+{
+    public string Name
+    {
+        get;
+        init;
+    } = string.Empty;
+
+    public string AvatarPath
+    {
+        get;
+        init;
+    } = string.Empty;
+
+    public BitmapImage? AvatarImage => string.IsNullOrWhiteSpace(AvatarPath) || !File.Exists(AvatarPath)
+        ? null
+        : new BitmapImage(new Uri(AvatarPath, UriKind.Absolute));
+
+    public override string ToString() => Name;
 }
 
 internal readonly record struct AutoBattleConfigValidationError(

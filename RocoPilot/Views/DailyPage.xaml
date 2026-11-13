@@ -31,41 +31,47 @@
                     ToolTipService.ToolTip="恢复每日任务的默认顺序、开关和挑战配置" />
         </Grid>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl x:Name="TaskRows" ItemsSource="{x:Bind ViewModel.Items}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:DailyTaskItemViewModel">
-                        <Border Margin="0,0,0,5" Padding="6,0,10,0" MinHeight="48" CornerRadius="5"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                            <Grid ColumnSpacing="7" ToolTipService.ToolTip="{x:Bind Status, Mode=OneWay}">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="20" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <Border Background="Transparent" Tag="{x:Bind}" ManipulationMode="None"
-                                        PointerPressed="Handle_Pressed" PointerMoved="Handle_Moved"
-                                        PointerReleased="Handle_Released" PointerCaptureLost="Handle_CaptureLost"
-                                        ToolTipService.ToolTip="拖动排序">
-                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="⠿"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </Border>
-                                <TextBlock Grid.Column="1" Width="78" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" Text="{x:Bind Title}" />
-                                <ToggleSwitch Grid.Column="2" MinWidth="0" OnContent="" OffContent=""
-                                              VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Title}"
-                                              IsEnabled="{x:Bind CanToggle, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <ListView Grid.Row="1" ItemsSource="{x:Bind ViewModel.Items}"
+                  SelectionMode="None" IsItemClickEnabled="False"
+                  CanDragItems="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+                  CanReorderItems="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+                  AllowDrop="True">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="0,0,0,5" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:DailyTaskItemViewModel">
+                    <Border Padding="6,0,10,0" MinHeight="48" CornerRadius="{StaticResource ControlCornerRadius}"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <Grid ColumnSpacing="7" ToolTipService.ToolTip="{x:Bind Status, Mode=OneWay}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="20" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="⠿"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       ToolTipService.ToolTip="拖动排序" />
+                            <TextBlock Grid.Column="1" Width="78" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" Text="{x:Bind Title}" />
+                            <ToggleSwitch Grid.Column="2" MinWidth="0" OnContent="" OffContent=""
+                                          VerticalAlignment="Center" AutomationProperties.Name="{x:Bind Title}"
+                                          IsEnabled="{x:Bind CanToggle, Mode=OneWay}" IsOn="{x:Bind IsEnabled, Mode=TwoWay}" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
 
         <ScrollViewer Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="8">
                 <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.FlowerSeedTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
                     <TextBlock Margin="4,0,0,0" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="花种挑战" />
-                    <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid Padding="14,10" CornerRadius="{StaticResource ControlCornerRadius}" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="22" />
                             <ColumnDefinition Width="3*" />
@@ -80,7 +86,7 @@
                         <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsFlowerSeedConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" PlaceholderText="请先在任务页扫描" ItemsSource="{x:Bind Challenges.FlowerSeedOptions}"
                                     DisplayMemberPath="DisplayName" SelectedItem="{x:Bind ViewModel.SelectedFlowerSeed, Mode=TwoWay}" />
                     </Grid>
-                    <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid Padding="14,10" CornerRadius="{StaticResource ControlCornerRadius}" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="22" />
                             <ColumnDefinition Width="3*" />
@@ -97,7 +103,7 @@
                 </StackPanel>
                 <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.LegendaryTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
                     <TextBlock Margin="4,0,0,0" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="传说精灵挑战" />
-                    <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid Padding="14,10" CornerRadius="{StaticResource ControlCornerRadius}" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="22" />
                             <ColumnDefinition Width="3*" />
@@ -112,7 +118,7 @@
                         <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" PlaceholderText="请先在任务页扫描" ItemsSource="{x:Bind Challenges.LegendaryTargets}"
                                     SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
                     </Grid>
-                    <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid Padding="14,10" CornerRadius="{StaticResource ControlCornerRadius}" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="22" />
                             <ColumnDefinition Width="3*" />
@@ -126,7 +132,7 @@
                         </StackPanel>
                         <ComboBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" HorizontalAlignment="Stretch" ItemsSource="{x:Bind Challenges.LegendaryDifficulties}" SelectedIndex="{x:Bind ViewModel.SelectedLegendaryDifficultyIndex, Mode=TwoWay}" />
                     </Grid>
-                    <Grid Padding="14,10" CornerRadius="5" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    <Grid Padding="14,10" CornerRadius="{StaticResource ControlCornerRadius}" ColumnSpacing="10" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="22" />
                             <ColumnDefinition Width="3*" />

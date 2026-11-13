@@ -206,7 +206,7 @@
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="8">
+                CornerRadius="{StaticResource OverlayCornerRadius}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -234,7 +234,7 @@
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                                CornerRadius="12">
+                                CornerRadius="{StaticResource OverlayCornerRadius}">
                                 <Image
                                     Width="40"
                                     Height="40"
@@ -253,7 +253,7 @@
                                         Padding="8,2"
                                         VerticalAlignment="Center"
                                         Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                        CornerRadius="4">
+                                        CornerRadius="{StaticResource ControlCornerRadius}">
                                         <TextBlock
                                             FontSize="12"
                                             Foreground="White"

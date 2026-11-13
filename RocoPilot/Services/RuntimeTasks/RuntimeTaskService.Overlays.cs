@@ -90,23 +90,21 @@ public sealed partial class RuntimeTaskService
         }
     }
 
+    public bool InfoOverlayEncounterPanelEnabled => _infoOverlayEncounterPanelEnabled;
+
     public void SetInfoOverlayEncounterPanelEnabled(bool isEnabled)
     {
+        if (_infoOverlayEncounterPanelEnabled == isEnabled) return;
         _infoOverlayEncounterPanelEnabled = isEnabled;
-        var changed = false;
-        if (CurrentState is { } state && state.Options.InfoOverlayEncounterPanelEnabled != isEnabled)
+        if (CurrentState is { } state)
         {
             state.Options.InfoOverlayEncounterPanelEnabled = isEnabled;
-            changed = true;
         }
 
         _infoOverlayService.SetEncounterPanelVisible(isEnabled);
         _logger.LogInformation("奇遇计数面板{State}", isEnabled ? "已开启" : "已关闭");
         _ = SaveInfoOverlayEncounterPanelEnabledAsync(isEnabled);
-        if (changed)
-        {
-            NotifySettingsChanged();
-        }
+        NotifySettingsChanged();
     }
 
     private async Task SaveInfoOverlayEncounterPanelEnabledAsync(bool isEnabled)

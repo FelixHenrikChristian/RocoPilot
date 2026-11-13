@@ -68,6 +68,7 @@ internal static class StatisticsEntryDialogs
         {
             XamlRoot = xamlRoot,
             Title = title,
+            TitleGlyph = title.StartsWith("新增", StringComparison.Ordinal) ? DialogGlyphs.Add : DialogGlyphs.Edit,
             Content = CreateScrollableForm(content, xamlRoot),
             PrimaryButtonText = primaryButtonText,
             CloseButtonText = "取消",
@@ -240,6 +241,7 @@ internal static class StatisticsEntryDialogs
         {
             XamlRoot = xamlRoot,
             Title = "新增异色条目",
+            TitleGlyph = DialogGlyphs.Add,
             Content = scrollViewer,
             PrimaryButtonText = "新增",
             CloseButtonText = "取消",
@@ -358,6 +360,7 @@ internal static class StatisticsEntryDialogs
         {
             XamlRoot = xamlRoot,
             Title = "编辑异色记录",
+            TitleGlyph = DialogGlyphs.Edit,
             Content = CreateScrollableForm(content, xamlRoot),
             PrimaryButtonText = "保存",
             CloseButtonText = "取消",
@@ -383,7 +386,7 @@ internal static class StatisticsEntryDialogs
         const double fieldHeight = 34;
         picker.Height = fieldHeight;
         picker.MinWidth = 0;
-        picker.CornerRadius = new CornerRadius(8);
+        picker.CornerRadius = (CornerRadius)Application.Current.Resources["ControlCornerRadius"];
         picker.VerticalAlignment = VerticalAlignment.Top;
         AutomationProperties.SetName(picker, label);
         if (picker is CalendarDatePicker datePicker)

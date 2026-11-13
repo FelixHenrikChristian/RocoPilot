@@ -105,7 +105,6 @@ public partial class MainViewModel : ObservableRecipient
         _isApplyingRuntimeTaskSettings = true;
         IsInfoOverlayEnabled = true;
         IsInfoOverlayLocked = true;
-        IsInfoOverlayEncounterPanelEnabled = true;
         LaunchNotificationSeverity = InfoBarSeverity.Informational;
         LaunchNotificationTitle = string.Empty;
         LaunchNotificationMessage = string.Empty;
@@ -118,7 +117,6 @@ public partial class MainViewModel : ObservableRecipient
             IsMaskOverlayEnabled = currentState.Options.RecognitionOverlayEnabled;
             IsInfoOverlayEnabled = currentState.Options.InfoOverlayEnabled;
             IsInfoOverlayLocked = currentState.Options.InfoOverlayLocked;
-            IsInfoOverlayEncounterPanelEnabled = currentState.Options.InfoOverlayEncounterPanelEnabled;
         }
 
         _isApplyingRuntimeTaskSettings = false;
@@ -163,7 +161,6 @@ public partial class MainViewModel : ObservableRecipient
             RecognitionOverlayEnabled = IsMaskOverlayEnabled,
             InfoOverlayEnabled = IsInfoOverlayEnabled,
             InfoOverlayLocked = IsInfoOverlayLocked,
-            InfoOverlayEncounterPanelEnabled = IsInfoOverlayEncounterPanelEnabled,
             EncounterStatisticsEnabled = _runtimeTaskService.EncounterStatisticsEnabled,
             AutoBattleSettings = _runtimeTaskService.AutoBattleSettings
         });
@@ -190,6 +187,9 @@ public partial class MainViewModel : ObservableRecipient
         await _runtimeTaskService.LoadSettingsAsync();
         ApplyRuntimeTaskSettings();
     }
+
+    [RelayCommand]
+    private void ToggleInfoOverlayLock() => IsInfoOverlayLocked = !IsInfoOverlayLocked;
 
     [RelayCommand]
     private void ResetInfoOverlayPosition()
@@ -265,7 +265,6 @@ public partial class MainViewModel : ObservableRecipient
                 IsMaskOverlayEnabled = state.Options.RecognitionOverlayEnabled;
                 IsInfoOverlayEnabled = state.Options.InfoOverlayEnabled;
                 IsInfoOverlayLocked = state.Options.InfoOverlayLocked;
-                IsInfoOverlayEncounterPanelEnabled = state.Options.InfoOverlayEncounterPanelEnabled;
             }
         }
         finally

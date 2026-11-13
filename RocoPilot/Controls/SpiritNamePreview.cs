@@ -29,7 +29,7 @@ internal static class SpiritNamePreview
             Width = 52,
             Height = 52,
             VerticalAlignment = VerticalAlignment.Bottom,
-            CornerRadius = new CornerRadius(8),
+            CornerRadius = (CornerRadius)Application.Current.Resources["OverlayCornerRadius"],
             Background = (Brush)Application.Current.Resources["ControlFillColorDefaultBrush"],
             Child = preview
         };

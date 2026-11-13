@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 
 using RocoPilot.Contracts.Services;
+using RocoPilot.Controls;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 using RocoPilot.Services.Encounters;
@@ -24,6 +25,7 @@ public sealed partial class ShellPage : Page
     }
 
     private readonly IUpdateService _updateService;
+    private readonly IHotkeyService _hotkeyService;
     private readonly EncounterSeasonReminderService _seasonReminderService;
     private readonly ILogger<ShellPage> _logger;
     private bool _areStartupChecksStarted;
@@ -31,11 +33,13 @@ public sealed partial class ShellPage : Page
     public ShellPage(
         ShellViewModel viewModel,
         IUpdateService updateService,
+        IHotkeyService hotkeyService,
         EncounterSeasonReminderService seasonReminderService,
         ILogger<ShellPage> logger)
     {
         ViewModel = viewModel;
         _updateService = updateService;
+        _hotkeyService = hotkeyService;
         _seasonReminderService = seasonReminderService;
         _logger = logger;
         InitializeComponent();
@@ -140,8 +144,89 @@ public sealed partial class ShellPage : Page
 
         _areStartupChecksStarted = true;
 
+        await ShowHotkeyStartupWarningAsync();
         await ShowSeasonReminderOnStartupAsync();
         await CheckForUpdatesOnStartupAsync();
+    }
+
+    private async Task ShowHotkeyStartupWarningAsync()
+    {
+        try
+        {
+            await _hotkeyService.LoadSettingsAsync();
+            if (_hotkeyService.UnavailableReason is null || XamlRoot is null)
+            {
+                return;
+            }
+
+            var warningIcon = new FontIcon
+            {
+                Glyph = "\uE7BA",
+                Style = (Style)Application.Current.Resources["DialogRowIconStyle"],
+                Foreground = (Brush)Application.Current.Resources["SystemFillColorCautionBrush"]
+            };
+            var message = new TextBlock
+            {
+                Text = "管理员授权失败，游戏热键可能失效。",
+                FontSize = 13,
+                LineHeight = 20,
+                TextWrapping = TextWrapping.Wrap
+            };
+            var body = new Grid { ColumnSpacing = 10 };
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(message, 1);
+            body.Children.Add(warningIcon);
+            body.Children.Add(message);
+
+            var hintIcon = new FontIcon
+            {
+                Glyph = DialogGlyphs.Info,
+                Style = (Style)Application.Current.Resources["DialogRowIconStyle"]
+            };
+            var hintText = new TextBlock
+            {
+                Text = "可尝试重启应用，并在 UAC 提示中选择“是”。",
+                Style = (Style)Application.Current.Resources["DialogCaptionTextStyle"]
+            };
+            var hint = new Grid { ColumnSpacing = 10 };
+            hint.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            hint.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(hintText, 1);
+            hint.Children.Add(hintIcon);
+            hint.Children.Add(hintText);
+
+            var content = new StackPanel { Spacing = 12, MaxWidth = 380 };
+            content.Children.Add(new Border
+            {
+                Style = (Style)Application.Current.Resources["DialogCardStyle"],
+                Padding = new Thickness(16),
+                Child = body
+            });
+            content.Children.Add(new Border
+            {
+                Style = (Style)Application.Current.Resources["ConfigHintBarStyle"],
+                Child = hint
+            });
+
+            var dialog = new AppContentDialog
+            {
+                XamlRoot = XamlRoot,
+                RequestedTheme = ActualTheme,
+                Title = "未获得管理员权限",
+                TitleGlyph = DialogGlyphs.Warning,
+                Tone = AppDialogTone.Caution,
+                Content = content,
+                CloseButtonText = "知道了",
+                DefaultButton = ContentDialogButton.Close
+            };
+
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "启动时显示热键助手提示失败。");
+        }
     }
 
     private async Task ShowSeasonReminderOnStartupAsync()

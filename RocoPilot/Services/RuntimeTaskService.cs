@@ -306,15 +306,12 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             if (!_frameRecognizer.TemplateExists(markerTemplate))
                 _logger.LogWarning("缺少捕捉按钮模板，本次会话无法识别奇遇效果解除：{Template}", markerTemplate);
 
+            options.InfoOverlayEncounterPanelEnabled = InfoOverlayEncounterPanelEnabled;
             var state = new RuntimeTaskState(
                 targetWindow,
                 recognitionRegionConfig,
                 options,
                 DateTimeOffset.Now);
-            // 面板开关以服务端字段为准：未运行时用户切换会即时更新该字段并持久化，
-            // 但历史版本保存值可能晚于 options 构造，这里统一回填避免启动后面板状态错乱。
-            options.InfoOverlayEncounterPanelEnabled = _infoOverlayEncounterPanelEnabled;
-            state.Options.InfoOverlayEncounterPanelEnabled = _infoOverlayEncounterPanelEnabled;
             var session = new RuntimeSession(state, _screenCaptureService);
             _session = session;
             preparingWindow = null;

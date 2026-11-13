@@ -131,12 +131,8 @@ public sealed partial class InfoOverlayWindow : WindowEx
 
     public void SetEncounterPanelVisible(bool isVisible)
     {
-        if (_isClosed || _isIsland) return;
+        if (_isClosed || _isIsland || _isEncounterPanelVisible == isVisible) return;
         _isEncounterPanelVisible = isVisible;
-        if (EncounterPanel.Visibility == (isVisible ? Visibility.Visible : Visibility.Collapsed)) return;
-        EncounterPanel.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
-        RecentRecordTimeText.Visibility = Visibility.Collapsed;
-        // 面板显隐改变内容高度，立即重测窗口尺寸并贴回游戏窗口。
         UpdateOverlayState(forceMove: true);
     }
 
@@ -145,8 +141,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
         if (_isClosed) return;
         if (_isIsland) { UpdateIslandSnapshot(snapshot); return; }
         var recordTime = snapshot.LatestRecordUpdatedAt;
-        RecentRecordTimeText.Visibility = recordTime.HasValue && _isEncounterPanelVisible
-            ? Visibility.Visible : Visibility.Collapsed;
+        RecentRecordTimeText.Visibility = recordTime.HasValue ? Visibility.Visible : Visibility.Collapsed;
         RecentRecordTimeText.Text = recordTime.HasValue
             ? $"最新记录更新于 {recordTime.Value.ToLocalTime():HH:mm:ss}"
             : string.Empty;
@@ -386,7 +381,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
             Width = size,
             Height = size,
             VerticalAlignment = VerticalAlignment.Center,
-            CornerRadius = new CornerRadius(size > 30 ? 10 : 6),
+            CornerRadius = (CornerRadius)Application.Current.Resources[size > 30 ? "OverlayCornerRadius" : "ControlCornerRadius"],
             Background = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF)),
             Child = CreateAvatarPlaceholder(size)
         };

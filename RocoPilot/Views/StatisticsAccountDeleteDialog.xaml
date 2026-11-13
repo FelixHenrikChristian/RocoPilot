@@ -4,6 +4,8 @@
     xmlns:controls="using:RocoPilot.Controls"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="删除账号"
+    TitleGlyph="&#xE74D;"
+    Tone="Critical"
     PrimaryButtonText="删除"
     PrimaryButtonStyle="{StaticResource DialogButtonStyle}"
     CloseButtonText="取消"
@@ -22,7 +24,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="36" Height="36" CornerRadius="8"
+                        <Border Width="36" Height="36" CornerRadius="{StaticResource ControlCornerRadius}"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}">
                             <FontIcon Glyph="&#xE77B;" FontSize="18"

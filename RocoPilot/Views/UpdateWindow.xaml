@@ -100,7 +100,7 @@
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="8">
+                CornerRadius="{StaticResource OverlayCornerRadius}">
                 <Grid MinHeight="0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />

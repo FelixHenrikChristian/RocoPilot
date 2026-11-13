@@ -24,12 +24,13 @@
                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="6">
+                CornerRadius="{StaticResource ControlCornerRadius}"
+                DoubleTapped="PollutionCountItem_DoubleTapped"
+                RightTapped="PollutionCountItem_RightTapped">
                 <Grid
                     MinHeight="28"
                     Background="Transparent"
-                    ColumnSpacing="8"
-                    DoubleTapped="PollutionCountItem_DoubleTapped">
+                    ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="24" />
                         <ColumnDefinition Width="*" />
@@ -41,7 +42,7 @@
                         Height="24"
                         VerticalAlignment="Center"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        CornerRadius="6">
+                        CornerRadius="{StaticResource ControlCornerRadius}">
                         <Grid>
                             <Image
                                 Margin="1"
@@ -63,10 +64,10 @@
                         VerticalAlignment="Center">
                         <Border
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            CornerRadius="6" />
+                            CornerRadius="{StaticResource ControlCornerRadius}" />
                         <Border
                             Background="{ThemeResource AccentFillColorDefaultBrush}"
-                            CornerRadius="6"
+                            CornerRadius="{StaticResource ControlCornerRadius}"
                             Opacity="0.82"
                             RenderTransformOrigin="0,0.5">
                             <Border.RenderTransform>
@@ -109,12 +110,13 @@
                 Background="{ThemeResource ControlFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="6">
+                CornerRadius="{StaticResource ControlCornerRadius}"
+                DoubleTapped="ShinyCountItem_DoubleTapped"
+                RightTapped="ShinyCountItem_RightTapped">
                 <Grid
                     MinHeight="28"
                     Background="Transparent"
-                    ColumnSpacing="8"
-                    DoubleTapped="ShinyCountItem_DoubleTapped">
+                    ColumnSpacing="8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="24" />
                         <ColumnDefinition Width="*" />
@@ -126,7 +128,7 @@
                         Height="24"
                         VerticalAlignment="Center"
                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        CornerRadius="6">
+                        CornerRadius="{StaticResource ControlCornerRadius}">
                         <Grid>
                             <Image
                                 Margin="1"
@@ -177,14 +179,14 @@
                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
-                CornerRadius="14">
+                CornerRadius="{StaticResource OverlayCornerRadius}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Border CornerRadius="14,14,0,0">
+                    <Border CornerRadius="8,8,0,0">
                         <Grid Padding="18,14" ColumnSpacing="12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
@@ -199,7 +201,7 @@
                                 Height="42"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                CornerRadius="14">
+                                CornerRadius="{StaticResource OverlayCornerRadius}">
                                 <Grid>
                                     <Image
                                         Margin="2"
@@ -236,7 +238,7 @@
                                 Height="28"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                CornerRadius="6">
+                                CornerRadius="{StaticResource ControlCornerRadius}">
                                 <Button
                                     Width="32"
                                     Height="28" MinHeight="28"
@@ -258,7 +260,7 @@
                                 Height="28"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                CornerRadius="6">
+                                CornerRadius="{StaticResource ControlCornerRadius}">
                                 <Button
                                     Width="32"
                                     Height="28" MinHeight="28"
@@ -304,7 +306,7 @@
                             Background="{ThemeResource ControlFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="14">
+                            CornerRadius="{StaticResource OverlayCornerRadius}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -315,7 +317,7 @@
                                     Height="32"
                                     VerticalAlignment="Center"
                                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    CornerRadius="6">
+                                    CornerRadius="{StaticResource ControlCornerRadius}">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                                         FontSize="13"
@@ -345,7 +347,7 @@
                             Background="{ThemeResource ControlFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="14">
+                            CornerRadius="{StaticResource OverlayCornerRadius}">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -356,7 +358,7 @@
                                     Height="32"
                                     VerticalAlignment="Center"
                                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    CornerRadius="6">
+                                    CornerRadius="{StaticResource ControlCornerRadius}">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                                         FontSize="13"
@@ -404,7 +406,7 @@
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="8">
+            CornerRadius="{StaticResource OverlayCornerRadius}">
         <Grid ColumnSpacing="14">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
@@ -635,7 +637,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <Border Padding="8" CornerRadius="8">
+                    <Border Padding="8" CornerRadius="{StaticResource OverlayCornerRadius}">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Offset="0" Color="#246366F1" />
@@ -654,7 +656,7 @@
                                 Height="40"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                CornerRadius="8">
+                                CornerRadius="{StaticResource ControlCornerRadius}">
                                 <FontIcon
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
                                     FontSize="19"
@@ -704,13 +706,14 @@
                         Grid.Row="2"
                         HorizontalScrollBarVisibility="Disabled"
                         HorizontalScrollMode="Disabled"
+                        Background="Transparent"
                         RightTapped="ShinyBlank_RightTapped"
                         VerticalScrollBarVisibility="Hidden"
                         ViewChanged="CardScrollViewer_ViewChanged"
                         ViewChanging="CardScrollViewer_ViewChanging"
                         VerticalScrollMode="Auto">
                         <ItemsControl
-                            Margin="0,0,10,0"
+                            Margin="0,0,10,40"
                             ItemTemplate="{StaticResource ShinyCountRowTemplate}"
                             ItemsSource="{x:Bind ViewModel.Overview.SelectedShinyCounts, Mode=OneWay}" />
                     </ScrollViewer>
@@ -751,7 +754,7 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
 
-                                <Border Padding="8" CornerRadius="8">
+                                <Border Padding="8" CornerRadius="{StaticResource OverlayCornerRadius}">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                             <GradientStop Offset="0" Color="#1F0F766E" />
@@ -770,7 +773,7 @@
                                             Height="40"
                                             VerticalAlignment="Center"
                                             Background="{ThemeResource ControlFillColorDefaultBrush}"
-                                            CornerRadius="8">
+                                            CornerRadius="{StaticResource ControlCornerRadius}">
                                             <FontIcon
                                                 FontFamily="{StaticResource SymbolThemeFontFamily}"
                                                 FontSize="19"
@@ -821,13 +824,14 @@
                                     Grid.Row="2"
                                     HorizontalScrollBarVisibility="Disabled"
                                     HorizontalScrollMode="Disabled"
+                                    Background="Transparent"
                                     RightTapped="PollutionBlank_RightTapped"
                                     VerticalScrollBarVisibility="Hidden"
                                     ViewChanged="CardScrollViewer_ViewChanged"
                                     ViewChanging="CardScrollViewer_ViewChanging"
                                     VerticalScrollMode="Auto">
                                     <ItemsControl
-                                        Margin="0,0,10,0"
+                                        Margin="0,0,10,40"
                                         ItemTemplate="{StaticResource PollutionCountRowTemplate}"
                                         ItemsSource="{Binding PollutionCounts}" />
                                 </ScrollViewer>

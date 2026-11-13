@@ -47,6 +47,8 @@ public sealed partial class MainWindow : WindowEx
 
     private async Task ShutdownAsync()
     {
+        App.GetService<IHotkeyService>().Dispose();
+
         try
         {
             var runtimeTaskService = App.GetService<IRuntimeTaskService>();

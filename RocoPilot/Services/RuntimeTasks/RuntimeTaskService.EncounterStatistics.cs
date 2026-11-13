@@ -75,8 +75,6 @@ public sealed partial class RuntimeTaskService
 
     public bool EncounterStatisticsEnabled => _encounterStatisticsEnabled;
 
-    public bool InfoOverlayEncounterPanelEnabled => _infoOverlayEncounterPanelEnabled;
-
     public void SetEncounterStatisticsEnabled(bool isEnabled)
     {
         if (_encounterStatisticsEnabled == isEnabled) return;

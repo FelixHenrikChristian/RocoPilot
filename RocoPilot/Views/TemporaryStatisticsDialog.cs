@@ -43,6 +43,7 @@ internal static class TemporaryStatisticsDialog
         var dialog = new AppContentDialog
         {
             XamlRoot = root, Title = "确认新赛季统计", PrimaryButtonText = "确认计入",
+            TitleGlyph = DialogGlyphs.Chart,
             CloseButtonText = "稍后处理", IsPrimaryButtonEnabled = false,
             Content = content
         };
@@ -82,7 +83,7 @@ internal static class TemporaryStatisticsDialog
             heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             heading.Children.Add(new Border
             {
-                Width = 36, Height = 36, CornerRadius = new CornerRadius(8),
+                Width = 36, Height = 36, CornerRadius = (CornerRadius)Application.Current.Resources["ControlCornerRadius"],
                 Background = new SolidColorBrush(group.Key
                     ? global::Windows.UI.Color.FromArgb(36, 139, 92, 246) : global::Windows.UI.Color.FromArgb(36, 15, 118, 110)),
                 Child = new FontIcon
@@ -134,7 +135,7 @@ internal static class TemporaryStatisticsDialog
                 var check = new FontIcon { Glyph = "\uE73E", FontSize = 12, Opacity = 0 };
                 var selected = new ToggleButton { IsChecked = false, MinWidth = 0, MinHeight = 0,
                     Width = 28, Height = 28, Padding = new Thickness(0), Content = check,
-                    VerticalAlignment = VerticalAlignment.Center, CornerRadius = new CornerRadius(8) };
+                    VerticalAlignment = VerticalAlignment.Center, CornerRadius = (CornerRadius)Application.Current.Resources["ControlCornerRadius"] };
                 var name = new TextBox { Text = item.Name == "未识别精灵" ? "" : item.Name, MaxLength = 32,
                     MinWidth = 0, PlaceholderText = "输入精灵名" };
                 var count = new NumberBox { Value = item.Count, MinWidth = 0,

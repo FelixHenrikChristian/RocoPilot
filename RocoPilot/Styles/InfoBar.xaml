@@ -13,7 +13,7 @@
         <Setter Property="Margin" Value="24,16,24,0" />
         <Setter Property="HorizontalAlignment" Value="Center" />
         <Setter Property="VerticalAlignment" Value="Top" />
-        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="IsClosable" Value="False" />
         <!-- Preserve WinUI InfoBar behavior while centering its icon across multiline messages. -->

@@ -2,8 +2,10 @@ using RocoPilot.Models.Hotkeys;
 
 namespace RocoPilot.Contracts.Services;
 
-public interface IHotkeyService
+public interface IHotkeyService : IDisposable
 {
+    string? UnavailableReason { get; }
+
     event EventHandler? SettingsChanged;
 
     event EventHandler<HotkeyTriggeredEventArgs>? HotkeyTriggered;

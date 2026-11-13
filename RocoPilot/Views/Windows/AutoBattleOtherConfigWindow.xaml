@@ -40,7 +40,7 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Border Width="40" Height="40" CornerRadius="12"
+                <Border Width="40" Height="40" CornerRadius="{StaticResource ControlCornerRadius}"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                     <FontIcon Glyph="&#xE713;" FontSize="20"
                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
@@ -60,14 +60,14 @@
                 VerticalScrollBarVisibility="Auto"
                 VerticalScrollMode="Auto">
                 <StackPanel Spacing="12" Padding="0,0,0,4">
-                    <Border Style="{StaticResource DialogCardStyle}" Padding="16" CornerRadius="12">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="16" CornerRadius="{StaticResource OverlayCornerRadius}">
                         <StackPanel Spacing="14">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="32" Height="32" CornerRadius="9"
+                                <Border Width="32" Height="32" CornerRadius="{StaticResource ControlCornerRadius}"
                                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                     <FontIcon Glyph="&#xE823;" FontSize="16"
                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
@@ -140,14 +140,14 @@
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource DialogCardStyle}" Padding="16" CornerRadius="12">
+                    <Border Style="{StaticResource DialogCardStyle}" Padding="16" CornerRadius="{StaticResource OverlayCornerRadius}">
                         <StackPanel Spacing="14">
                             <Grid ColumnSpacing="10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Width="32" Height="32" CornerRadius="9"
+                                <Border Width="32" Height="32" CornerRadius="{StaticResource ControlCornerRadius}"
                                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
                                     <FontIcon Glyph="&#xE765;" FontSize="16"
                                               Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />

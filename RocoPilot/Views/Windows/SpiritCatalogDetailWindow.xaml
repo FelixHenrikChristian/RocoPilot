@@ -51,7 +51,7 @@
             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
             BorderThickness="1"
-            CornerRadius="14">
+            CornerRadius="{StaticResource OverlayCornerRadius}">
             <ScrollViewer
                 HorizontalScrollBarVisibility="Disabled"
                 HorizontalScrollMode="Disabled"
@@ -79,7 +79,7 @@
                             Background="{ThemeResource ControlFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1"
-                            CornerRadius="8">
+                            CornerRadius="{StaticResource OverlayCornerRadius}">
                             <Grid RowSpacing="8">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
@@ -94,7 +94,7 @@
                                     VerticalAlignment="Center">
                                     <Border
                                         Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                        CornerRadius="8">
+                                        CornerRadius="{StaticResource OverlayCornerRadius}">
                                         <Image
                                             MaxWidth="104"
                                             MaxHeight="104"

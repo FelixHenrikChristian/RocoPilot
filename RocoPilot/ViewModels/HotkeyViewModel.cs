@@ -171,7 +171,8 @@ public class HotkeyViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            ShowNotification(InfoBarSeverity.Error, "保存热键失败", ex.Message);
+            ApplySettings(_hotkeyService.Settings);
+            ShowNotification(InfoBarSeverity.Error, "设置热键失败", ex.Message);
             return null;
         }
     }

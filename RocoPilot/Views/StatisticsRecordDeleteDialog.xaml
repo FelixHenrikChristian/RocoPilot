@@ -3,6 +3,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:controls="using:RocoPilot.Controls"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    TitleGlyph="&#xE74D;"
+    Tone="Critical"
     PrimaryButtonText="删除"
     PrimaryButtonStyle="{StaticResource DialogButtonStyle}"
     CloseButtonText="取消"
@@ -21,7 +23,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="48" Height="48" CornerRadius="10"
+                        <Border Width="48" Height="48" CornerRadius="{StaticResource OverlayCornerRadius}"
                                 VerticalAlignment="Center"
                                 Background="{ThemeResource ControlFillColorDefaultBrush}">
                             <Grid>

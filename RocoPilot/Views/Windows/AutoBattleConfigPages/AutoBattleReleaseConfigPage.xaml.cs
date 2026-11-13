@@ -2,11 +2,8 @@ using System.Diagnostics;
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
+using Microsoft.Windows.Storage.Pickers;
 using RocoPilot.Controls;
-using RocoPilot.Helpers;
-
-using Windows.Foundation;
 
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
 
@@ -71,85 +68,6 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         }
     }
 
-    // 平台拖拽（GridView 鼠标不触发 DragItemsStarting、ItemsWrapGrid 无原生重排）不可靠，
-    // 卡片自实现 Pointer 拖拽：按下捕获指针并半透明，松开时按指针落点交换位置。
-    private Border? _dragStepCard;
-
-    private void StepCard_PointerPressed(object sender, PointerRoutedEventArgs e)
-    {
-        if (sender is not Border { DataContext: AutoBattleReleaseEditorItem item } card)
-        {
-            return;
-        }
-
-        if (!e.GetCurrentPoint(card).Properties.IsLeftButtonPressed)
-        {
-            return;
-        }
-
-        _dragStepCard = card;
-        card.CapturePointer(e.Pointer);
-        card.Opacity = item.CardOpacity * 0.45;
-        e.Handled = true;
-    }
-
-    private void StepCard_PointerReleased(object sender, PointerRoutedEventArgs e)
-    {
-        if (sender is not Border { DataContext: AutoBattleReleaseEditorItem item } card || _dragStepCard is null)
-        {
-            return;
-        }
-
-        _dragStepCard = null;
-        card.Opacity = item.CardOpacity;
-        card.ReleasePointerCapture(e.Pointer);
-        e.Handled = true;
-
-        var sequence = Set.SelectedSequence;
-        var oldIndex = sequence.Items.IndexOf(item);
-        var targetIndex = FindStepDropIndex(e.GetCurrentPoint(StepsGrid).Position);
-        if (oldIndex < 0 || targetIndex < 0 || targetIndex == oldIndex)
-        {
-            return;
-        }
-
-        sequence.Items.Move(oldIndex, targetIndex);
-        Debug.WriteLine($"[战斗配置] 拖拽排序：{item.StepTitle} #{oldIndex + 1} -> #{targetIndex + 1}");
-    }
-
-    private void StepCard_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
-    {
-        if (sender is not Border { DataContext: AutoBattleReleaseEditorItem item } card)
-        {
-            return;
-        }
-
-        _dragStepCard = null;
-        card.Opacity = item.CardOpacity;
-    }
-
-    /// <summary>返回指针所在步骤卡片的索引；落在空白区域返回 -1。</summary>
-    private int FindStepDropIndex(Point position)
-    {
-        for (var index = 0; index < StepsGrid.Items.Count; index++)
-        {
-            if (StepsGrid.ContainerFromIndex(index) is not ListViewItem container)
-            {
-                continue;
-            }
-
-            var bounds = container
-                .TransformToVisual(StepsGrid)
-                .TransformBounds(new Rect(0, 0, container.ActualWidth, container.ActualHeight));
-            if (bounds.Contains(position))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
-
     private void InsertPresetButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: AutoBattlePresetEditorItem preset })
@@ -185,7 +103,14 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         var dialog = new AppContentDialog
         {
             Title = $"重命名{BattleTypeName}配置",
-            Content = textBox,
+            TitleGlyph = DialogGlyphs.Rename,
+            Content = new Border
+            {
+                Style = (Style)Application.Current.Resources["DialogCardStyle"],
+                Padding = new Thickness(16),
+                MinWidth = 320,
+                Child = textBox
+            },
             PrimaryButtonText = "确定",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
@@ -209,16 +134,19 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         var dialog = new AppContentDialog
         {
             Title = "删除配置",
+            TitleGlyph = DialogGlyphs.Delete,
+            Tone = AppDialogTone.Critical,
             Content = new TextBlock
             {
                 Text = $"确定删除{BattleTypeName}的配置「{selected.Name}」？该配置的步骤将一并删除。",
-                TextWrapping = TextWrapping.Wrap
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 360
             },
             PrimaryButtonText = "删除",
             CloseButtonText = "取消",
-            DefaultButton = ContentDialogButton.Close,
             XamlRoot = _owner.Content.XamlRoot
         };
+        dialog.UseDestructiveButtons();
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
             Set.RemoveConfig(selected);
@@ -226,14 +154,29 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         }
     }
 
-    private void ImportConfigButton_Click(object sender, RoutedEventArgs e)
+    private async void ImportConfigButton_Click(object sender, RoutedEventArgs e)
     {
-        // 应用提权运行时 WindowsAppSDK 的 FileOpenPicker 会抛 COMException，改用 Win32 对话框。
-        var path = Win32FileDialog.PickOpenFile(
-            WinRT.Interop.WindowNative.GetWindowHandle(_owner),
-            "战斗配置",
-            AutoBattleReleaseConfigTransfer.FileExtension);
-        if (string.IsNullOrWhiteSpace(path))
+        string? path;
+        try
+        {
+            var picker = new FileOpenPicker(_owner.AppWindow.Id)
+            {
+                Title = "导入战斗配置",
+                FileTypeChoices =
+                {
+                    { "战斗配置", new List<string> { AutoBattleReleaseConfigTransfer.FileExtension } },
+                    { "所有文件", new List<string> { "*" } }
+                }
+            };
+            path = (await picker.PickSingleFileAsync())?.Path;
+        }
+        catch (Exception ex)
+        {
+            _owner.ShowMessage("打开导入窗口失败", ex.Message);
+            return;
+        }
+
+        if (path is null)
         {
             return;
         }
@@ -241,7 +184,7 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         string json;
         try
         {
-            json = File.ReadAllText(path);
+            json = await File.ReadAllTextAsync(path);
         }
         catch (Exception ex)
         {
@@ -268,28 +211,41 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
             InfoBarSeverity.Success);
     }
 
-    private void ExportConfigButton_Click(object sender, RoutedEventArgs e)
+    private async void ExportConfigButton_Click(object sender, RoutedEventArgs e)
     {
         if (Set.Selected is not { } selected)
         {
             return;
         }
 
-        var path = Win32FileDialog.PickSaveFile(
-            WinRT.Interop.WindowNative.GetWindowHandle(_owner),
-            "战斗配置",
-            AutoBattleReleaseConfigTransfer.FileExtension,
-            SanitizeFileName(string.IsNullOrWhiteSpace(selected.Name)
-                ? AutoBattleSettingsRules.CreateDefaultConfigName(null)
-                : selected.Name));
-        if (string.IsNullOrWhiteSpace(path))
+        string? path;
+        try
+        {
+            var picker = new FileSavePicker(_owner.AppWindow.Id)
+            {
+                Title = "导出战斗配置",
+                SuggestedFileName = SanitizeFileName(string.IsNullOrWhiteSpace(selected.Name)
+                    ? AutoBattleSettingsRules.CreateDefaultConfigName(null)
+                    : selected.Name),
+                DefaultFileExtension = AutoBattleReleaseConfigTransfer.FileExtension,
+                FileTypeChoices = { { "战斗配置", new List<string> { AutoBattleReleaseConfigTransfer.FileExtension } } }
+            };
+            path = (await picker.PickSaveFileAsync())?.Path;
+        }
+        catch (Exception ex)
+        {
+            _owner.ShowMessage("打开导出窗口失败", ex.Message);
+            return;
+        }
+
+        if (path is null)
         {
             return;
         }
 
         try
         {
-            File.WriteAllText(path, AutoBattleReleaseConfigTransfer.Export(selected));
+            await File.WriteAllTextAsync(path, AutoBattleReleaseConfigTransfer.Export(selected));
             Debug.WriteLine($"[战斗配置] 导出配置：{BattleTypeName} / {selected.Name} -> {path}");
             _owner.ShowMessage("导出成功", $"已导出到 {path}", InfoBarSeverity.Success);
         }

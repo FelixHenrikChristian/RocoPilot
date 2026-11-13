@@ -50,7 +50,7 @@
                     Height="36"
                     VerticalAlignment="Center"
                     Background="{ThemeResource SubtleFillColorSecondaryBrush}"
-                    CornerRadius="10">
+                    CornerRadius="{StaticResource ControlCornerRadius}">
                     <FontIcon
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
@@ -85,7 +85,7 @@
                             Padding="6,2"
                             Background="Transparent"
                             BorderThickness="0"
-                            CornerRadius="4"
+                            CornerRadius="{StaticResource ControlCornerRadius}"
                             FontSize="11"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Content="检查云端时间"

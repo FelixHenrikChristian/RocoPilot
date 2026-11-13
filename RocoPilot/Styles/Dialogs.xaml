@@ -36,14 +36,14 @@
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
     </Style>
 
     <Style x:Key="DialogButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="Padding" Value="12,6" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
 
     <Style x:Key="DialogPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
@@ -51,7 +51,7 @@
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="MinWidth" Value="96" />
         <Setter Property="Padding" Value="14,6" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
 
     <Style x:Key="DialogFooterStyle" TargetType="Grid">
@@ -70,7 +70,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="Padding" Value="10,6" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
         <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
     </Style>
 
@@ -78,7 +78,7 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="Padding" Value="10,6" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
         <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
     </Style>
 
@@ -86,14 +86,14 @@
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
         <Setter Property="Padding" Value="10,6" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
         <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
     </Style>
 
     <Style x:Key="DialogNumberBoxStyle" TargetType="NumberBox">
         <Setter Property="FontSize" Value="13" />
         <Setter Property="MinHeight" Value="34" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
         <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
     </Style>
 
@@ -128,9 +128,7 @@
         <Setter Property="Height" Value="32" />
         <Setter Property="MinHeight" Value="32" />
         <Setter Property="Padding" Value="10,0" />
-        <Setter Property="CornerRadius" Value="8" />
-        <Setter Property="Background" Value="#FFF6CC" />
-        <Setter Property="Foreground" Value="#3D3320" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
 
     <Style x:Key="PresetRowStyle" TargetType="Border">
@@ -138,20 +136,54 @@
         <Setter Property="Background" Value="{ThemeResource ControlFillColorDefaultBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
 
     <Style x:Key="ConfigHintBarStyle" TargetType="Border">
         <Setter Property="Padding" Value="12,10" />
         <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
-        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+    </Style>
+
+    <!-- Secondary line under a card heading or inside a hint bar. -->
+    <Style x:Key="DialogCaptionTextStyle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="LineHeight" Value="18" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- 16px status/hint icon placed at the start of a row. -->
+    <Style x:Key="DialogRowIconStyle" TargetType="FontIcon">
+        <Setter Property="FontFamily" Value="{StaticResource SymbolThemeFontFamily}" />
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Style>
+
+    <!-- Title icons used by AppContentDialog.TitleGlyph; one style per AppDialogTone
+         so the color follows the dialog's own theme. -->
+    <Style x:Key="DialogTitleIconAccentStyle" TargetType="FontIcon">
+        <Setter Property="FontFamily" Value="{StaticResource SymbolThemeFontFamily}" />
+        <Setter Property="FontSize" Value="20" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+    </Style>
+    <Style x:Key="DialogTitleIconCautionStyle" TargetType="FontIcon" BasedOn="{StaticResource DialogTitleIconAccentStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCautionBrush}" />
+    </Style>
+    <Style x:Key="DialogTitleIconCriticalStyle" TargetType="FontIcon" BasedOn="{StaticResource DialogTitleIconAccentStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorCriticalBrush}" />
+    </Style>
+    <Style x:Key="DialogTitleIconSuccessStyle" TargetType="FontIcon" BasedOn="{StaticResource DialogTitleIconAccentStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource SystemFillColorSuccessBrush}" />
     </Style>
     <DataTemplate x:Key="DialogTitleTemplate">
         <TextBlock Text="{Binding}" Style="{StaticResource DialogTitleTextStyle}" />
     </DataTemplate>
     <Style x:Key="AppContentDialogStyle" TargetType="ContentDialog" BasedOn="{StaticResource DefaultContentDialogStyle}">
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
         <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
         <Setter Property="TitleTemplate" Value="{StaticResource DialogTitleTemplate}" />
         <Setter Property="PrimaryButtonStyle" Value="{StaticResource DialogPrimaryButtonStyle}" />

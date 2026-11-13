@@ -16,16 +16,28 @@ internal static class StatisticsSyncConflictDialog
         };
         content.Children.Add(new TextBlock
         {
-            Text = "两端都有独立修改。请选择要保留的整个账号版本，另一端独有的内容不会自动相加。取消可先返回统计页面导出备份或修改数据。",
-            TextWrapping = TextWrapping.Wrap
+            Text = "两端都有独立修改。请选择要保留的整个账号版本，另一端独有的内容不会自动相加。",
+            FontSize = 13, LineHeight = 20, TextWrapping = TextWrapping.Wrap
         });
-        content.Children.Add(new TextBlock { Text = "本地", Style = (Style)Application.Current.Resources["DialogSectionTitleStyle"] });
-        content.Children.Add(new TextBlock { Text = Describe(conflict.Local.Account), TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true });
-        content.Children.Add(new TextBlock { Text = "云端", Style = (Style)Application.Current.Resources["DialogSectionTitleStyle"] });
-        content.Children.Add(new TextBlock { Text = Describe(conflict.Remote.Account), TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true });
+        content.Children.Add(CreateSide(DialogGlyphs.Computer, "本地", Describe(conflict.Local.Account)));
+        content.Children.Add(CreateSide(DialogGlyphs.Cloud, "云端", Describe(conflict.Remote.Account)));
+        var hintIcon = new FontIcon { Glyph = DialogGlyphs.Info, Style = Resource<Style>("DialogRowIconStyle") };
+        var hintText = new TextBlock
+        {
+            Text = "取消可先返回统计页面导出备份或修改数据。",
+            Style = Resource<Style>("DialogCaptionTextStyle")
+        };
+        var hint = new Grid { ColumnSpacing = 10 };
+        hint.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        hint.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(hintText, 1);
+        hint.Children.Add(hintIcon);
+        hint.Children.Add(hintText);
+        content.Children.Add(new Border { Style = Resource<Style>("ConfigHintBarStyle"), Child = hint });
         var dialog = new AppContentDialog
         {
             XamlRoot = root, Title = $"账号 {conflict.Local.Uid} 同步冲突",
+            TitleGlyph = DialogGlyphs.Sync, Tone = AppDialogTone.Caution,
             PrimaryButtonText = "保留本地", SecondaryButtonText = "采用云端", CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Close,
             Content = new ScrollViewer
@@ -42,6 +54,41 @@ internal static class StatisticsSyncConflictDialog
             _ => null
         };
     }
+
+    private static Border CreateSide(string glyph, string title, string description)
+    {
+        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        header.Children.Add(new FontIcon
+        {
+            Glyph = glyph,
+            Style = Resource<Style>("DialogRowIconStyle"),
+            Foreground = Resource<Microsoft.UI.Xaml.Media.Brush>("AccentTextFillColorPrimaryBrush")
+        });
+        header.Children.Add(new TextBlock
+        {
+            Text = title,
+            Style = Resource<Style>("DialogSectionTitleStyle"),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var body = new StackPanel { Spacing = 10 };
+        body.Children.Add(header);
+        body.Children.Add(new Border
+        {
+            Height = 1,
+            Background = Resource<Microsoft.UI.Xaml.Media.Brush>("DividerStrokeColorDefaultBrush")
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = description,
+            FontSize = 12,
+            LineHeight = 18,
+            TextWrapping = TextWrapping.Wrap,
+            IsTextSelectionEnabled = true
+        });
+        return new Border { Style = Resource<Style>("DialogCardStyle"), Padding = new Thickness(16), Child = body };
+    }
+
+    private static T Resource<T>(string key) => (T)Application.Current.Resources[key];
 
     internal static string Describe(AccountStatisticsData? account)
     {

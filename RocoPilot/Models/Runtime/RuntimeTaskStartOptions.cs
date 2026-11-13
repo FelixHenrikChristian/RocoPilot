@@ -35,7 +35,7 @@ public sealed class RuntimeTaskStartOptions
     public bool InfoOverlayEncounterPanelEnabled
     {
         get;
-        set;
+        internal set;
     } = true;
 
     public bool EncounterStatisticsEnabled

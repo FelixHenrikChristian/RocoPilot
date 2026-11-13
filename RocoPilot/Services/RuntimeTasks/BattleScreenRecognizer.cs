@@ -34,7 +34,7 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
     private const string BattleSkillTurnArrowTemplateName = "battle-skill-turn-arrow.png";
     private static readonly ImageMatchOptions BattleSkillTurnArrowMatchOptions = new()
     {
-        // 实测箭头帧 0.89-0.99；0.85 留余量。
+        // 模板只保留箭头及周围背景，避免混入技能图标的黄色边框。
         MinimumScore = 0.85,
         AlphaThreshold = 16,
         SearchStep = 1
@@ -94,38 +94,6 @@ public sealed class BattleScreenRecognizer(RuntimeFrameRecognizer recognizer)
         }
 
         return samples;
-    }
-
-    /// <summary>第 1 技能图标黄框（轮到本玩家可出招）的黄色像素数下限，实测黄框约 500+、无黄框 &lt;60。</summary>
-    private const int FirstIconHighlightMinimumPixels = 150;
-
-    /// <summary>
-    /// 出招队列第 1 个技能图标是否带黄色高亮边框（轮到本玩家可出招的标志）。
-    /// 中间跳过回合用它判定"已轮到玩家"：黄框出现后玩家选择不出招，等待 AI 插入。
-    /// </summary>
-    public bool IsFirstSkillIconHighlighted(RuntimeTaskState state, CapturedFrame frame, CancellationToken cancellationToken)
-    {
-        var region = RuntimeFrameRecognizer.FindRegion(state.RecognitionRegionConfig, BattleSkillQueueFirstRegionIds);
-        var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
-            region, frame, state.TargetWindow, state.RecognitionRegionConfig);
-        if (frameRegion.Width <= 0 || frameRegion.Height <= 0) return false;
-        var yellow = 0;
-        for (var y = 0; y < frameRegion.Height; y++)
-        {
-            var row = (frameRegion.Y + y) * frame.Width;
-            for (var x = 0; x < frameRegion.Width; x++)
-            {
-                var offset = (row + frameRegion.X + x) * 4;
-                if (offset + 2 >= frame.Pixels.Length) return false;
-                var b = frame.Pixels[offset];
-                var g = frame.Pixels[offset + 1];
-                var r = frame.Pixels[offset + 2];
-                // 亮黄橙高亮：红绿高、蓝低、红蓝差大
-                if (r > 150 && g > 120 && b < 120 && r - b > 70) yellow++;
-            }
-        }
-
-        return yellow >= FirstIconHighlightMinimumPixels;
     }
 
     /// <summary>

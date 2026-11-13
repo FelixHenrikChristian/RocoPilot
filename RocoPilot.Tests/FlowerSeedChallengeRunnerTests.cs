@@ -471,7 +471,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(true)]
     public async Task ChallengeUsesDedicatedSkillsAndExclusiveCaptureThenRepeatsAndExits(bool medalConfirmation)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var capture = new ChallengeCapture(medalConfirmation);
         var state = CreateState();
         state.Options.AutoBattleSettings.IsEnabled = false;

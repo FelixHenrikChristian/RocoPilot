@@ -60,7 +60,7 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
 
     internal async Task<ManualChallengeScreen> ReadAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken cancellationToken, Action<RecognitionRegion, string>? reportOcr = null,
-        bool legendary = false)
+        bool legendary = false, bool preferWorld = false)
     {
         var scale = Math.Min(width / 2048d, height / 1152d);
         var options = new ImageMatchOptions
@@ -68,6 +68,11 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             MinimumScore = .94,
             TemplateScaleX = scale, TemplateScaleY = scale
         };
+        if (preferWorld)
+        {
+            var hud = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
+            if (hud.IsMatch) return await ReadWorldAsync(hud);
+        }
         // 遮罩只保留跳过图标与 Esc 键帽的内部，排除动画背景及混色边缘。
         var skip = await Match("animation-skip", .04, .015, .11, .12);
         if (skip is not null) return new(ManualChallengeScene.SkippableAnimation, [], skip);
@@ -178,51 +183,11 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (exclusive is null && captureButton is not null)
             return new(ManualChallengeScene.CaptureBallMissing, [], captureButton);
         // 交互菜单必须同时具有大世界 HUD，结束动画中的浅色图形不能判为挑战失败。
-        var world = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
-        var prompt = world.IsMatch ? await Match("interaction-f", .42, .24, .84, .9) : null;
-        if (prompt is not null)
+        if (!preferWorld)
         {
-            var line = new RecognitionRegion
-            {
-                Id = "花种交互选项",
-                X = (int)Math.Round(prompt.X + 90 * scale), Y = (int)Math.Round(prompt.Y - 5 * scale),
-                Width = (int)Math.Round(150 * scale), Height = (int)Math.Round(40 * scale)
-            };
-            if (line.X + line.Width < clientX + width && line.Y >= clientY && line.Y + line.Height < clientY + height
-                && IsSelectedLine(frame, line))
-            {
-                var text = await ocr.RecognizeAsync(frame, line, TextRecognitionDefaults.Method, cancellationToken);
-                reportOcr?.Invoke(line, string.IsNullOrWhiteSpace(text.Text) ? "OCR：无文本" : $"OCR：{text.Text}");
-                var selected = Normalize(text.Text);
-                var hasChallenge = selected == "挑战";
-                if (!hasChallenge && selected.Length > 0)
-                {
-                    // 只在交互图标列查找挑战，再识别对应行；不能因出现留言就原地滚轮。
-                    var menu = Area(.42, .24, .84, .9);
-                    menu.X = (int)Math.Round(prompt.X + 35 * scale);
-                    menu.Width = (int)Math.Round(60 * scale);
-                    var challenges = await images.FindMatchesAsync(frame, menu, TemplatePath("interaction-challenge"),
-                        6, options, cancellationToken: cancellationToken);
-                    foreach (var icon in challenges.Matches.Where(match => match.IsMatch))
-                    {
-                        var option = new RecognitionRegion
-                        {
-                            Id = "挑战交互选项",
-                            X = (int)Math.Round(icon.X + 42 * scale), Y = (int)Math.Round(icon.Y - 2 * scale),
-                            Width = line.Width, Height = line.Height
-                        };
-                        var candidate = await ocr.RecognizeAsync(frame, option, TextRecognitionDefaults.Method, cancellationToken);
-                        reportOcr?.Invoke(option, $"OCR：{candidate.Text}");
-                        if (Normalize(candidate.Text) != "挑战") continue;
-                        hasChallenge = true;
-                        break;
-                    }
-                }
-                return new(ManualChallengeScene.Interaction, [], world, Text: selected, HasChallengeOption: hasChallenge);
-            }
+            var hud = await MatchWorldHudAsync(frame, clientX, clientY, width, height, cancellationToken);
+            if (hud.IsMatch) return await ReadWorldAsync(hud);
         }
-        // 只采用游戏 HUD 与战斗按钮的正向匹配，未知画面不会由上一输入推断。
-        if (world.IsMatch) return new(ManualChallengeScene.World, [], world);
         // 传说挑战倒下后仍显示“技能”按钮；用左侧候选精灵血条外框和战斗聊天共同确认。
         // 血条模板遮掉填充部分，不依赖候选精灵的剩余生命值。
         if (legendary && (await Match("legendary-pet-health", .10, .25, .25, .80)
@@ -249,6 +214,54 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
         if (!legendary && await Button("rewards") is { } rewardHeader)
             return new(ManualChallengeScene.RewardSettlement, [], rewardHeader);
         return new(ManualChallengeScene.Unknown, []);
+
+        async Task<ManualChallengeScreen> ReadWorldAsync(ImageMatchResult world)
+        {
+            var prompt = await Match("interaction-f", .42, .24, .84, .9);
+            if (prompt is not null)
+            {
+                var line = new RecognitionRegion
+                {
+                    Id = "花种交互选项",
+                    X = (int)Math.Round(prompt.X + 90 * scale), Y = (int)Math.Round(prompt.Y - 5 * scale),
+                    Width = (int)Math.Round(150 * scale), Height = (int)Math.Round(40 * scale)
+                };
+                if (line.X + line.Width < clientX + width && line.Y >= clientY && line.Y + line.Height < clientY + height
+                    && IsSelectedLine(frame, line))
+                {
+                    var text = await ocr.RecognizeAsync(frame, line, TextRecognitionDefaults.Method, cancellationToken);
+                    reportOcr?.Invoke(line, string.IsNullOrWhiteSpace(text.Text) ? "OCR：无文本" : $"OCR：{text.Text}");
+                    var selected = Normalize(text.Text);
+                    var hasChallenge = selected == "挑战";
+                    if (!hasChallenge && (preferWorld || selected.Length > 0))
+                    {
+                        // 只在交互图标列查找挑战，再识别对应行；不能因出现留言就原地滚轮。
+                        var menu = Area(.42, .24, .84, .9);
+                        menu.X = (int)Math.Round(prompt.X + 35 * scale);
+                        menu.Width = (int)Math.Round(60 * scale);
+                        var challenges = await images.FindMatchesAsync(frame, menu, TemplatePath("interaction-challenge"),
+                            6, options, cancellationToken: cancellationToken);
+                        foreach (var icon in challenges.Matches.Where(match => match.IsMatch))
+                        {
+                            var option = new RecognitionRegion
+                            {
+                                Id = "挑战交互选项",
+                                X = (int)Math.Round(icon.X + 42 * scale), Y = (int)Math.Round(icon.Y - 2 * scale),
+                                Width = line.Width, Height = line.Height
+                            };
+                            var candidate = await ocr.RecognizeAsync(frame, option, TextRecognitionDefaults.Method, cancellationToken);
+                            reportOcr?.Invoke(option, $"OCR：{candidate.Text}");
+                            if (Normalize(candidate.Text) != "挑战") continue;
+                            hasChallenge = true;
+                            break;
+                        }
+                    }
+                    return new(ManualChallengeScene.Interaction, [], world, Text: selected, HasChallengeOption: hasChallenge);
+                }
+            }
+            // 只采用游戏 HUD 与战斗按钮的正向匹配，未知画面不会由上一输入推断。
+            return new(ManualChallengeScene.World, [], world);
+        }
 
         Task<ImageMatchResult?> Button(string template)
             => MatchButtonAsync(frame, template, clientX, clientY, width, height, cancellationToken);

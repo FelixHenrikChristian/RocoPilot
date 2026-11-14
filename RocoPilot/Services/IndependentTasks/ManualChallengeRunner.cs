@@ -89,6 +89,7 @@ public sealed class ManualChallengeRunner(
         var lastActionScene = ManualChallengeScene.Unknown;
         var lastFrameTime = DateTimeOffset.MinValue;
         var minimumFrameAt = DateTimeOffset.UtcNow;
+        await using var approachWalk = scanning ? null : new ChallengeApproachWalk(keyboard, window.Hwnd, inputMethod, token);
         CapturedFrame? pendingFrame = null;
         logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", legendaryTarget ?? target?.DisplayName
             ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);
@@ -102,7 +103,7 @@ public sealed class ManualChallengeRunner(
                     out var clientX, out var clientY, out var width, out var height);
                 List<(RecognitionRegion Region, string Text)> previews = [];
                 var screen = await recognizer.ReadAsync(frame, clientX, clientY, width, height, token,
-                    state.Options.RecognitionOverlayEnabled ? (region, text) => previews.Add((region, text)) : null, legendary);
+                    state.Options.RecognitionOverlayEnabled ? (region, text) => previews.Add((region, text)) : null, legendary, preferWorld: flow.IsApproachingTarget);
                 if (target is not null && screen.Scene == ManualChallengeScene.Map && !string.IsNullOrWhiteSpace(screen.Text))
                     creatureName = screen.Text;
                 if (screen.Scene != ManualChallengeScene.Unknown && screen.Scene != lastScene)
@@ -115,6 +116,16 @@ public sealed class ManualChallengeRunner(
                 var completedCount = flow.CompletedCount;
                 var failures = flow.ConsecutiveFailures;
                 var decision = flow.Next(screen, height);
+                if (approachWalk is { Active: true } && decision.Action != ManualChallengeAction.Approach)
+                {
+                    await approachWalk.StopAsync();
+                    if (screen.Scene == ManualChallengeScene.Interaction)
+                    {
+                        // 停稳后重新识别 F 对应的选项。
+                        minimumFrameAt = DateTimeOffset.UtcNow;
+                        continue;
+                    }
+                }
                 if (flow.Options.Count > count) lastAdvance = DateTimeOffset.UtcNow;
                 if (screen.Scene == ManualChallengeScene.Battle && flow.IsBattleActive
                     || flow.CompletedCount != completedCount || flow.ConsecutiveFailures != failures)
@@ -372,6 +383,12 @@ public sealed class ManualChallengeRunner(
 
                 // 当前截图的结果先显示；输入改变画面后不能继续叠加这一帧的框。
                 var previewEnabled = state.Options.RecognitionOverlayEnabled;
+                if (approachWalk != null && decision.Action == ManualChallengeAction.Approach)
+                {
+                    await approachWalk.AdvanceAsync(frame.CapturedAt);
+                    await Task.Delay(120, token);
+                    continue;
+                }
                 if (previewEnabled) await Task.Delay(180, token);
                 if (!keyboard.IsWindowForeground(window.Hwnd)) continue;
                 if (decision.Action != ManualChallengeAction.None
@@ -412,9 +429,6 @@ public sealed class ManualChallengeRunner(
                                     (int)Math.Round(nativeHeight * .56),
                                     480, inputMethod, token);
                                 logger.LogInformation("手册挑战：捕捉界面未显示专属球，已在球列表滚动切换");
-                                break;
-                            case ManualChallengeAction.Approach:
-                                await SendKey("W", 200);
                                 break;
                             case ManualChallengeAction.SelectChallenge:
                                 await mouse.ScrollAtCurrentPositionAsync(window.Hwnd, 120, inputMethod, token);

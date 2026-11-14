@@ -35,6 +35,8 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
     public int CompletedCount { get; private set; }
     public int ConsecutiveFailures { get; private set; }
     public int BattleNumber { get; private set; }
+    public bool IsApproachingTarget => (target is not null || legendaryTarget is not null) && _targetStage == TargetStage.Confirmed
+        && _challengePhase == ChallengePhase.Navigation && StopReason is null;
     public bool IsBattleActive => _challengePhase == ChallengePhase.Battle;
 
     public ManualChallengeDecision Next(ManualChallengeScreen screen, int clientHeight)
@@ -135,7 +137,7 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
                 return Click(screen.Button);
             case ManualChallengeScene.Interaction when _challengePhase == ChallengePhase.Navigation:
                 if (_targetStage != TargetStage.Confirmed) return new(ManualChallengeAction.OpenManual);
-                if (string.IsNullOrWhiteSpace(screen.Text)) return default;
+                if (string.IsNullOrWhiteSpace(screen.Text) && !IsApproachingTarget) return default;
                 return new(ManualChallengeScreenRecognizer.Normalize(screen.Text) == "挑战"
                     ? ManualChallengeAction.Interact
                     : screen.HasChallengeOption ? ManualChallengeAction.SelectChallenge : ManualChallengeAction.Approach);

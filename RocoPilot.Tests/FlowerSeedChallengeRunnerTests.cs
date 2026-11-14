@@ -1188,8 +1188,52 @@ public sealed class FlowerSeedChallengeRunnerTests
             });
     }
 
+    [TestMethod]
+    public async Task FreshApproachFramesKeepOneContinuousKeyDown()
+    {
+        var keyboard = new Keyboard { SimulateHold = true };
+        await using var walk = new ChallengeApproachWalk(keyboard, 1, KeyboardInputMethod.SendInput, CancellationToken.None);
+        for (var i = 0; i < 4; i++)
+        {
+            await walk.AdvanceAsync(DateTimeOffset.UtcNow.AddMilliseconds(-1000));
+            await Task.Delay(850);
+        }
+        Assert.HasCount(1, keyboard.Keys);
+        Assert.IsFalse(keyboard.Released.Task.IsCompleted);
+        await walk.StopAsync();
+        Assert.IsTrue(keyboard.Released.Task.IsCompleted);
+    }
+
+    [TestMethod]
+    [DataRow("interaction")]
+    [DataRow("stale")]
+    [DataRow("focus")]
+    [DataRow("cancel")]
+    public async Task ContinuousApproachReleasesW(string reason)
+    {
+        using var cancel = new CancellationTokenSource();
+        var keyboard = new Keyboard { SimulateHold = true };
+        await using var walk = new ChallengeApproachWalk(keyboard, 1, KeyboardInputMethod.SendInput, cancel.Token);
+        await walk.AdvanceAsync(DateTimeOffset.UtcNow.AddSeconds(-4));
+        Assert.IsEmpty(keyboard.Keys);
+        await walk.AdvanceAsync(DateTimeOffset.UtcNow);
+        await walk.AdvanceAsync(DateTimeOffset.UtcNow);
+        Assert.HasCount(1, keyboard.Keys);
+        Assert.IsFalse(keyboard.Released.Task.IsCompleted);
+        switch (reason)
+        {
+            case "interaction": await walk.StopAsync(); break;
+            case "focus": keyboard.Foreground = false; break;
+            case "cancel": cancel.Cancel(); break;
+            // No further capture: W must go up independently of the recognition loop.
+        }
+        await keyboard.Released.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     private sealed class Keyboard : IKeyboardInputService
     {
+        public bool SimulateHold;
+        public TaskCompletionSource Released { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Action? DuringKey;
         public Action<string>? DuringSequence;
         public List<(string Key, KeyboardInputOptions Options)> Keys { get; } = [];
@@ -1211,7 +1255,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             Keys.Add((sequence, options!));
             DuringKey?.Invoke();
             DuringSequence?.Invoke(sequence);
-            await Task.Delay(10, cancellationToken);
+            try { await Task.Delay(SimulateHold ? options!.HoldDurationMs : 10, cancellationToken); }
+            finally { Released.TrySetResult(); }
         }
         public Task SendSequenceAsync(nint hwnd, IReadOnlyList<KeyStroke> keyStrokes, KeyboardInputOptions? options = null,
             CancellationToken cancellationToken = default)

@@ -47,6 +47,8 @@ public sealed class LegendaryChallengeFlowTests
         Assert.AreEqual(ManualChallengeAction.OpenManual, Next(flow, ManualChallengeScene.Interaction, text: "挑战！").Action);
         Assert.AreEqual(ManualChallengeAction.Click, Next(flow, ManualChallengeScene.Map, text: name).Action);
         Assert.AreEqual(ManualChallengeAction.Approach, Next(flow, ManualChallengeScene.World).Action);
+        Assert.IsTrue(flow.IsApproachingTarget);
+        Assert.AreEqual(ManualChallengeAction.Approach, Next(flow, ManualChallengeScene.Interaction).Action);
         Assert.AreEqual(ManualChallengeAction.Approach, Next(flow, ManualChallengeScene.Interaction, text: "查看留言").Action);
         Assert.AreEqual(ManualChallengeAction.SelectChallenge, flow.Next(new(ManualChallengeScene.Interaction, [],
             Text: "查看留言", HasChallengeOption: true), 1152).Action);

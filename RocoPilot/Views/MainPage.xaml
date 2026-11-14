@@ -273,7 +273,7 @@
                                 Margin="0,2,0,0"
                                 FontSize="12"
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="在信息遮罩窗口中显示最近捕捉列表和奇遇次数。"
+                                Text="在信息遮罩窗口中显示最近奇遇列表和奇遇次数。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
                         <ToggleButton

@@ -316,7 +316,7 @@ public sealed partial class InfoOverlayWindow : WindowEx
         {
             CounterList.Children.Add(new TextBlock
             {
-                Text = "暂无捕捉记录",
+                Text = "暂无奇遇记录",
                 FontSize = 12,
                 Foreground = new SolidColorBrush(CounterSecondaryForeground)
             });

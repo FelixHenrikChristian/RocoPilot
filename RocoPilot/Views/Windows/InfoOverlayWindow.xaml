@@ -17,7 +17,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="最近捕捉" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
+                    <TextBlock Text="最近奇遇" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="1" Text="奇遇次数" FontSize="11" Foreground="#9B9BAA" VerticalAlignment="Center" />
                 </Grid>
                 <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled"

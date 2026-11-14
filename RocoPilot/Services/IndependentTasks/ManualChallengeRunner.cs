@@ -34,12 +34,12 @@ public sealed class ManualChallengeRunner(
         int difficulty, bool useLegendaryMark, bool atTargetLocation, AutoBattleSettings battleSettings,
         Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
         => _ = await RunCoreAsync(state, null, runCount, battleSettings, progress, cancellationToken,
-            targetName, useLegendaryMark, difficulty, atTargetLocation: atTargetLocation);
+            atTargetLocation ? string.Empty : targetName, useLegendaryMark, difficulty, atTargetLocation: atTargetLocation);
 
-    public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target, int runCount, bool atTargetLocation,
+    public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption? target, int runCount, bool atTargetLocation,
         bool preferCondensedMark, AutoBattleSettings battleSettings, Action<IndependentTaskProgress> progress,
         CancellationToken cancellationToken)
-        => _ = await RunCoreAsync(state, target, runCount, battleSettings, progress, cancellationToken,
+        => _ = await RunCoreAsync(state, atTargetLocation ? null : target, runCount, battleSettings, progress, cancellationToken,
             atTargetLocation: atTargetLocation, preferCondensedMark: preferCondensedMark);
 
     public Task<IReadOnlyList<FlowerSeedOption>> ScanAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress,
@@ -58,7 +58,7 @@ public sealed class ManualChallengeRunner(
         bool atTargetLocation = false, bool preferCondensedMark = false)
     {
         legendary |= legendaryTarget is not null;
-        var scanning = target is null && legendaryTarget is null;
+        var scanning = target is null && legendaryTarget is null && !atTargetLocation;
         var flow = new ManualChallengeFlow(target, runCount, legendaryTarget, useLegendaryMark, legendaryDifficulty, atTargetLocation);
         var settings = AutoBattleSettingsRules.Normalize(battleSettings);
         if (!scanning)
@@ -91,8 +91,8 @@ public sealed class ManualChallengeRunner(
         var minimumFrameAt = DateTimeOffset.UtcNow;
         await using var approachWalk = scanning ? null : new ChallengeApproachWalk(keyboard, window.Hwnd, inputMethod, token);
         CapturedFrame? pendingFrame = null;
-        logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", legendaryTarget ?? target?.DisplayName
-            ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);
+        logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", atTargetLocation ? "当前位置"
+            : legendaryTarget ?? target?.DisplayName ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);
 
         try
         {
@@ -374,7 +374,7 @@ public sealed class ManualChallengeRunner(
                         && screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Unknown,
                     Recognition = scanning ? recognized
                     : screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Capture or ManualChallengeScene.Result
-                        ? $"{creatureName} · 成功 {flow.CompletedCount}/{runCount}"
+                        ? $"{(string.IsNullOrWhiteSpace(creatureName) ? "当前位置" : creatureName)} · 成功 {flow.CompletedCount}/{runCount}"
                         : $"成功 {flow.CompletedCount}/{runCount} 次 · {recognized}" });
                 if (decision.Action == ManualChallengeAction.Stop)
                     throw new InvalidOperationException(flow.StopReason);

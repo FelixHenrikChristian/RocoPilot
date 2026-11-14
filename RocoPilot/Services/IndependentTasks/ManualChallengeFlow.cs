@@ -35,7 +35,7 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
     public int CompletedCount { get; private set; }
     public int ConsecutiveFailures { get; private set; }
     public int BattleNumber { get; private set; }
-    public bool IsApproachingTarget => (target is not null || legendaryTarget is not null) && _targetStage == TargetStage.Confirmed
+    public bool IsApproachingTarget => (atTargetLocation || target is not null || legendaryTarget is not null) && _targetStage == TargetStage.Confirmed
         && _challengePhase == ChallengePhase.Navigation && StopReason is null;
     public bool IsBattleActive => _challengePhase == ChallengePhase.Battle;
 
@@ -59,7 +59,7 @@ internal sealed class ManualChallengeFlow(FlowerSeedOption? target, int runCount
             _challengePhase = ChallengePhase.Navigation;
             _useLegendaryForCapture = false;
         }
-        if ((target is not null || legendaryTarget is not null) && CompletedCount >= runCount && screen.Scene != ManualChallengeScene.Result) return default;
+        if ((atTargetLocation || target is not null || legendaryTarget is not null) && CompletedCount >= runCount && screen.Scene != ManualChallengeScene.Result) return default;
 
         // 传说列表可直接传送到挑战场景；若实际打开了地图，仍须核对地图目标。
         if (legendaryTarget is not null && _targetStage == TargetStage.Selected

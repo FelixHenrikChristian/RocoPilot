@@ -35,7 +35,8 @@ public sealed partial class TasksPage : Page
 
     private async void ToggleFlowerSeedChallengeButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!ViewModel.IsFlowerSeedChallengeRunning && ViewModel.SelectedFlowerSeed is null)
+        if (!ViewModel.IsFlowerSeedChallengeRunning && !ViewModel.FlowerSeedAtTargetLocation
+            && ViewModel.SelectedFlowerSeed is null)
         {
             await new AppContentDialog
             {

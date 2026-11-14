@@ -55,9 +55,11 @@ public partial class TasksViewModel : ObservableRecipient
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedConfigurationEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedTargetSelectionEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedScanButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeConfigurationEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryTargetSelectionEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
     public partial bool IsIndependentTaskRunning { get; set; }
@@ -86,12 +88,16 @@ public partial class TasksViewModel : ObservableRecipient
     public partial double FlowerSeedRunCount { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedTargetSelectionEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsFlowerSeedScanButtonEnabled))]
     public partial bool FlowerSeedAtTargetLocation { get; set; }
 
     [ObservableProperty]
     public partial bool FlowerSeedPreferCondensedMark { get; set; } = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryTargetSelectionEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
     public partial bool LegendaryAtTargetLocation { get; set; }
 
     [ObservableProperty]
@@ -112,6 +118,8 @@ public partial class TasksViewModel : ObservableRecipient
 
     public bool IsLegendaryChallengeConfigurationEnabled => !IsIndependentTaskRunning;
 
+    public bool IsLegendaryTargetSelectionEnabled => IsLegendaryChallengeConfigurationEnabled && !LegendaryAtTargetLocation;
+
     public bool IsLegendaryChallengeButtonEnabled => IsLegendaryChallengeRunning || !IsIndependentTaskRunning;
 
     public string FlowerSeedChallengeButtonText => IsFlowerSeedChallengeRunning ? StopButtonText : StartButtonText;
@@ -124,16 +132,18 @@ public partial class TasksViewModel : ObservableRecipient
 
     public bool IsFlowerSeedConfigurationEnabled => !IsIndependentTaskRunning;
 
+    public bool IsFlowerSeedTargetSelectionEnabled => IsFlowerSeedConfigurationEnabled && !FlowerSeedAtTargetLocation;
+
     public bool IsFlowerSeedChallengeButtonEnabled => IsFlowerSeedChallengeRunning
         || !IsIndependentTaskRunning;
 
-    public bool IsFlowerSeedScanButtonEnabled => IsFlowerSeedScanning || !IsIndependentTaskRunning;
+    public bool IsFlowerSeedScanButtonEnabled => IsFlowerSeedScanning || IsFlowerSeedTargetSelectionEnabled;
 
     public string LegendaryScanButtonLabel => IsLegendaryScanning ? "停止扫描" : "刷新传说精灵（仅本次启动有效）";
 
     public string LegendaryScanButtonGlyph => IsLegendaryScanning ? StopButtonGlyph : "\uE72C";
 
-    public bool IsLegendaryScanButtonEnabled => IsLegendaryScanning || !IsIndependentTaskRunning;
+    public bool IsLegendaryScanButtonEnabled => IsLegendaryScanning || IsLegendaryTargetSelectionEnabled;
 
     public TasksViewModel(
         IIndependentTaskService independentTaskService,

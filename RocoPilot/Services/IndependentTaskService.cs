@@ -145,12 +145,14 @@ public sealed class IndependentTaskService : IIndependentTaskService
             settings.FlowerSeedOptions = [.. _settings.FlowerSeedOptions];
             settings.UseLegendaryMarkWhenInsufficient = _settings.UseLegendaryMarkWhenInsufficient;
             if (tasks.Contains(IndependentTaskKind.FlowerSeedChallenge)
+                && !settings.FlowerSeedAtTargetLocation
                 && !settings.FlowerSeedOptions.Any(option => option.Number == settings.FlowerSeedTargetNumber))
             {
                 return IndependentTaskStartResult.Failed("请先扫描并选择目标花种。");
             }
 
-            if (tasks.Contains(IndependentTaskKind.LegendaryChallenge) && !LegendaryTargets.Contains(settings.LegendaryTargetName))
+            if (tasks.Contains(IndependentTaskKind.LegendaryChallenge) && !settings.LegendaryAtTargetLocation
+                && !LegendaryTargets.Contains(settings.LegendaryTargetName))
                 return IndependentTaskStartResult.Failed("请先选择目标传说精灵。");
 
             if (kind == IndependentTaskKind.FlowerSeedScan)
@@ -295,19 +297,22 @@ public sealed class IndependentTaskService : IIndependentTaskService
                         settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient,
                         settings.LegendaryAtTargetLocation, battleSettings, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
-                    outcome = $"成功：{settings.LegendaryTargetName}，{settings.LegendaryChallengeRunCount} 次";
-                    _logger.LogInformation("传说精灵挑战完成：{Target}，成功 {Count} 次", settings.LegendaryTargetName, settings.LegendaryChallengeRunCount);
+                    var legendaryTarget = settings.LegendaryAtTargetLocation ? "当前位置" : settings.LegendaryTargetName;
+                    outcome = $"成功：{legendaryTarget}，{settings.LegendaryChallengeRunCount} 次";
+                    _logger.LogInformation("传说精灵挑战完成：{Target}，成功 {Count} 次", legendaryTarget, settings.LegendaryChallengeRunCount);
                     await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界", !isDaily);
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:
                     await _challengeRunner.RunAsync(state,
-                        settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
+                        settings.FlowerSeedAtTargetLocation ? null
+                            : settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
                         settings.FlowerSeedRunCount, settings.FlowerSeedAtTargetLocation,
                         settings.FlowerSeedPreferCondensedMark, battleSettings,
                         UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
-                    outcome = $"成功：花种 {settings.FlowerSeedTargetNumber}，{settings.FlowerSeedRunCount} 次";
-                    _logger.LogInformation("花种挑战完成：编号 {Target}，成功 {Count} 次", settings.FlowerSeedTargetNumber, settings.FlowerSeedRunCount);
+                    var flowerSeedTarget = settings.FlowerSeedAtTargetLocation ? "当前位置" : $"花种 {settings.FlowerSeedTargetNumber}";
+                    outcome = $"成功：{flowerSeedTarget}，{settings.FlowerSeedRunCount} 次";
+                    _logger.LogInformation("花种挑战完成：{Target}，成功 {Count} 次", flowerSeedTarget, settings.FlowerSeedRunCount);
                     await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界", !isDaily);
                     break;
                 case IndependentTaskKind.FlowerSeedScan:

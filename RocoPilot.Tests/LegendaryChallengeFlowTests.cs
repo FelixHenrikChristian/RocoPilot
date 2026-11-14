@@ -14,6 +14,25 @@ public sealed class LegendaryChallengeFlowTests
     private static readonly ImageMatchResult Mark = Confirm with { TemplatePath = "mark" };
 
     [TestMethod]
+    public void CurrentLocationChallengeNeedsNoLegendaryName()
+    {
+        var flow = new ManualChallengeFlow(null, 1, string.Empty, atTargetLocation: true);
+        Assert.IsTrue(flow.IsApproachingTarget);
+        Assert.AreEqual(ManualChallengeAction.Approach, Next(flow, ManualChallengeScene.World).Action);
+        Assert.AreEqual(ManualChallengeAction.Interact, Next(flow, ManualChallengeScene.Interaction, text: "挑战").Action);
+        Assert.AreEqual(ManualChallengeAction.Click, flow.Next(new(ManualChallengeScene.LegendaryConfirmation, [],
+            Confirm, Difficulty: 3), 1152).Action);
+        Assert.AreEqual(ManualChallengeAction.Click, Next(flow, ManualChallengeScene.UnderfilledTeam).Action);
+        Next(flow, ManualChallengeScene.Preparation);
+        Assert.AreEqual(ManualChallengeAction.Battle, Next(flow, ManualChallengeScene.Battle).Action);
+        Assert.AreEqual(Confirm, Next(flow, ManualChallengeScene.CaptureConfirmation).Button);
+        Assert.AreEqual(ManualChallengeAction.Escape, Next(flow, ManualChallengeScene.LegendaryRewards).Action);
+        Assert.AreEqual(ManualChallengeAction.Capture, Next(flow, ManualChallengeScene.Capture).Action);
+        Assert.AreEqual(Exit, Next(flow, ManualChallengeScene.Result).Button);
+        Assert.AreEqual(ManualChallengeAction.Complete, Next(flow, ManualChallengeScene.World).Action);
+    }
+
+    [TestMethod]
     [DataRow(true)]
     [DataRow(false)]
     public void LegendaryDirectTeleportContinuesAtTheSelectedTargetWithoutReopeningManual(bool worldFirst)

@@ -22,7 +22,7 @@ public interface IManualChallengeRunner
 
     Task RunAsync(
         RuntimeTaskState state,
-        FlowerSeedOption target,
+        FlowerSeedOption? target,
         int runCount,
         bool atTargetLocation,
         bool preferCondensedMark,

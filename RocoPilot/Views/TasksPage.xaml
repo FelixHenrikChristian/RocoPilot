@@ -77,7 +77,7 @@
                                     Width="200"
                                     VerticalAlignment="Center"
                                     DisplayMemberPath="DisplayName"
-                                    IsEnabled="{x:Bind ViewModel.IsFlowerSeedConfigurationEnabled, Mode=OneWay}"
+                                    IsEnabled="{x:Bind ViewModel.IsFlowerSeedTargetSelectionEnabled, Mode=OneWay}"
                                     ItemsSource="{x:Bind ViewModel.FlowerSeedOptions}"
                                     PlaceholderText="请先扫描花种"
                                     SelectedItem="{x:Bind ViewModel.SelectedFlowerSeed, Mode=TwoWay}" />
@@ -314,7 +314,7 @@
                                     Width="160"
                                     VerticalAlignment="Center"
                                     PlaceholderText="请选择传说精灵"
-                                    IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}"
+                                    IsEnabled="{x:Bind ViewModel.IsLegendaryTargetSelectionEnabled, Mode=OneWay}"
                                     ItemsSource="{x:Bind ViewModel.LegendaryTargets}"
                                     SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
                                 <Button

@@ -467,12 +467,14 @@ public sealed class FlowerSeedChallengeRunnerTests
     }
 
     [TestMethod]
-    [DataRow(false)]
-    [DataRow(true)]
-    public async Task ChallengeUsesDedicatedSkillsAndExclusiveCaptureThenRepeatsAndExits(bool medalConfirmation)
+    [DataRow(false, false)]
+    [DataRow(true, false)]
+    [DataRow(false, true)]
+    [DataRow(true, true)]
+    public async Task ChallengeUsesDedicatedSkillsAndExclusiveCaptureThenRepeatsAndExits(bool medalConfirmation, bool atTargetLocation)
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var capture = new ChallengeCapture(medalConfirmation);
+        var capture = new ChallengeCapture(medalConfirmation, atTargetLocation: atTargetLocation);
         var state = CreateState();
         state.Options.AutoBattleSettings.IsEnabled = false;
         state.Options.AutoBattleSettings.TurnSequence = "R, {skill}";
@@ -485,8 +487,8 @@ public sealed class FlowerSeedChallengeRunnerTests
             new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
         List<IndependentTaskProgress> updates = [];
 
-        await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 2,
-            false, false, state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
+        await runner.RunAsync(state, atTargetLocation ? null : new FlowerSeedOption(1, "友爱星飞"), 2,
+            atTargetLocation, false, state.Options.AutoBattleSettings, updates.Add, cancellation.Token);
 
         CollectionAssert.AreEqual(new[] { "F", "4", "1, Space", "4", "1, Space" },
             keyboard.Keys.Select(key => key.Key).ToArray());
@@ -496,6 +498,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.IsTrue(keyboard.Keys.Where(key => key.Key == "1, Space")
             .All(key => key.Options.IntervalMs == state.Options.AutoBattleSettings.CaptureKeyboardIntervalMs));
         Assert.AreEqual(2, capture.BattlesStarted);
+        Assert.AreEqual(atTargetLocation ? 0 : 1, capture.Teleports);
         Assert.AreEqual(1, capture.Retries);
         Assert.AreEqual(1, capture.Exits);
         Assert.AreEqual(4, capture.AnimationFrames);
@@ -505,7 +508,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         Assert.IsTrue(updates.Any(update => update.Recognition.Contains("正在确认当前界面", StringComparison.Ordinal)));
         Assert.IsTrue(updates.Any(update => update.Operation == "技能 4"));
         Assert.IsTrue(updates.Any(update => update.Operation == "捕捉"));
-        Assert.IsTrue(updates.All(update => update.CreatureName == "友爱星飞"));
+        Assert.IsTrue(updates.All(update => update.CreatureName == (atTargetLocation ? string.Empty : "友爱星飞")));
         Assert.IsFalse(updates.Any(update => update.Operation.Contains('（') || update.Operation.Contains("已发送", StringComparison.Ordinal)));
         Assert.AreEqual("挑战完成，成功2次，已返回大世界", updates[^1].Operation);
         Assert.AreEqual(1, overlay.Hides);
@@ -991,9 +994,9 @@ public sealed class FlowerSeedChallengeRunnerTests
 
     // 捕捉后的过渡画面会短暂命中大世界与交互 HUD。
     private sealed class ChallengeCapture(bool medalConfirmation = false, bool failFirstBattle = false, int skillTurns = 1,
-        bool staticReward = false) : IScreenCaptureService
+        bool staticReward = false, bool atTargetLocation = false) : IScreenCaptureService
     {
-        private byte _scene = 6;
+        private byte _scene = atTargetLocation ? (byte)3 : (byte)6;
         private CapturedFrame? _rewardFrame;
         private int _animationFramesLeft;
         private int _skillsUsed;

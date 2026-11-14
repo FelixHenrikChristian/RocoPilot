@@ -317,6 +317,93 @@ public sealed class IndependentTaskServiceTests
     }
 
     [TestMethod]
+    public async Task SkippingNavigationDisablesTargetControlsAndPreservesSelections()
+    {
+        // VSTest runs outside the application's WinRT activation manifest.
+        Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.Initialize(0x00020001);
+        try
+        {
+            var fixture = new Fixture();
+            var vm = new RocoPilot.ViewModels.TasksViewModel(fixture.Service,
+                NullLogger<RocoPilot.ViewModels.TasksViewModel>.Instance);
+            await vm.LoadAsync();
+            var flower = vm.SelectedFlowerSeed;
+            var legendary = vm.SelectedLegendaryTarget;
+            List<string?> changed = [];
+            vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+            vm.FlowerSeedAtTargetLocation = true;
+            Assert.IsFalse(vm.IsFlowerSeedTargetSelectionEnabled);
+            Assert.IsFalse(vm.IsFlowerSeedScanButtonEnabled);
+            Assert.IsTrue(vm.IsLegendaryTargetSelectionEnabled);
+            vm.LegendaryAtTargetLocation = true;
+            Assert.IsFalse(vm.IsLegendaryTargetSelectionEnabled);
+            Assert.IsFalse(vm.IsLegendaryScanButtonEnabled);
+            Assert.IsTrue(vm.IsFlowerSeedConfigurationEnabled);
+            Assert.IsTrue(vm.IsLegendaryChallengeConfigurationEnabled);
+            CollectionAssert.Contains(changed, nameof(vm.IsFlowerSeedTargetSelectionEnabled));
+            CollectionAssert.Contains(changed, nameof(vm.IsFlowerSeedScanButtonEnabled));
+            CollectionAssert.Contains(changed, nameof(vm.IsLegendaryTargetSelectionEnabled));
+            CollectionAssert.Contains(changed, nameof(vm.IsLegendaryScanButtonEnabled));
+
+            vm.FlowerSeedAtTargetLocation = false;
+            vm.LegendaryAtTargetLocation = false;
+            Assert.IsTrue(vm.IsFlowerSeedTargetSelectionEnabled && vm.IsFlowerSeedScanButtonEnabled);
+            Assert.IsTrue(vm.IsLegendaryTargetSelectionEnabled && vm.IsLegendaryScanButtonEnabled);
+            Assert.AreEqual(flower, vm.SelectedFlowerSeed);
+            Assert.AreEqual(legendary, vm.SelectedLegendaryTarget);
+            changed.Clear();
+            vm.IsIndependentTaskRunning = true;
+            Assert.IsFalse(vm.IsFlowerSeedTargetSelectionEnabled || vm.IsFlowerSeedScanButtonEnabled);
+            Assert.IsFalse(vm.IsLegendaryTargetSelectionEnabled || vm.IsLegendaryScanButtonEnabled);
+            CollectionAssert.Contains(changed, nameof(vm.IsFlowerSeedTargetSelectionEnabled));
+            CollectionAssert.Contains(changed, nameof(vm.IsLegendaryTargetSelectionEnabled));
+            vm.IsFlowerSeedScanning = true;
+            vm.IsLegendaryScanning = true;
+            Assert.IsTrue(vm.IsFlowerSeedScanButtonEnabled && vm.IsLegendaryScanButtonEnabled);
+        }
+        finally
+        {
+            Microsoft.Windows.ApplicationModel.DynamicDependency.Bootstrap.Shutdown();
+        }
+    }
+
+    [TestMethod]
+    [DataRow(IndependentTaskKind.FlowerSeedChallenge, false)]
+    [DataRow(IndependentTaskKind.FlowerSeedChallenge, true)]
+    [DataRow(IndependentTaskKind.LegendaryChallenge, false)]
+    [DataRow(IndependentTaskKind.LegendaryChallenge, true)]
+    public async Task ChallengeAtCurrentLocationDoesNotRequireTargetSelection(IndependentTaskKind kind, bool hasSelection)
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        if (kind == IndependentTaskKind.LegendaryChallenge)
+        {
+            Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryScan)).Success);
+            await WaitStoppedAsync(fixture.Service);
+        }
+        fixture.Service.SetSettings(new()
+        {
+            FlowerSeedOptions = hasSelection ? [new(1, "旧花种")] : [],
+            FlowerSeedTargetNumber = hasSelection ? 1 : 0,
+            LegendaryTargetName = hasSelection ? "圣羽翼王" : string.Empty,
+            FlowerSeedAtTargetLocation = true,
+            LegendaryAtTargetLocation = true
+        });
+        if (kind == IndependentTaskKind.LegendaryChallenge && !hasSelection)
+            Assert.AreEqual(string.Empty, fixture.Service.Settings.LegendaryTargetName);
+        var resumes = fixture.Runtime.Resumes;
+
+        Assert.IsTrue((await fixture.Service.StartAsync(kind)).Success);
+        await WaitStoppedAsync(fixture.Service);
+
+        Assert.IsTrue(fixture.Runner.ChallengeStarted.Task.IsCompleted);
+        Assert.IsTrue(fixture.Runner.AtTargetLocation);
+        if (kind == IndependentTaskKind.FlowerSeedChallenge) Assert.IsNull(fixture.Runner.Target);
+        Assert.AreEqual(resumes + 1, fixture.Runtime.Resumes);
+    }
+
+    [TestMethod]
     public async Task ChallengeRequiresASelectedNumberFromTheCurrentScan()
     {
         var fixture = new Fixture();
@@ -789,7 +876,7 @@ public sealed class IndependentTaskServiceTests
         public TaskCompletionSource ScanStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ChallengeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption target,
+        public async Task RunAsync(RuntimeTaskState state, FlowerSeedOption? target,
             int runCount, bool atTargetLocation, bool preferCondensedMark, AutoBattleSettings battleSettings,
             Action<IndependentTaskProgress> progress, CancellationToken cancellationToken)
         {

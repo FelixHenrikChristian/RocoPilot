@@ -18,6 +18,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
         var input = state.Options.AutoBattleSettings;
         var method = input.KeyboardInputMethod;
         keyboard.EnsureReady(method);
+        await using var walk = new ForwardWalk(keyboard, window.Hwnd, method, token);
         var plots = new Queue<int>(Enumerable.Range(0, 15).Select(i =>
             (2 - i / 5) * 5 + (i / 5 == 1 ? 4 - i % 5 : i % 5)));
         var revisit = new HashSet<int>();
@@ -28,7 +29,6 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
         var stable = 0;
         var planted = false;
         var atPlot = false;
-        var observedCare = false;
         var status = "打开家园地图";
         void Report(string message)
         {
@@ -64,7 +64,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
         Report(status);
         while (true)
         {
-            await Task.Delay(step == Step.Care ? 2200 : 350, token);
+            await Task.Delay(step == Step.Care ? 2200 : walk.Active ? 120 : 350, token);
             if (!keyboard.IsWindowAvailable(window.Hwnd)) throw new InvalidOperationException("游戏窗口已关闭。");
             if (!keyboard.IsWindowForeground(window.Hwnd))
             {
@@ -141,12 +141,24 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                 planted = false;
                 continue;
             }
-            if (await screen.World(token) == null) { stable = 0; continue; }
+            if (await screen.World(token) == null)
+            {
+                await walk.StopAsync();
+                stable = 0;
+                continue;
+            }
             var vision = new GardenVision(frame, window);
             var pos = vision.Locate();
-            if (step == Step.Approach && pos == null)
+            // 从南侧入口直行，提前一行松键，停稳后再微调到收菜位置。
+            if (step == Step.Approach && (pos == null || pos.Value.Row > 3.5))
             {
-                await Key("W", 400);
+                await walk.AdvanceAsync(frame.CapturedAt);
+                continue;
+            }
+            if (walk.Active)
+            {
+                await walk.StopAsync();
+                freshAfter = DateTimeOffset.UtcNow;
                 continue;
             }
             if (pos is not { } location) { stable = 0; continue; }
@@ -223,14 +235,9 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                     if (location.DirectionTo(2.5, 4.3) != null)
                         throw new InvalidOperationException("已离开田边观察位置，养护未确认。");
                     if (vision.HasCareBubble())
-                    {
-                        observedCare = true;
                         stable = 0;
-                    }
-                    else if (++stable >= 4 && observedCare)
+                    else if (++stable >= 4)
                         return "成功：15/15 格已种植，浇水施肥已完成";
-                    else if (!observedCare && timer.Elapsed.TotalSeconds >= 35)
-                        throw new InvalidOperationException("15/15 格已种植，田边未观察到养护图标，无法确认养护完成。");
                     break;
             }
         }

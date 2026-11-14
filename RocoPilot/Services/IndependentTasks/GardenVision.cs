@@ -9,7 +9,7 @@ internal readonly record struct GardenPosition(double Column, double Row)
     public string? DirectionTo(double column, double row)
     {
         if (Math.Abs(Column - column) > .32) return Column < column ? "D" : "A";
-        if (Math.Abs(Row - row) > .32) return Row < row ? "W" : "S";
+        if (Math.Abs(Row - row) > .32) return Row < row ? "S" : "W";
         return null;
     }
 }

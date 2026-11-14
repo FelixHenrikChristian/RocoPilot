@@ -89,7 +89,7 @@ public sealed class ManualChallengeRunner(
         var lastActionScene = ManualChallengeScene.Unknown;
         var lastFrameTime = DateTimeOffset.MinValue;
         var minimumFrameAt = DateTimeOffset.UtcNow;
-        await using var approachWalk = scanning ? null : new ChallengeApproachWalk(keyboard, window.Hwnd, inputMethod, token);
+        await using var approachWalk = scanning ? null : new ForwardWalk(keyboard, window.Hwnd, inputMethod, token);
         CapturedFrame? pendingFrame = null;
         logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", atTargetLocation ? "当前位置"
             : legendaryTarget ?? target?.DisplayName ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);

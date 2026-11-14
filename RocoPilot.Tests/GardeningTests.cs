@@ -13,6 +13,14 @@ public sealed class GardeningTests
     private static string Folder([CallerFilePath] string file = "") => Path.GetDirectoryName(file)!;
 
     [TestMethod]
+    public void NorthwardMovementReducesRowFromTheEntrance()
+    {
+        Assert.AreEqual("W", new GardenPosition(2.5, 4.3).DirectionTo(2.5, 2.5));
+        Assert.IsNull(new GardenPosition(2.5, 2.7).DirectionTo(2.5, 2.5));
+        Assert.AreEqual("S", new GardenPosition(2.5, 2.5).DirectionTo(2.5, 4.3));
+    }
+
+    [TestMethod]
     [DataRow("2026-11-09", "selected-corner", 0, 2, true)]
     [DataRow("2026-11-09", "empty-field", 2, 2, true)]
     [DataRow("2026-11-14", "planted", 4, 0, false)]
@@ -40,6 +48,7 @@ public sealed class GardeningTests
     [TestMethod]
     [DataRow("2026-11-14", "care-pending", false, true)]
     [DataRow("2026-11-14", "care-finished", false, false)]
+    [DataRow("2026-11-15", "care-already-finished", false, false)]
     [DataRow("2026-11-09", "empty-field", true, false)]
     [DataRow("2026-11-09", "ripe-field", true, true)]
     public async Task ChecksFieldBubbles(string date, string name, bool harvest, bool expected)

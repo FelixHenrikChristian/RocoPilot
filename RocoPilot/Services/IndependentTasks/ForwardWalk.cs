@@ -5,7 +5,7 @@ namespace RocoPilot.Services.IndependentTasks;
 
 // Only a fresh approach decision extends the hold. The keyboard service releases W
 // in its finally block even when capture or recognition stops responding.
-internal sealed class ChallengeApproachWalk(IKeyboardInputService keyboard, nint hwnd, KeyboardInputMethod method,
+internal sealed class ForwardWalk(IKeyboardInputService keyboard, nint hwnd, KeyboardInputMethod method,
     CancellationToken token) : IAsyncDisposable
 {
     private const int FrameDeadlineMs = 3000;

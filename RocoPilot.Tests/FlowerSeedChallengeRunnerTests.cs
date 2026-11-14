@@ -1195,7 +1195,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     public async Task FreshApproachFramesKeepOneContinuousKeyDown()
     {
         var keyboard = new Keyboard { SimulateHold = true };
-        await using var walk = new ChallengeApproachWalk(keyboard, 1, KeyboardInputMethod.SendInput, CancellationToken.None);
+        await using var walk = new ForwardWalk(keyboard, 1, KeyboardInputMethod.SendInput, CancellationToken.None);
         for (var i = 0; i < 4; i++)
         {
             await walk.AdvanceAsync(DateTimeOffset.UtcNow.AddMilliseconds(-1000));
@@ -1216,7 +1216,7 @@ public sealed class FlowerSeedChallengeRunnerTests
     {
         using var cancel = new CancellationTokenSource();
         var keyboard = new Keyboard { SimulateHold = true };
-        await using var walk = new ChallengeApproachWalk(keyboard, 1, KeyboardInputMethod.SendInput, cancel.Token);
+        await using var walk = new ForwardWalk(keyboard, 1, KeyboardInputMethod.SendInput, cancel.Token);
         await walk.AdvanceAsync(DateTimeOffset.UtcNow.AddSeconds(-4));
         Assert.IsEmpty(keyboard.Keys);
         await walk.AdvanceAsync(DateTimeOffset.UtcNow);

@@ -9,6 +9,9 @@ public interface IMouseInputService
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
         CancellationToken cancellationToken = default);
 
+    void LookDown(IntPtr hwnd, KeyboardInputMethod method);
+    Task PressAtCurrentPositionAsync(IntPtr hwnd, int holdMs, KeyboardInputMethod method, CancellationToken token);
+
     Task DragAsync(IntPtr hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
         CancellationToken cancellationToken);
 

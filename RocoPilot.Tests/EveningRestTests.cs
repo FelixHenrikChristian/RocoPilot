@@ -97,6 +97,8 @@ public sealed class EveningRestTests
         public bool RequiresForeground(KeyboardInputMethod method) => true;
         public void EnsureReady(KeyboardInputMethod method) { }
         public void Release(CaptureTargetWindow window, CaptureMethod method) { }
+        public void LookDown(nint hwnd, KeyboardInputMethod method) => throw new NotSupportedException();
+        public Task PressAtCurrentPositionAsync(nint hwnd, int holdMs, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
         public Task DragAsync(nint hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
         public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
         public Task ScrollAtCurrentPositionAsync(nint hwnd, int delta, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();

@@ -27,27 +27,55 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
         int y,
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
         CancellationToken cancellationToken = default)
-        => PressAsync(hwnd, x, y, null, method, cancellationToken);
+        => PressAsync(hwnd, new WindowPoint { X = x, Y = y }, null, 50, method, cancellationToken);
 
     public Task DragAsync(IntPtr hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
         CancellationToken cancellationToken)
-        => PressAsync(hwnd, x, y, new WindowPoint { X = endX, Y = endY }, method, cancellationToken);
+        => PressAsync(hwnd, new WindowPoint { X = x, Y = y }, new WindowPoint { X = endX, Y = endY }, 50, method, cancellationToken);
 
-    private async Task PressAsync(IntPtr hwnd, int x, int y, WindowPoint? end, KeyboardInputMethod method,
+    public void LookDown(IntPtr hwnd, KeyboardInputMethod method)
+    {
+        EnsureForeground(hwnd);
+        var hook = GetMouseHook(method);
+        const int distance = 60;
+        if (hook is null)
+        {
+            var input = new InputEnvelope { Type = 0, Mouse = new MouseInput { Flags = 1, Y = distance } };
+            if (SendInput(1, [input], Marshal.SizeOf<InputEnvelope>()) != 1)
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            return;
+        }
+        var stroke = new InputInterceptorNS.Stroke();
+        stroke.Mouse.Y = distance;
+        lock (_interceptionSyncRoot)
+        {
+            var device = hook.Device == -1 ? hook.RandomDevice : hook.Device;
+            if (InterceptionInput.Send(hook.Context, device, ref stroke, 1) != 1)
+                throw new InvalidOperationException("Interception 视角移动失败。");
+        }
+    }
+
+    public Task PressAtCurrentPositionAsync(IntPtr hwnd, int holdMs, KeyboardInputMethod method, CancellationToken token)
+        => PressAsync(hwnd, null, null, holdMs, method, token);
+
+    private async Task PressAsync(IntPtr hwnd, WindowPoint? start, WindowPoint? end, int holdMs, KeyboardInputMethod method,
         CancellationToken cancellationToken)
     {
         await _inputGate.WaitAsync(cancellationToken);
         try
         {
             var hook = GetMouseHook(method);
-            MoveCursorToClientPoint(hook, hwnd, x, y);
-            await Task.Delay(50, cancellationToken);
+            if (start is { } point)
+            {
+                MoveCursorToClientPoint(hook, hwnd, point.X, point.Y);
+                await Task.Delay(50, cancellationToken);
+            }
             EnsureForeground(hwnd);
             SendMouseInput(hook, MouseEventLeftDown, InterceptionMouseState.LeftButtonDown);
             try
             {
-                await Task.Delay(50, cancellationToken);
-                if (end is { } target)
+                await Task.Delay(holdMs, cancellationToken);
+                if (end is { } target && start is { X: var x, Y: var y })
                 {
                     const int steps = 5;
                     for (var i = 1; i <= steps; i++)

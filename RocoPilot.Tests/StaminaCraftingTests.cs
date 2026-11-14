@@ -142,6 +142,8 @@ public class StaminaCraftingTests
             return Task.CompletedTask;
         }
 
+        public void LookDown(nint hwnd, KeyboardInputMethod method) => throw new NotSupportedException();
+        public Task PressAtCurrentPositionAsync(nint hwnd, int holdMs, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
         public Task DragAsync(nint hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method, CancellationToken cancellationToken)
         {
             Assert.IsFalse(insufficient, "制造按钮置灰时不应拖动滑块。");

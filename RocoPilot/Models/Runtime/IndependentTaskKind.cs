@@ -11,5 +11,6 @@ public enum IndependentTaskKind
     LegendaryScan,
     StaminaCrafting,
     EveningRest,
-    Mail
+    Mail,
+    Gardening
 }

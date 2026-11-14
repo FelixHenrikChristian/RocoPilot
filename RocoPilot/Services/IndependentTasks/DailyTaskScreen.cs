@@ -26,12 +26,12 @@ internal sealed class DailyTaskScreen
     public int ClientY(double py) => (int)Math.Round((py - _y) * (_window.ClientHeight > 0 ? _window.ClientHeight : _height) / _height);
 
     public async Task<ImageMatchResult?> Find(string template, int left, int top, int right, int bottom,
-        CancellationToken token, double threshold = .94)
+        CancellationToken token, double threshold = .94, double templateScale = 1)
     {
         var region = RecognitionRegionImageHelper.MapReferenceArea(_x, _y, _width, _height, 2048, 1152,
             left, top, right - left, bottom - top);
         var result = await _images.MatchAsync(_frame, region, $"2048x1152/{template}.png",
-            new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = Scale, TemplateScaleY = Scale }, token);
+            new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = Scale * templateScale, TemplateScaleY = Scale * templateScale }, token);
         return result.IsMatch ? result : null;
     }
 

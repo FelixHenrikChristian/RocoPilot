@@ -122,7 +122,7 @@ public class StaminaCraftingTests
             return Task.CompletedTask;
         }
 
-        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken cancellationToken)
+        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken cancellationToken, int holdMs = 50)
         {
             if (Stage == "slider-maximum") Assert.IsTrue(_frames > 1);
             var (next, cx, cy) = Stage switch

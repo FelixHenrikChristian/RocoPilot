@@ -17,6 +17,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly IRuntimeSessionControl _runtimeTaskService;
     private readonly ILocalSettingsService _localSettingsService;
     private readonly MailRunner _mail;
+    private readonly CropSaleRunner _cropSale;
     private readonly GardeningRunner _gardening;
     private readonly EveningRestRunner _eveningRest;
     private readonly StaminaCraftingRunner _staminaCrafting;
@@ -55,7 +56,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         IManualChallengeRunner challengeRunner,
         IAppNotificationService notifications,
         IGameWindowService gameWindowService,
-        StaminaCraftingRunner staminaCrafting, EveningRestRunner eveningRest, MailRunner mail, GardeningRunner gardening,
+        StaminaCraftingRunner staminaCrafting, EveningRestRunner eveningRest, MailRunner mail, GardeningRunner gardening, CropSaleRunner cropSale,
         ILogger<IndependentTaskService> logger)
     {
         _runtimeTaskService = runtimeTaskService;
@@ -67,6 +68,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         _eveningRest = eveningRest;
         _mail = mail;
         _gardening = gardening;
+        _cropSale = cropSale;
         _logger = logger;
     }
 
@@ -111,7 +113,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     {
         if (tasks.Count == 0)
             return Task.FromResult(IndependentTaskStartResult.Failed("请至少启用一个每日任务。"));
-        if (tasks.Any(kind => kind is not (IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge or IndependentTaskKind.StaminaCrafting or IndependentTaskKind.EveningRest or IndependentTaskKind.Mail or IndependentTaskKind.Gardening)))
+        if (tasks.Any(kind => kind is not (IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge or IndependentTaskKind.StaminaCrafting or IndependentTaskKind.EveningRest or IndependentTaskKind.Mail or IndependentTaskKind.Gardening or IndependentTaskKind.Sell)))
             return Task.FromResult(IndependentTaskStartResult.Failed("每日清单包含尚未接入的任务。"));
         return StartTasksAsync(tasks.ToArray(), challenges.Clone(), cancellationToken);
     }
@@ -144,6 +146,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
             var settings = dailySettings?.Normalize(LegendaryTargets) ?? _settings.Clone();
             settings.FlowerSeedOptions = [.. _settings.FlowerSeedOptions];
             settings.UseLegendaryMarkWhenInsufficient = _settings.UseLegendaryMarkWhenInsufficient;
+            if (tasks.Contains(IndependentTaskKind.Sell) && (!IndependentTaskSettings.SaleFlowers.Contains(settings.SaleFlower) || settings.SaleQuantity < 1))
+                return IndependentTaskStartResult.Failed("请选择要出售的花，并填写正整数数量。");
+
             if (tasks.Contains(IndependentTaskKind.FlowerSeedChallenge)
                 && !settings.FlowerSeedAtTargetLocation
                 && !settings.FlowerSeedOptions.Any(option => option.Number == settings.FlowerSeedTargetNumber))
@@ -259,6 +264,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 _logger.LogInformation("开始执行{Task}（第 {Index}/{Total} 项）", taskName, index + 1, tasks.Count);
                 switch (kind)
             {
+                case IndependentTaskKind.Sell:
+                    outcome = await _cropSale.RunAsync(state, settings.SaleFlower, settings.SaleQuantity, UpdateProgress, taskCts.Token);
+                    break;
                 case IndependentTaskKind.Gardening:
                     outcome = await _gardening.RunAsync(state, UpdateProgress, taskCts.Token);
                     break;
@@ -440,6 +448,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
             IndependentTaskKind.FlowerSeedChallenge => "花种挑战",
             IndependentTaskKind.FlowerSeedScan => "扫描花种",
             IndependentTaskKind.Mail => "邮件领取",
+            IndependentTaskKind.Sell => "自动出售",
             IndependentTaskKind.Gardening => "自动种菜",
             IndependentTaskKind.EveningRest => "晚风小憩",
             IndependentTaskKind.StaminaCrafting => "体力合成",

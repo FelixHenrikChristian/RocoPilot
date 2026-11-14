@@ -104,6 +104,7 @@ public partial class App : Application
             services.AddSingleton<EveningRestRunner>();
             services.AddSingleton<MailRunner>();
             services.AddSingleton<GardeningRunner>();
+            services.AddSingleton<CropSaleRunner>();
             services.AddSingleton<IManualChallengeRunner, ManualChallengeRunner>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();

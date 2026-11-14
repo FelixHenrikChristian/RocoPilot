@@ -25,6 +25,18 @@ internal sealed class DailyTaskScreen
     public int ClientX(double px) => (int)Math.Round((px - _x) * (_window.ClientWidth > 0 ? _window.ClientWidth : _width) / _width);
     public int ClientY(double py) => (int)Math.Round((py - _y) * (_window.ClientHeight > 0 ? _window.ClientHeight : _height) / _height);
 
+    public Task<ImageMatchResult?> Map(CancellationToken token) => Find("stamina-crafting/map", 45, 0, 320, 120, token);
+    public Task<ImageMatchResult?> Garden(CancellationToken token) => Find("stamina-crafting/garden", 185, 36, 405, 103, token);
+
+    public async Task<(bool Selected, ImageMatchResult? Target)> SelectGarden(CancellationToken token)
+    {
+        if (await Map(token) is null) return (false, null);
+        var option = await Find("stamina-crafting/garden-option", 100, 300, 485, 1045, token, .90)
+            ?? await Find("stamina-crafting/garden-option-selected", 100, 300, 485, 1045, token, .90);
+        if (option != null || await Garden(token) != null) return (true, option);
+        return (false, await Find("stamina-crafting/triangle", 180, 1010, 500, 1120, token));
+    }
+
     public async Task<ImageMatchResult?> Find(string template, int left, int top, int right, int bottom,
         CancellationToken token, double threshold = .94, double templateScale = 1)
     {

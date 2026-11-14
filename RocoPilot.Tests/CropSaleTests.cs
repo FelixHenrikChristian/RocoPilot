@@ -1,0 +1,165 @@
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Models.Capture;
+using RocoPilot.Models.Input;
+using RocoPilot.Models.Runtime;
+using RocoPilot.Services.ImageMatching;
+using RocoPilot.Services.IndependentTasks;
+
+namespace RocoPilot.Tests;
+
+[TestClass]
+[TestCategory("LocalScreenshots")]
+public sealed class CropSaleTests
+{
+    private static string Folder([CallerFilePath] string file = "") =>
+        Path.Combine(Path.GetDirectoryName(file)!, "LocalScreenshots", "2026-11-15", "crop-sale");
+
+    private static CaptureTargetWindow Window(int width) => new()
+    {
+        Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30
+    };
+
+    private static CapturedFrame Load(string name, int width) => FlowerSeedScreenRecognizerTests.LoadFixture(
+        Path.Combine(Folder(), name + ".png"), width, width * 9 / 16, 12, 30);
+
+    [TestMethod]
+    [DataRow(2048)]
+    [DataRow(1280)]
+    [DataRow(960)]
+    public async Task LocatesAllFlowersOnlyOnTheirOwnCards(int width)
+    {
+        var images = new ImageMatchingService();
+        var pages = new[] { "flowers-top", "flowers-middle", "flowers-bottom-selected" };
+        for (var page = 0; page < pages.Length; page++)
+        {
+            using var frame = Load(pages[page], width);
+            var screen = new DailyTaskScreen(frame, Window(width), images);
+            for (var i = 0; i < IndependentTaskSettings.SaleFlowers.Count; i++)
+            {
+                var flower = IndependentTaskSettings.SaleFlowers[i];
+                var match = await screen.Find("crop-sale/flowers/" + flower, 110, 139, 734, 1003, default, .988);
+                var baseline = page switch { 0 => 122, 1 => 185 - 3 * 245, _ => 488 - 6 * 245 };
+                var y = baseline + i / 3 * 245 + 77;
+                if (y - 42 < 139 || y + 42 > 1003 || page == 2 && i == 17)
+                {
+                    Assert.IsNull(match, $"{flower} {page} {width}: {match}");
+                    continue;
+                }
+                Assert.IsNotNull(match, $"{flower} {page} {width}");
+                Assert.AreEqual(211 + i % 3 * 210, screen.ClientX(match.X + match.Width / 2d) / screen.Scale, 6, flower);
+                Assert.AreEqual(y, screen.ClientY(match.Y + match.Height / 2d) / screen.Scale, 6, flower);
+            }
+        }
+    }
+
+    [TestMethod]
+    [DataRow(2048, 36)]
+    [DataRow(1280, 10)]
+    [DataRow(960, 1)]
+    public async Task SellsOneFlowerWithConfiguredPressesAndReturnsToWorld(int width, int quantity)
+    {
+        var game = new Replay(width);
+        var runner = new CropSaleRunner(game, new ImageMatchingService(), game, game);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), "紫晶菇", quantity, progress => Console.WriteLine(progress), timeout.Token);
+        Assert.AreEqual("done", game.Scene);
+        CollectionAssert.AreEqual(Enumerable.Repeat(300, quantity / 10).Concat(Enumerable.Repeat(50, quantity % 10)).ToArray(), game.Presses);
+        StringAssert.Contains(outcome, "已领取紫晶菇的出售奖励");
+    }
+
+    private sealed class Replay(int width) : IScreenCaptureService, IKeyboardInputService, IMouseInputService
+    {
+        public string Scene = "start";
+        public List<int> Presses { get; } = [];
+        private readonly Stopwatch _sinceLastInput = new();
+
+        private void CheckInputInterval()
+        {
+            if (_sinceLastInput.IsRunning)
+                Assert.IsTrue(_sinceLastInput.ElapsedMilliseconds >= 1000, $"{Scene} 操作间隔只有 {_sinceLastInput.ElapsedMilliseconds} ms");
+            _sinceLastInput.Restart();
+        }
+
+        public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method) =>
+            Load(Scene switch
+            {
+                "start" or "arrival" or "done" => "arrival-other-prompt",
+                "map" or "marker" => "map-sam",
+                "interact" => "sam-prompt",
+                "dialogue" => "sam-dialogue",
+                "selected" => "flowers-bottom-selected",
+                "exit" or "top" => "flowers-top",
+                "middle" => "flowers-middle",
+                "confirm" => "confirm-multiple",
+                _ => Scene
+            }, width);
+
+        public Task SendSequenceAsync(nint hwnd, string key, KeyboardInputOptions? options, CancellationToken token)
+        {
+            CheckInputInterval();
+            Scene = (Scene, key) switch
+            {
+                ("start", "M") => "map",
+                ("arrival", "W") => "interact",
+                ("interact", "F") => "dialogue",
+                ("dialogue", "1") => "top",
+                ("reward", "Esc") => "exit",
+                ("exit", "Esc") => "done",
+                _ => throw new AssertFailedException($"{Scene} 意外按键 {key}")
+            };
+            return key == "W" ? Task.Delay(Timeout.Infinite, token) : Task.CompletedTask;
+        }
+
+        public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token)
+        {
+            CheckInputInterval();
+            Check(x, y, 417, 568);
+            Assert.IsLessThan(0, delta);
+            Assert.AreEqual("top", Scene);
+            Scene = "middle";
+            return Task.CompletedTask;
+        }
+
+        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken token, int holdMs = 50)
+        {
+            CheckInputInterval();
+            var (next, px, py) = Scene switch
+            {
+                "map" => ("marker", 237, 914),
+                "marker" => ("teleport-sam", 1075, 406),
+                "teleport-sam" => ("arrival", 1634, 1085),
+                "middle" => ("selected", 631, 752),
+                "selected" when y * 2048d / width < 1000 => ("selected", 631, 322),
+                "selected" => ("confirm", 238, 1080),
+                "confirm" => ("reward", 1186, 948),
+                _ => throw new AssertFailedException($"{Scene} 意外点击")
+            };
+            Check(x, y, px, py);
+            if (next == "selected") Presses.Add(holdMs);
+            Scene = next;
+            return Task.CompletedTask;
+        }
+
+        private void Check(int x, int y, int px, int py)
+        {
+            Assert.AreEqual(px, x * 2048d / width, 15, Scene);
+            Assert.AreEqual(py, y * 2048d / width, 15, Scene);
+        }
+
+        public bool IsWindowAvailable(nint hwnd) => true;
+        public bool IsWindowForeground(nint hwnd) => true;
+        public bool RequiresForeground(KeyboardInputMethod method) => true;
+        public void EnsureReady(KeyboardInputMethod method) { }
+        public void Release(CaptureTargetWindow window, CaptureMethod method) { }
+        public bool TryParseSequence(string sequence, out IReadOnlyList<KeyStroke> keys, out string error) => throw new NotSupportedException();
+        public Task SendSequenceAsync(nint hwnd, IReadOnlyList<KeyStroke> keys, KeyboardInputOptions? options, CancellationToken token) => throw new NotSupportedException();
+        public void LookDown(nint hwnd, KeyboardInputMethod method) => throw new NotSupportedException();
+        public Task PressAtCurrentPositionAsync(nint hwnd, int holdMs, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
+        public Task DragAsync(nint hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
+        public Task ScrollAtCurrentPositionAsync(nint hwnd, int delta, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
+    }
+}

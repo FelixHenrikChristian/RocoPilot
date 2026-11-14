@@ -26,8 +26,8 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
         int x,
         int y,
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
-        CancellationToken cancellationToken = default)
-        => PressAsync(hwnd, new WindowPoint { X = x, Y = y }, null, 50, method, cancellationToken);
+        CancellationToken cancellationToken = default, int holdMs = 50)
+        => PressAsync(hwnd, new WindowPoint { X = x, Y = y }, null, holdMs, method, cancellationToken);
 
     public Task DragAsync(IntPtr hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
         CancellationToken cancellationToken)

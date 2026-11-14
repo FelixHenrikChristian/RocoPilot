@@ -5,6 +5,16 @@ namespace RocoPilot.Models.Runtime;
 /// </summary>
 public sealed class IndependentTaskSettings
 {
+    public const int DefaultSaleQuantity = 36;
+    public static IReadOnlyList<string> SaleFlowers { get; } = Array.AsReadOnly(new[]
+    {
+        "向阳花", "蜜黄菌", "星霜花", "幽幽草", "喷气菇", "伞伞菌", "喵喵草", "海神花", "天使草",
+        "大嘴花", "紫雀花", "雪菇", "睡铃", "海桑花", "彩玉花", "短木莲", "荧光兰", "紫晶菇",
+        "蓝掌", "花星角", "流星兰", "火焰花", "恶魔雪茄", "象牙花"
+    });
+    public string SaleFlower { get; set; } = SaleFlowers[0];
+    public int SaleQuantity { get; set; } = DefaultSaleQuantity;
+
     public const int MinimumRunCount = 1;
     public const int MaximumRunCount = 99;
     public const int DefaultLegendaryChallengeRunCount = 3;
@@ -47,6 +57,8 @@ public sealed class IndependentTaskSettings
     {
         return new IndependentTaskSettings
         {
+            SaleFlower = SaleFlower,
+            SaleQuantity = SaleQuantity,
             LegendaryChallengeRunCount = LegendaryChallengeRunCount,
             LegendaryTargetName = LegendaryTargetName,
             LegendaryDifficulty = LegendaryDifficulty,
@@ -64,6 +76,8 @@ public sealed class IndependentTaskSettings
     {
         return new IndependentTaskSettings
         {
+            SaleFlower = SaleFlower,
+            SaleQuantity = SaleQuantity,
             LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount),
             LegendaryTargetName = (legendaryTargets ?? LegendaryTargets).Contains(LegendaryTargetName)
                 ? LegendaryTargetName : legendaryTargets is null ? LegendaryTargets[0] : string.Empty,

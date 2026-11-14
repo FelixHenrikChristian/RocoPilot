@@ -12,5 +12,6 @@ public enum IndependentTaskKind
     StaminaCrafting,
     EveningRest,
     Mail,
-    Gardening
+    Gardening,
+    Sell
 }

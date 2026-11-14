@@ -25,6 +25,15 @@ public partial class DailyViewModel : ObservableObject
 
     public ObservableCollection<DailyTaskItemViewModel> Items { get; } = [];
 
+    public DailyTaskItemViewModel? SaleTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.Sell);
+    public IReadOnlyList<string> SaleFlowers => IndependentTaskSettings.SaleFlowers;
+
+    [ObservableProperty]
+    public partial string? SelectedSaleFlower { get; set; }
+
+    [ObservableProperty]
+    public partial double SaleQuantity { get; set; }
+
     public DailyTaskItemViewModel? FlowerSeedTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.FlowerSeedChallenge);
     public DailyTaskItemViewModel? LegendaryTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.LegendaryChallenge);
 
@@ -104,6 +113,9 @@ public partial class DailyViewModel : ObservableObject
         }
 
         var challenges = (settings.Challenges ?? defaults).Normalize(_tasks.LegendaryTargets);
+        SelectedSaleFlower = challenges.SaleFlower;
+        SaleQuantity = challenges.SaleQuantity;
+        OnPropertyChanged(nameof(SaleTask));
         SelectedLegendaryTarget = challenges.LegendaryTargetName;
         SelectedLegendaryDifficultyIndex = challenges.LegendaryDifficulty - 1;
         LegendaryChallengeRunCount = challenges.LegendaryChallengeRunCount;
@@ -126,6 +138,9 @@ public partial class DailyViewModel : ObservableObject
 
     private IndependentTaskSettings ChallengeSnapshot() => new()
     {
+        SaleFlower = SelectedSaleFlower ?? string.Empty,
+        SaleQuantity = SaleQuantity >= 1 && SaleQuantity <= int.MaxValue && SaleQuantity == Math.Truncate(SaleQuantity)
+            ? (int)SaleQuantity : 0,
         LegendaryTargetName = SelectedLegendaryTarget ?? string.Empty,
         LegendaryDifficulty = SelectedLegendaryDifficultyIndex + 1,
         LegendaryChallengeRunCount = TasksViewModel.ToRunCount(LegendaryChallengeRunCount, IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
@@ -137,7 +152,8 @@ public partial class DailyViewModel : ObservableObject
     {
         base.OnPropertyChanged(e);
         if (_loaded && e.PropertyName is nameof(SelectedLegendaryTarget) or nameof(SelectedLegendaryDifficultyIndex)
-            or nameof(LegendaryChallengeRunCount) or nameof(SelectedFlowerSeed) or nameof(FlowerSeedRunCount))
+            or nameof(LegendaryChallengeRunCount) or nameof(SelectedFlowerSeed) or nameof(FlowerSeedRunCount)
+            or nameof(SelectedSaleFlower) or nameof(SaleQuantity))
             _ = SaveAsync();
     }
 

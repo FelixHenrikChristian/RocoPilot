@@ -11,6 +11,7 @@ public partial class DailyTaskItemViewModel(DailyTaskKind kind) : ObservableObje
     public IndependentTaskKind? TaskKind => Kind switch
     {
         DailyTaskKind.Mail => IndependentTaskKind.Mail,
+        DailyTaskKind.Sell => IndependentTaskKind.Sell,
         DailyTaskKind.Gardening => IndependentTaskKind.Gardening,
         DailyTaskKind.EveningRest => IndependentTaskKind.EveningRest,
         DailyTaskKind.StaminaCrafting => IndependentTaskKind.StaminaCrafting,

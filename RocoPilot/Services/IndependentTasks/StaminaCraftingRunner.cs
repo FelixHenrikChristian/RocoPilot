@@ -58,9 +58,6 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             Task<ImageMatchResult?> Recipe() => Find("recipe", 40, 0, 370, 115);
             Task<ImageMatchResult?> Choices() => Find("choices", 1420, 620, 1950, 735, .90);
             Task<ImageMatchResult?> SeasonTimer() => Find("timer", 550, 870, 1020, 971);
-            async Task<ImageMatchResult?> GardenOption() =>
-                await Find("garden-option", 100, 300, 485, 1045, .90) ??
-                await Find("garden-option-selected", 100, 300, 485, 1045, .90);
             Task<ImageMatchResult?> Maximum() => Find("max", 1460, 975, 1560, 1060);
             Task<ImageMatchResult?> Skip() => screen.Find("flower-seed/animation-skip", 80, 10, 240, 146, token);
             async Task AfterInput()
@@ -89,7 +86,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             switch (step)
             {
                 case Step.OpenMap:
-                    if (await Find("map", 45, 0, 320, 120) is not null) step = Step.SelectMap;
+                    if (await screen.Map(token) is not null) step = Step.SelectMap;
                     else if (await screen.World(token) is not null)
                     {
                         await Key("M");
@@ -97,29 +94,12 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                     }
                     break;
                 case Step.SelectMap:
-                    if (await Find("map", 45, 0, 320, 120) is null) break;
-                    if (await GardenOption() is { } option)
-                    {
-                        await Click(option);
-                        step = Step.Cauldron;
-                    }
-                    else if (await Find("garden", 185, 36, 405, 103) is not null)
-                        step = Step.Cauldron;
-                    else if (await Find("triangle", 180, 1010, 500, 1120) is { } arrow)
-                    {
-                        await Click(arrow);
-                        step = Step.PickGarden;
-                    }
-                    break;
-                case Step.PickGarden:
-                    if (await GardenOption() is { } garden)
-                    {
-                        await Click(garden);
-                        step = Step.Cauldron;
-                    }
+                    var (selected, target) = await screen.SelectGarden(token);
+                    if (target != null) await Click(target);
+                    if (selected) step = Step.Cauldron;
                     break;
                 case Step.Cauldron:
-                    if (await Find("garden", 185, 36, 405, 103) is not null &&
+                    if (await screen.Garden(token) is not null &&
                         await Find("cauldron", 350, 210, 1530, 960) is { } marker)
                     {
                         await Click(marker);
@@ -221,12 +201,12 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
         }
     }
 
-    private enum Step { OpenMap, SelectMap, PickGarden, Cauldron, Teleport, Approach, Dialogue, SelectRecipe,
+    private enum Step { OpenMap, SelectMap, Cauldron, Teleport, Approach, Dialogue, SelectRecipe,
         SetAmount, Make, ConfirmMake, ExitRecipe, ExitDialogue, ReturnWorld }
 
     private static string Describe(Step step) => step switch
     {
-        Step.OpenMap or Step.SelectMap or Step.PickGarden => "选择家园种植园地图",
+        Step.OpenMap or Step.SelectMap => "选择家园种植园地图",
         Step.Cauldron or Step.Teleport => "传送到炼金釜",
         Step.Approach => "接近炼金釜",
         Step.Dialogue => "进入炼金造物",

@@ -94,7 +94,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                 switch (step)
                 {
                     case Step.Map:
-                        if (await Find("stamina-crafting/map", 45, 0, 320, 120) != null)
+                        if (await screen.Map(token) != null)
                             Advance(Step.Garden, "选择家园种植园");
                         else if (await screen.World(token) != null)
                         {
@@ -103,19 +103,12 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                         }
                         break;
                     case Step.Garden:
-                        if (await Find("stamina-crafting/map", 45, 0, 320, 120) == null) break;
-                        var option = await Find("stamina-crafting/garden-option", 100, 300, 485, 1045, .90)
-                            ?? await Find("stamina-crafting/garden-option-selected", 100, 300, 485, 1045, .90);
-                        if (option != null) await Click(option);
-                        else if (await Find("stamina-crafting/garden", 185, 36, 405, 103) == null)
-                        {
-                            if (await Find("stamina-crafting/triangle", 180, 1010, 500, 1120) is { } arrow) await Click(arrow);
-                            break;
-                        }
-                        Advance(Step.Entrance, "定位种植园入口");
+                        var (selected, target) = await screen.SelectGarden(token);
+                        if (target != null) await Click(target);
+                        if (selected) Advance(Step.Entrance, "定位种植园入口");
                         break;
                     case Step.Entrance:
-                        if (await Find("stamina-crafting/garden", 185, 36, 405, 103) != null &&
+                        if (await screen.Garden(token) != null &&
                             await Find("gardening/entrance", 350, 210, 1580, 1080) is { } marker)
                         {
                             await Click(marker);

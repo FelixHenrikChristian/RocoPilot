@@ -14,6 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="TextRecognitionTestPageTests.cs" Condition="'$(Configuration)' == 'Release'" />
     <ProjectReference Include="..\RocoPilot\RocoPilot.csproj" />
     <None Update="Fixtures\biligame-nrc-catalog.html" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Fixtures\biligame-nrc-season5.html" CopyToOutputDirectory="PreserveNewest" />

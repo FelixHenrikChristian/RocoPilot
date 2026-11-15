@@ -3,7 +3,6 @@ using System.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
-using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.ViewModels;
 using RocoPilot.Views.Windows;
@@ -13,7 +12,6 @@ namespace RocoPilot.Views;
 
 public sealed partial class RealtimePage : Page
 {
-    private AutoBattleOtherConfigWindow? _autoBattleOtherConfigWindow;
     private SpiritCatalogWindow? _spiritCatalogWindow;
 
     public RealtimeViewModel ViewModel
@@ -38,23 +36,6 @@ public sealed partial class RealtimePage : Page
     private async void ConfigureAutoBattleButton_Click(object sender, RoutedEventArgs e)
     {
         await AutoBattleConfigWindow.ShowAsync(AutoBattleConfigSection.SharedSequences);
-    }
-
-    private async void ConfigureAutoBattleOtherButton_Click(object sender, RoutedEventArgs e)
-    {
-        var runtime = App.GetService<IRuntimeTaskService>();
-        await runtime.LoadSettingsAsync();
-        if (_autoBattleOtherConfigWindow is not null)
-        {
-            _autoBattleOtherConfigWindow.Activate();
-            return;
-        }
-
-        _autoBattleOtherConfigWindow = new AutoBattleOtherConfigWindow(runtime);
-        _autoBattleOtherConfigWindow.Closed += (_, _) => _autoBattleOtherConfigWindow = null;
-        WindowPlacementHelper.SetOwner(_autoBattleOtherConfigWindow, App.MainWindow);
-        WindowPlacementHelper.CenterOnParent(_autoBattleOtherConfigWindow, App.MainWindow);
-        _autoBattleOtherConfigWindow.Activate();
     }
 
     private async void ViewSpiritCatalogButton_Click(object sender, RoutedEventArgs e)

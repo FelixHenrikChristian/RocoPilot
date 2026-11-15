@@ -31,5 +31,4 @@
     <x:String x:Key="SpiritCatalogGlyph">&#xE178;</x:String>
     <x:String x:Key="CatalogSyncGlyph">&#xF190;</x:String>
     <x:String x:Key="EncounterActionGlyph">&#xE1DE;</x:String>
-    <x:String x:Key="OtherSettingsGlyph">&#xF6A9;</x:String>
 </ResourceDictionary>

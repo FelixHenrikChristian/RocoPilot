@@ -20,8 +20,9 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
         var method = input.KeyboardInputMethod;
         keyboard.EnsureReady(method);
         await using var walk = new ForwardWalk(keyboard, window.Hwnd, method, token);
-        var plots = new Queue<int>(Enumerable.Range(0, 15).Select(i =>
-            (2 - i / 5) * 5 + (i / 5 == 1 ? 4 - i % 5 : i % 5)));
+        var route = Enumerable.Range(0, 15).Select(i =>
+            (2 - i / 5) * 5 + (i / 5 == 1 ? 4 - i % 5 : i % 5)).ToArray();
+        var plots = new Queue<int>(route);
         var revisit = new HashSet<int>();
         var pendingSows = new HashSet<int>();
         var newlySown = 0;
@@ -45,17 +46,29 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
             stable = 0;
             Report(message);
         }
+        void ReportPlot(int plot)
+        {
+            var message = $"第 {Array.IndexOf(route, plot) + 1} 块地，已种 {newlySown}/15";
+            if (message != status) Report(message);
+        }
         void NextPlot(bool success)
         {
             var plot = plots.Dequeue();
             if (success)
             {
-                if (pendingSows.Remove(plot)) newlySown++;
+                if (pendingSows.Remove(plot))
+                {
+                    newlySown++;
+                    ReportPlot(plot);
+                }
             }
             else if (revisit.Add(plot)) plots.Enqueue(plot);
             planted = atPlot = false;
-            if (plots.TryPeek(out var next))
-                Advance(Step.Sow, $"第 {next / 5 + 1} 行第 {next % 5 + 1} 列，种了 {newlySown}/15");
+            if (plots.Count > 0)
+            {
+                timer.Restart();
+                stable = 0;
+            }
             else Advance(Step.Observe, "退到田边观察养护");
         }
         async Task Key(string key, int? duration = null, int settleMs = 950)
@@ -236,7 +249,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                         await Task.Delay(1800, token);
                         Advance(Step.Harvest, "等待精灵收菜");
                     }
-                    else if (++stable >= 3) Advance(Step.Sow, "检查第一块地");
+                    else if (++stable >= 3) Advance(Step.Sow, "定位当前地块");
                     break;
                 case Step.Harvest:
                     if (await screen.HasHarvestPrompt(token)) stable = 0;
@@ -246,9 +259,11 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                     await mouse.PressAtCurrentPositionAsync(window.Hwnd, 80, method, token);
                     freshAfter = DateTimeOffset.UtcNow;
                     await Task.Delay(1200, token);
-                    Advance(Step.Sow, "检查第一块地");
+                    Advance(Step.Sow, "定位当前地块");
                     break;
                 case Step.Sow:
+                    if (location.Column is >= 0 and < 5 && location.Row is >= 0 and < 3)
+                        ReportPlot((int)location.Row * 5 + (int)location.Column);
                     var id = plots.Peek();
                     if (location.DirectionTo(id % 5 + .5, id / 5 + .5) is { } direction)
                     {

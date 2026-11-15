@@ -11,6 +11,39 @@ namespace RocoPilot.Tests;
 [TestCategory("LocalScreenshots")]
 public sealed class BattlePassTests
 {
+    [TestMethod]
+    [DataRow(2048)]
+    [DataRow(1280)]
+    [DataRow(960)]
+    public async Task RecognizesLevelRewardsButNotItsPopup(int width)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        var window = new CaptureTargetWindow { ClientWidth = width, ClientHeight = width * 9 / 16,
+            ClientOffsetX = 12, ClientOffsetY = 30 };
+        foreach (var name in new[] { "level-rewards-window-client", "level-rewards-popup-window-client", "tasks-three-ready" })
+        {
+            using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(Folder(), name + ".png"), width, width * 9 / 16, 12, 30);
+            var screen = new DailyTaskScreen(frame, window, new ImageMatchingService());
+            Assert.AreEqual(name == "level-rewards-window-client", await BattlePassRunner.ReadRewardsPageAsync(frame, screen, ocr, default), name);
+            if (name != "tasks-three-ready")
+                Assert.IsNull(await BattlePassRunner.ReadCompletedAsync(frame, screen, ocr, default));
+        }
+    }
+
+    [TestMethod]
+    [DataRow("level-rewards-window", true)]
+    [DataRow("level-rewards-popup-window", false)]
+    public async Task RecognizesOriginalWindowWithTitleBar(string name, bool expected)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(Folder(), name + ".png"));
+        var window = new CaptureTargetWindow { ClientWidth = 2048, ClientHeight = 1152, ClientOffsetX = 1, ClientOffsetY = 31 };
+        Assert.AreEqual(expected, await BattlePassRunner.ReadRewardsPageAsync(frame,
+            new DailyTaskScreen(frame, window, new ImageMatchingService()), ocr, default));
+    }
+
     internal static string Folder([System.Runtime.CompilerServices.CallerFilePath] string path = "") =>
         Path.Combine(Path.GetDirectoryName(path)!, "LocalScreenshots", "2026-11-16", "battle-pass");
 

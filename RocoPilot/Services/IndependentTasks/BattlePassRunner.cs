@@ -15,7 +15,7 @@ namespace RocoPilot.Services.IndependentTasks;
 public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchingService images,
     IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr, OnnxTextLocator locator)
 {
-    private enum Step { World, Menu, Tasks, Claim, Dismiss, ExitTasks, ExitMenu, ExitWorld }
+    private enum Step { World, Menu, Tasks, ClaimTasks, DismissTasks, OpenRewards, Rewards, ClaimRewards, DismissRewards, ExitRewards, ExitMenu, ExitWorld }
 
     internal static async Task<string> ReadAsync(CapturedFrame frame, DailyTaskScreen screen,
         ITextRecognitionService ocr, int left, int top, int right, int bottom, CancellationToken token) =>
@@ -49,6 +49,12 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
         return false;
     }
 
+    // 标题在奖励弹窗后仍然可见；同时核对中部礼券文字，确认已回到未遮挡的等级页。
+    internal static async Task<bool> ReadRewardsPageAsync(CapturedFrame frame, DailyTaskScreen screen,
+        ITextRecognitionService ocr, CancellationToken token) =>
+        (await ReadAsync(frame, screen, ocr, 195, 57, 340, 96, token)) == "等级奖励" &&
+        (await ReadAsync(frame, screen, ocr, 660, 514, 805, 553, token)) == "基础礼券";
+
     public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
@@ -63,8 +69,9 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
         {
             Step.World or Step.Menu => "打开通行证",
             Step.Tasks => "检查四项日常任务",
-            Step.Claim => "确认领取界面切换",
-            Step.Dismiss => "关闭弹窗并核对领取结果",
+            Step.ClaimTasks or Step.ClaimRewards => "确认领取界面切换",
+            Step.DismissTasks or Step.DismissRewards => "关闭弹窗并核对领取结果",
+            Step.OpenRewards or Step.Rewards => "领取通行证等级奖励",
             _ => $"通行证任务领取了{completed}/4，返回大世界"
         };
         progress(new("通行证奖励", Status()));
@@ -102,27 +109,48 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
                     if (click is null) break;
                     next = Step.Tasks; break;
                 case Step.Tasks:
-                    if (await Tasks() is not { } count) { stable = 0; break; }
-                    completed = count;
-                    if (await Claim()) { click = screen.Region(1535, 1083, 1536, 1084); next = Step.Claim; }
-                    else if (await HasClaimableAsync(frame, screen, ocr, token)) stable = 0;
-                    else if (++stable >= 2) next = Step.ExitTasks;
-                    break;
-                case Step.Claim:
-                    // 领取按钮仍在时不发送 ESC，也不把一次点击当作领取成功。
-                    if (!await Claim()) next = Step.Dismiss;
-                    break;
-                case Step.Dismiss:
-                    if (await Tasks() is { } after)
+                    if (await Tasks() is not { } count)
                     {
-                        if (await Claim() || after != completed || await HasClaimableAsync(frame, screen, ocr, token))
+                        stable = 0;
+                        if (await ReadRewardsPageAsync(frame, screen, ocr, token))
+                            click = screen.Region(166, 304, 167, 305);
+                        break;
+                    }
+                    completed = count;
+                    if (await Claim()) { click = screen.Region(1535, 1083, 1536, 1084); next = Step.ClaimTasks; }
+                    else if (await HasClaimableAsync(frame, screen, ocr, token)) stable = 0;
+                    else if (++stable >= 2) next = Step.OpenRewards;
+                    break;
+                case Step.ClaimTasks:
+                case Step.ClaimRewards:
+                    // 领取按钮仍在时不发送 ESC，也不把一次点击当作领取成功。
+                    if (!await Claim()) next = step == Step.ClaimTasks ? Step.DismissTasks : Step.DismissRewards;
+                    break;
+                case Step.DismissTasks:
+                case Step.DismissRewards:
+                    var tasks = step == Step.DismissTasks;
+                    var after = tasks ? await Tasks() : null;
+                    var pageReady = tasks ? after.HasValue : await ReadRewardsPageAsync(frame, screen, ocr, token);
+                    if (pageReady)
+                    {
+                        if (await Claim() || (tasks && (after != completed || await HasClaimableAsync(frame, screen, ocr, token))))
                         { stable = 0; break; }
-                        if (++stable >= 2) next = Step.ExitTasks;
+                        if (++stable >= 2) next = tasks ? Step.OpenRewards : Step.ExitRewards;
                     }
                     else { stable = 0; key = "Esc"; }
                     break;
-                case Step.ExitTasks:
+                case Step.OpenRewards:
                     if (await Tasks() is null) break;
+                    click = screen.Region(166, 192, 167, 193);
+                    next = Step.Rewards;
+                    break;
+                case Step.Rewards:
+                    if (!await ReadRewardsPageAsync(frame, screen, ocr, token)) { stable = 0; break; }
+                    if (await Claim()) { click = screen.Region(1535, 1083, 1536, 1084); next = Step.ClaimRewards; }
+                    else if (++stable >= 2) next = Step.ExitRewards;
+                    break;
+                case Step.ExitRewards:
+                    if (!await ReadRewardsPageAsync(frame, screen, ocr, token)) break;
                     key = "Esc"; next = Step.ExitMenu; break;
                 case Step.ExitMenu:
                     if (await Menu() is null) break;
@@ -141,7 +169,7 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
                     screen.ClientY(click.Y + click.Height / 2d), input.KeyboardInputMethod, token);
             }
             freshAfter = DateTimeOffset.UtcNow;
-            if (key is not null || click is not null) await Task.Delay(next == Step.Claim ? 2000 : 1000, token);
+            if (key is not null || click is not null) await Task.Delay(next is Step.ClaimTasks or Step.ClaimRewards ? 2000 : 1000, token);
             if (next == step) continue;
             step = next;
             stable = 0;

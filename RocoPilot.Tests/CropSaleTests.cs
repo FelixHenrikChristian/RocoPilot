@@ -91,6 +91,9 @@ public sealed class CropSaleTests
         var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), "紫晶菇", quantity, progress => Console.WriteLine(progress), timeout.Token);
         Assert.AreEqual("done", game.Scene);
         Assert.AreEqual(quantity, game.FlowerClicks);
+        Assert.AreEqual(quantity == 1 ? 1 : 2, game.SelectedFrames, "选中后只需定位连点位置和读取最终收入");
+        if (game.FlowerClickIntervals.Count > 0)
+            Console.WriteLine($"连续选花平均间隔 {game.FlowerClickIntervals.Average():F0} ms");
         StringAssert.Contains(outcome, "已领取紫晶菇的出售奖励，预期收入 3000 金币");
     }
 
@@ -98,6 +101,8 @@ public sealed class CropSaleTests
     {
         public string Scene = "start";
         public int FlowerClicks { get; private set; }
+        public int SelectedFrames { get; private set; }
+        public List<long> FlowerClickIntervals { get; } = [];
         private readonly Stopwatch _sinceLastInput = new();
 
         private void CheckInputInterval(int minimumMs = 1000)
@@ -107,8 +112,16 @@ public sealed class CropSaleTests
             _sinceLastInput.Restart();
         }
 
-        public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method) =>
-            Load(Scene switch
+        public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method)
+        {
+            if (Scene == "selected") SelectedFrames++;
+            if (Scene == "middle")
+            {
+                var delay = _sinceLastInput.ElapsedMilliseconds;
+                Console.WriteLine($"滚动后 {delay} ms 开始检查列表");
+                Assert.IsLessThan(1000L, delay, "找花滚动不应等待界面切换的 1 秒间隔");
+            }
+            return Load(Scene switch
             {
                 "start" or "arrival" or "done" => "arrival-other-prompt",
                 "map" or "marker" => "map-sam",
@@ -120,6 +133,7 @@ public sealed class CropSaleTests
                 "confirm" => "confirm-multiple",
                 _ => Scene
             }, width);
+        }
 
         public Task SendSequenceAsync(nint hwnd, string key, KeyboardInputOptions? options, CancellationToken token)
         {
@@ -141,7 +155,7 @@ public sealed class CropSaleTests
         {
             CheckInputInterval();
             Check(x, y, 417, 568);
-            Assert.IsLessThan(0, delta);
+            Assert.AreEqual(-6 * 120, delta);
             Assert.AreEqual("top", Scene);
             Scene = "middle";
             return Task.CompletedTask;
@@ -161,10 +175,13 @@ public sealed class CropSaleTests
                 _ => throw new AssertFailedException($"{Scene} 意外点击")
             };
             Check(x, y, px, py);
-            CheckInputInterval(Scene == "selected" && next == "selected" ? 200 : 1000);
+            var repeat = Scene == "selected" && next == "selected";
+            if (repeat) FlowerClickIntervals.Add(_sinceLastInput.ElapsedMilliseconds);
+            CheckInputInterval(repeat ? 145 : Scene == "middle" ? 195 : 1000);
             if (next == "selected") FlowerClicks++;
             Scene = next;
-            return Task.CompletedTask;
+            // 与实际鼠标输入一样，定位等待和按压各占 50 ms。
+            return next == "selected" ? Task.Delay(100, token) : Task.CompletedTask;
         }
 
         private void Check(int x, int y, int px, int py)

@@ -15,7 +15,8 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
     IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr)
 {
     private const int ActionPauseMs = 1000;
-    private const int FlowerClickIntervalMs = 200;
+    private const int FlowerClickIntervalMs = 150;
+    private const int FlowerScrollDelta = -6 * 120;
     private enum Step { Map, Garden, Marker, Teleport, Approach, Dialogue, FindFlower, Quantity, Confirm, Reward, Exit }
 
     public async Task<string> RunAsync(RuntimeTaskState state, string flower, int quantity,
@@ -29,6 +30,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         var step = Step.Map;
         var status = "打开家园地图";
         var timer = Stopwatch.StartNew();
+        var sinceFlowerClick = new Stopwatch();
         var freshAfter = DateTimeOffset.MinValue;
         var remaining = quantity;
         var outcome = string.Empty;
@@ -57,7 +59,12 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         progress(new("自动出售", status));
         while (true)
         {
-            await Task.Delay(step switch { Step.Quantity => FlowerClickIntervalMs, Step.Approach => 120, _ => 350 }, token);
+            await Task.Delay(step switch
+            {
+                Step.FindFlower => 200,
+                Step.Quantity or Step.Approach => 120,
+                _ => 350
+            }, token);
             if (!keyboard.IsWindowAvailable(window.Hwnd)) throw new InvalidOperationException("游戏窗口已关闭。");
             if (!keyboard.IsWindowForeground(window.Hwnd))
             {
@@ -83,13 +90,20 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                     screen.ClientY(match.Y + match.Height / 2d), method, token);
                 await AfterInput();
             }
-            async Task Add(double x, double y)
+            async Task<bool> Add(double x, double y)
             {
+                // 从上一次点击开始计时，鼠标定位和按压都计入间隔。
+                var waitMs = FlowerClickIntervalMs - sinceFlowerClick.ElapsedMilliseconds;
+                if (sinceFlowerClick.IsRunning && waitMs > 0) await Task.Delay((int)waitMs, token);
+                token.ThrowIfCancellationRequested();
+                if (!keyboard.IsWindowForeground(window.Hwnd)) return false;
+                sinceFlowerClick.Restart();
                 await mouse.ClickAsync(window.Hwnd, screen.ClientX(x), screen.ClientY(y), method, token);
                 remaining--;
                 freshAfter = DateTimeOffset.UtcNow;
                 if (remaining == 0) await AfterInput();
                 timer.Restart();
+                return true;
             }
 
             switch (step)
@@ -150,7 +164,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                     var card = await Find($"flowers/{flower}", 110, 139, 734, 1003, .988);
                     if (card != null)
                     {
-                        await Add(card.X + card.Width / 2d, card.Y + card.Height / 2d);
+                        if (!await Add(card.X + card.Width / 2d, card.Y + card.Height / 2d)) break;
                         Advance(Step.Quantity, $"选择{flower}，目标 {quantity} 朵");
                         break;
                     }
@@ -162,24 +176,26 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                         break;
                     }
                     await mouse.ScrollAsync(window.Hwnd, screen.ClientX(header.X + 300 * screen.Scale),
-                        screen.ClientY(header.Y + 550 * screen.Scale), -120, method, token);
-                    await AfterInput();
+                        screen.ClientY(header.Y + 550 * screen.Scale), FlowerScrollDelta, method, token);
+                    freshAfter = DateTimeOffset.UtcNow;
                     break;
                 case Step.Quantity:
                     if (await Station() == null || await Find("sell", 90, 1020, 390, 1130, .98) is not { } sell) break;
-                    // 首次选择后列表底部会为预期收入让位，用减号重新定位选中的卡片。
-                    if (await Find("minus", 98, 104, 740, 967, .965) is not { } minus) break;
-                    var cx = minus.X + minus.Width / 2d + 82 * screen.Scale;
-                    var cy = minus.Y + minus.Height / 2d + 71 * screen.Scale;
-                    if (remaining > 0) await Add(cx, cy);
-                    else
+                    if (remaining > 0)
                     {
-                        var income = await ReadIncomeAsync(frame, screen, ocr, token);
-                        var price = income is null ? "预期收入未识别" : $"预期收入 {income} 金币";
-                        outcome = $"成功：已领取{flower}的出售奖励，{price}";
-                        await Click(sell);
-                        Advance(Step.Confirm, "等待出售确认");
+                        // 收入栏出现后卡片可能移位；校准一次，在同一点连点，失焦后再定位。
+                        if (await Find("minus", 98, 104, 740, 967, .965) is not { } minus) break;
+                        var cx = minus.X + minus.Width / 2d + 82 * screen.Scale;
+                        var cy = minus.Y + minus.Height / 2d + 71 * screen.Scale;
+                        while (remaining > 0)
+                            if (!await Add(cx, cy)) break;
+                        break;
                     }
+                    var income = await ReadIncomeAsync(frame, screen, ocr, token);
+                    var price = income is null ? "预期收入未识别" : $"预期收入 {income} 金币";
+                    outcome = $"成功：已领取{flower}的出售奖励，{price}";
+                    await Click(sell);
+                    Advance(Step.Confirm, "等待出售确认");
                     break;
                 case Step.Confirm:
                     if (await Find("confirm-title", 755, 360, 1280, 508) != null &&

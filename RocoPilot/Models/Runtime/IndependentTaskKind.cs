@@ -13,5 +13,6 @@ public enum IndependentTaskKind
     EveningRest,
     Mail,
     Gardening,
-    Sell
+    Sell,
+    BattlePassRewards
 }

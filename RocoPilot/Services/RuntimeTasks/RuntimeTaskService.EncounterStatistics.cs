@@ -150,16 +150,10 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var shinyTipTask = TryUpdateRuntimeShinyTipSignalAsync(
-            state,
-            frame,
-            season,
-            battleId,
-            cancellationToken);
         var previewTask = state.Options.RecognitionOverlayEnabled
             ? _frameRecognizer.RecognizeRegionTextAsync(state, frame, BattleTipRegionIds, cancellationToken)
             : Task.CompletedTask;
-        await Task.WhenAll(shinyTipTask, previewTask, bloodlineTipTask);
+        await Task.WhenAll(previewTask, bloodlineTipTask);
         if (battleId != _battle.BattleId) return;
         await TryRecordEncounterAfterRelievedAsync(
             state,
@@ -389,7 +383,7 @@ public sealed partial class RuntimeTaskService
     private async Task<bool> TryUpdateRuntimeShinyTipSignalAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
-        EncounterSeasonDefinition season,
+        EncounterSeasonDefinition? season,
         long battleId,
         CancellationToken cancellationToken)
     {
@@ -397,7 +391,6 @@ public sealed partial class RuntimeTaskService
             : _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
                 ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
         var detectedAt = DateTimeOffset.Now;
-        season = EncounterSeasonTimeline.ResolveForRecording(_encounterSeasonConfigService.Load(), detectedAt, season);
         var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
             frame,
@@ -413,8 +406,9 @@ public sealed partial class RuntimeTaskService
         if (battleId != _battle.BattleId) return false;
         if (ApplyAutoBattleShinySuspension(tipText, "异色识别", battleId))
             await _shinyNotification.NotifyAsync(frame);
-        if (EncounterStatisticsEnabled && !_statisticsService.IsActiveAccountSelectionRequired && accountUid is not null)
+        if (season is not null && EncounterStatisticsEnabled && !_statisticsService.IsActiveAccountSelectionRequired && accountUid is not null)
         {
+            season = EncounterSeasonTimeline.ResolveForRecording(_encounterSeasonConfigService.Load(), detectedAt, season);
             RuntimePendingShinyCapture capture;
             lock (_pendingShinyRecordLock)
             {

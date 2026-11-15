@@ -539,21 +539,28 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("状态待识别", DateTimeOffset.Now));
     }
 
-    private async Task RuntimeOcrLoopAsync(RuntimeSession session, CancellationToken cancellationToken)
+    private Task RuntimeOcrLoopAsync(RuntimeSession session, CancellationToken cancellationToken) =>
+        Task.WhenAll(
+            RuntimeOcrLoopAsync(session, true, cancellationToken),
+            RuntimeOcrLoopAsync(session, false, cancellationToken));
+
+    private async Task RuntimeOcrLoopAsync(RuntimeSession session, bool shinyOnly, CancellationToken cancellationToken)
     {
         var state = session.State;
         Task? activeScanTask = null;
+        DateTimeOffset? lastFrameAt = null;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(RuntimeRecognitionDefaults.OcrScanIntervalMs, cancellationToken);
+                await Task.Delay(shinyOnly ? RuntimeRecognitionDefaults.ShinyScanIntervalMs : RuntimeRecognitionDefaults.OcrScanIntervalMs, cancellationToken);
 
                 if (activeScanTask is { IsCompleted: false }) continue;
                 if (activeScanTask is not null) await activeScanTask;
                 activeScanTask = null;
 
-                if (_isSuspended || _scene != GameScene.Battle)
+                if (_isSuspended || _scene != GameScene.Battle
+                    || (shinyOnly && _battle.IsSuspendedForShiny))
                 {
                     continue;
                 }
@@ -565,7 +572,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                     var battleId = _battle.BattleId;
                     var frame = session.RentFrame(battleId);
                     if (frame is null) continue;
-                    activeScanTask = RunRuntimeOcrScanAsync(state, frame, battleId, cancellationToken);
+                    if (shinyOnly && frame.CapturedAt == lastFrameAt)
+                    {
+                        frame.Dispose();
+                        continue;
+                    }
+                    lastFrameAt = frame.CapturedAt;
+                    activeScanTask = RunRuntimeOcrScanAsync(state, frame, battleId, shinyOnly, cancellationToken);
                     session.Track(activeScanTask);
                 }
                 finally { _runtimeIteration.Release(); }
@@ -577,7 +590,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         finally
         {
             if (activeScanTask is not null) await activeScanTask;
-            session.ClearFrame();
         }
     }
 
@@ -585,13 +597,17 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         RuntimeTaskState state,
         CapturedFrame frame,
         long battleId,
+        bool shinyOnly,
         CancellationToken cancellationToken)
     {
         using (frame)
         {
             try
             {
-                await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, battleId, cancellationToken);
+                if (shinyOnly)
+                    await TryUpdateRuntimeShinyTipSignalAsync(state, frame, _encounterSeasonConfigService.GetCurrentSeason(), battleId, cancellationToken);
+                else
+                    await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, battleId, cancellationToken);
             }
             catch (OperationCanceledException)
             {

@@ -15,8 +15,11 @@ internal static class RuntimeRecognitionDefaults
     // 调整时应保持不小于截图周期，避免提高频率却无法取得更新的画面。
     public const int GameStateScanIntervalMs = 500;
 
-    // 后台周期性 OCR 的检查间隔：1000 ms，约每秒尝试一次，用于战斗提示和精灵名等文字。
+    // 异色独立每 250 ms 检查一次最新帧，约每秒 4 次。
+    public const int ShinyScanIntervalMs = 250;
+
+    // 普通后台 OCR 每秒尝试一次，用于血脉、精灵名和统计。
     // 仅处理已确认的战斗画面；上一轮 OCR 未完成时跳过，避免并发堆积。
-    // 增大会延迟异色等战斗信息的识别；此值不控制启动 UID 等按需执行的 OCR。
+    // 此值不控制异色保护和启动 UID 等按需执行的 OCR。
     public const int OcrScanIntervalMs = 1000;
 }

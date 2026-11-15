@@ -492,6 +492,7 @@ public sealed class RuntimeTaskStartupTests
             await fixture.ProcessFrameAsync();
             scan = fixture.ScanOcrAsync();
             Assert.IsFalse(scan.IsCompleted);
+            await fixture.ScanShinyWithoutSeasonAsync();
             Assert.IsTrue(fixture.Battle.IsSuspendedForShiny);
             await fixture.ProcessFrameAsync();
             await fixture.ProcessFrameAsync();
@@ -639,6 +640,13 @@ public sealed class RuntimeTaskStartupTests
             options.AutoBattleSettings.BloodlineCaptureFilter.CaptureQiYi = captureQiYi;
             Assert.IsTrue((await Runtime.StartAsync(options)).Success);
             Matching.MatchedTemplate = "battle-button-skill.png";
+        }
+
+        public async Task ScanShinyWithoutSeasonAsync()
+        {
+            using var frame = CapturedFrame.RentBgra32(16, 9);
+            var scan = typeof(RuntimeTaskService).GetMethod("TryUpdateRuntimeShinyTipSignalAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            await (Task)scan.Invoke(Runtime, [Runtime.CurrentState!, frame, null, Battle.BattleId, CancellationToken.None])!;
         }
 
         public async Task ScanOcrAsync()

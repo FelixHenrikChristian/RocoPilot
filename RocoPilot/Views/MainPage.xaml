@@ -8,6 +8,18 @@
     mc:Ignorable="d"
     Loaded="OnLoaded">
 
+    <Page.Resources>
+        <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="ToggleButtonBackground" />
+        <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="ToggleButtonBackgroundPointerOver" />
+        <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="ToggleButtonBackgroundPressed" />
+        <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="ToggleButtonForeground" />
+        <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="ToggleButtonForegroundPointerOver" />
+        <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="ToggleButtonForegroundPressed" />
+        <StaticResource x:Key="ToggleButtonBorderBrushChecked" ResourceKey="ToggleButtonBorderBrush" />
+        <StaticResource x:Key="ToggleButtonBorderBrushCheckedPointerOver" ResourceKey="ToggleButtonBorderBrushPointerOver" />
+        <StaticResource x:Key="ToggleButtonBorderBrushCheckedPressed" ResourceKey="ToggleButtonBorderBrushPressed" />
+    </Page.Resources>
+
     <Grid>
         <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
         <StackPanel
@@ -202,13 +214,21 @@
                                 Text="启动后叠加截图识别区域框。"
                                 TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch
+                        <ToggleButton
                             Grid.Column="2"
-                            MinWidth="0"
                             VerticalAlignment="Center"
-                            IsOn="{x:Bind ViewModel.IsMaskOverlayEnabled, Mode=TwoWay}"
-                            OffContent=""
-                            OnContent="" />
+                            AutomationProperties.Name="识别区域可见"
+                            IsChecked="{x:Bind ViewModel.IsMaskOverlayEnabled, Mode=TwoWay}"
+                            ToolTipService.ToolTip="{x:Bind GetRecognitionOverlayAction(ViewModel.IsMaskOverlayEnabled), Mode=OneWay}">
+                            <Grid Width="16" Height="16">
+                                <FontIcon x:Name="RecognitionOverlayEye" FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                          FontSize="16" Glyph="&#xE890;" />
+                                <Line x:Load="{x:Bind IsOverlayHidden(ViewModel.IsMaskOverlayEnabled), Mode=OneWay}"
+                                      x:Name="HiddenRecognitionOverlaySlash"
+                                      X1="1" Y1="1" X2="15" Y2="15" StrokeThickness="1.5"
+                                      Stroke="{Binding Foreground, ElementName=RecognitionOverlayEye}" />
+                            </Grid>
+                        </ToggleButton>
                     </Grid>
                 </StackPanel>
             </Expander>
@@ -282,21 +302,10 @@
                             AutomationProperties.Name="奇遇计数面板可见"
                             IsChecked="{x:Bind ViewModel.IsInfoOverlayEncounterPanelEnabled, Mode=TwoWay}"
                             ToolTipService.ToolTip="{x:Bind GetEncounterPanelAction(ViewModel.IsInfoOverlayEncounterPanelEnabled), Mode=OneWay}">
-                            <ToggleButton.Resources>
-                                <StaticResource x:Key="ToggleButtonBackgroundChecked" ResourceKey="ToggleButtonBackground" />
-                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPointerOver" ResourceKey="ToggleButtonBackgroundPointerOver" />
-                                <StaticResource x:Key="ToggleButtonBackgroundCheckedPressed" ResourceKey="ToggleButtonBackgroundPressed" />
-                                <StaticResource x:Key="ToggleButtonForegroundChecked" ResourceKey="ToggleButtonForeground" />
-                                <StaticResource x:Key="ToggleButtonForegroundCheckedPointerOver" ResourceKey="ToggleButtonForegroundPointerOver" />
-                                <StaticResource x:Key="ToggleButtonForegroundCheckedPressed" ResourceKey="ToggleButtonForegroundPressed" />
-                                <StaticResource x:Key="ToggleButtonBorderBrushChecked" ResourceKey="ToggleButtonBorderBrush" />
-                                <StaticResource x:Key="ToggleButtonBorderBrushCheckedPointerOver" ResourceKey="ToggleButtonBorderBrushPointerOver" />
-                                <StaticResource x:Key="ToggleButtonBorderBrushCheckedPressed" ResourceKey="ToggleButtonBorderBrushPressed" />
-                            </ToggleButton.Resources>
                             <Grid Width="16" Height="16">
                                 <FontIcon x:Name="EncounterPanelEye" FontFamily="{StaticResource SymbolThemeFontFamily}"
                                           FontSize="16" Glyph="&#xE890;" />
-                                <Line x:Name="HiddenPanelSlash" x:Load="{x:Bind IsEncounterPanelHidden(ViewModel.IsInfoOverlayEncounterPanelEnabled), Mode=OneWay}"
+                                <Line x:Name="HiddenPanelSlash" x:Load="{x:Bind IsOverlayHidden(ViewModel.IsInfoOverlayEncounterPanelEnabled), Mode=OneWay}"
                                       X1="1" Y1="1" X2="15" Y2="15" StrokeThickness="1.5"
                                       Stroke="{Binding Foreground, ElementName=EncounterPanelEye}" />
                             </Grid>

@@ -53,13 +53,13 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                 Advance(Step.Sow, $"第 {next / 5 + 1} 行第 {next % 5 + 1} 列，已确认 {confirmed}/15 格");
             else Advance(Step.Observe, "退到田边观察养护");
         }
-        async Task Key(string key, int? duration = null)
+        async Task Key(string key, int? duration = null, int settleMs = 950)
         {
             if (!keyboard.IsWindowForeground(window.Hwnd)) throw new InvalidOperationException("输入前游戏窗口已离开前台。");
             await keyboard.SendSequenceAsync(window.Hwnd, key, new() { Method = method,
                 HoldDurationMs = duration ?? input.KeyboardHoldDurationMs }, token);
             freshAfter = DateTimeOffset.UtcNow;
-            await Task.Delay(950, token);
+            await Task.Delay(settleMs, token);
         }
         Report(status);
         while (true)
@@ -199,7 +199,8 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                     {
                         atPlot = false;
                         stable = 0;
-                        await Key(direction, 150);
+                        // 缩短移动后的等待；下一轮仍重新定位，到格后沿用原有播种确认节奏。
+                        await Key(direction, 100, settleMs: 100);
                         break;
                     }
                     if (!atPlot)

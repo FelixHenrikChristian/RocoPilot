@@ -37,8 +37,6 @@ public sealed class BattlePassTests
                 Assert.AreEqual(name != "tasks-claimed", claim == "全部领取", $"{name}: {claim}");
                 Assert.AreEqual(name != "tasks-claimed", await BattlePassRunner.HasClaimableAsync(frame, screen, ocr, default));
             }
-            if (name == "season-menu")
-                Assert.AreEqual("通行证", await BattlePassRunner.ReadAsync(frame, screen, ocr, 177, 461, 265, 496, default));
         }
     }
 }

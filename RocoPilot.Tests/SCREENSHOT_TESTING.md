@@ -26,3 +26,9 @@ dotnet test RocoPilot.Tests -p:Platform=x64 --filter FullyQualifiedName~Challeng
 - 1920×1440、3440×1440 的矩阵用例是按顶部中央／右侧锚定的合成布局，只验证坐标映射，不能代替原生布局实拍。
 - 箭头位置对照通过移动实拍箭头构造；不足提示的合成对照只验证模板缩放与搜索范围。独立的实拍测试读取 `flower-seed-condensed-insufficient.png`、`flower-seed-skip-turn-second.png`（2048×1152 纯客户区），缺少时跳过。
 - 原生 4:3 箭头测试使用 `1920x1440.json` 和对应模板，读取 `flower-seed-skip-turn-first-4x3.png`、`flower-seed-skip-turn-second-4x3.png`（1920×1440 纯客户区），缺少时跳过。来源和裁剪记录只写入本地索引。
+
+`BattlePassTextLocatorTests` 验证全客户区 OCR 定位“通行证”：覆盖跨赛季本地参考图、多档缩放、客户区偏移、文字移位、文字缺失、同名文字歧义及非入口页面。只在找到唯一精确文字时返回点击区域；缺少素材明确跳过。视频参考图不能替代游戏窗口实拍，也不证明其他赛季的日常任务页布局一致。
+
+```powershell
+dotnet test RocoPilot.Tests -c Release -p:Platform=x64 --filter FullyQualifiedName~BattlePass
+```

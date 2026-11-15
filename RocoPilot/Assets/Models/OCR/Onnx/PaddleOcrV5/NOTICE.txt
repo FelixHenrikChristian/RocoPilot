@@ -3,3 +3,12 @@ PP-OCRv5 mobile recognition ONNX model
 Source: https://huggingface.co/itextresearch/itext-PP-OCRv5_mobile_rec_infer
 Upstream PaddleOCR model: PP-OCRv5_mobile_rec_infer
 License: Apache License 2.0
+
+PP-OCRv5 mobile text detection ONNX model (detection.onnx)
+Source: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx
+Upstream: PaddleOCR PP-OCRv5_mobile_det, Apache License 2.0
+SHA256: 4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae
+Model hash verified against RapidAI/RapidOCR default_models.yaml.
+Detection preprocessing and rectangular expansion follow Sdcb.PaddleOCR 3.3.1
+(PaddleSharp commit 139bc184a6d86c0c60bb8b8a90fb641b21c0b0e6), Apache-2.0.
+Source: https://github.com/sdcb/PaddleSharp/blob/139bc184a6d86c0c60bb8b8a90fb641b21c0b0e6/src/Sdcb.PaddleOCR/PaddleOcrDetector.cs

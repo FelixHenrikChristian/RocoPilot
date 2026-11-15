@@ -7,11 +7,13 @@ using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.TextRecognition;
+using RocoPilot.Models.Recognition;
+using RocoPilot.Services.TextRecognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
 public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchingService images,
-    IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr)
+    IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr, OnnxTextLocator locator)
 {
     private enum Step { World, Menu, Tasks, Claim, Dismiss, ExitTasks, ExitMenu, ExitWorld }
 
@@ -83,25 +85,26 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
             if (frame is null || frame.CapturedAt <= freshAfter) continue;
             var screen = new DailyTaskScreen(frame, window, images);
             Task<string> Read(int l, int t, int r, int b) => ReadAsync(frame, screen, ocr, l, t, r, b, token);
-            async Task<bool> Menu() => await Read(177, 461, 265, 496) == "通行证";
+            Task<RecognitionRegion?> Menu() => locator.FindAsync(frame, window, "通行证", token);
             async Task<bool> Claim() => await Read(1460, 1063, 1608, 1106) == "全部领取";
             async Task<int?> Tasks() => (await Read(195, 57, 340, 96)).Contains("日常任务")
                 ? await ReadCompletedAsync(frame, screen, ocr, token) : null;
             var next = step;
             string? key = null;
-            (int X, int Y)? click = null;
+            RecognitionRegion? click = null;
             switch (step)
             {
                 case Step.World:
                     if (await screen.World(token) is null) break;
                     key = "F1"; next = Step.Menu; break;
                 case Step.Menu:
-                    if (!await Menu()) break;
-                    click = (220, 479); next = Step.Tasks; break;
+                    click = await Menu();
+                    if (click is null) break;
+                    next = Step.Tasks; break;
                 case Step.Tasks:
                     if (await Tasks() is not { } count) { stable = 0; break; }
                     completed = count;
-                    if (await Claim()) { click = (1535, 1083); next = Step.Claim; }
+                    if (await Claim()) { click = screen.Region(1535, 1083, 1536, 1084); next = Step.Claim; }
                     else if (await HasClaimableAsync(frame, screen, ocr, token)) stable = 0;
                     else if (++stable >= 2) next = Step.ExitTasks;
                     break;
@@ -122,7 +125,7 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
                     if (await Tasks() is null) break;
                     key = "Esc"; next = Step.ExitMenu; break;
                 case Step.ExitMenu:
-                    if (!await Menu()) break;
+                    if (await Menu() is null) break;
                     key = "Esc"; next = Step.ExitWorld; break;
                 case Step.ExitWorld:
                     if (await screen.World(token) is not null) return $"通行证任务领取了{completed}/4";
@@ -132,10 +135,10 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
             if (key is not null)
                 await keyboard.SendSequenceAsync(window.Hwnd, key,
                     new() { Method = input.KeyboardInputMethod, HoldDurationMs = input.KeyboardHoldDurationMs }, token);
-            if (click is { } point)
+            if (click is not null)
             {
-                var region = screen.Region(point.X, point.Y, point.X + 1, point.Y + 1);
-                await mouse.ClickAsync(window.Hwnd, screen.ClientX(region.X), screen.ClientY(region.Y), input.KeyboardInputMethod, token);
+                await mouse.ClickAsync(window.Hwnd, screen.ClientX(click.X + click.Width / 2d),
+                    screen.ClientY(click.Y + click.Height / 2d), input.KeyboardInputMethod, token);
             }
             freshAfter = DateTimeOffset.UtcNow;
             if (key is not null || click is not null) await Task.Delay(next == Step.Claim ? 2000 : 1000, token);

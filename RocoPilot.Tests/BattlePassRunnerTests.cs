@@ -24,7 +24,8 @@ public sealed class BattlePassRunnerTests
         var game = new Replay(width, levelUp, enabled, completed);
         using var backend = new RocoPilot.Services.TextRecognition.Backends.OnnxOcrV5SingleLineTextRecognitionBackend();
         var ocr = new RocoPilot.Services.TextRecognition.TextRecognitionService([new RocoPilot.Services.TextRecognition.Backends.OnnxOcrV5TextRecognitionBackend(backend)]);
-        var runner = new BattlePassRunner(game, new ImageMatchingService(), game, game, ocr);
+        using var locator = new RocoPilot.Services.TextRecognition.OnnxTextLocator(ocr);
+        var runner = new BattlePassRunner(game, new ImageMatchingService(), game, game, ocr, locator);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16,
             ClientOffsetX = 12, ClientOffsetY = 30 };
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));

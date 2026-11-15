@@ -73,7 +73,7 @@ public sealed class EveningRestTests
             return Task.CompletedTask;
         }
 
-        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken token, int holdMs = 50)
+        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken token)
         {
             var (next, px, py) = Scene switch
             {

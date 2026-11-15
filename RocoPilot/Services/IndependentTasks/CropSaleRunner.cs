@@ -1,16 +1,21 @@
 using System.Diagnostics;
+using System.Globalization;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.ImageMatching;
+using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.Services.IndependentTasks;
 
 public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatchingService images,
-    IKeyboardInputService keyboard, IMouseInputService mouse)
+    IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr)
 {
     private const int ActionPauseMs = 1000;
+    private const int FlowerClickIntervalMs = 200;
     private enum Step { Map, Garden, Marker, Teleport, Approach, Dialogue, FindFlower, Quantity, Confirm, Reward, Exit }
 
     public async Task<string> RunAsync(RuntimeTaskState state, string flower, int quantity,
@@ -26,7 +31,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         var timer = Stopwatch.StartNew();
         var freshAfter = DateTimeOffset.MinValue;
         var remaining = quantity;
-        var outcome = $"成功：已领取{flower}的出售奖励，配置数量 {quantity}";
+        var outcome = string.Empty;
         void Advance(Step next, string message)
         {
             step = next;
@@ -52,7 +57,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         progress(new("自动出售", status));
         while (true)
         {
-            await Task.Delay(step is Step.Quantity or Step.Approach ? 120 : 350, token);
+            await Task.Delay(step switch { Step.Quantity => FlowerClickIntervalMs, Step.Approach => 120, _ => 350 }, token);
             if (!keyboard.IsWindowAvailable(window.Hwnd)) throw new InvalidOperationException("游戏窗口已关闭。");
             if (!keyboard.IsWindowForeground(window.Hwnd))
             {
@@ -80,10 +85,10 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
             }
             async Task Add(double x, double y)
             {
-                var batch = remaining >= 10 ? 10 : 1;
-                await mouse.ClickAsync(window.Hwnd, screen.ClientX(x), screen.ClientY(y), method, token, batch == 10 ? 300 : 50);
-                remaining -= batch;
-                await AfterInput();
+                await mouse.ClickAsync(window.Hwnd, screen.ClientX(x), screen.ClientY(y), method, token);
+                remaining--;
+                freshAfter = DateTimeOffset.UtcNow;
+                if (remaining == 0) await AfterInput();
                 timer.Restart();
             }
 
@@ -169,6 +174,9 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                     if (remaining > 0) await Add(cx, cy);
                     else
                     {
+                        var income = await ReadIncomeAsync(frame, screen, ocr, token);
+                        var price = income is null ? "预期收入未识别" : $"预期收入 {income} 金币";
+                        outcome = $"成功：已领取{flower}的出售奖励，{price}";
                         await Click(sell);
                         Advance(Step.Confirm, "等待出售确认");
                     }
@@ -193,6 +201,30 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                     if (await Station() != null || await Dialogue() != null) await Key("Esc");
                     break;
             }
+        }
+    }
+
+    internal static async Task<long?> ReadIncomeAsync(CapturedFrame frame, DailyTaskScreen screen,
+        ITextRecognitionService ocr, CancellationToken token)
+    {
+        // 金额右对齐，金币图标随位数左移。只把图标右侧的数字交给单行 OCR。
+        var coin = await screen.Find("crop-sale/income-coin", 300, 976, 690, 1028, token);
+        if (coin == null) return null;
+        var digits = screen.Region(300, 986, 710, 1018);
+        var left = coin.X + coin.Width + (int)Math.Round(2 * screen.Scale);
+        digits.Width -= left - digits.X;
+        digits.X = left;
+        if (digits.Width <= 0) return null;
+        try
+        {
+            var result = await ocr.RecognizeAsync(frame, digits, TextRecognitionMethod.OnnxOcrV5, token);
+            return long.TryParse(result.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var amount) && amount > 0
+                ? amount : null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // 金额只用于成交后的日志及每日汇总。
+            return null;
         }
     }
 }

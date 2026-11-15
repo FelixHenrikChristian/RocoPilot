@@ -8,6 +8,8 @@ using RocoPilot.Models.Input;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.ImageMatching;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.TextRecognition;
+using RocoPilot.Services.TextRecognition.Backends;
 
 namespace RocoPilot.Tests;
 
@@ -25,6 +27,25 @@ public sealed class CropSaleTests
 
     private static CapturedFrame Load(string name, int width) => FlowerSeedScreenRecognizerTests.LoadFixture(
         Path.Combine(Folder(), name + ".png"), width, width * 9 / 16, 12, 30);
+
+    [TestMethod]
+    [DataRow(2048)]
+    [DataRow(1280)]
+    [DataRow(960)]
+    public async Task ReadsOnlyTheExpectedIncomeAtTheBottom(int width)
+    {
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        var images = new ImageMatchingService();
+        foreach (var amount in new long[] { 9000, 42000, 132000, 582000, 912000, 1182000, 2052000 })
+        {
+            using var frame = Load($"sunflower-income-{amount}", width);
+            var screen = new DailyTaskScreen(frame, Window(width), images);
+            Assert.AreEqual(amount, await CropSaleRunner.ReadIncomeAsync(frame, screen, ocr, default), $"{width} / {amount}");
+        }
+        using var empty = Load("flowers-top", width);
+        Assert.IsNull(await CropSaleRunner.ReadIncomeAsync(empty, new DailyTaskScreen(empty, Window(width), images), ocr, default));
+    }
 
     [TestMethod]
     [DataRow(2048)]
@@ -63,24 +84,26 @@ public sealed class CropSaleTests
     public async Task SellsOneFlowerWithConfiguredPressesAndReturnsToWorld(int width, int quantity)
     {
         var game = new Replay(width);
-        var runner = new CropSaleRunner(game, new ImageMatchingService(), game, game);
+        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        var runner = new CropSaleRunner(game, new ImageMatchingService(), game, game, ocr);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), "紫晶菇", quantity, progress => Console.WriteLine(progress), timeout.Token);
         Assert.AreEqual("done", game.Scene);
-        CollectionAssert.AreEqual(Enumerable.Repeat(300, quantity / 10).Concat(Enumerable.Repeat(50, quantity % 10)).ToArray(), game.Presses);
-        StringAssert.Contains(outcome, "已领取紫晶菇的出售奖励");
+        Assert.AreEqual(quantity, game.FlowerClicks);
+        StringAssert.Contains(outcome, "已领取紫晶菇的出售奖励，预期收入 3000 金币");
     }
 
     private sealed class Replay(int width) : IScreenCaptureService, IKeyboardInputService, IMouseInputService
     {
         public string Scene = "start";
-        public List<int> Presses { get; } = [];
+        public int FlowerClicks { get; private set; }
         private readonly Stopwatch _sinceLastInput = new();
 
-        private void CheckInputInterval()
+        private void CheckInputInterval(int minimumMs = 1000)
         {
             if (_sinceLastInput.IsRunning)
-                Assert.IsTrue(_sinceLastInput.ElapsedMilliseconds >= 1000, $"{Scene} 操作间隔只有 {_sinceLastInput.ElapsedMilliseconds} ms");
+                Assert.IsTrue(_sinceLastInput.ElapsedMilliseconds >= minimumMs, $"{Scene} 操作间隔只有 {_sinceLastInput.ElapsedMilliseconds} ms");
             _sinceLastInput.Restart();
         }
 
@@ -124,9 +147,8 @@ public sealed class CropSaleTests
             return Task.CompletedTask;
         }
 
-        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken token, int holdMs = 50)
+        public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method, CancellationToken token)
         {
-            CheckInputInterval();
             var (next, px, py) = Scene switch
             {
                 "map" => ("marker", 237, 914),
@@ -139,7 +161,8 @@ public sealed class CropSaleTests
                 _ => throw new AssertFailedException($"{Scene} 意外点击")
             };
             Check(x, y, px, py);
-            if (next == "selected") Presses.Add(holdMs);
+            CheckInputInterval(Scene == "selected" && next == "selected" ? 200 : 1000);
+            if (next == "selected") FlowerClicks++;
             Scene = next;
             return Task.CompletedTask;
         }

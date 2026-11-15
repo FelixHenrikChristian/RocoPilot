@@ -1276,7 +1276,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         public Action? DuringScroll;
         public Action<int, int>? DuringClick;
         public Task ClickAsync(nint hwnd, int x, int y, KeyboardInputMethod method = KeyboardInputMethod.SendInput,
-            CancellationToken cancellationToken = default, int holdMs = 50) { Clicks++; DuringClick?.Invoke(x, y); return Task.CompletedTask; }
+            CancellationToken cancellationToken = default) { Clicks++; DuringClick?.Invoke(x, y); return Task.CompletedTask; }
         public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method = KeyboardInputMethod.SendInput,
             CancellationToken cancellationToken = default) { DuringScroll?.Invoke(); return Task.CompletedTask; }
         public Task ScrollAtCurrentPositionAsync(nint hwnd, int delta, KeyboardInputMethod method = KeyboardInputMethod.SendInput,

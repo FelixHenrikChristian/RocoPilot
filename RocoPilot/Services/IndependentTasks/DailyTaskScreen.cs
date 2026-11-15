@@ -1,6 +1,7 @@
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services.IndependentTasks;
@@ -37,12 +38,14 @@ internal sealed class DailyTaskScreen
         return (false, await Find("stamina-crafting/triangle", 180, 1010, 500, 1120, token));
     }
 
+    public RecognitionRegion Region(int left, int top, int right, int bottom) =>
+        RecognitionRegionImageHelper.MapReferenceArea(_x, _y, _width, _height, 2048, 1152,
+            left, top, right - left, bottom - top);
+
     public async Task<ImageMatchResult?> Find(string template, int left, int top, int right, int bottom,
         CancellationToken token, double threshold = .94, double templateScale = 1)
     {
-        var region = RecognitionRegionImageHelper.MapReferenceArea(_x, _y, _width, _height, 2048, 1152,
-            left, top, right - left, bottom - top);
-        var result = await _images.MatchAsync(_frame, region, $"2048x1152/{template}.png",
+        var result = await _images.MatchAsync(_frame, Region(left, top, right, bottom), $"2048x1152/{template}.png",
             new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = Scale * templateScale, TemplateScaleY = Scale * templateScale }, token);
         return result.IsMatch ? result : null;
     }

@@ -269,11 +269,11 @@ public sealed class StatisticsUidCoordinatorService :
         _infoOverlayNotificationService.UpdateUidNotice(
             detectionResult.Success && !string.IsNullOrWhiteSpace(detectionResult.Uid)
                 ? new InfoOverlayNotice(
-                    "需要确认统计账号",
-                    $"检测到 UID {detectionResult.Uid}，请前往统计页核对")
+                    "确认统计账号",
+                    $"UID {detectionResult.Uid} · 请到统计页核对")
                 : new InfoOverlayNotice(
                     "UID 识别失败",
-                    "自动统计已暂停，请前往统计页手动输入或重新识别"));
+                    "统计已暂停 · 请到统计页处理"));
     }
 
     private void SetPendingConfirmation(StatisticsUidConfirmationRequest pending)

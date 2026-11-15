@@ -471,7 +471,7 @@ public sealed partial class RuntimeTaskService
                 .FirstOrDefault(item => TextMatchingHelper.AreSameSpiritName(item.Name, enemyName))?.Count ?? 0;
             if (currentCount == 0) return;
             if (CurrentState is { } recordedState && !cancellationToken.IsCancellationRequested && !_isSuspended)
-                RefreshOverlayActivity(recordedState, _overlayActivities.Record(enemyName, currentCount, now, DateTimeOffset.Now));
+                RefreshOverlayActivity(recordedState, _overlayActivities.Record(enemyName, currentCount, DateTimeOffset.Now));
             _logger.LogInformation(
                 "奇遇统计：{SpiritName} 奇遇 +1（当前 {Count}）",
                 enemyName,

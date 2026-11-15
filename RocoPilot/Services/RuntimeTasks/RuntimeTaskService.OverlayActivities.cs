@@ -60,18 +60,19 @@ public sealed partial class RuntimeTaskService
         if (completed) _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}，已发送 {Sequence}",
             turn.Number, plan.Description, sequence);
         if (_battle.IsSuspendedForShiny || !ReferenceEquals(CurrentState, state) || _isSuspended) return;
-        var kind = plan.Action switch
-        {
-            AutoBattleAction.Capture => InfoOverlayActivityKind.Capture,
-            AutoBattleAction.EnergyRecovery => InfoOverlayActivityKind.EnergyRecovery,
-            _ => InfoOverlayActivityKind.Skill
-        };
+        var title = InfoOverlayIslandPresentation.BattleInputTitle(plan);
+        // 技能序列里的 X 同样是回能，步骤行与标题保持一致。
+        var kind = plan.Action == AutoBattleAction.Capture ? InfoOverlayActivityKind.Capture
+            : plan.Action == AutoBattleAction.EnergyRecovery || title == "回能" ? InfoOverlayActivityKind.EnergyRecovery
+            : InfoOverlayActivityKind.Skill;
         var isCustomSequence = plan.Action == AutoBattleAction.Skill && plan.FallbackSequence is null;
+        var bloodline = _battle.Bloodline;
         var description = plan.Action == AutoBattleAction.Capture
-            ? $"血脉：{EncounterBloodlineRecognition.GetDisplayName(_battle.Bloodline)}"
+            ? bloodline == EncounterBloodlineKind.Unrecognized ? string.Empty
+                : $"{EncounterBloodlineRecognition.GetDisplayName(bloodline)}血脉"
             : isCustomSequence && plan.DisplayKey != plan.Sequence ? plan.DisplayKey : string.Empty;
         RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turn.Id,
-            $"input:{turn.Id}:{plan.Action}:{sequence}", kind, InfoOverlayIslandPresentation.BattleInputTitle(plan),
+            $"input:{turn.Id}:{plan.Action}:{sequence}", kind, title,
             description,
             DateTimeOffset.Now, completed));
     }
@@ -95,7 +96,7 @@ public sealed partial class RuntimeTaskService
         catch (Exception ex)
         {
             RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turn.Id, $"error:{turn.Id}:{plan.Action}",
-                InfoOverlayActivityKind.Error, "按键发送未完成", ex.Message, DateTimeOffset.Now, completed: true));
+                InfoOverlayActivityKind.Error, "按键未发送", ex.Message, DateTimeOffset.Now, completed: true));
             throw;
         }
     }

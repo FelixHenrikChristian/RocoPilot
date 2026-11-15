@@ -25,6 +25,19 @@ public sealed class InfoOverlayActivityTests
     }
 
     [TestMethod]
+    public void IndependentTaskStepLineDoesNotRepeatTheTaskNameShownInTheTopBar()
+    {
+        var snapshot = new InfoOverlaySnapshot("已挂起", [], Now, Scene: InfoOverlayScene.Suspended,
+            IndependentTaskName: "自动种菜", IndependentTaskProgress: new("自动种菜", "传送到种植园入口"));
+
+        var presentation = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!;
+        Assert.AreEqual("自动种菜", snapshot.MainStatusText);
+        Assert.AreEqual("当前步骤", presentation.Category);
+        Assert.AreEqual("传送到种植园入口", presentation.Title);
+        Assert.AreEqual("", presentation.Description);
+    }
+
+    [TestMethod]
     public void IndependentTaskUsesItsRecognizedCreatureInsteadOfThePreviousRealtimeBattle()
     {
         var progress = new IndependentTaskProgress("战斗", "技能 1", "成功 0/6 次", "伊贝粉粉");
@@ -107,7 +120,7 @@ public sealed class InfoOverlayActivityTests
         var recognized = tracker.RecognizeSpirit(1, null, "栗鼠", Now.AddSeconds(1));
         Assert.AreEqual(action!.Id, recognized!.Id);
         Assert.AreEqual("栗鼠", recognized.CreatureName);
-        Assert.AreSame(recognized, tracker.Record("栗鼠", 8, Now, Now.AddSeconds(2)));
+        Assert.AreSame(recognized, tracker.Record("栗鼠", 8, Now.AddSeconds(2)));
         var completed = tracker.Publish(1, 2, "input", InfoOverlayActivityKind.Skill, "已发送", "", Now.AddSeconds(3), true);
         Assert.AreEqual("栗鼠", completed!.CreatureName);
     }
@@ -117,13 +130,16 @@ public sealed class InfoOverlayActivityTests
     {
         var tracker = new InfoOverlayActivityTracker();
         var publishedAt = Now.AddSeconds(20);
-        var record = tracker.Record("栗鼠", 8, Now, publishedAt);
+        var record = tracker.Record("栗鼠", 8, publishedAt);
         tracker.ResetBattle(10);
         tracker.ResetBattle(11);
         Assert.AreSame(record, tracker.Current);
         Assert.IsNotNull(Present(record, publishedAt.AddSeconds(3)));
         Assert.IsNull(Present(record, publishedAt.AddSeconds(4)));
-        StringAssert.Contains(record.Description, Now.ToLocalTime().ToString("HH:mm:ss"));
+        Assert.AreEqual("奇遇 8 次", record.Title);
+        var presentation = Present(record, publishedAt)!;
+        Assert.AreEqual("奇遇记录", presentation.Category);
+        Assert.AreEqual("栗鼠 · 已记录", presentation.Description);
         tracker.Clear();
         Assert.IsNull(tracker.Current);
     }
@@ -142,7 +158,7 @@ public sealed class InfoOverlayActivityTests
         var resumed = new InfoOverlaySnapshot("大世界", [], Now, Activity: tracker.Current, Scene: InfoOverlayScene.World);
         var presentation = InfoOverlayIslandPresentation.Resolve(resumed, null, Now.AddSeconds(3))!;
         Assert.AreEqual("大世界", resumed.MainStatusText);
-        Assert.AreEqual("任务完成", presentation.Category);
+        Assert.AreEqual("操作结果", presentation.Category);
         Assert.AreEqual(completed.Title, presentation.Title);
         Assert.AreEqual(completed.Description, presentation.Description);
         Assert.IsNull(InfoOverlayIslandPresentation.Resolve(resumed, null, Now.AddSeconds(4)));
@@ -153,7 +169,7 @@ public sealed class InfoOverlayActivityTests
     {
         var tracker = new InfoOverlayActivityTracker();
         var snapshot = new InfoOverlaySnapshot("战斗中", [], Now,
-            Activity: tracker.Record("栗鼠", 8, Now, Now), IsShinyProtectionActive: true);
+            Activity: tracker.Record("栗鼠", 8, Now), IsShinyProtectionActive: true);
         var warning = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddHours(1));
         Assert.IsTrue(warning!.IsWarning);
         Assert.AreEqual("异色保护", warning.Category);
@@ -170,7 +186,7 @@ public sealed class InfoOverlayActivityTests
         var warning = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddHours(1))!;
         Assert.IsTrue(warning.IsWarning);
         Assert.AreEqual("栗鼠", warning.CreatureName);
-        StringAssert.Contains(warning.Description, "精灵：栗鼠");
+        Assert.AreEqual("栗鼠 · 退出战斗后恢复", warning.Description);
         Assert.AreEqual("自动操作已暂停", warning.Title);
         Assert.AreEqual("异色保护", snapshot.MainStatusText);
     }
@@ -212,12 +228,13 @@ public sealed class InfoOverlayActivityTests
         var snapshot = new InfoOverlaySnapshot("战斗中 - 技能选择", [], Now,
             PendingShinyCapture: new("栗鼠", "S4", Now.AddMinutes(-1)), Activity: recognized,
             Scene: InfoOverlayScene.Battle, IsAutoBattleEnabled: true, BattleCreatureName: "刺轮砣");
-        Assert.AreEqual("刺轮砣", InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!.CreatureName);
+        // 仅识别出名称不算动作，保持收起。
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now));
 
         var skill = tracker.Publish(2, 1, "input", InfoOverlayActivityKind.Skill, "使用技能 3", "", Now, false);
         var running = InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = skill }, null, Now.AddSeconds(30))!;
         Assert.AreEqual("使用技能 3", running.Title);
-        Assert.AreEqual("精灵：刺轮砣", running.Description);
+        Assert.AreEqual("刺轮砣 · 执行中", running.Description);
         Assert.IsFalse(running.IsWarning);
         var withoutPending = InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = skill, PendingShinyCapture = null }, null, Now.AddSeconds(30));
         Assert.AreEqual(running, withoutPending);
@@ -242,17 +259,18 @@ public sealed class InfoOverlayActivityTests
     }
 
     [TestMethod]
-    public void ExpiredActivityFallsBackToTheCurrentBattleFlowWithoutChangingMainTitle()
+    public void ExpiredActivityCollapsesWithoutChangingMainTitle()
     {
         var tracker = new InfoOverlayActivityTracker();
         tracker.ResetBattle(1); tracker.BeginTurn(1);
         var activity = tracker.Publish(1, 1, "input", InfoOverlayActivityKind.Skill, "使用技能 3", "", Now, true);
         var snapshot = new InfoOverlaySnapshot("战斗中 - 技能选择", [], Now, Activity: activity,
             Scene: InfoOverlayScene.Battle, IsAutoBattleEnabled: true);
-        Assert.AreEqual("使用技能 3", InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!.Title);
-        Assert.AreEqual("技能选择", InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddSeconds(4))!.Title);
+        var sent = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now)!;
+        Assert.AreEqual("使用技能 3", sent.Title);
+        Assert.AreEqual("已发送", sent.Description);
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddSeconds(4)));
         Assert.AreEqual("自动战斗中", snapshot.MainStatusText);
-        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot with { Scene = InfoOverlayScene.World, StatusText = "大世界" }, null, Now.AddSeconds(4)));
     }
 
     [TestMethod]
@@ -265,24 +283,39 @@ public sealed class InfoOverlayActivityTests
         var presentation = Present(activity, Now)!;
         Assert.AreEqual("栗鼠", presentation.CreatureName);
         Assert.AreEqual("使用技能 3", presentation.Title);
-        Assert.AreEqual("精灵：栗鼠", presentation.Description);
-        Assert.AreEqual("技能选择", presentation.Category);
+        Assert.AreEqual("栗鼠 · 执行中", presentation.Description);
+        Assert.AreEqual("释放技能", presentation.Category);
     }
 
     [TestMethod]
-    public void BattleFlowKeepsCreatureNameAfterActivityExpiresAndClearsOnNewBattle()
+    public void RecognizedNameAloneDoesNotExpandTheIslandOrMaskALaterAction()
     {
         var tracker = new InfoOverlayActivityTracker();
         tracker.ResetBattle(1); tracker.BeginTurn(1);
         var recognized = tracker.RecognizeSpirit(1, 1, "栗鼠", Now);
         var snapshot = new InfoOverlaySnapshot("战斗中 - 技能选择", [], Now, Activity: recognized,
             Scene: InfoOverlayScene.Battle, BattleCreatureName: tracker.CreatureName);
-        var flow = InfoOverlayIslandPresentation.Resolve(snapshot, null, Now.AddSeconds(5))!;
-        Assert.AreEqual("技能选择", flow.Title);
-        Assert.AreEqual("精灵：栗鼠", flow.Description);
-        Assert.AreEqual("栗鼠", flow.CreatureName);
-        tracker.ResetBattle(2);
-        Assert.AreEqual("", tracker.CreatureName);
-        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot with { Scene = InfoOverlayScene.World, StatusText = "大世界" }, null, Now.AddSeconds(5)));
+        Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now));
+        var capture = tracker.Publish(1, 1, "input", InfoOverlayActivityKind.Capture, "捕捉", "奇异血脉", Now, true);
+        var presentation = InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = capture }, null, Now)!;
+        Assert.AreEqual("战斗操作", presentation.Category);
+        Assert.AreEqual("捕捉", presentation.Title);
+        Assert.AreEqual("栗鼠 · 奇异血脉 · 已发送", presentation.Description);
+    }
+
+    [TestMethod]
+    public void PetSwitchAndErrorDoNotAttributeTheOpponentCreature()
+    {
+        var tracker = new InfoOverlayActivityTracker();
+        tracker.ResetBattle(1); tracker.BeginTurn(1);
+        tracker.RecognizeSpirit(1, 1, "栗鼠", Now);
+        var switching = Present(tracker.Publish(1, 1, "switch", InfoOverlayActivityKind.PetSwitch, "第 2 只", "切换中", Now, true), Now)!;
+        Assert.AreEqual("切换精灵", switching.Category);
+        Assert.AreEqual("第 2 只", switching.Title);
+        Assert.AreEqual("切换中", switching.Description);
+        Assert.AreEqual("", switching.CreatureName);
+        var failed = Present(tracker.Publish(1, 1, "error", InfoOverlayActivityKind.Error, "按键未发送", "键盘设备不可用", Now, true), Now)!;
+        Assert.AreEqual("操作失败", failed.Category);
+        Assert.AreEqual("键盘设备不可用", failed.Description);
     }
 }

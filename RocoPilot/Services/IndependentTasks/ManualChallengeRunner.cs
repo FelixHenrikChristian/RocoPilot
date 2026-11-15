@@ -349,7 +349,8 @@ public sealed class ManualChallengeRunner(
                     ManualChallengeScene.Interaction => string.IsNullOrWhiteSpace(screen.Text)
                         ? "正在确认交互选项" : $"当前选项：{screen.Text}",
                     ManualChallengeScene.LegendaryList => "当前精灵：" + string.Join("、", screen.Rows.Select(row => row.Name)),
-                    _ => $"当前界面：{Stage(screen.Scene)}"
+                    // 界面名称已是灵动岛的步骤行，结果行不再重复。
+                    _ => string.Empty
                 };
                 var operation = flow.StopReason is not null ? "退出并停止：" + flow.StopReason : decision.Action switch
                 {
@@ -372,10 +373,14 @@ public sealed class ManualChallengeRunner(
                 Publish(lastProgress with { Operation = operation,
                     IsBattleWaiting = flow.IsBattleActive && plan is null && !switchingPet
                         && screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Unknown,
-                    Recognition = scanning ? recognized
-                    : screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Capture or ManualChallengeScene.Result
-                        ? $"{(string.IsNullOrWhiteSpace(creatureName) ? "当前位置" : creatureName)} · 成功 {flow.CompletedCount}/{runCount}"
-                        : $"成功 {flow.CompletedCount}/{runCount} 次 · {recognized}" });
+                    // 结果行固定为“对象 · 进度”，战斗外再补一条当前识别内容。
+                    Recognition = scanning ? recognized : string.Join(" · ", new[]
+                    {
+                        string.IsNullOrWhiteSpace(creatureName) ? "当前位置" : creatureName,
+                        $"成功 {flow.CompletedCount}/{runCount}",
+                        screen.Scene is ManualChallengeScene.Battle or ManualChallengeScene.Capture or ManualChallengeScene.Result
+                            ? string.Empty : recognized
+                    }.Where(text => text.Length > 0)) });
                 if (decision.Action == ManualChallengeAction.Stop)
                     throw new InvalidOperationException(flow.StopReason);
                 if (decision.Action == ManualChallengeAction.Complete)
@@ -591,7 +596,7 @@ public sealed class ManualChallengeRunner(
                 if (!keyboard.IsWindowForeground(window.Hwnd)) return;
                 if (phase == BattleScreen.PetSwitching)
                 {
-                    Publish(lastProgress with { Operation = $"切换精灵：选择第 {slot} 只", IsBattleWaiting = false });
+                    Publish(lastProgress with { Operation = $"切换精灵 · 第 {slot} 只", IsBattleWaiting = false });
                     await SendKey(slot.ToString(), settings.KeyboardHoldDurationMs);
                     minimumFrameAt = DateTimeOffset.UtcNow;
                     await Task.Delay(1500, token);
@@ -601,7 +606,7 @@ public sealed class ManualChallengeRunner(
                 var timer = Stopwatch.StartNew();
                 do
                 {
-                    Publish(lastProgress with { Operation = "切换精灵：按 Space 确认", IsBattleWaiting = false });
+                    Publish(lastProgress with { Operation = "切换精灵 · 确认", IsBattleWaiting = false });
                     await SendKey("Space", settings.KeyboardHoldDurationMs);
                     minimumFrameAt = DateTimeOffset.UtcNow;
                     logger.LogDebug("挑战换精灵：已发送 Space，等待确认界面消失");

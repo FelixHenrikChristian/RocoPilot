@@ -54,7 +54,7 @@ public sealed partial class RuntimeTaskService
             using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
                 await file.WriteAsync(bytes);
             _logger.LogInformation("截图已保存：{Path}", path);
-            ShowIndependentTaskResult("截图已保存", path);
+            ShowIndependentTaskResult("截图已保存", Path.GetFileName(path));
         }
         catch (Exception ex)
         {

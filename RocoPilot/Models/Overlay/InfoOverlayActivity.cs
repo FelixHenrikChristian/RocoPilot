@@ -1,6 +1,6 @@
 namespace RocoPilot.Models.Overlay;
 
-public enum InfoOverlayActivityKind { Spirit, Skill, Capture, EnergyRecovery, PetSwitch, Waiting, Record, Error, Task }
+public enum InfoOverlayActivityKind { Spirit, Skill, Capture, EnergyRecovery, PetSwitch, Record, Error, Task }
 
 public sealed record InfoOverlayActivity(long Id, InfoOverlayActivityKind Kind, string Title,
     string Description, string CreatureName, DateTimeOffset CreatedAt, DateTimeOffset? ExpiresAt,
@@ -67,15 +67,16 @@ public sealed class InfoOverlayActivityTracker
         }
     }
 
-    public InfoOverlayActivity Record(string name, int? count, DateTimeOffset recordedAt, DateTimeOffset publishedAt)
+    public InfoOverlayActivity Record(string name, int? count, DateTimeOffset publishedAt)
     {
         lock (_gate)
         {
             // 后台保存只更新计数，不打断尚未完成的按键序列提示。
             if (_current is { IsBattleBound: true, ExpiresAt: null } ongoing) return ongoing;
             return _current = new(++_nextId, InfoOverlayActivityKind.Record,
-                string.IsNullOrWhiteSpace(name) ? "奇遇记录已暂存" : count.HasValue ? $"{name} · 奇遇 {count} 次" : $"{name} · 奇遇已暂存",
-                count.HasValue ? $"记录更新于 {recordedAt.ToLocalTime():HH:mm:ss}" : "等待补齐赛季或精灵名称后归档",
+                // 名称由灵动岛结果行和头像展示，标题只留次数。
+                !string.IsNullOrWhiteSpace(name) && count.HasValue ? $"奇遇 {count} 次" : "奇遇已暂存",
+                !string.IsNullOrWhiteSpace(name) && count.HasValue ? "已记录" : "待补齐赛季或精灵名称",
                 name, publishedAt, publishedAt.AddSeconds(4), IsBattleBound: false);
         }
     }

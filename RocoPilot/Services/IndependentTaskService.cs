@@ -298,7 +298,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     }
                     NotifyStateChanged();
                     _logger.LogInformation("传说精灵扫描完成，共 {Count} 个", names.Count);
-                    _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {names.Count} 个传说精灵", "名单和选择仅本次启动有效，重启后恢复本地设置");
+                    _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {names.Count} 个传说精灵", "名单仅本次启动有效");
                     break;
                 case IndependentTaskKind.LegendaryChallenge:
                     await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,

@@ -80,18 +80,11 @@ public sealed partial class RuntimeTaskService
             {
                 return;
             }
-            if (plan.Action == AutoBattleAction.None)
-            {
-                RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"wait:{turn.Id}",
-                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "识别精灵血脉", string.Empty, now, completed: true));
-                return;
-            }
+            // 等待血脉识别、等待手动操作都没有实际动作，灵动岛保持收起，也不打断上一条提示。
+            if (plan.Action == AutoBattleAction.None) return;
             if (plan.ShouldSendKeys
                 && !await ExecuteBattleInputWithOverlayAsync(state, settings, plan, turn, cancellationToken)) return;
             if (!_battle.RecordAction(turn.Id, plan.Action, DateTimeOffset.Now)) return;
-            if (!plan.ShouldSendKeys)
-                RefreshOverlayActivity(state, _overlayActivities.Publish(_battle.BattleId, turn.Id, $"manual:{turn.Id}",
-                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.Waiting, "等待手动操作", string.Empty, now, completed: true));
 
             if (!plan.ShouldSendKeys && turn.Action != plan.Action)
                 _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}", turn.Number, plan.Description);
@@ -166,8 +159,8 @@ public sealed partial class RuntimeTaskService
 
                 var slotKey = slot.ToString();
                 RefreshOverlayActivity(state, _overlayActivities.Publish(switchBattleId, switchTurn, $"switch:{switchTurn}:{slot}",
-                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.PetSwitch, "切换精灵",
-                    $"选择第 {slot} 只精灵", DateTimeOffset.Now, completed: true));
+                    RocoPilot.Models.Overlay.InfoOverlayActivityKind.PetSwitch, $"第 {slot} 只",
+                    "切换中", DateTimeOffset.Now, completed: true));
                 _logger.LogDebug("自动战斗换精灵：尝试按 {SlotKey}", slotKey);
                 await _keyboardInputService.SendSequenceAsync(
                     state.TargetWindow.Hwnd,

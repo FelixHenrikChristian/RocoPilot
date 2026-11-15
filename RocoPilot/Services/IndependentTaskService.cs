@@ -148,6 +148,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
             var settings = dailySettings?.Normalize(LegendaryTargets) ?? _settings.Clone();
             settings.FlowerSeedOptions = [.. _settings.FlowerSeedOptions];
             settings.UseLegendaryMarkWhenInsufficient = _settings.UseLegendaryMarkWhenInsufficient;
+            if (tasks.Contains(IndependentTaskKind.Gardening) && !settings.ReuseEquippedSeed &&
+                (!IndependentTaskSettings.SaleFlowers.Contains(settings.GardenSeed) || settings.SeedsPerPlot is < 1 or > 3))
+                return IndependentTaskStartResult.Failed("请选择种子和每格播种颗数。");
+
             if (tasks.Contains(IndependentTaskKind.Sell) && (!IndependentTaskSettings.SaleFlowers.Contains(settings.SaleFlower) || settings.SaleQuantity < 1))
                 return IndependentTaskStartResult.Failed("请选择要出售的花，并填写正整数数量。");
 
@@ -273,7 +277,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     outcome = await _cropSale.RunAsync(state, settings.SaleFlower, settings.SaleQuantity, UpdateProgress, taskCts.Token);
                     break;
                 case IndependentTaskKind.Gardening:
-                    outcome = await _gardening.RunAsync(state, UpdateProgress, taskCts.Token);
+                    outcome = await _gardening.RunAsync(state, settings, UpdateProgress, taskCts.Token);
                     break;
                 case IndependentTaskKind.Mail:
                     outcome = await _mail.RunAsync(state, UpdateProgress, taskCts.Token);

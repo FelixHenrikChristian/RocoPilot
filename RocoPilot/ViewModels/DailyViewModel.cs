@@ -25,6 +25,19 @@ public partial class DailyViewModel : ObservableObject
 
     public ObservableCollection<DailyTaskItemViewModel> Items { get; } = [];
 
+    public DailyTaskItemViewModel? GardeningTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.Gardening);
+    public bool CanSelectGardenSeed => CanReorder && !ReuseEquippedSeed;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSelectGardenSeed))]
+    public partial bool ReuseEquippedSeed { get; set; }
+
+    [ObservableProperty]
+    public partial string? GardenSeed { get; set; }
+
+    [ObservableProperty]
+    public partial int SeedCountIndex { get; set; }
+
     public DailyTaskItemViewModel? SaleTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.Sell);
     public IReadOnlyList<string> SaleFlowers => IndependentTaskSettings.SaleFlowers;
 
@@ -46,6 +59,7 @@ public partial class DailyViewModel : ObservableObject
     public partial bool CanStartOrStop { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSelectGardenSeed))]
     public partial bool CanReorder { get; set; }
 
     [ObservableProperty]
@@ -113,6 +127,10 @@ public partial class DailyViewModel : ObservableObject
         }
 
         var challenges = (settings.Challenges ?? defaults).Normalize(_tasks.LegendaryTargets);
+        ReuseEquippedSeed = challenges.ReuseEquippedSeed;
+        GardenSeed = challenges.GardenSeed;
+        SeedCountIndex = challenges.SeedsPerPlot - 1;
+        OnPropertyChanged(nameof(GardeningTask));
         SelectedSaleFlower = challenges.SaleFlower;
         SaleQuantity = challenges.SaleQuantity;
         OnPropertyChanged(nameof(SaleTask));
@@ -138,6 +156,9 @@ public partial class DailyViewModel : ObservableObject
 
     private IndependentTaskSettings ChallengeSnapshot() => new()
     {
+        ReuseEquippedSeed = ReuseEquippedSeed,
+        GardenSeed = GardenSeed ?? string.Empty,
+        SeedsPerPlot = SeedCountIndex + 1,
         SaleFlower = SelectedSaleFlower ?? string.Empty,
         SaleQuantity = SaleQuantity >= 1 && SaleQuantity <= int.MaxValue && SaleQuantity == Math.Truncate(SaleQuantity)
             ? (int)SaleQuantity : 0,
@@ -153,6 +174,7 @@ public partial class DailyViewModel : ObservableObject
         base.OnPropertyChanged(e);
         if (_loaded && e.PropertyName is nameof(SelectedLegendaryTarget) or nameof(SelectedLegendaryDifficultyIndex)
             or nameof(LegendaryChallengeRunCount) or nameof(SelectedFlowerSeed) or nameof(FlowerSeedRunCount)
+            or nameof(ReuseEquippedSeed) or nameof(GardenSeed) or nameof(SeedCountIndex)
             or nameof(SelectedSaleFlower) or nameof(SaleQuantity))
             _ = SaveAsync();
     }

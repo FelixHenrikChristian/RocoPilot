@@ -12,6 +12,10 @@ public sealed class IndependentTaskSettings
         "大嘴花", "紫雀花", "雪菇", "睡铃", "海桑花", "彩玉花", "短木莲", "荧光兰", "紫晶菇",
         "蓝掌", "花星角", "流星兰", "火焰花", "恶魔雪茄", "象牙花"
     });
+    public bool ReuseEquippedSeed { get; set; } = true;
+    public string GardenSeed { get; set; } = SaleFlowers[0];
+    public int SeedsPerPlot { get; set; } = 1;
+
     public string SaleFlower { get; set; } = SaleFlowers[0];
     public int SaleQuantity { get; set; } = DefaultSaleQuantity;
 
@@ -57,6 +61,9 @@ public sealed class IndependentTaskSettings
     {
         return new IndependentTaskSettings
         {
+            ReuseEquippedSeed = ReuseEquippedSeed,
+            GardenSeed = GardenSeed,
+            SeedsPerPlot = SeedsPerPlot,
             SaleFlower = SaleFlower,
             SaleQuantity = SaleQuantity,
             LegendaryChallengeRunCount = LegendaryChallengeRunCount,
@@ -76,6 +83,9 @@ public sealed class IndependentTaskSettings
     {
         return new IndependentTaskSettings
         {
+            ReuseEquippedSeed = ReuseEquippedSeed,
+            GardenSeed = GardenSeed,
+            SeedsPerPlot = SeedsPerPlot,
             SaleFlower = SaleFlower,
             SaleQuantity = SaleQuantity,
             LegendaryChallengeRunCount = Math.Clamp(LegendaryChallengeRunCount, MinimumRunCount, MaximumRunCount),

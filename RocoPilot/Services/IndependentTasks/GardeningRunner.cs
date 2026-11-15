@@ -10,9 +10,10 @@ namespace RocoPilot.Services.IndependentTasks;
 public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchingService images,
     IKeyboardInputService keyboard, IMouseInputService mouse)
 {
-    private enum Step { Map, Garden, Entrance, Teleport, Approach, Harvest, Recall, Sow, Observe, Care }
+    private enum Step { Map, Garden, Entrance, Teleport, OpenPocket, PickSeed, EquipSeed, WaitForGarden, Approach, Harvest, Recall, Sow, Observe, Care }
 
-    public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
+    public async Task<string> RunAsync(RuntimeTaskState state, IndependentTaskSettings settings,
+        Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
         var input = state.Options.AutoBattleSettings;
@@ -22,7 +23,9 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
         var plots = new Queue<int>(Enumerable.Range(0, 15).Select(i =>
             (2 - i / 5) * 5 + (i / 5 == 1 ? 4 - i % 5 : i % 5)));
         var revisit = new HashSet<int>();
-        var confirmed = 0;
+        var pendingSows = new HashSet<int>();
+        var newlySown = 0;
+        var seedIndex = IndependentTaskSettings.SaleFlowers.ToList().IndexOf(settings.GardenSeed);
         var step = Step.Map;
         var timer = Stopwatch.StartNew();
         var freshAfter = DateTimeOffset.MinValue;
@@ -45,12 +48,14 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
         void NextPlot(bool success)
         {
             var plot = plots.Dequeue();
-            if (success) confirmed++;
+            if (success)
+            {
+                if (pendingSows.Remove(plot)) newlySown++;
+            }
             else if (revisit.Add(plot)) plots.Enqueue(plot);
-            else throw new InvalidOperationException($"第 {plot / 5 + 1} 行第 {plot % 5 + 1} 列播种未确认，已确认 {confirmed}/15 格。");
             planted = atPlot = false;
             if (plots.TryPeek(out var next))
-                Advance(Step.Sow, $"第 {next / 5 + 1} 行第 {next % 5 + 1} 列，已确认 {confirmed}/15 格");
+                Advance(Step.Sow, $"第 {next / 5 + 1} 行第 {next % 5 + 1} 列，种了 {newlySown}/15");
             else Advance(Step.Observe, "退到田边观察养护");
         }
         async Task Key(string key, int? duration = null, int settleMs = 950)
@@ -76,7 +81,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
             }
             if (!timer.IsRunning) { timer.Start(); Report(status); }
             if (timer.Elapsed.TotalSeconds > (step == Step.Care ? 600 : 60))
-                throw new TimeoutException($"自动种菜超时：{status}，已确认 {confirmed}/15 格。");
+                throw new TimeoutException($"自动种菜超时：{status}。");
             using var frame = capture.Capture(window, state.Options.CaptureMethod);
             if (frame is null || frame.CapturedAt <= freshAfter) continue;
             freshAfter = frame.CapturedAt;
@@ -120,8 +125,57 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                             await screen.Teleport(token) is { } teleport)
                         {
                             await Click(teleport);
-                            Advance(Step.Approach, "从入口接近田地");
+                            if (settings.ReuseEquippedSeed) Advance(Step.Approach, "从入口接近田地");
+                            else Advance(Step.OpenPocket, "打开种子口袋");
                         }
+                        break;
+                }
+                continue;
+            }
+
+            if (step is >= Step.OpenPocket and <= Step.WaitForGarden)
+            {
+                var pocket = new GardenSeedPocket(frame, screen);
+                if (await pocket.Title(token) == null)
+                {
+                    if (await screen.World(token) != null)
+                    {
+                        if (step == Step.OpenPocket) await Key("E");
+                        else if (step == Step.WaitForGarden) Advance(Step.Approach, "从入口接近田地");
+                    }
+                    continue;
+                }
+                switch (step)
+                {
+                    case Step.OpenPocket:
+                        if (await pocket.Remove(token) is { } remove) await Click(remove);
+                        else if (await pocket.Equip(token) != null)
+                            Advance(Step.PickSeed, $"选择{settings.GardenSeed}种子");
+                        break;
+                    case Step.PickSeed:
+                        if (await pocket.Seed(seedIndex, token) is { } seed)
+                        {
+                            await Click(seed);
+                            Advance(Step.EquipSeed, $"装备{settings.GardenSeed}，每格 {settings.SeedsPerPlot} 颗");
+                        }
+                        else
+                        {
+                            var (x, y) = pocket.ClientPoint(757, 619);
+                            await mouse.ScrollAsync(window.Hwnd, x, y, seedIndex < 5 ? 720 : -720, method, token);
+                            freshAfter = DateTimeOffset.UtcNow;
+                        }
+                        break;
+                    case Step.EquipSeed:
+                        if (await pocket.Equip(token) is not { } equip || await pocket.Detail(seedIndex, token) == null) break;
+                        if (!pocket.QuantitySelected(settings.SeedsPerPlot))
+                        {
+                            var (x, y) = pocket.ClientPoint(1228 + (settings.SeedsPerPlot - 1) * 158, 577);
+                            await mouse.ClickAsync(window.Hwnd, x, y, method, token);
+                            freshAfter = DateTimeOffset.UtcNow;
+                            break;
+                        }
+                        await Click(equip);
+                        Advance(Step.WaitForGarden, "等待返回种植园");
                         break;
                 }
                 continue;
@@ -131,6 +185,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
             {
                 await Key("Esc");
                 stable = 0;
+                if (planted) pendingSows.Remove(plots.Peek());
                 planted = false;
                 continue;
             }
@@ -221,6 +276,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                         if (++stable >= 2)
                         {
                             await Key("F");
+                            pendingSows.Add(id);
                             planted = true;
                             timer.Restart();
                             stable = 0;
@@ -239,7 +295,7 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                     if (vision.HasCareBubble())
                         stable = 0;
                     else if (++stable >= 4)
-                        return "成功：15/15 格已种植，浇水施肥已完成";
+                        return $"种了 {newlySown}/15";
                     break;
             }
         }

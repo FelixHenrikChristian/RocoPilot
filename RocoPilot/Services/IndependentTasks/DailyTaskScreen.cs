@@ -38,14 +38,14 @@ internal sealed class DailyTaskScreen
         return (false, await Find("stamina-crafting/triangle", 180, 1010, 500, 1120, token));
     }
 
-    public RecognitionRegion Region(int left, int top, int right, int bottom) =>
+    public RecognitionRegion Region(int left, int top, int right, int bottom, RecognitionAnchor anchor = RecognitionAnchor.Auto) =>
         RecognitionRegionImageHelper.MapReferenceArea(_x, _y, _width, _height, 2048, 1152,
-            left, top, right - left, bottom - top);
+            left, top, right - left, bottom - top, anchor);
 
     public async Task<ImageMatchResult?> Find(string template, int left, int top, int right, int bottom,
-        CancellationToken token, double threshold = .94, double templateScale = 1)
+        CancellationToken token, double threshold = .94, double templateScale = 1, RecognitionAnchor anchor = RecognitionAnchor.Auto)
     {
-        var result = await _images.MatchAsync(_frame, Region(left, top, right, bottom), $"2048x1152/{template}.png",
+        var result = await _images.MatchAsync(_frame, Region(left, top, right, bottom, anchor), $"2048x1152/{template}.png",
             new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = Scale * templateScale, TemplateScaleY = Scale * templateScale }, token);
         return result.IsMatch ? result : null;
     }

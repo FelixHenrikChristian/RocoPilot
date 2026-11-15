@@ -78,6 +78,54 @@ public sealed class GardeningTests
         }
     }
 
+    [TestMethod]
+    [DataRow(2048)]
+    [DataRow(1280)]
+    [DataRow(960)]
+    public async Task PocketIdentifiesVisibleSeedsQuantityAndEquippedState(int width)
+    {
+        var images = new ImageMatchingService();
+        foreach (var (file, top, quantity, equipped) in new[]
+        {
+            ("top-twenty", true, 3, false), ("bottom-four", false, 3, false),
+            ("equipped-three", false, 3, true), ("unequipped-one", false, 1, false),
+            ("unequipped-two", false, 2, false), ("unequipped-three", false, 3, false)
+        })
+        {
+            var window = new CaptureTargetWindow { ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };
+            using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(
+                Path.Combine(Folder(), "LocalScreenshots", "2026-11-16", "seed-pocket", file + ".png"), width, window.ClientHeight, 12, 30);
+            var screen = new DailyTaskScreen(frame, window, images);
+            var pocket = new GardenSeedPocket(frame, screen);
+            Assert.IsNotNull(await pocket.Title(default));
+            Assert.AreEqual(equipped, await pocket.Remove(default) != null);
+            Assert.AreEqual(!equipped, await pocket.Equip(default) != null);
+            for (var n = 1; n <= 3; n++) Assert.AreEqual(n == quantity, pocket.QuantitySelected(n));
+            if (file is not ("top-twenty" or "bottom-four")) continue;
+            for (var index = 0; index < 24; index++)
+            {
+                Assert.AreEqual(index == 22, await pocket.Detail(index, default) != null, $"详情 {file} {width} {index}");
+                var match = await pocket.Seed(index, default);
+                var visible = top ? index < 20 : index >= 5;
+                Assert.AreEqual(visible, match != null, $"列表 {file} {width} {index}");
+                if (match == null) continue;
+                var y = top ? 399 + index / 5 * 138 : 430 + (index / 5 - 1) * 138;
+                Assert.AreEqual(y, screen.ClientY(match.Y + match.Height / 2d) / screen.Scale, 9, $"位置 {index}");
+            }
+        }
+    }
+
+    [TestMethod]
+    public async Task WorldAfterEquipIsRecognizedWithPocketClosed()
+    {
+        var window = new CaptureTargetWindow { ClientWidth = 2048, ClientHeight = 1152 };
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(
+            Path.Combine(Folder(), "LocalScreenshots", "2026-11-16", "seed-pocket", "world-after-equip.png"), 2048, 1152, 0, 0);
+        var screen = new DailyTaskScreen(frame, window, new ImageMatchingService());
+        Assert.IsNull(await new GardenSeedPocket(frame, screen).Title(default));
+        Assert.IsNotNull(await screen.World(default));
+    }
+
     private static (CapturedFrame, CaptureTargetWindow) Load(string date, string name, int width)
     {
         var window = new CaptureTargetWindow { ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };

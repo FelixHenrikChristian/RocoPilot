@@ -147,6 +147,24 @@
                         <NumberBox Grid.Column="2" IsEnabled="{x:Bind Challenges.IsLegendaryChallengeConfigurationEnabled, Mode=OneWay}" Minimum="1" Maximum="99" SpinButtonPlacementMode="Compact" Value="{x:Bind ViewModel.LegendaryChallengeRunCount, Mode=TwoWay}" />
                     </Grid>
                 </StackPanel>
+                <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.GardeningTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
+                    <TextBlock Margin="4,0,0,0" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="自动种菜" />
+                    <StackPanel Padding="14,10" Spacing="8" CornerRadius="{StaticResource ControlCornerRadius}" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <CheckBox Content="沿用上次设置" IsChecked="{x:Bind ViewModel.ReuseEquippedSeed, Mode=TwoWay}" IsEnabled="{x:Bind ViewModel.CanReorder, Mode=OneWay}" />
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" MaxWidth="180" />
+                            </Grid.ColumnDefinitions>
+                            <ComboBox Header="种子" IsEnabled="{x:Bind ViewModel.CanSelectGardenSeed, Mode=OneWay}" HorizontalAlignment="Stretch" ItemsSource="{x:Bind ViewModel.SaleFlowers}" SelectedItem="{x:Bind ViewModel.GardenSeed, Mode=TwoWay}" />
+                            <ComboBox Grid.Column="1" Header="每格颗数" IsEnabled="{x:Bind ViewModel.CanSelectGardenSeed, Mode=OneWay}" HorizontalAlignment="Stretch" SelectedIndex="{x:Bind ViewModel.SeedCountIndex, Mode=TwoWay}">
+                                <ComboBoxItem Content="1 颗" />
+                                <ComboBoxItem Content="2 颗" />
+                                <ComboBoxItem Content="3 颗" />
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
                 <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.SaleTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
                     <TextBlock Margin="4,0,0,0" FontSize="13" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" Text="自动出售" />
                     <Grid Padding="14,10" ColumnSpacing="14" CornerRadius="{StaticResource ControlCornerRadius}"

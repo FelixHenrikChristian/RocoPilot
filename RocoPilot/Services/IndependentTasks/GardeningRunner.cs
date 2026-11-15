@@ -148,6 +148,14 @@ public sealed class GardeningRunner(IScreenCaptureService capture, IImageMatchin
                 await walk.AdvanceAsync(frame.CapturedAt);
                 continue;
             }
+            // 退到观察点时连续走，距离当前轴目标一格内松键，再沿用短步定位。
+            if (step == Step.Observe && pos is { } observing &&
+                observing.DirectionTo(2.5, 4.3) is { } awayDirection &&
+                (awayDirection is "A" or "D" ? Math.Abs(observing.Column - 2.5) : Math.Abs(observing.Row - 4.3)) > 1)
+            {
+                await walk.AdvanceAsync(frame.CapturedAt, awayDirection);
+                continue;
+            }
             if (walk.Active)
             {
                 await walk.StopAsync();

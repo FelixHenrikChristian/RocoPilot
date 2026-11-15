@@ -3,7 +3,7 @@ using RocoPilot.Models.Input;
 
 namespace RocoPilot.Services.IndependentTasks;
 
-// Only a fresh approach decision extends the hold. The keyboard service releases W
+// Only a fresh movement decision extends the hold. The keyboard service releases the key
 // in its finally block even when capture or recognition stops responding.
 internal sealed class ForwardWalk(IKeyboardInputService keyboard, nint hwnd, KeyboardInputMethod method,
     CancellationToken token) : IAsyncDisposable
@@ -11,10 +11,11 @@ internal sealed class ForwardWalk(IKeyboardInputService keyboard, nint hwnd, Key
     private const int FrameDeadlineMs = 3000;
     private CancellationTokenSource? _hold;
     private Task _walking = Task.CompletedTask;
+    private string? _direction;
 
     public bool Active => _hold != null;
 
-    public async Task AdvanceAsync(DateTimeOffset capturedAt)
+    public async Task AdvanceAsync(DateTimeOffset capturedAt, string direction = "W")
     {
         var remaining = FrameDeadlineMs - (int)Math.Clamp((DateTimeOffset.UtcNow - capturedAt).TotalMilliseconds, 0, FrameDeadlineMs);
         if (remaining == 0 || !keyboard.IsWindowForeground(hwnd))
@@ -22,7 +23,7 @@ internal sealed class ForwardWalk(IKeyboardInputService keyboard, nint hwnd, Key
             await StopAsync();
             return;
         }
-        if (_hold != null && !_hold.IsCancellationRequested && !_walking.IsCompleted)
+        if (_hold != null && !_hold.IsCancellationRequested && !_walking.IsCompleted && _direction == direction)
         {
             _hold.CancelAfter(remaining);
             return;
@@ -31,12 +32,13 @@ internal sealed class ForwardWalk(IKeyboardInputService keyboard, nint hwnd, Key
         token.ThrowIfCancellationRequested();
         _hold = CancellationTokenSource.CreateLinkedTokenSource(token);
         _hold.CancelAfter(remaining);
-        _walking = WalkAsync(_hold);
+        _direction = direction;
+        _walking = WalkAsync(_hold, direction);
     }
 
-    private async Task WalkAsync(CancellationTokenSource hold)
+    private async Task WalkAsync(CancellationTokenSource hold, string direction)
     {
-        var input = keyboard.SendSequenceAsync(hwnd, "W", new KeyboardInputOptions
+        var input = keyboard.SendSequenceAsync(hwnd, direction, new KeyboardInputOptions
             { Method = method, HoldDurationMs = Timeout.Infinite, IntervalMs = 0 }, hold.Token);
         try
         {

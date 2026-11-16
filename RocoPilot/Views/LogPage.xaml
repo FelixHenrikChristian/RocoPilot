@@ -1,0 +1,377 @@
+<Page
+    x:Class="RocoPilot.Views.LogPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:helpers="using:RocoPilot.Helpers"
+    xmlns:vm="using:RocoPilot.ViewModels">
+
+    <Page.Resources>
+        <ResourceDictionary>
+            <!-- 级别开关沿用血脉筛选的选中样式：强调色浅底加描边，文字保持正文颜色。 -->
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#F3F3F3" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#F3F3F3" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#1B1B1B" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#1B1B1B" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#1B1B1B" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="{ThemeResource SystemColorHighlightTextColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{ThemeResource SystemColorHighlightColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="{ThemeResource SystemAccentColor}" Opacity="0.16" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.24" />
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.3" />
+            <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="{ThemeResource SystemAccentColor}" />
+
+            <Style x:Key="LogLevelToggleStyle" TargetType="ToggleButton" BasedOn="{StaticResource DefaultToggleButtonStyle}">
+                <Setter Property="MinHeight" Value="32" />
+                <Setter Property="Padding" Value="10,4" />
+                <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+                <Setter Property="FontSize" Value="13" />
+            </Style>
+
+            <Style x:Key="LogLevelDotStyle" TargetType="Ellipse">
+                <Setter Property="Width" Value="8" />
+                <Setter Property="Height" Value="8" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+
+            <Style x:Key="LogLevelBadgeStyle" TargetType="Border">
+                <Setter Property="Height" Value="20" />
+                <Setter Property="VerticalAlignment" Value="Top" />
+                <Setter Property="CornerRadius" Value="10" />
+            </Style>
+
+            <Style x:Key="LogLevelBadgeTextStyle" TargetType="TextBlock">
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="FontSize" Value="11" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+
+            <!-- 行内各列都落在 20px 高的首行里，消息展开成多行时其余列仍与第一行对齐。 -->
+            <Style x:Key="LogRowCellStyle" TargetType="Grid">
+                <Setter Property="Height" Value="20" />
+                <Setter Property="VerticalAlignment" Value="Top" />
+            </Style>
+
+            <Style x:Key="LogRowMetaTextStyle" TargetType="TextBlock">
+                <Setter Property="VerticalAlignment" Value="Center" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
+                <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                <Setter Property="TextWrapping" Value="NoWrap" />
+            </Style>
+        </ResourceDictionary>
+    </Page.Resources>
+
+    <Grid Padding="20,16" RowSpacing="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <AutoSuggestBox
+                VerticalAlignment="Center"
+                AutomationProperties.Name="搜索日志"
+                PlaceholderText="搜索消息、来源或异常"
+                QueryIcon="Find"
+                Text="{x:Bind ViewModel.SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button
+                Grid.Column="1"
+                AutomationProperties.Name="复制日志"
+                Click="CopyButton_Click"
+                IsEnabled="{x:Bind ViewModel.HasEntries, Mode=OneWay}"
+                ToolTipService.ToolTip="复制当前显示的日志">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon FontSize="13" Glyph="&#xE8C8;" />
+                    <TextBlock Text="复制" />
+                </StackPanel>
+            </Button>
+
+            <Button
+                Grid.Column="2"
+                AutomationProperties.Name="导出日志"
+                Click="ExportButton_Click"
+                IsEnabled="{x:Bind ViewModel.HasEntries, Mode=OneWay}"
+                ToolTipService.ToolTip="将当前显示的日志导出为文件">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon FontSize="13" Glyph="&#xE898;" />
+                    <TextBlock Text="导出" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <ToggleButton
+                    AutomationProperties.Name="显示信息"
+                    IsChecked="{x:Bind ViewModel.ShowInformation, Mode=TwoWay}"
+                    Style="{StaticResource LogLevelToggleStyle}"
+                    ToolTipService.ToolTip="显示或隐藏信息">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Style="{StaticResource LogLevelDotStyle}" Fill="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Text="信息" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.InformationCount, Mode=OneWay}" />
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton
+                    AutomationProperties.Name="显示警告"
+                    IsChecked="{x:Bind ViewModel.ShowWarning, Mode=TwoWay}"
+                    Style="{StaticResource LogLevelToggleStyle}"
+                    ToolTipService.ToolTip="显示或隐藏警告">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Style="{StaticResource LogLevelDotStyle}" Fill="{ThemeResource SystemFillColorCautionBrush}" />
+                        <TextBlock Text="警告" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.WarningCount, Mode=OneWay}" />
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton
+                    AutomationProperties.Name="显示错误"
+                    IsChecked="{x:Bind ViewModel.ShowError, Mode=TwoWay}"
+                    Style="{StaticResource LogLevelToggleStyle}"
+                    ToolTipService.ToolTip="显示或隐藏错误">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Style="{StaticResource LogLevelDotStyle}" Fill="{ThemeResource SystemFillColorCriticalBrush}" />
+                        <TextBlock Text="错误" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.ErrorCount, Mode=OneWay}" />
+                    </StackPanel>
+                </ToggleButton>
+            </StackPanel>
+
+            <TextBlock
+                Grid.Column="1"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                TextTrimming="CharacterEllipsis"
+                TextWrapping="NoWrap" />
+        </Grid>
+
+        <Border
+            Grid.Row="2"
+            Padding="4"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource OverlayCornerRadius}">
+            <Grid>
+                <ListView
+                    x:Name="LogList"
+                    AutomationProperties.Name="运行日志"
+                    IsItemClickEnabled="True"
+                    ItemClick="LogList_ItemClick"
+                    ItemsSource="{x:Bind ViewModel.Entries, Mode=OneWay}"
+                    SelectionMode="None">
+                    <ListView.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <!-- 停在底部时跟随最新日志，向上翻看时不被新日志带走。 -->
+                            <ItemsStackPanel ItemsUpdatingScrollMode="KeepLastItemInView" />
+                        </ItemsPanelTemplate>
+                    </ListView.ItemsPanel>
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0" />
+                            <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LogEntryItemViewModel">
+                            <Grid
+                                Margin="0,1"
+                                Background="Transparent"
+                                RightTapped="LogEntry_RightTapped">
+                                <Border
+                                    Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                                    CornerRadius="{StaticResource ControlCornerRadius}"
+                                    Opacity="0.6"
+                                    Visibility="{x:Bind IsWarning}" />
+                                <Border
+                                    Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                                    CornerRadius="{StaticResource ControlCornerRadius}"
+                                    Opacity="0.6"
+                                    Visibility="{x:Bind IsError}" />
+
+                                <Grid Padding="10,6" ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="84" />
+                                        <ColumnDefinition Width="40" />
+                                        <ColumnDefinition Width="*" MaxWidth="132" />
+                                        <ColumnDefinition Width="3*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Grid Style="{StaticResource LogRowCellStyle}">
+                                        <TextBlock
+                                            Style="{StaticResource LogRowMetaTextStyle}"
+                                            FontFamily="Consolas"
+                                            Text="{x:Bind Time}" />
+                                    </Grid>
+
+                                    <Border
+                                        Grid.Column="1"
+                                        Style="{StaticResource LogLevelBadgeStyle}"
+                                        Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                        Visibility="{x:Bind IsInformation}">
+                                        <TextBlock
+                                            Style="{StaticResource LogLevelBadgeTextStyle}"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Text="{x:Bind LevelText}" />
+                                    </Border>
+                                    <Border
+                                        Grid.Column="1"
+                                        Style="{StaticResource LogLevelBadgeStyle}"
+                                        Background="{ThemeResource SystemFillColorCautionBackgroundBrush}"
+                                        Visibility="{x:Bind IsWarning}">
+                                        <TextBlock
+                                            Style="{StaticResource LogLevelBadgeTextStyle}"
+                                            Foreground="{ThemeResource SystemFillColorCautionBrush}"
+                                            Text="{x:Bind LevelText}" />
+                                    </Border>
+                                    <Border
+                                        Grid.Column="1"
+                                        Style="{StaticResource LogLevelBadgeStyle}"
+                                        Background="{ThemeResource SystemFillColorCriticalBackgroundBrush}"
+                                        Visibility="{x:Bind IsError}">
+                                        <TextBlock
+                                            Style="{StaticResource LogLevelBadgeTextStyle}"
+                                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                            Text="{x:Bind LevelText}" />
+                                    </Border>
+
+                                    <Grid Grid.Column="2" Style="{StaticResource LogRowCellStyle}">
+                                        <TextBlock Style="{StaticResource LogRowMetaTextStyle}" Text="{x:Bind Source}" />
+                                    </Grid>
+
+                                    <Grid
+                                        Grid.Column="3"
+                                        Style="{StaticResource LogRowCellStyle}"
+                                        Visibility="{x:Bind IsCollapsed, Mode=OneWay}">
+                                        <TextBlock
+                                            VerticalAlignment="Center"
+                                            FontSize="13"
+                                            Text="{x:Bind Headline}"
+                                            TextTrimming="CharacterEllipsis"
+                                            TextWrapping="NoWrap" />
+                                    </Grid>
+                                    <TextBlock
+                                        Grid.Column="3"
+                                        Margin="0,1,0,0"
+                                        FontSize="13"
+                                        IsTextSelectionEnabled="True"
+                                        Text="{x:Bind Entry.Message}"
+                                        TextWrapping="Wrap"
+                                        Visibility="{x:Bind IsExpanded, Mode=OneWay}" />
+
+                                    <Grid
+                                        Grid.Column="4"
+                                        Style="{StaticResource LogRowCellStyle}"
+                                        Visibility="{x:Bind HasException}">
+                                        <FontIcon
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="10"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Glyph="&#xE70D;"
+                                            Visibility="{x:Bind IsCollapsed, Mode=OneWay}" />
+                                        <FontIcon
+                                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                            FontSize="10"
+                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                            Glyph="&#xE70E;"
+                                            Visibility="{x:Bind IsExpanded, Mode=OneWay}" />
+                                    </Grid>
+
+                                    <StackPanel
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        Grid.ColumnSpan="4"
+                                        Margin="0,6,0,2"
+                                        Spacing="6"
+                                        Visibility="{x:Bind IsExpanded, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <TextBlock
+                                                FontFamily="Consolas"
+                                                FontSize="12"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                IsTextSelectionEnabled="True"
+                                                Text="{x:Bind FullTime}" />
+                                            <TextBlock
+                                                FontSize="12"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                IsTextSelectionEnabled="True"
+                                                Text="{x:Bind Entry.Source}" />
+                                        </StackPanel>
+                                        <Border
+                                            Padding="10,8"
+                                            Background="{ThemeResource ControlFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{StaticResource ControlCornerRadius}"
+                                            Visibility="{x:Bind HasException}">
+                                            <TextBlock
+                                                FontFamily="Consolas"
+                                                FontSize="12"
+                                                IsTextSelectionEnabled="True"
+                                                Text="{x:Bind Entry.Exception}"
+                                                TextWrapping="Wrap" />
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+
+                <StackPanel Style="{StaticResource EmptyStatePanelStyle}" Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}">
+                    <FontIcon
+                        HorizontalAlignment="Center"
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="28"
+                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                        Glyph="&#xE9F9;" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.EmptyText, Mode=OneWay}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <InfoBar
+            x:Name="LogNotice"
+            Grid.RowSpan="3"
+            Margin="4,0,4,0"
+            Canvas.ZIndex="10"
+            helpers:InfoBarAutoCloseBehavior.AutoCloseDelayMilliseconds="{StaticResource InfoBarAutoCloseDelayMilliseconds}"
+            Style="{StaticResource AppToastStyle}" />
+    </Grid>
+</Page>

@@ -23,6 +23,7 @@ using RocoPilot.Services.Capture.Backends;
 using RocoPilot.Services.Encounters;
 using RocoPilot.Services.ImageMatching;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.Logging;
 using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.Spirits;
@@ -69,7 +70,9 @@ public partial class App : Application
     {
         InitializeComponent();
 
-        Log.Logger = LoggingHelper.CreateLogger(LoggingHelper.LogDirectory);
+        // 在主机之前创建，启动信息也能出现在日志页。
+        var logEntries = new LogEntryStore();
+        Log.Logger = LoggingHelper.CreateLogger(LoggingHelper.LogDirectory, logEntries);
         LoggingHelper.LogStartup();
 
         Host = Microsoft.Extensions.Hosting.Host.
@@ -87,6 +90,7 @@ public partial class App : Application
             services.AddTransient<ActivationHandler<LaunchActivatedEventArgs>, DefaultActivationHandler>();
 
             // Services
+            services.AddSingleton(logEntries);
             services.AddSingleton<IAppNotificationService, AppNotificationService>();
             services.AddSingleton<ShinyEncounterNotification>();
             services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
@@ -174,6 +178,8 @@ public partial class App : Application
             services.AddTransient<StatisticsPage>();
             services.AddSingleton<HotkeyViewModel>();
             services.AddTransient<HotkeyPage>();
+            services.AddSingleton<LogViewModel>();
+            services.AddTransient<LogPage>();
 #if DEBUG
             services.AddTransient<TestViewModel>();
             services.AddTransient<TestPage>();

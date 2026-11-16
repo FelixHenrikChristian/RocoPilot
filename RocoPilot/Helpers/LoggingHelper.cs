@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Reflection;
 
+using RocoPilot.Services.Logging;
+
 using Serilog;
 using Serilog.Events;
 
@@ -13,14 +15,14 @@ public static class LoggingHelper
 {
     public static string LogDirectory { get; } = ResolveLogDirectory();
 
-    internal static Serilog.Core.Logger CreateLogger(string directory)
+    internal static Serilog.Core.Logger CreateLogger(string directory, LogEntryStore? entries = null)
     {
         Directory.CreateDirectory(directory);
 
         const string outputTemplate =
             "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}";
 
-        return new LoggerConfiguration()
+        var configuration = new LoggerConfiguration()
             .MinimumLevel.Is(LogEventLevel.Debug)
             .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
             .MinimumLevel.Override("System", LogEventLevel.Warning)
@@ -32,8 +34,15 @@ public static class LoggingHelper
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 shared: true,
-                outputTemplate: outputTemplate)
-            .CreateLogger();
+                outputTemplate: outputTemplate);
+
+        // 日志页与文件日志记录同一批事件。
+        if (entries is not null)
+        {
+            configuration.WriteTo.Sink(new LogEntrySink(entries), LogEventLevel.Information);
+        }
+
+        return configuration.CreateLogger();
     }
 
     public static void CloseAndFlush() => Log.CloseAndFlush();

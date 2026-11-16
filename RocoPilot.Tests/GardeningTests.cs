@@ -126,6 +126,62 @@ public sealed class GardeningTests
         Assert.IsNotNull(await screen.World(default));
     }
 
+    [TestMethod]
+    [DataRow(2048)]
+    [DataRow(1280)]
+    [DataRow(960)]
+    public async Task RestoredTenthPlotCanNavigateToEleventh(int width)
+    {
+        var (frame, window) = Load("2026-11-17", "plot-ten-manually-restored", width);
+        using (frame)
+        {
+            var screen = new DailyTaskScreen(frame, window, new ImageMatchingService());
+            Assert.IsNotNull(await screen.World(default));
+            Assert.IsNull(await screen.Find("gardening/pet-panel", 1650, 0, 1980, 145, default, .89));
+            var position = new GardenVision(frame, window).Locate();
+            Assert.IsNotNull(position);
+            Assert.AreEqual(0, (int)position.Value.Column);
+            Assert.AreEqual(1, (int)position.Value.Row);
+            Assert.AreEqual("W", position.Value.DirectionTo(.5, .5));
+            Assert.IsFalse(await screen.CanPlant(default));
+        }
+    }
+
+    [TestMethod]
+    [DataRow("failure-stalled-client", .74, 1.57)]
+    [DataRow("failure-before-turn-client", .95, 1.70)]
+    [DataRow("success-turn-client", .68, .61)]
+    public void VideoTurnPositionsRemainVisibleUnderPlayerMarker(string name, double column, double row)
+    {
+        foreach (var width in new[] { 2048, 1280, 960 })
+        {
+            var (frame, window) = Load("2026-11-17", name, width);
+            using (frame)
+            {
+                var position = new GardenVision(frame, window).Locate();
+                Assert.IsNotNull(position, $"{name} {width}");
+                // 视频压缩及缩放会使边缘偏移少量像素，按田格单位比较位置。
+                Assert.AreEqual(column, position.Value.Column, .15, $"{name} {width}");
+                Assert.AreEqual(row, position.Value.Row, .15, $"{name} {width}");
+                if (name == "failure-stalled-client") Assert.AreEqual("W", position.Value.DirectionTo(.5, .5));
+            }
+        }
+    }
+
+    [TestMethod]
+    [DataRow("garden-map")]
+    [DataRow("garden-teleport")]
+    public async Task MapScreensCannotEnterFieldNavigation(string name)
+    {
+        foreach (var width in new[] { 2048, 1280, 960 })
+        {
+            var (frame, window) = Load("2026-11-09", name, width);
+            // Runner 先确认大世界，地图页不能进入小地图导航。
+            using (frame)
+                Assert.IsNull(await new DailyTaskScreen(frame, window, new ImageMatchingService()).World(default), $"{name} {width}");
+        }
+    }
+
     private static (CapturedFrame, CaptureTargetWindow) Load(string date, string name, int width)
     {
         var window = new CaptureTargetWindow { ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };

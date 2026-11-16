@@ -70,7 +70,8 @@ internal sealed class GardenVision
             }
             return best >= span - 5 ? edge : null;
         }
-        if (Edge(cols, soilWidth, 11) is not { } left || Edge(rows, soilHeight, 19) is not { } top) return null;
+        // 角色箭头和朝向扇区会遮住同一列的大部分土色，按剩余可见像素定位。
+        if (Edge(cols, soilWidth, 8) is not { } left || Edge(rows, soilHeight, 19) is not { } top) return null;
         return new((center - left) * 5d / soilWidth, (center - top) * 3d / soilHeight);
     }
 

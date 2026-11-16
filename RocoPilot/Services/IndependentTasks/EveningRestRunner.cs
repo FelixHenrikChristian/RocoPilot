@@ -48,7 +48,8 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
             Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom) =>
                 screen.Find($"evening-rest/{name}", left, top, right, bottom, token);
             Task<ImageMatchResult?> Explore() => Find("explore", 175, 34, 310, 105);
-            Task<ImageMatchResult?> Event() => Find("event", 85, 118, 445, 219);
+            // 晚间活动会更换标题，共用选中项的月亮图标。
+            Task<ImageMatchResult?> Event() => Find("event", 85, 118, 200, 1000);
             Task<ImageMatchResult?> Full() => Find("full", 1680, 820, 1960, 915);
             async Task<bool> Key(string key)
             {
@@ -90,8 +91,13 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                     if (await Explore() is null) break;
                     if (await Event() is null)
                     {
+                        if (await Find("event-unselected", 85, 118, 200, 1000) is { } activity)
+                        {
+                            await Click(activity);
+                            break;
+                        }
                         if (timer.Elapsed.TotalSeconds < 3) break;
-                        exitReason = "跳过：默认活动不是晚风小憩";
+                        exitReason = "跳过：未找到晚间休憩活动";
                         step = Step.Exit;
                     }
                     else if (await Full() is not null)
@@ -117,7 +123,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                     }
                     break;
                 case Step.Teleport:
-                    if (await Find("shelter", 1310, 15, 1730, 116) is not null &&
+                    if (await screen.Map(token) is not null &&
                         await screen.Teleport(token) is { } teleport)
                     {
                         await Click(teleport);
@@ -140,8 +146,8 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
     private static string Describe(Step step) => step switch
     {
         Step.Open or Step.Explore => "打开活动探索页",
-        Step.CheckEvent => "确认晚风小憩",
-        Step.Teleport => "传送到星光庇护所",
+        Step.CheckEvent => "选择晚间休憩活动",
+        Step.Teleport => "传送到活动地点",
         Step.Arrival => "等待传送完成",
         Step.Monitor => "等待本日星光达到 1200/1200",
         _ => "返回大世界"

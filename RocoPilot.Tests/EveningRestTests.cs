@@ -17,6 +17,13 @@ public sealed class EveningRestTests
     [DataRow(2048, "collect")]
     [DataRow(1280, "collect")]
     [DataRow(960, "collect")]
+    [DataRow(2048, "renamed")]
+    [DataRow(1280, "renamed")]
+    [DataRow(960, "renamed")]
+    [DataRow(2048, "unselected")]
+    [DataRow(1280, "unselected")]
+    [DataRow(960, "unselected")]
+    [DataRow(960, "shifted")]
     [DataRow(960, "full")]
     [DataRow(1280, "unavailable")]
     public async Task ReturnsToWorldAfterFullOrUnavailable(int width, string scenario)
@@ -28,14 +35,17 @@ public sealed class EveningRestTests
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), _ => { }, timeout.Token);
         Assert.AreEqual("done", game.Scene);
-        Assert.AreEqual(scenario == "collect" ? 1 : 0, game.Teleports);
+        Assert.AreEqual(scenario is "full" or "unavailable" ? 0 : 1, game.Teleports);
+        if (scenario is "unselected" or "shifted") Assert.AreEqual(3, game.ActivityClicks);
     }
 
     private sealed class Replay(int width, string scenario) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
     {
         public string Scene = "start";
         public int Teleports;
+        public int ActivityClicks;
         private int _samples;
+        private bool SelectActivity => scenario is "unselected" or "shifted";
 
         public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method)
         {
@@ -48,9 +58,29 @@ public sealed class EveningRestTests
             }
             if (Scene == "unavailable") sample = "event-0";
             var path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "evening-rest", sample + ".png");
+            // 新活动原图验证入口，后续地图及进度用旧素材模拟，不代表新活动现场回放。
+            if ((scenario == "renamed" || SelectActivity) && sample == "event-0")
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-17", "evening-rest", "good-night-kingdom-0.png");
+            if (Scene == "unselected")
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-17", "evening-rest", "good-night-kingdom-unselected.png");
             if (!File.Exists(path)) Assert.Inconclusive($"缺少本地截图：{path}");
             return FlowerSeedScreenRecognizerTests.LoadFixture(path, width, width * 9 / 16, 12, 30, image =>
             {
+                if (SelectActivity && Scene == "shelter-map")
+                {
+                    // 合成名称缺失的地图详情，验证地图名不参与导航判断。
+                    using var title = new OpenCvSharp.Mat(image, new OpenCvSharp.Rect(1310, 15, 420, 101));
+                    title.SetTo(new OpenCvSharp.Scalar(230, 230, 230));
+                }
+                if (scenario == "shifted" && (Scene is "unselected" or "event-0" or "waiting"))
+                {
+                    // 合成活动位于第二行，覆盖选中与未选中两种状态。
+                    using var first = new OpenCvSharp.Mat(image, new OpenCvSharp.Rect(100, 130, 400, 80));
+                    using var second = new OpenCvSharp.Mat(image, new OpenCvSharp.Rect(100, 222, 400, 80));
+                    using var saved = first.Clone();
+                    second.CopyTo(first);
+                    saved.CopyTo(second);
+                }
                 if (Scene == "unavailable")
                 {
                     // 保留“探索”页头，用另一项活动替换第一行。
@@ -79,7 +109,10 @@ public sealed class EveningRestTests
             {
                 "recommended" when scenario == "full" => ("event-full", 387, 1090),
                 "recommended" when scenario == "unavailable" => ("unavailable", 387, 1090),
+                "recommended" when SelectActivity => ("unselected", 387, 1090),
                 "recommended" => (Teleports == 0 ? "event-0" : "waiting", 387, 1090),
+                "unselected" => (ActivityClicks == 0 ? "unselected" : Teleports == 0 ? "event-0" : "waiting",
+                    165, scenario == "shifted" ? 260 : 168),
                 "event-0" => ("shelter-map", 1553, 1084),
                 "shelter-map" => ("arrival", 1635, 1084),
                 _ => throw new AssertFailedException($"{Scene} 意外点击")
@@ -87,6 +120,7 @@ public sealed class EveningRestTests
             Assert.AreEqual(px, x * 2048d / width, 15, Scene);
             Assert.AreEqual(py, y * 2048d / width, 15, Scene);
             if (Scene == "shelter-map") Teleports++;
+            if (Scene == "unselected") ActivityClicks++;
             Scene = next;
             return Task.CompletedTask;
         }

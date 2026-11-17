@@ -558,7 +558,7 @@ public sealed class ManualChallengeRunner(
             var watchForShortage = preferCondensedMark && !legendary && !useContractMark;
             var elapsed = Stopwatch.StartNew();
             var closeAttempts = 0;
-            if (!watchForShortage) await Task.Delay(2000, token);
+            if (!watchForShortage) await Task.Delay(3000, token);
             while (true)
             {
                 // 静止弹窗可能只有一帧。允许复用本次输入之后的画面，才能按时点击。

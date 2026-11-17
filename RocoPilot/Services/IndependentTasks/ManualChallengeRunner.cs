@@ -22,8 +22,12 @@ public sealed class ManualChallengeRunner(
     BattleScreenRecognizer battleScreen,
     AutoBattleInputExecutor battleInput,
     IRecognitionOverlayService overlay,
-    ILogger<ManualChallengeRunner> logger) : IManualChallengeRunner
+    ILogger<ManualChallengeRunner> logger) : IManualChallengeRunner, IChallengeResultFrameSource
 {
+    private CapturedFrame? _resultFrame;
+
+    public CapturedFrame? TakeResultFrame() => Interlocked.Exchange(ref _resultFrame, null);
+
     private static readonly TimeSpan MyTurnCheckInterval = TimeSpan.FromMilliseconds(500);
     /// <summary>中间跳过的黄框阶段超时：黄框（轮到玩家）出现后等 AI 插入超过 5 秒即强制执行。</summary>
     private const double SkipTurnTimeoutSeconds = 5;
@@ -91,6 +95,7 @@ public sealed class ManualChallengeRunner(
         var minimumFrameAt = DateTimeOffset.UtcNow;
         await using var approachWalk = scanning ? null : new ForwardWalk(keyboard, window.Hwnd, inputMethod, token);
         CapturedFrame? pendingFrame = null;
+        TakeResultFrame()?.Dispose();
         logger.LogInformation("手册挑战：开始，目标 {Target}（输入方式 {Method}）", atTargetLocation ? "当前位置"
             : legendaryTarget ?? target?.DisplayName ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);
 
@@ -131,7 +136,11 @@ public sealed class ManualChallengeRunner(
                     || flow.CompletedCount != completedCount || flow.ConsecutiveFailures != failures)
                     lastAdvance = DateTimeOffset.UtcNow;
                 if (flow.CompletedCount > completedCount)
+                {
                     logger.LogInformation("手册挑战：挑战成功，已完成 {Completed}/{Total} 次", flow.CompletedCount, runCount);
+                    // 这一帧就是“捉到了××”的结果画面，留最后一张给完成通知配图。
+                    Interlocked.Exchange(ref _resultFrame, frame.AddReference())?.Dispose();
+                }
                 if (flow.ConsecutiveFailures > failures)
                     logger.LogWarning("手册挑战：挑战失败，原地重试（连续失败 {Failures}/3，已成功 {Completed}/{Total} 次，当时画面 {Scene}）",
                         flow.ConsecutiveFailures, flow.CompletedCount, runCount, screen.Scene);

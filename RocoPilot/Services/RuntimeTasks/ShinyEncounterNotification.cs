@@ -3,11 +3,15 @@ using Microsoft.Extensions.Logging;
 using OpenCvSharp;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Capture;
+using RocoPilot.Notifications;
 
 namespace RocoPilot.Services.RuntimeTasks;
 
-public sealed class ShinyEncounterNotification(IAppNotificationService notifications, ILogger<ShinyEncounterNotification> logger)
+public sealed class ShinyEncounterNotification(IAppNotificationService notifications, ILogger<ShinyEncounterNotification> logger,
+    NotificationScreenshotStore? screenshots = null)
 {
+    private readonly NotificationScreenshotStore _screenshots = screenshots ?? new();
+
     internal string ScreenshotDirectory { get; init; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RocoPilot", "Screenshots", "Shiny");
 
@@ -30,7 +34,9 @@ public sealed class ShinyEncounterNotification(IAppNotificationService notificat
             finally { pixels.Free(); }
             await File.WriteAllBytesAsync(path, png);
             logger.LogInformation("异色截图已保存：{Path}", path);
-            await notifications.ShowAsync("发现异色精灵", "本场战斗已暂停自动操作，请返回游戏处理。", path);
+            // 原图留给用户；通知用缩小的副本，原尺寸 PNG 可能超出通知图片的大小上限。
+            var preview = await _screenshots.SaveAsync(frame);
+            await notifications.ShowAsync("发现异色精灵", "本场战斗已暂停自动操作，请返回游戏处理。", preview, openGame: true);
         }
         catch (Exception ex)
         {

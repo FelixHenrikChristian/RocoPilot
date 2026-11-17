@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OpenCvSharp;
 using RocoPilot.Models.Capture;
+using RocoPilot.Notifications;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Tests.TestDoubles;
 
@@ -17,8 +18,9 @@ public sealed class ShinyEncounterNotificationTests
     {
         var directory = Path.Combine(Path.GetTempPath(), "RocoPilot-Shiny-" + Guid.NewGuid().ToString("N"));
         var notifications = new AppNotificationStub { Fail = fail };
-        var service = new ShinyEncounterNotification(notifications, NullLogger<ShinyEncounterNotification>.Instance)
-            { ScreenshotDirectory = directory };
+        var previews = Path.Combine(directory, "previews");
+        var service = new ShinyEncounterNotification(notifications, NullLogger<ShinyEncounterNotification>.Instance,
+            new NotificationScreenshotStore { DirectoryPath = previews }) { ScreenshotDirectory = directory };
         // Alpha may be zero in a GDI capture: the notification must still show an opaque image.
         using var frame = new CapturedFrame(2, 1, [0, 0, 255, 0, 255, 0, 0, 0]);
         try
@@ -26,7 +28,15 @@ public sealed class ShinyEncounterNotificationTests
             await service.NotifyAsync(frame);
             var message = notifications.Messages.Single();
             Assert.AreEqual("发现异色精灵", message.Title);
-            using var image = Cv2.ImRead(message.ImagePath!, ImreadModes.Unchanged);
+            Assert.IsTrue(notifications.LastOpenGame);
+            // 通知用缩小的 JPEG 副本，原图仍按原尺寸保存。
+            Assert.AreEqual(previews, Path.GetDirectoryName(message.ImagePath));
+            using (var preview = Cv2.ImRead(message.ImagePath!, ImreadModes.Unchanged))
+            {
+                Assert.AreEqual(2, preview.Width);
+                Assert.AreEqual(3, preview.Channels());
+            }
+            using var image = Cv2.ImRead(Directory.GetFiles(directory, "*.png").Single(), ImreadModes.Unchanged);
             Assert.AreEqual(2, image.Width);
             Assert.AreEqual(1, image.Height);
             Assert.AreEqual(3, image.Channels());
@@ -42,7 +52,8 @@ public sealed class ShinyEncounterNotificationTests
         var notifications = new AppNotificationStub();
         await notifications.SetEnabledAsync(false);
         var directory = Path.Combine(Path.GetTempPath(), "RocoPilot-Shiny-" + Guid.NewGuid().ToString("N"));
-        var service = new ShinyEncounterNotification(notifications, NullLogger<ShinyEncounterNotification>.Instance)
+        var service = new ShinyEncounterNotification(notifications, NullLogger<ShinyEncounterNotification>.Instance,
+            new NotificationScreenshotStore { DirectoryPath = Path.Combine(directory, "previews") })
             { ScreenshotDirectory = directory };
         using var frame = new CapturedFrame(1, 1, new byte[4]);
         await service.NotifyAsync(frame);

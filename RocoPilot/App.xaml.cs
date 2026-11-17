@@ -93,6 +93,7 @@ public partial class App : Application
             // Services
             services.AddSingleton(logEntries);
             services.AddSingleton<IAppNotificationService, AppNotificationService>();
+            services.AddSingleton<NotificationScreenshotStore>();
             services.AddSingleton<ShinyEncounterNotification>();
             services.AddSingleton<ILocalSettingsService, LocalSettingsService>();
             services.AddSingleton<IThemeSelectorService, ThemeSelectorService>();

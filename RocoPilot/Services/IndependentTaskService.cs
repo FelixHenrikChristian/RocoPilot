@@ -2,7 +2,10 @@ using Microsoft.Extensions.Logging;
 
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
+using RocoPilot.Contracts.Services.Capture;
+using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Notifications;
 using RocoPilot.Services.IndependentTasks;
 using RocoPilot.Services.Recognition;
 
@@ -28,6 +31,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly IGameWindowService _gameWindowService;
     private readonly ILogger<IndependentTaskService> _logger;
     private readonly RecognitionDiagnostics? _recognitionDiagnostics;
+    private readonly IScreenCaptureService? _screenCapture;
+    private readonly NotificationScreenshotStore? _screenshots;
 
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private readonly SemaphoreSlim _settingsSaveLock = new(1, 1);
@@ -61,9 +66,13 @@ public sealed class IndependentTaskService : IIndependentTaskService
         IGameWindowService gameWindowService,
         StaminaCraftingRunner staminaCrafting, EveningRestRunner eveningRest, MailRunner mail, GardeningRunner gardening, CropSaleRunner cropSale, BattlePassRunner battlePass,
         ILogger<IndependentTaskService> logger,
-        RecognitionDiagnostics? recognitionDiagnostics = null)
+        RecognitionDiagnostics? recognitionDiagnostics = null,
+        IScreenCaptureService? screenCapture = null,
+        NotificationScreenshotStore? screenshots = null)
     {
         _recognitionDiagnostics = recognitionDiagnostics;
+        _screenCapture = screenCapture;
+        _screenshots = screenshots;
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
         _challengeRunner = challengeRunner;
@@ -250,11 +259,12 @@ public sealed class IndependentTaskService : IIndependentTaskService
         var kind = tasks[0];
         var taskName = GetTaskDisplayName(kind);
         string? lastProgress = null;
+        RuntimeTaskState? session = null;
         try
         {
             UpdateProgress(new("准备任务", "等待实时任务暂停"));
             await _runtimeTaskService.SuspendAsync($"{taskName}任务运行中", taskCts.Token);
-            var state = _runtimeTaskService.CurrentState
+            var state = session = _runtimeTaskService.CurrentState
                 ?? throw new InvalidOperationException("运行会话已结束，请先在启动页启动任务。");
 
             if (_gameWindowService.TryBringGameWindowToForeground(state.TargetWindow))
@@ -326,7 +336,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     var legendaryTarget = settings.LegendaryAtTargetLocation ? "当前位置" : settings.LegendaryTargetName;
                     outcome = $"成功：{legendaryTarget}，{settings.LegendaryChallengeRunCount} 次";
                     _logger.LogInformation("传说精灵挑战完成：{Target}，成功 {Count} 次", legendaryTarget, settings.LegendaryChallengeRunCount);
-                    await ReportResultAsync($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界", !isDaily);
+                    _runtimeTaskService.ShowIndependentTaskResult($"传说精灵挑战完成，成功 {settings.LegendaryChallengeRunCount} 次", "已退出并返回大世界");
+                    await NotifyChallengeCompletedAsync(settings.LegendaryAtTargetLocation ? null : settings.LegendaryTargetName,
+                        settings.LegendaryChallengeRunCount);
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:
                     await _challengeRunner.RunAsync(state,
@@ -339,7 +351,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     var flowerSeedTarget = settings.FlowerSeedAtTargetLocation ? "当前位置" : $"花种 {settings.FlowerSeedTargetNumber}";
                     outcome = $"成功：{flowerSeedTarget}，{settings.FlowerSeedRunCount} 次";
                     _logger.LogInformation("花种挑战完成：{Target}，成功 {Count} 次", flowerSeedTarget, settings.FlowerSeedRunCount);
-                    await ReportResultAsync($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界", !isDaily);
+                    _runtimeTaskService.ShowIndependentTaskResult($"花种挑战完成，成功 {settings.FlowerSeedRunCount} 次", "已退出并返回大世界");
+                    await NotifyChallengeCompletedAsync(settings.FlowerSeedAtTargetLocation ? null : flowerSeedTarget,
+                        settings.FlowerSeedRunCount);
                     break;
                 case IndependentTaskKind.FlowerSeedScan:
                     var options = await _challengeRunner.ScanAsync(state, UpdateProgress, taskCts.Token);
@@ -371,7 +385,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
             StatusMessage = isDaily ? $"每日清单结束，共 {tasks.Count} 项" : $"{taskName}：{outcomes[0]}";
             if (isDaily)
             {
-                await ReportResultAsync(StatusMessage, Summary());
+                // 每日清单只通知最终结果，各子任务的完成信息仍显示在灵动岛。
+                _runtimeTaskService.ShowIndependentTaskResult(StatusMessage, Summary());
+                await NotifyAsync(TaskNotificationText.DailyCompleted(Outcomes()));
             }
         }
         catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
@@ -387,12 +403,18 @@ public sealed class IndependentTaskService : IIndependentTaskService
             StatusMessage = $"{(isDaily ? "每日任务" : taskName)}已停止：{ex.Message}";
             // 失败原因上一行已经记过，这里只更新遮罩。
             _runtimeTaskService.UpdateIndependentTaskStatus(taskName, new("任务失败", ex.Message));
-            await ReportResultAsync($"{(isDaily ? "每日任务" : taskName)}已停止", isDaily ? $"{ex.Message}。{Summary()}" : ex.Message);
+            _runtimeTaskService.ShowIndependentTaskResult($"{(isDaily ? "每日任务" : taskName)}已停止",
+                isDaily ? $"{ex.Message.TrimEnd('。')}。{Summary()}" : ex.Message);
+            // 出错时附上当前游戏画面，不在电脑前也能看出卡在哪个界面；点击通知直接回到游戏。
+            using var failureFrame = _notifications.IsEnabled ? await CaptureFailureFrameAsync() : null;
+            await NotifyAsync(isDaily ? TaskNotificationText.DailyFailed(taskName, ex.Message, Outcomes())
+                : TaskNotificationText.TaskFailed(taskName, ex.Message), failureFrame, openGame: true);
         }
         finally
         {
             if (isDaily) _logger.LogInformation("每日任务汇总：{Summary}", Summary());
             _recognitionDiagnostics?.Flush();
+            (_challengeRunner as IChallengeResultFrameSource)?.TakeResultFrame()?.Dispose();
             var stateCleared = false;
             await _stateLock.WaitAsync();
             try
@@ -446,11 +468,47 @@ public sealed class IndependentTaskService : IIndependentTaskService
             or IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge
             or IndependentTaskKind.FlowerSeedScan;
 
-        async Task ReportResultAsync(string title, string message, bool notify = true)
+        (string Name, string? Outcome)[] Outcomes()
+            => tasks.Select((task, i) => (GetTaskDisplayName(task), outcomes[i])).ToArray();
+
+        async Task NotifyChallengeCompletedAsync(string? target, int count)
         {
-            // 每日清单仅通知最终结果，各子任务的完成信息仍显示在遮罩中。
-            _runtimeTaskService.ShowIndependentTaskResult(title, message);
-            if (notify && _notifications.IsEnabled) await _notifications.ShowAsync(title, message);
+            // 结果画面随手取走；每日清单里的挑战不单独通知。
+            using var resultFrame = (_challengeRunner as IChallengeResultFrameSource)?.TakeResultFrame();
+            if (!isDaily) await NotifyAsync(TaskNotificationText.ChallengeCompleted(taskName, target, count), resultFrame);
+        }
+
+        async Task<CapturedFrame?> CaptureFailureFrameAsync()
+        {
+            if (_screenCapture is null || _screenshots is null || session is null) return null;
+            try
+            {
+                return await Task.Run(() => _screenCapture.Capture(session.TargetWindow, session.Options.CaptureMethod));
+            }
+            catch (Exception captureError)
+            {
+                _logger.LogDebug(captureError, "{Task}：出错时没能截到游戏画面，通知不带图", taskName);
+                return null;
+            }
+        }
+
+        async Task NotifyAsync((string Title, string Message) text, CapturedFrame? frame = null, bool openGame = false)
+        {
+            if (!_notifications.IsEnabled) return;
+            string? imagePath = null;
+            if (frame is not null && _screenshots is not null)
+            {
+                try
+                {
+                    imagePath = await _screenshots.SaveAsync(frame, session?.TargetWindow);
+                }
+                catch (Exception imageError)
+                {
+                    _logger.LogWarning(imageError, "{Task}：通知配图没有保存下来，改发不带图的通知", taskName);
+                }
+            }
+
+            await _notifications.ShowAsync(text.Title, text.Message, imagePath, openGame);
         }
     }
 

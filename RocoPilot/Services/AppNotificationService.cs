@@ -6,8 +6,12 @@ using RocoPilot.Contracts.Services;
 
 namespace RocoPilot.Notifications;
 
-public class AppNotificationService(ILocalSettingsService settings, ILogger<AppNotificationService> logger) : IAppNotificationService
+public class AppNotificationService(ILocalSettingsService settings, ILogger<AppNotificationService> logger,
+    IGameWindowService? gameWindow = null) : IAppNotificationService
 {
+    internal const string TargetArgument = "target";
+    internal const string GameTarget = "game";
+
     private AppNotificationManager? _manager;
 
     public bool IsEnabled { get; private set; } = true;
@@ -56,8 +60,21 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
         }
     }
 
-    private static void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
+    private void OnNotificationInvoked(AppNotificationManager sender, AppNotificationActivatedEventArgs args)
     {
+        // 需要回游戏处理的通知直接切到游戏；游戏已经关掉时退回到 RocoPilot。
+        if (args.Arguments.TryGetValue(TargetArgument, out var target) && target == GameTarget)
+        {
+            try
+            {
+                if (gameWindow?.FindGameWindow() is { } window && gameWindow.TryBringGameWindowToForeground(window)) return;
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "点击通知后没能切到游戏窗口，改为打开 RocoPilot");
+            }
+        }
+
         App.MainWindow.DispatcherQueue.TryEnqueue(() => App.MainWindow.BringToFront());
     }
 
@@ -73,7 +90,7 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
         return settings.SaveSettingAsync(SettingsKeys.NotificationSoundEnabled, enabled);
     }
 
-    public Task<bool> ShowAsync(string title, string message, string? imagePath = null)
+    public Task<bool> ShowAsync(string title, string message, string? imagePath = null, bool openGame = false)
     {
         if (!IsEnabled) return Task.FromResult(false);
         if (_manager is null)
@@ -87,7 +104,7 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
             if (setting != AppNotificationSetting.Enabled)
                 throw new InvalidOperationException($"Windows 通知不可用：{setting}");
 
-            var notification = BuildNotification(title, message, IsSoundEnabled, imagePath);
+            var notification = BuildNotification(title, message, IsSoundEnabled, imagePath, openGame);
             _manager.Show(notification);
             if (notification.Id == 0)
                 throw new InvalidOperationException("Windows 未接收此通知。");
@@ -102,9 +119,11 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
         }
     }
 
-    internal static AppNotification BuildNotification(string title, string message, bool sound, string? imagePath = null)
+    internal static AppNotification BuildNotification(string title, string message, bool sound, string? imagePath = null,
+        bool openGame = false)
     {
         var builder = new AppNotificationBuilder().AddText(title).AddText(message);
+        if (openGame) builder.AddArgument(TargetArgument, GameTarget);
         var path = imagePath ?? Path.Combine(AppContext.BaseDirectory, "Assets", "Square150x150Logo.scale-200.png");
         // SDK 2.1 writes image URIs directly into the notification XML.
         var uri = new Uri(System.Security.SecurityElement.Escape(Path.GetFullPath(path))!);

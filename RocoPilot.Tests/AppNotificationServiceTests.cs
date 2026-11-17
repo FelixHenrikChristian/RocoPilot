@@ -67,6 +67,24 @@ public sealed class AppNotificationServiceTests
     }
 
     [TestMethod]
+    [DataRow(true)]
+    [DataRow(false)]
+    public void OnlyGameNotificationsCarryTheGameTarget(bool openGame)
+    {
+        Bootstrap.Initialize(0x00020001);
+        try
+        {
+            var toast = XDocument.Parse(AppNotificationService.BuildNotification("任务未完成", "原因。", true, null, openGame).Payload);
+            var launch = (string?)toast.Root!.Attribute("launch") ?? string.Empty;
+            Assert.AreEqual(openGame, launch.Contains("target=game"), launch);
+        }
+        finally
+        {
+            Bootstrap.Shutdown();
+        }
+    }
+
+    [TestMethod]
     public async Task UninitializedNotificationReportsFailureWithoutThrowing()
     {
         var service = new AppNotificationService(new ControlledSettingsStore(), NullLogger<AppNotificationService>.Instance);

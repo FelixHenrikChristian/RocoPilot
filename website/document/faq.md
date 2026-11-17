@@ -69,7 +69,9 @@ RocoPilot 主界面默认使用启动者的权限。配置了热键后，仅在�
 
 在“通知”页确认 Windows 通知已开启并发送测试通知。如果仍未看到通知，请检查系统通知权限、勿扰模式以及 RocoPilot 日志。提示音可独立开关。
 
-启用通知后，实时异色提醒会保存并附带游戏截图，目录为 `%LOCALAPPDATA%\RocoPilot\Screenshots\Shiny`。关闭通知时不保存此类截图；通知失败不影响异色保护和待确认记录。
+启用通知后，实时异色提醒会保存并附带游戏截图，原图目录为 `%LOCALAPPDATA%\RocoPilot\Screenshots\Shiny`。关闭通知时不保存此类截图；通知失败不影响异色保护和待确认记录。
+
+任务出错和单独运行的挑战完成时，通知也会附带当时的游戏画面。这些配图是缩小后的副本，保存在 `%LOCALAPPDATA%\RocoPilot\Screenshots\Notifications`，只保留最近 20 张。
 
 ## 恢复设置会删除统计数据吗？
 

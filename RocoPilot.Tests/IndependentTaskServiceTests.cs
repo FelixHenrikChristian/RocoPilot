@@ -46,6 +46,12 @@ public sealed class IndependentTaskServiceTests
         };
         CollectionAssert.Contains(log.Messages.ToArray(), "每日任务汇总：" + expected);
         if (outcome != "cancel") StringAssert.Contains(fixture.Runtime.Results.Last().Description, expected);
+        // 通知不照搬灵动岛的逐项汇总：标题说成没成，正文只留原因和计数。
+        var notifications = fixture.Notifications.Payloads.ToArray();
+        if (outcome == "cancel") Assert.HasCount(0, notifications);
+        else Assert.AreEqual(outcome == "failure"
+            ? ("每日清单未完成", "花种挑战：扫描结果过期。\n未执行 1 项。")
+            : ("每日清单完成", "共 2 项，全部完成。"), notifications.Single());
     }
 
     [TestMethod]
@@ -154,10 +160,10 @@ public sealed class IndependentTaskServiceTests
         Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.LegendaryChallenge)).Success);
         await WaitStoppedAsync(fixture.Service);
 
-        var expected = ("传说精灵挑战已停止", fixture.Runner.Failure);
-        Assert.AreEqual(expected, fixture.Runtime.Results.Single());
+        Assert.AreEqual(("传说精灵挑战已停止", fixture.Runner.Failure), fixture.Runtime.Results.Single());
         Assert.AreEqual(notificationsEnabled ? 1 : 0, fixture.Notifications.Payloads.Count);
-        if (notificationsEnabled) Assert.AreEqual(expected, fixture.Notifications.Payloads.Single());
+        if (notificationsEnabled)
+            Assert.AreEqual(("传说精灵挑战未完成", fixture.Runner.Failure), fixture.Notifications.Payloads.Single());
         Assert.AreEqual(1, fixture.Runtime.Resumes);
     }
 
@@ -187,10 +193,12 @@ public sealed class IndependentTaskServiceTests
             if (shouldNotify)
             {
                 var notification = fixture.Notifications.Payloads.Single();
-                var result = fixture.Runtime.Results.Single();
-                Assert.AreEqual((result.Title, result.Description), notification);
-                StringAssert.Contains(notification.Title, fails ? "已停止" : "完成");
-                if (fails) Assert.AreEqual(fixture.Runner.Failure, notification.Message);
+                var taskName = IndependentTaskService.GetTaskDisplayName(kind);
+                Assert.AreEqual(taskName + (fails ? "未完成" : "完成"), notification.Title);
+                if (fails) Assert.AreEqual("测试失败原因。", notification.Message);
+                else StringAssert.EndsWith(notification.Message, " 次");
+                // 出错要回游戏处理，完成只是告知。
+                Assert.AreEqual(fails, fixture.Notifications.OpenGame.Single());
             }
             Assert.AreEqual(1, fixture.Runtime.Resumes);
             Assert.IsFalse(fixture.Service.IsRunning);
@@ -511,7 +519,7 @@ public sealed class IndependentTaskServiceTests
         await WaitStoppedAsync(fixture.Service);
 
         Assert.AreEqual(("花种挑战已停止", fixture.Runner.Failure), fixture.Runtime.Results.Single());
-        Assert.AreEqual(("花种挑战已停止", fixture.Runner.Failure), fixture.Notifications.Payloads.Single());
+        Assert.AreEqual(("花种挑战未完成", fixture.Runner.Failure + "。"), fixture.Notifications.Payloads.Single());
         Assert.IsTrue(fixture.Runtime.Progress.Any(item => item.Name == "花种挑战"
             && item.Progress?.Stage == "任务失败" && item.Progress.Operation == fixture.Runner.Failure));
         Assert.AreEqual(1, fixture.Runtime.Resumes);
@@ -933,6 +941,7 @@ public sealed class IndependentTaskServiceTests
     private sealed class NotificationStub : IAppNotificationService
     {
         public ConcurrentQueue<(string Title, string Message)> Payloads { get; } = new();
+        public ConcurrentQueue<bool> OpenGame { get; } = new();
         public bool ShowSucceeds = true;
         public string? LastError => null;
         public bool IsEnabled { get; private set; } = true;
@@ -941,9 +950,10 @@ public sealed class IndependentTaskServiceTests
         public Task SetEnabledAsync(bool enabled) { IsEnabled = enabled; return Task.CompletedTask; }
         public Task SetSoundEnabledAsync(bool enabled) { IsSoundEnabled = enabled; return Task.CompletedTask; }
         public void Unregister() { }
-        public Task<bool> ShowAsync(string title, string message, string? imagePath = null)
+        public Task<bool> ShowAsync(string title, string message, string? imagePath = null, bool openGame = false)
         {
             Payloads.Enqueue((title, message));
+            OpenGame.Enqueue(openGame);
             return Task.FromResult(ShowSucceeds);
         }
     }

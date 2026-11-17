@@ -8,6 +8,7 @@ public interface IAppNotificationService
     Task InitializeAsync();
     Task SetEnabledAsync(bool enabled);
     Task SetSoundEnabledAsync(bool enabled);
-    Task<bool> ShowAsync(string title, string message, string? imagePath = null);
+    /// <param name="openGame">点击通知后回到游戏窗口；否则打开 RocoPilot。</param>
+    Task<bool> ShowAsync(string title, string message, string? imagePath = null, bool openGame = false);
     void Unregister();
 }

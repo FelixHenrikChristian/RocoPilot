@@ -49,16 +49,20 @@ public class StaminaCraftingTests
                 "open" => initialMap,
                 "options" => "map-options",
                 "garden" => "garden-cauldron-marked",
+                // F 交互后先保留一帧没有跳过或播放中提示的画面，期间应等待。
+                "intro-animation" when _frames == 1 => "world-interaction",
                 "season-selected" when _frames == 1 => "recipe-list-marked",
                 "slider-maximum" when _frames == 1 => "season-selected",
                 "skip-craft" when _frames <= 2 => "slider-maximum",
-                "skip-intro" or "skip-craft" => "legendary-skip",
+                "skip-craft" => "legendary-skip",
                 "exit-recipe" => "season-selected",
                 "exit-dialogue" => "choices",
                 _ => Stage
             };
             if (Stage == "skip-craft" && _frames == 3) _resultWait.Restart();
             var path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-07", "stamina-crafting", name + ".png");
+            if (name is "world-interaction" or "intro-animation" or "dialogue-before-choices" or "choices")
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-18", "stamina-crafting", name + ".png");
             if (name == "season-selected" && insufficient)
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "stamina-crafting", "season-insufficient-stamina.png");
             if (name == "craft-result" && initialMap != "map-continent")
@@ -92,6 +96,9 @@ public class StaminaCraftingTests
 
         public Task SendSequenceAsync(nint hwnd, string key, KeyboardInputOptions? options = null, CancellationToken cancellationToken = default)
         {
+            // 首次空格只补全当前句，仍需识别播放中后再次推进。
+            if (Stage == "dialogue-before-choices" && key == "Space" && _frames == 1)
+                return Task.CompletedTask;
             if (Stage is "skip-craft" or "craft-result" && key == "Esc")
             {
                 Assert.IsTrue(_resultWait.Elapsed >= TimeSpan.FromSeconds(3), "制造按钮消失后或前次 ESC 后需等待结算。");
@@ -108,10 +115,10 @@ public class StaminaCraftingTests
             {
                 ("start", "M") => "open",
                 ("world-arrival", "W") => "world-interaction",
-                ("world-interaction", "F") => "skip-intro",
-                ("skip-intro", "Esc") => "dialogue",
+                ("world-interaction", "F") => "intro-animation",
+                ("intro-animation", "Esc") when _frames > 1 => "dialogue-before-choices",
+                ("dialogue-before-choices", "Space") => "choices",
                 ("skip-craft", "Esc") => "craft-result",
-                ("dialogue", "Esc") => "choices",
                 ("choices", "1") => "recipe-list-marked",
                 ("craft-result", "Esc") => "exit-recipe",
                 ("season-selected", "Esc") when insufficient => "exit-dialogue",

@@ -59,7 +59,6 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             Task<ImageMatchResult?> Choices() => Find("choices", 1420, 620, 1950, 735, .90);
             Task<ImageMatchResult?> SeasonTimer() => Find("timer", 550, 870, 1020, 971);
             Task<ImageMatchResult?> Maximum() => Find("max", 1460, 975, 1560, 1060);
-            Task<ImageMatchResult?> Skip() => screen.Find("flower-seed/animation-skip", 80, 10, 240, 146, token);
             async Task AfterInput()
             {
                 freshAfter = DateTimeOffset.UtcNow;
@@ -128,8 +127,10 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                         await Key("1");
                         step = Step.SelectRecipe;
                     }
-                    else if (await Skip() is not null || await Find("playing", 1700, 0, 1980, 102) is not null)
+                    else if (await screen.Find("flower-seed/animation-skip", 80, 10, 240, 146, token) is not null)
                         await Key("Esc");
+                    else if (await Find("playing", 1700, 0, 1980, 102) is not null)
+                        await Key("Space");
                     break;
                 case Step.SelectRecipe:
                     if (await Recipe() is not null && await Find("badge", 250, 110, 1100, 906, .87) is { } badge)
@@ -209,7 +210,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
         Step.OpenMap or Step.SelectMap => "选择家园种植园地图",
         Step.Cauldron or Step.Teleport => "传送到炼金釜",
         Step.Approach => "接近炼金釜",
-        Step.Dialogue => "进入炼金造物",
+        Step.Dialogue => "等待炼金造物选项",
         Step.SelectRecipe => "定位赛季球角标",
         Step.SetAmount => "确认赛季球并拖动制造次数",
         Step.Make => "确认最大次数和制造按钮",

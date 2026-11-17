@@ -214,7 +214,7 @@ public partial class TasksViewModel : ObservableRecipient
         SyncRunningState();
         if (!result.Success)
         {
-            _logger.LogWarning("独立任务启动失败：{Message}", result.Message);
+            _logger.LogError("任务启动失败：{Message}", result.Message);
             ShowTaskNotification(InfoBarSeverity.Error, "启动失败", result.Message);
             return;
         }

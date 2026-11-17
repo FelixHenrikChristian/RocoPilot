@@ -214,9 +214,9 @@ public partial class StatisticsViewModel : ObservableRecipient
                 await _statisticsService.LoadAsync();
                 _isLoaded = true;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                _logger.LogWarning(ex, "读取统计数据失败。");
+                // 统计服务已经记录过失败原因，这里只提示用户。
                 ShowNotification(InfoBarSeverity.Warning, "读取统计失败", "已使用当前内存统计数据。");
             }
         }
@@ -504,7 +504,7 @@ public partial class StatisticsViewModel : ObservableRecipient
 
     public void ShowOperationFailed(string title, Exception exception)
     {
-        _logger.LogWarning(exception, "{Title}", title);
+        _logger.LogError(exception, "统计页：{Title}", title);
         ShowNotification(InfoBarSeverity.Error, title, exception.Message);
     }
 
@@ -591,7 +591,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取赛季奇遇配置失败，统计页将仅显示已有统计赛季。");
+            _logger.LogWarning(ex, "读取赛季奇遇配置失败，统计页只显示已有统计的赛季");
             return new EncounterSeasonConfig();
         }
     }
@@ -607,7 +607,7 @@ public partial class StatisticsViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取精灵头像失败。");
+            _logger.LogWarning(ex, "读取精灵头像失败，统计页先不显示头像");
         }
     }
 

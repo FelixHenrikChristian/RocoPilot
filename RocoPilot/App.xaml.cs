@@ -81,7 +81,8 @@ public partial class App : Application
         ConfigureLogging(logging =>
         {
             logging.ClearProviders();
-            logging.SetMinimumLevel(LogLevel.Debug);
+            // 逐次识别记录是 Trace，日志管线要把它留在内存里供出问题时回放，这里不能先滤掉。
+            logging.SetMinimumLevel(LogLevel.Trace);
             logging.AddSerilog(dispose: true);
         }).
         ConfigureServices((context, services) =>
@@ -148,6 +149,7 @@ public partial class App : Application
             services.AddSingleton<ICaptureBackend, PrintWindowCaptureBackend>();
             services.AddSingleton<ICaptureBackend, WindowsGraphicsCaptureBackend>();
             services.AddSingleton<IScreenCaptureService, ScreenCaptureService>();
+            services.AddSingleton<RecognitionDiagnostics>();
             services.AddSingleton<IImageMatchingService, ImageMatchingService>();
 #if DEBUG
             services.AddSingleton<ITextRecognitionBackend, PaddleOcrV5TextRecognitionBackend>();
@@ -196,11 +198,19 @@ public partial class App : Application
         _ = App.GetService<OnnxOcrV5SingleLineTextRecognitionBackend>().PrewarmAsync();
 
         UnhandledException += App_UnhandledException;
+        // 界面线程之外的异常不经过上面的事件，另行记录，否则崩溃时日志里什么都没有。
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Log.ForContext(typeof(App)).Fatal(e.ExceptionObject as Exception, "后台线程出现未处理异常，应用即将退出");
+            LoggingHelper.CloseAndFlush();
+        };
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+            Log.ForContext(typeof(App)).Error(e.Exception, "后台任务的异常没有被处理");
     }
 
     private void App_UnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
     {
-        Log.ForContext(typeof(App)).Fatal(e.Exception, "未处理异常: {Message}", e.Message);
+        Log.ForContext(typeof(App)).Fatal(e.Exception, "未处理异常：{Message}", e.Message);
         LoggingHelper.CloseAndFlush();
     }
 

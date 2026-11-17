@@ -38,7 +38,7 @@ public sealed class InterceptionDriverService : IInterceptionDriverService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "检测 Interception 驱动安装状态失败");
+            _logger.LogWarning(ex, "检测 Interception 驱动是否安装时出错，按未安装处理");
             return false;
         }
     }

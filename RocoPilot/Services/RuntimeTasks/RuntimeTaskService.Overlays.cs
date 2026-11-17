@@ -17,7 +17,7 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "更新独立任务完成信息失败，不影响任务执行");
+            LogOverlayFailure(ex);
         }
     }
 
@@ -115,7 +115,7 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存奇遇计数面板开关状态失败。");
+            _logger.LogError(ex, "保存奇遇计数面板开关失败，下次启动会恢复为之前的状态");
         }
     }
 

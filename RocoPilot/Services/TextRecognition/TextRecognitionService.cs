@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
@@ -11,10 +13,14 @@ namespace RocoPilot.Services.TextRecognition;
 public sealed class TextRecognitionService : ITextRecognitionService
 {
     private readonly IReadOnlyDictionary<TextRecognitionMethod, ITextRecognitionBackend> _backends;
+    private readonly RecognitionDiagnostics? _diagnostics;
 
-    public TextRecognitionService(IEnumerable<ITextRecognitionBackend> backends)
+    public TextRecognitionService(
+        IEnumerable<ITextRecognitionBackend> backends,
+        RecognitionDiagnostics? diagnostics = null)
     {
         _backends = backends.ToDictionary(backend => backend.Method);
+        _diagnostics = diagnostics;
     }
 
     public IReadOnlyList<TextRecognitionMethodOption> GetMethods()
@@ -65,15 +71,28 @@ public sealed class TextRecognitionService : ITextRecognitionService
             throw new NotSupportedException($"Unsupported text recognition method: {method}");
         }
 
+        var startedAt = Stopwatch.GetTimestamp();
+        TextRecognitionResult result;
         if (backend is IFrameTextRecognitionBackend frameBackend)
         {
-            return await frameBackend.RecognizeAsync(frame, region, cancellationToken);
+            result = await frameBackend.RecognizeAsync(frame, region, cancellationToken);
+        }
+        else
+        {
+            var imageBytes = await RecognitionRegionImageHelper.EncodePngAsync(
+                frame,
+                region,
+                cancellationToken);
+            result = await backend.RecognizeAsync(imageBytes, cancellationToken);
         }
 
-        var imageBytes = await RecognitionRegionImageHelper.EncodePngAsync(
-            frame,
-            region,
-            cancellationToken);
-        return await backend.RecognizeAsync(imageBytes, cancellationToken);
+        // 没有 ID 的临时区域用坐标区分。
+        _diagnostics?.ReportText(
+            string.IsNullOrWhiteSpace(region.Id)
+                ? $"{region.X},{region.Y} {region.Width}x{region.Height}"
+                : region.Id,
+            result.Text,
+            Stopwatch.GetElapsedTime(startedAt));
+        return result;
     }
 }

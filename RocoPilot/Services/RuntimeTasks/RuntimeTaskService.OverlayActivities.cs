@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.Logging;
 
 namespace RocoPilot.Services;
 
@@ -23,6 +24,7 @@ public sealed partial class RuntimeTaskService
             state, frame, BattleEnemyNameRegionIds, cancellationToken);
         var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
         if (battleId != _battle.BattleId) return;
+        NoteBattleSpirit(battleId, name);
         RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(battleId, turnId, name, DateTimeOffset.Now));
     }
 
@@ -37,7 +39,16 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "更新独立任务灵动岛信息失败，不影响任务执行");
+            LogOverlayFailure(ex);
+        }
+    }
+
+    // 遮罩只负责展示，更新失败不影响任务；刷新很频繁，同一种故障不逐次记录。
+    private void LogOverlayFailure(Exception exception)
+    {
+        if (_overlayFailures.TryEnter(out var skipped))
+        {
+            _logger.LogWarning(exception, "信息遮罩更新失败，任务照常执行{Repeat}", RepeatedFailureGate.Describe(skipped));
         }
     }
 
@@ -50,15 +61,30 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "更新灵动岛信息失败，不影响任务执行");
+            LogOverlayFailure(ex);
         }
     }
 
     private void PublishBattleInputProgress(RuntimeTaskState state, long battleId, AutoBattleTurn turn,
         AutoBattlePlan plan, string sequence, bool completed)
     {
-        if (completed) _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}，已发送 {Sequence}",
-            turn.Number, plan.Description, sequence);
+        if (completed)
+        {
+            // 给用户看的是这一回合做了什么；捕捉时带上目标精灵。实际按键另记一条调试信息。
+            var creature = _overlayActivities.CreatureName;
+            if (plan.Action == AutoBattleAction.Capture && creature.Length > 0)
+            {
+                _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}：{SpiritName}",
+                    turn.Number, plan.Description, creature);
+            }
+            else
+            {
+                _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}", turn.Number, plan.Description);
+            }
+
+            _logger.LogDebug("自动战斗：第 {Turn} 回合已发送按键 {Sequence}", turn.Number, sequence);
+        }
+
         if (_battle.IsSuspendedForShiny || !ReferenceEquals(CurrentState, state) || _isSuspended) return;
         var title = InfoOverlayIslandPresentation.BattleInputTitle(plan);
         // 技能序列里的 X 同样是回能，步骤行与标题保持一致。

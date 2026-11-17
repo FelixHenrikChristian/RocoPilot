@@ -101,7 +101,7 @@ public sealed partial class LogPage : Page
         }
         catch (Exception ex)
         {
-            Log.ForContext(typeof(LogPage)).Warning(ex, "打开日志导出窗口失败");
+            Log.ForContext(typeof(LogPage)).Error(ex, "导出日志的保存窗口打不开");
             ShowNotice(InfoBarSeverity.Error, "打开导出窗口失败", ex.Message);
             return;
         }
@@ -119,7 +119,7 @@ public sealed partial class LogPage : Page
         }
         catch (Exception ex)
         {
-            Log.ForContext(typeof(LogPage)).Warning(ex, "导出日志失败：{Path}", filePath);
+            Log.ForContext(typeof(LogPage)).Error(ex, "导出日志失败：{Path}", filePath);
             ShowNotice(InfoBarSeverity.Error, "导出失败", ex.Message);
         }
     }
@@ -137,7 +137,7 @@ public sealed partial class LogPage : Page
         }
         catch (Exception ex)
         {
-            Log.ForContext(typeof(LogPage)).Warning(ex, "复制日志失败");
+            Log.ForContext(typeof(LogPage)).Error(ex, "复制日志失败");
             ShowNotice(InfoBarSeverity.Error, "复制失败", ex.Message);
         }
     }

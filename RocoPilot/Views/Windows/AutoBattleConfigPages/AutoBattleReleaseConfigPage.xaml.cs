@@ -1,9 +1,9 @@
-using System.Diagnostics;
-
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.Storage.Pickers;
 using RocoPilot.Controls;
+
+using Serilog;
 
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
 
@@ -84,7 +84,9 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
     private void NewConfigButton_Click(object sender, RoutedEventArgs e)
     {
         var item = Set.AddConfig();
-        Debug.WriteLine($"[战斗配置] 新建配置：{BattleTypeName} / {item.Name}（共 {Set.Items.Count} 个）");
+        // 编辑窗口里的增删改在保存前不生效，只留调试记录；导入导出涉及文件，记为给用户看的流水。
+        Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Debug(
+            "战斗配置：新建 {BattleType} / {Name}（共 {Count} 个）", BattleTypeName, item.Name, Set.Items.Count);
     }
 
     private async void RenameConfigButton_Click(object sender, RoutedEventArgs e)
@@ -120,7 +122,8 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
             && !string.IsNullOrWhiteSpace(textBox.Text))
         {
             selected.Name = textBox.Text.Trim();
-            Debug.WriteLine($"[战斗配置] 重命名配置：{BattleTypeName} -> {selected.Name}");
+            Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Debug(
+                "战斗配置：重命名 {BattleType} / {Name}", BattleTypeName, selected.Name);
         }
     }
 
@@ -150,7 +153,8 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         if (await dialog.ShowAsync() == ContentDialogResult.Primary)
         {
             Set.RemoveConfig(selected);
-            Debug.WriteLine($"[战斗配置] 删除配置：{BattleTypeName} / {selected.Name}（剩余 {Set.Items.Count} 个）");
+            Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Debug(
+                "战斗配置：删除 {BattleType} / {Name}（剩余 {Count} 个）", BattleTypeName, selected.Name, Set.Items.Count);
         }
     }
 
@@ -188,6 +192,7 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         }
         catch (Exception ex)
         {
+            Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Error(ex, "战斗配置：导入时读取文件失败：{Path}", path);
             _owner.ShowMessage("读取文件失败", ex.Message);
             return;
         }
@@ -198,13 +203,16 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
                 out var config,
                 out var error))
         {
+            Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Error(
+                "战斗配置：导入失败，{Error}（{Path}）", error, path);
             _owner.ShowMessage("导入失败", error);
             return;
         }
 
         var item = Editor.AddImportedConfig(Set, config);
-        Debug.WriteLine(
-            $"[战斗配置] 导入配置：{BattleTypeName} / {item.Name}，{config.Steps.Count} 步，来源 {path}");
+        Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Information(
+            "战斗配置：已导入「{Name}」（{StepCount} 步）到{BattleType}，保存后生效，来源 {Path}",
+            item.Name, config.Steps.Count, BattleTypeName, path);
         _owner.ShowMessage(
             "导入成功",
             $"已导入配置「{item.Name}」（{config.Steps.Count} 步）到{BattleTypeName}，保存后生效。",
@@ -246,11 +254,13 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
         try
         {
             await File.WriteAllTextAsync(path, AutoBattleReleaseConfigTransfer.Export(selected));
-            Debug.WriteLine($"[战斗配置] 导出配置：{BattleTypeName} / {selected.Name} -> {path}");
+            Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Information(
+                "战斗配置：已导出「{Name}」到 {Path}", selected.Name, path);
             _owner.ShowMessage("导出成功", $"已导出到 {path}", InfoBarSeverity.Success);
         }
         catch (Exception ex)
         {
+            Log.ForContext(typeof(AutoBattleReleaseConfigPage)).Error(ex, "战斗配置：导出失败：{Path}", path);
             _owner.ShowMessage("导出失败", ex.Message);
         }
     }

@@ -5,7 +5,6 @@ using System.Reflection;
 using RocoPilot.Services.Logging;
 
 using Serilog;
-using Serilog.Events;
 
 using Windows.ApplicationModel;
 
@@ -15,35 +14,12 @@ public static class LoggingHelper
 {
     public static string LogDirectory { get; } = ResolveLogDirectory();
 
-    internal static Serilog.Core.Logger CreateLogger(string directory, LogEntryStore? entries = null)
-    {
-        Directory.CreateDirectory(directory);
-
-        const string outputTemplate =
-            "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}";
-
-        var configuration = new LoggerConfiguration()
-            .MinimumLevel.Is(LogEventLevel.Debug)
-            .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-            .MinimumLevel.Override("System", LogEventLevel.Warning)
-            .Enrich.FromLogContext()
-            .WriteTo.Debug(outputTemplate: outputTemplate)
-            .WriteTo.File(
-                path: Path.Combine(directory, "app-.log"),
-                restrictedToMinimumLevel: LogEventLevel.Information,
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 14,
-                shared: true,
-                outputTemplate: outputTemplate);
-
-        // 日志页与文件日志记录同一批事件。
-        if (entries is not null)
-        {
-            configuration.WriteTo.Sink(new LogEntrySink(entries), LogEventLevel.Information);
-        }
-
-        return configuration.CreateLogger();
-    }
+    /// <summary>各输出的级别和去向见 <see cref="LogPipeline"/>。</summary>
+    internal static Serilog.Core.Logger CreateLogger(
+        string directory,
+        LogEntryStore? entries = null,
+        bool writeDebugFile = true) =>
+        LogPipeline.Create(directory, entries, writeDebugFile);
 
     public static void CloseAndFlush() => Log.CloseAndFlush();
 
@@ -59,22 +35,8 @@ public static class LoggingHelper
             version, isMsix ? "MSIX" : "Unpackaged", arch, framework, os);
     }
 
-    internal static string FormatLogText(string? text, int maximumLength = 120)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return "<empty>";
-        }
-
-        var normalized = string.Join(
-            " ",
-            text
-                .Trim()
-                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-        return normalized.Length <= maximumLength
-            ? normalized
-            : $"{normalized[..maximumLength]}...";
-    }
+    internal static string FormatLogText(string? text, int maximumLength = 120) =>
+        LogText.Compact(text, maximumLength);
 
     private static string GetAppVersion()
     {

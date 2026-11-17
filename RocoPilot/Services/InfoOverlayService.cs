@@ -7,6 +7,7 @@ using RocoPilot.Contracts.Services.Statistics;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.Logging;
 using RocoPilot.Views.Windows;
 
 namespace RocoPilot.Services;
@@ -14,6 +15,9 @@ namespace RocoPilot.Services;
 public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotificationService
 {
     private readonly ILogger<InfoOverlayService> _logger;
+
+    // 遮罩每秒刷新多次，同一种更新故障不逐次记录。
+    private readonly RepeatedFailureGate _updateFailures = new(TimeSpan.FromSeconds(30));
     private readonly DispatcherQueue _dispatcherQueue;
     private readonly IStatisticsService _statisticsService;
     private readonly ISpiritCatalogService _spiritCatalogService;
@@ -147,12 +151,12 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
 
             _ = LoadAvatarPathsAsync(_overlayWindow);
 
-            _logger.LogDebug("信息遮罩窗口已显示。Locked={Locked}", state.Options.InfoOverlayLocked);
+            _logger.LogDebug("信息遮罩窗口已显示，Locked={Locked}", state.Options.InfoOverlayLocked);
         }
         catch (Exception ex)
         {
             HideCore();
-            _logger.LogWarning(ex, "显示信息遮罩窗口失败");
+            _logger.LogError(ex, "信息遮罩窗口没有显示出来");
         }
     }
 
@@ -188,7 +192,7 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "加载信息遮罩精灵头像失败，使用占位图标");
+            _logger.LogWarning(ex, "信息遮罩的精灵头像加载失败，改用占位图标");
         }
     }
 
@@ -222,8 +226,17 @@ public sealed class InfoOverlayService : IInfoOverlayService, IInfoOverlayNotifi
 
         void ApplyUpdate()
         {
-            try { action(); }
-            catch (Exception ex) { _logger.LogWarning(ex, "更新信息遮罩失败"); }
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                if (_updateFailures.TryEnter(out var skipped))
+                {
+                    _logger.LogWarning(ex, "信息遮罩更新失败{Repeat}", RepeatedFailureGate.Describe(skipped));
+                }
+            }
         }
     }
 }

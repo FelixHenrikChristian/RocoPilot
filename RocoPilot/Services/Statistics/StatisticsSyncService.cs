@@ -65,7 +65,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         _credentials = credentials;
         _autoUpload = new StatisticsAutoUploadScheduler(AutoUploadDelay,
             token => UploadAsync(automatic: true, token),
-            ex => _logger.LogDebug("后台上传结束，后续变更可再次触发上传：{Reason}", ex.Message), delay);
+            ex => _logger.LogDebug("自动上传没有完成，下次统计变更时再试：{Reason}", ex.Message), delay);
         _statisticsService.DocumentChanged += StatisticsService_DocumentChanged;
         ApplyStatusFromSettings(_settings, "未配置云同步");
     }
@@ -369,7 +369,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
                     settings.LastSyncedAccountFingerprints[uid] = version.LegacyFingerprint!;
         await SaveSettingsCoreAsync(settings, cancellationToken);
         ApplyStatusFromSettings(settings, successMessage);
-        _logger.LogInformation("云端统计已下载并合并，大小 {Bytes} 字节", result.ContentLength);
+        _logger.LogInformation("云同步：云端统计已下载并合并到本地");
+        _logger.LogDebug("云端统计文件大小 {Bytes} 字节", result.ContentLength);
         return result;
     }
 
@@ -441,7 +442,8 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
                         ? "已自动上传统计数据"
                         : "已上传统计数据";
                 ApplyStatusFromSettings(settings, successMessage);
-                _logger.LogInformation("统计数据已上传，自动上传={Automatic}，大小 {Bytes} 字节", automatic, result.ContentLength);
+                _logger.LogInformation("云同步：统计数据已上传（{Mode}）", automatic ? "自动" : "手动");
+                _logger.LogDebug("上传的统计文件大小 {Bytes} 字节", result.ContentLength);
                 return result;
             }
 
@@ -453,7 +455,7 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         }
         catch (Exception ex)
         {
-            SetFailureStatus(automatic ? "自动上传统计失败" : "上传统计失败", ex);
+            SetFailureStatus(automatic ? "自动上传统计失败" : "上传统计失败", ex, willRetry: automatic);
             throw;
         }
         finally
@@ -593,9 +595,10 @@ public sealed class StatisticsSyncService : IStatisticsSyncService
         StatusChanged?.Invoke(this, new StatisticsSyncStatusChangedEventArgs(snapshot));
     }
 
-    private void SetFailureStatus(string title, Exception exception)
+    // 自动上传失败后，下次统计变更会再试，只算警告；其余是用户发起的操作没做成。
+    private void SetFailureStatus(string title, Exception exception, bool willRetry = false)
     {
-        _logger.LogWarning(exception, "{Title}", title);
+        _logger.Log(willRetry ? LogLevel.Warning : LogLevel.Error, exception, "云同步：{Title}", title);
         StatisticsSyncStatus snapshot;
         lock (_statusGate)
         {

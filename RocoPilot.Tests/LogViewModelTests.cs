@@ -75,6 +75,55 @@ public sealed class LogViewModelTests
     }
 
     [TestMethod]
+    public void DebugEntriesStayHiddenUntilSwitchedOn()
+    {
+        var store = new LogEntryStore();
+        store.Add(Now, LogSeverity.Information, "RocoPilot.Services.RuntimeTaskService", "进入战斗");
+        store.Add(Now, LogSeverity.Debug, "RocoPilot.Services.Recognition.RecognitionDiagnostics", "匹配变化 battle-chat：命中");
+        var viewModel = new LogViewModel(store);
+        viewModel.Activate();
+        store.Add(Now, LogSeverity.Debug, "RocoPilot.Services.Recognition.RecognitionDiagnostics", "OCR 变化 battle-enemy-name：栗鼠");
+
+        // 默认只有给用户看的记录，调试记录不算进总数，但开关上能看到有多少条。
+        CollectionAssert.AreEqual(new[] { "进入战斗" }, Messages(viewModel));
+        Assert.AreEqual("共 1 条", viewModel.StatusText);
+        Assert.AreEqual(2, viewModel.DebugCount);
+
+        viewModel.ShowDebug = true;
+        CollectionAssert.AreEqual(
+            new[] { "进入战斗", "匹配变化 battle-chat：命中", "OCR 变化 battle-enemy-name：栗鼠" },
+            Messages(viewModel));
+        Assert.AreEqual("共 3 条", viewModel.StatusText);
+
+        viewModel.ShowInformation = false;
+        Assert.AreEqual("显示 2 / 3 条", viewModel.StatusText);
+        Assert.AreEqual("调试", viewModel.Entries[0].LevelText);
+        Assert.IsTrue(viewModel.Entries[0].IsDebug);
+        Assert.IsFalse(viewModel.Entries[0].IsInformation);
+    }
+
+    [TestMethod]
+    public void DropsDebugEntriesTheStoreNoLongerRetainsAndKeepsTheRest()
+    {
+        var store = new LogEntryStore(capacity: 10, debugCapacity: 2);
+        var viewModel = new LogViewModel(store) { ShowDebug = true };
+        viewModel.Activate();
+
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 1");
+        store.Add(Now, LogSeverity.Information, "A", "进入战斗");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 2");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 3");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 4");
+
+        CollectionAssert.AreEqual(new[] { "进入战斗", "识别变化 3", "识别变化 4" }, Messages(viewModel));
+        Assert.AreEqual("共 3 条，更早的记录在日志文件中", viewModel.StatusText);
+
+        // 被移出的只有调试记录，关掉调试后不再提示有更早的记录。
+        viewModel.ShowDebug = false;
+        Assert.AreEqual("共 1 条", viewModel.StatusText);
+    }
+
+    [TestMethod]
     public void NewEntriesFollowTheActiveFilter()
     {
         var store = new LogEntryStore();

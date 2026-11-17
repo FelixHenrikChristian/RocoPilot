@@ -4,6 +4,7 @@ using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services;
 
@@ -26,6 +27,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly IAppNotificationService _notifications;
     private readonly IGameWindowService _gameWindowService;
     private readonly ILogger<IndependentTaskService> _logger;
+    private readonly RecognitionDiagnostics? _recognitionDiagnostics;
 
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private readonly SemaphoreSlim _settingsSaveLock = new(1, 1);
@@ -58,8 +60,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
         IAppNotificationService notifications,
         IGameWindowService gameWindowService,
         StaminaCraftingRunner staminaCrafting, EveningRestRunner eveningRest, MailRunner mail, GardeningRunner gardening, CropSaleRunner cropSale, BattlePassRunner battlePass,
-        ILogger<IndependentTaskService> logger)
+        ILogger<IndependentTaskService> logger,
+        RecognitionDiagnostics? recognitionDiagnostics = null)
     {
+        _recognitionDiagnostics = recognitionDiagnostics;
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
         _challengeRunner = challengeRunner;
@@ -92,7 +96,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取独立任务设置失败，使用默认值。");
+            _logger.LogWarning(ex, "读取任务设置失败，已使用默认值");
         }
 
         _hasLoadedSettings = true;
@@ -228,7 +232,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
             }
             catch (Exception ex)
             {
-                _logger.LogDebug(ex, "等待独立任务结束时出现异常。");
+                _logger.LogDebug(ex, "等待任务结束时出现异常");
             }
         }
     }
@@ -245,6 +249,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         var activeIndex = -1;
         var kind = tasks[0];
         var taskName = GetTaskDisplayName(kind);
+        string? lastProgress = null;
         try
         {
             UpdateProgress(new("准备任务", "等待实时任务暂停"));
@@ -253,9 +258,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 ?? throw new InvalidOperationException("运行会话已结束，请先在启动页启动任务。");
 
             if (_gameWindowService.TryBringGameWindowToForeground(state.TargetWindow))
-                _logger.LogInformation("独立任务启动：已将游戏窗口切换到前台。Task={TaskName}, Window={Window}", taskName, state.TargetWindow.DisplayName);
+                _logger.LogDebug("{Task}：已将游戏窗口切换到前台，窗口 {Window}", taskName, state.TargetWindow.DisplayName);
             else
-                _logger.LogWarning("独立任务启动：未能将游戏窗口切换到前台。Task={TaskName}, Window={Window}", taskName, state.TargetWindow.DisplayName);
+                _logger.LogWarning("{Task}：未能把游戏窗口切换到前台，请手动切到游戏", taskName);
 
             for (var index = 0; index < tasks.Count; index++)
             {
@@ -267,7 +272,11 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 _runningTaskKind = kind;
                 StatusMessage = isDaily ? $"正在执行 {index + 1}/{tasks.Count}：{taskName}" : $"正在执行：{taskName}";
                 NotifyStateChanged();
-                _logger.LogInformation("开始执行{Task}（第 {Index}/{Total} 项）", taskName, index + 1, tasks.Count);
+                lastProgress = null;
+                if (isDaily)
+                    _logger.LogInformation("每日任务 {Index}/{Total}：开始执行{Task}", index + 1, tasks.Count, taskName);
+                else
+                    _logger.LogInformation("{Task}：开始执行", taskName);
                 switch (kind)
             {
                 case IndependentTaskKind.BattlePassRewards:
@@ -355,7 +364,8 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 }
                 outcomes[index] = outcome;
                 activeIndex = -1;
-                _logger.LogInformation("{Task}：{Outcome}", taskName, outcome);
+                // 挑战和扫描在上面各自记过结果，这里只补日常任务的结束。
+                if (!HasOwnLog(kind)) _logger.LogInformation("{Task}结束：{Outcome}", taskName, outcome);
             }
 
             StatusMessage = isDaily ? $"每日清单结束，共 {tasks.Count} 项" : $"{taskName}：{outcomes[0]}";
@@ -367,20 +377,22 @@ public sealed class IndependentTaskService : IIndependentTaskService
         catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
         {
             if (activeIndex >= 0) outcomes[activeIndex] = "已取消";
-            _logger.LogInformation("任务已取消：{Task}", taskName);
+            _logger.LogInformation("{Task}：已取消", taskName);
             StatusMessage = isDaily ? "每日任务已停止" : $"{taskName}已停止";
         }
         catch (Exception ex)
         {
             if (activeIndex >= 0) outcomes[activeIndex] = $"失败：{ex.Message}";
-            _logger.LogError(ex, "独立任务异常终止：{TaskName}", GetTaskDisplayName(kind));
+            _logger.LogError(ex, "{Task}失败，任务已停止", GetTaskDisplayName(kind));
             StatusMessage = $"{(isDaily ? "每日任务" : taskName)}已停止：{ex.Message}";
-            UpdateProgress(new("任务失败", ex.Message));
+            // 失败原因上一行已经记过，这里只更新遮罩。
+            _runtimeTaskService.UpdateIndependentTaskStatus(taskName, new("任务失败", ex.Message));
             await ReportResultAsync($"{(isDaily ? "每日任务" : taskName)}已停止", isDaily ? $"{ex.Message}。{Summary()}" : ex.Message);
         }
         finally
         {
             if (isDaily) _logger.LogInformation("每日任务汇总：{Summary}", Summary());
+            _recognitionDiagnostics?.Flush();
             var stateCleared = false;
             await _stateLock.WaitAsync();
             try
@@ -416,7 +428,23 @@ public sealed class IndependentTaskService : IIndependentTaskService
             $"{GetTaskDisplayName(task)}：{outcomes[i] ?? "未执行"}"));
 
         void UpdateProgress(IndependentTaskProgress progress)
-            => _runtimeTaskService.UpdateIndependentTaskStatus(taskName, progress);
+        {
+            _runtimeTaskService.UpdateIndependentTaskStatus(taskName, progress);
+
+            // 各任务每一轮都会上报进度，内容变了才记。日常任务自己不写日志，进度就是它们的流水；
+            // 挑战和扫描有自己的流水，进度只留调试信息。
+            var text = string.IsNullOrWhiteSpace(progress.Operation) ? progress.Stage : progress.Operation;
+            if (string.IsNullOrWhiteSpace(text) || text == lastProgress) return;
+            lastProgress = text;
+            if (HasOwnLog(kind))
+                _logger.LogDebug("{Task}进度：{Stage}，{Operation}", taskName, progress.Stage, progress.Operation);
+            else
+                _logger.LogInformation("{Task}：{Step}", taskName, text);
+        }
+
+        static bool HasOwnLog(IndependentTaskKind kind) => kind is IndependentTaskKind.LegendaryScan
+            or IndependentTaskKind.LegendaryChallenge or IndependentTaskKind.FlowerSeedChallenge
+            or IndependentTaskKind.FlowerSeedScan;
 
         async Task ReportResultAsync(string title, string message, bool notify = true)
         {
@@ -436,7 +464,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存独立任务设置失败。");
+            _logger.LogError(ex, "保存任务设置失败，本次修改重启后不会保留");
         }
         finally
         {

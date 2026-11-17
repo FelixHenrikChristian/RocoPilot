@@ -3,6 +3,7 @@ using RocoPilot.Configuration;
 using RocoPilot.Helpers;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.Logging;
 using RocoPilot.Services.RuntimeTasks;
 
 namespace RocoPilot.Services;
@@ -24,7 +25,7 @@ public sealed partial class RuntimeTaskService
         var wasEnabled = _autoBattleSettings.IsEnabled;
         _autoBattleSettings = AutoBattleSettingsRules.Normalize(settings);
         if (_autoBattleSettings.IsEnabled != wasEnabled)
-            _logger.LogInformation("自动战斗{State}，输入方式 {Method}", _autoBattleSettings.IsEnabled ? "已开启" : "已关闭",
+            _logger.LogInformation("自动战斗{State}（输入方式 {Method}）", _autoBattleSettings.IsEnabled ? "已开启" : "已关闭",
                 _autoBattleSettings.KeyboardInputMethod);
         if (CurrentState is { } state)
         {
@@ -49,7 +50,7 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存自动战斗设置失败。");
+            _logger.LogError(ex, "保存自动战斗设置失败，本次修改重启后不会保留");
         }
     }
 
@@ -86,12 +87,23 @@ public sealed partial class RuntimeTaskService
                 && !await ExecuteBattleInputWithOverlayAsync(state, settings, plan, turn, cancellationToken)) return;
             if (!_battle.RecordAction(turn.Id, plan.Action, DateTimeOffset.Now)) return;
 
+            _battleInputFailures.Reset();
             if (!plan.ShouldSendKeys && turn.Action != plan.Action)
                 _logger.LogInformation("自动战斗：第 {Turn} 回合，{Action}", turn.Number, plan.Description);
         }
         catch (OperationCanceledException) { }
-        catch (Exception ex) { _logger.LogWarning(ex, "自动战斗技能释放失败。"); }
+        catch (Exception ex) { LogBattleInputFailure(ex, "出招"); }
         finally { _autoBattleActionLock.Release(); }
+    }
+
+    // 按键没发出去时下一轮扫描会重试，每半秒一次；同一种故障不逐次记录。
+    private void LogBattleInputFailure(Exception? exception, string operation)
+    {
+        if (_battleInputFailures.TryEnter(out var skipped))
+        {
+            _logger.LogWarning(exception, "自动战斗：{Operation}的按键没有发出去，下一轮重试{Repeat}",
+                operation, RepeatedFailureGate.Describe(skipped));
+        }
     }
 
     private bool ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief()
@@ -131,7 +143,7 @@ public sealed partial class RuntimeTaskService
         {
             if (!_keyboardInputService.IsWindowAvailable(state.TargetWindow.Hwnd))
             {
-                _logger.LogWarning("自动战斗换精灵未执行：目标游戏窗口句柄已失效。");
+                LogBattleInputFailure(new InvalidOperationException("目标游戏窗口句柄已失效。"), "换精灵");
                 return;
             }
 
@@ -188,7 +200,7 @@ public sealed partial class RuntimeTaskService
                 using var frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
                 if (frame is null)
                 {
-                    _logger.LogWarning("自动战斗换精灵：按 Space 确认后未能获取画面，停止本轮自动换精灵。");
+                    _logger.LogWarning("自动战斗：换精灵确认后获取不到画面，本轮不再继续尝试");
                     return;
                 }
 
@@ -198,18 +210,18 @@ public sealed partial class RuntimeTaskService
                     continue;
                 }
 
-                _logger.LogInformation("自动战斗：切换到第 {Slot} 只精灵，按 Space 确认后离开切换界面", slot);
+                _logger.LogInformation("自动战斗：已切换到第 {Slot} 只精灵", slot);
                 return;
             }
 
-            _logger.LogWarning("自动战斗换精灵失败：已尝试 1-6 并按 Space 确认，但仍处于切换精灵界面。");
+            _logger.LogError("自动战斗：换精灵失败，6 个位置都试过后仍停在切换界面，需要手动处理");
         }
         catch (OperationCanceledException)
         {
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "自动战斗换精灵失败。");
+            _logger.LogError(ex, "自动战斗：换精灵时出错，需要手动处理");
         }
         finally
         {
@@ -231,7 +243,7 @@ public sealed partial class RuntimeTaskService
     private void BeginAutoBattlePetSwitchingTurn(AutoBattleSettings settings)
     {
         var step = _battle.BeginPetSwitching(settings);
-        _logger.LogInformation("自动战斗：切换精灵，下回合继续 {Step}", AutoBattleSettingsRules.GetReleaseStepDisplay(step));
+        _logger.LogInformation("自动战斗：开始切换精灵，换完后继续 {Step}", AutoBattleSettingsRules.GetReleaseStepDisplay(step));
     }
 
     private async Task<bool> TryHandleAutoBattleSkillReleaseFailureAsync(
@@ -240,9 +252,7 @@ public sealed partial class RuntimeTaskService
         if (_isSuspended) return false;
         if (!_battle.ShouldRecoverAfterSkillFailure(_autoBattleSettings, DateTimeOffset.Now)) return false;
         QueueAutoBattleSkillFailureTipRecognition(state, frame, _battle.TurnNumber, cancellationToken);
-        if (!await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken)) return false;
-        _logger.LogInformation("自动战斗：第 {Turn} 回合已临时回能，原技能延后", _battle.TurnNumber);
-        return true;
+        return await TrySendAutoBattleEnergyRecoveryAsync(state, cancellationToken);
     }
 
     private void QueueAutoBattleSkillFailureTipRecognition(
@@ -292,7 +302,7 @@ public sealed partial class RuntimeTaskService
                             : LoggingHelper.FormatLogText(tipText);
 
                         _logger.LogInformation(
-                            "自动战斗：第 {TurnNumber} 回合，技能失败提示：{FailureReason}",
+                            "自动战斗：第 {TurnNumber} 回合技能没放出去，游戏提示：{FailureReason}",
                             turnNumber > 0 ? turnNumber : 1,
                             failureReason);
                     }
@@ -301,7 +311,7 @@ public sealed partial class RuntimeTaskService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogDebug(ex, "自动战斗技能失败提示 OCR 失败");
+                        _logger.LogDebug(ex, "识别技能失败提示时出错");
                     }
                     finally
                     {
@@ -325,12 +335,12 @@ public sealed partial class RuntimeTaskService
         {
             var turn = _battle.CurrentTurn;
             if (turn is null || _isSuspended || _battle.IsSuspendedForShiny) return false;
-            var plan = new AutoBattlePlan(AutoBattleAction.EnergyRecovery, "X", "临时回能", "X");
+            var plan = new AutoBattlePlan(AutoBattleAction.EnergyRecovery, "X", "技能没放出去，先回能，原技能顺延", "X");
             return await ExecuteBattleInputWithOverlayAsync(state, _autoBattleSettings, plan, turn, cancellationToken)
                 && _battle.RecordAction(turn.Id, AutoBattleAction.EnergyRecovery, DateTimeOffset.Now);
         }
         catch (OperationCanceledException) { return false; }
-        catch (Exception ex) { _logger.LogWarning(ex, "自动战斗回能失败。"); return false; }
+        catch (Exception ex) { LogBattleInputFailure(ex, "回能"); return false; }
         finally { _autoBattleActionLock.Release(); }
     }
 

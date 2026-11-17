@@ -95,7 +95,7 @@ public sealed class RecognitionOverlayService : IRecognitionOverlayService
         catch (Exception ex)
         {
             _overlayWindow = null;
-            _logger.LogWarning(ex, "显示识别区域遮罩失败");
+            _logger.LogError(ex, "识别区域遮罩没有显示出来");
         }
     }
 

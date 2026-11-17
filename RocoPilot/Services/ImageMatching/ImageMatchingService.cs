@@ -8,13 +8,14 @@ using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Recognition;
+using RocoPilot.Services.Recognition;
 
 using Windows.Graphics.Imaging;
 using Windows.Storage.Streams;
 
 namespace RocoPilot.Services.ImageMatching;
 
-public sealed class ImageMatchingService : IImageMatchingService
+public sealed class ImageMatchingService(RecognitionDiagnostics? diagnostics = null) : IImageMatchingService
 {
     private readonly ConcurrentDictionary<TemplateCacheKey, Lazy<Task<ImageTemplate>>> _templateCache = new();
 
@@ -43,8 +44,11 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         var resolvedTemplatePath = ResolveTemplatePath(templatePath);
         var normalizedOptions = NormalizeOptions(options);
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var (_, best) = await MatchTemplatesAsync(frame, region, resolvedTemplatePath,
             normalizedOptions, 1, .5, true, cancellationToken);
+        diagnostics?.ReportMatch(templatePath, region.Id, best.Score, normalizedOptions.MinimumScore,
+            best.IsMatch ? 1 : 0, System.Diagnostics.Stopwatch.GetElapsedTime(startedAt));
         return best;
     }
 
@@ -79,8 +83,11 @@ public sealed class ImageMatchingService : IImageMatchingService
 
         var resolvedTemplatePath = ResolveTemplatePath(templatePath);
         var normalizedOptions = NormalizeOptions(options);
+        var startedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var (matches, best) = await MatchTemplatesAsync(frame, region, resolvedTemplatePath,
             normalizedOptions, maximumMatches, maximumOverlapRatio, false, cancellationToken);
+        diagnostics?.ReportMatch(templatePath, region.Id, best.Score, normalizedOptions.MinimumScore,
+            matches.Count, System.Diagnostics.Stopwatch.GetElapsedTime(startedAt));
         return new ImageMatchCollectionResult(matches, best.Score, resolvedTemplatePath);
     }
 

@@ -108,7 +108,7 @@ public sealed partial class UpdateWindow : WindowEx
         }
         catch (Exception ex)
         {
-            Log.ForContext(typeof(UpdateWindow)).Warning(ex, "更新日志 WebView2 初始化或导航失败，改用纯文本回退。");
+            Log.ForContext(typeof(UpdateWindow)).Warning(ex, "更新说明页面加载失败，改用纯文本显示");
             ShowReleaseNotesFallback();
         }
     }
@@ -159,13 +159,13 @@ public sealed partial class UpdateWindow : WindowEx
     {
         if (args.Exception != null)
         {
-            Log.ForContext(typeof(UpdateWindow)).Warning(args.Exception, "更新日志 WebView2 Core 初始化失败。");
+            Log.ForContext(typeof(UpdateWindow)).Warning(args.Exception, "更新说明页面的 WebView2 初始化失败");
         }
     }
 
     private void OnReleaseNotesWebViewCoreProcessFailed(WebView2 sender, CoreWebView2ProcessFailedEventArgs args)
     {
-        Log.ForContext(typeof(UpdateWindow)).Warning("更新日志 WebView2 Core 进程异常退出。Kind={Kind}, Reason={Reason}, ExitCode={ExitCode}",
+        Log.ForContext(typeof(UpdateWindow)).Warning("更新说明页面的 WebView2 进程异常退出（{Kind}，{Reason}，退出码 {ExitCode}）",
             args.ProcessFailedKind,
             args.Reason,
             args.ExitCode);
@@ -181,7 +181,7 @@ public sealed partial class UpdateWindow : WindowEx
         }
         catch (Exception ex)
         {
-            Log.ForContext(typeof(UpdateWindow)).Debug(ex, "关闭更新日志 WebView2 时发生异常。");
+            Log.ForContext(typeof(UpdateWindow)).Debug(ex, "关闭更新说明页面的 WebView2 时出现异常");
         }
     }
 

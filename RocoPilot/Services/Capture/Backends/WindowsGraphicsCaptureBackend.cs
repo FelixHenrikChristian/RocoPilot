@@ -2,7 +2,11 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices.WindowsRuntime;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 using RocoPilot.Models.Capture;
+using RocoPilot.Services.Logging;
 
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
@@ -13,8 +17,13 @@ using Windows.Security.Authorization.AppCapabilityAccess;
 
 namespace RocoPilot.Services.Capture.Backends;
 
-public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
+public sealed class WindowsGraphicsCaptureBackend(ILogger<WindowsGraphicsCaptureBackend>? logger = null)
+    : ICaptureBackend, IDisposable
 {
+    private readonly ILogger _logger = logger ?? NullLogger<WindowsGraphicsCaptureBackend>.Instance;
+
+    // 截图每秒约 10 次，同一种故障不逐次记录。
+    private readonly RepeatedFailureGate _captureFailures = new(TimeSpan.FromSeconds(30));
     private readonly ConcurrentDictionary<IntPtr, CaptureSessionState> _sessions = new();
     private readonly object _deviceLock = new();
 
@@ -36,10 +45,22 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
                 targetWindow.Hwnd,
                 hwnd => new CaptureSessionState(hwnd, GetOrCreateDevice(), RemoveSession));
 
-            return session.GetLatestFrame();
+            var frame = session.GetLatestFrame();
+            if (frame is not null)
+            {
+                _captureFailures.Reset();
+            }
+
+            return frame;
         }
-        catch
+        catch (Exception ex)
         {
+            // 调用方只知道“没有画面”并据此告警，具体原因留在这里。
+            if (_captureFailures.TryEnter(out var skipped))
+            {
+                _logger.LogDebug(ex, "Windows Graphics Capture 截图出错{Repeat}", RepeatedFailureGate.Describe(skipped));
+            }
+
             return null;
         }
     }
@@ -82,6 +103,7 @@ public sealed class WindowsGraphicsCaptureBackend : ICaptureBackend, IDisposable
             && _sessions.TryRemove(hwnd, out var removed))
         {
             removed.Dispose();
+            _logger.LogDebug("Windows Graphics Capture 会话已关闭，下次截图时重新建立");
         }
     }
 

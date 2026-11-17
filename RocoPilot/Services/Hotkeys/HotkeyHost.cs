@@ -76,8 +76,9 @@ internal sealed class HotkeyHost
         }
         catch (Exception ex)
         {
-            using var logger = LoggingHelper.CreateLogger(LoggingHelper.LogDirectory);
-            logger.ForContext<HotkeyHost>().Error(ex, "热键辅助进程 {ProcessId} 异常退出。", Environment.ProcessId);
+            // 辅助进程只在异常退出时写一条，不需要调试日志文件。
+            using var logger = LoggingHelper.CreateLogger(LoggingHelper.LogDirectory, writeDebugFile: false);
+            logger.ForContext<HotkeyHost>().Error(ex, "热键辅助进程 {ProcessId} 异常退出", Environment.ProcessId);
             return 1;
         }
     }

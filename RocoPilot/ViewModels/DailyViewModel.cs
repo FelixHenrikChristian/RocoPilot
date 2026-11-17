@@ -103,7 +103,7 @@ public partial class DailyViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "读取每日清单失败，使用默认清单。");
+                _logger.LogWarning(ex, "读取每日清单失败，已使用默认清单");
                 NoticeRequested?.Invoke(this, "读取每日清单失败，已使用默认清单。");
             }
 
@@ -226,7 +226,7 @@ public partial class DailyViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存每日清单失败。");
+            _logger.LogError(ex, "保存每日清单失败，本次修改重启后可能丢失");
             NoticeRequested?.Invoke(this, "每日清单保存失败，重新启动后可能丢失此次修改。");
         }
         finally { _saveLock.Release(); }

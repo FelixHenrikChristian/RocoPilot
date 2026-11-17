@@ -58,7 +58,7 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "游戏截图保存失败。");
+            _logger.LogError(ex, "截图保存失败");
             ShowIndependentTaskResult("截图保存失败", ex.Message);
         }
         finally
@@ -71,7 +71,7 @@ public sealed partial class RuntimeTaskService
     {
         if (CurrentState is not { } state)
         {
-            _logger.LogInformation("热键：实时任务未运行，信息遮罩窗口开关已忽略。");
+            _logger.LogInformation("热键：实时任务没有运行，信息遮罩开关未生效");
             return;
         }
 

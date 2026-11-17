@@ -66,7 +66,7 @@ public sealed class HotkeyService : IHotkeyService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "读取热键设置失败，使用默认未绑定设置。");
+                _logger.LogWarning(ex, "读取热键设置失败，已按没有绑定任何热键处理");
             }
 
             _settingsLoaded = true;
@@ -77,7 +77,14 @@ public sealed class HotkeyService : IHotkeyService
             catch (Exception ex)
             {
                 // 授权取消或监听启动失败只影响监听，不丢失用户已保存的绑定。
-                _logger.LogWarning(ex, "热键辅助进程未启动。");
+                if (ex is Win32Exception { NativeErrorCode: 1223 })
+                {
+                    _logger.LogWarning("已取消管理员授权，热键监听没有启动，快捷键暂不可用");
+                }
+                else
+                {
+                    _logger.LogError(ex, "热键监听启动失败，快捷键不可用");
+                }
             }
         }
         finally
@@ -182,7 +189,8 @@ public sealed class HotkeyService : IHotkeyService
             }
 
             UnavailableReason = null;
-            _logger.LogInformation("热键辅助进程已连接，PID={ProcessId}，主界面权限保持不变。", process.Id);
+            _logger.LogInformation("热键监听已启动");
+            _logger.LogDebug("热键辅助进程已连接，PID={ProcessId}，主界面权限保持不变", process.Id);
             _ = ReadActionsAsync(pipe, reader);
         }
         catch (Exception ex)
@@ -213,7 +221,7 @@ public sealed class HotkeyService : IHotkeyService
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or ObjectDisposedException)
         {
-            _logger.LogDebug(ex, "热键辅助进程连接结束。");
+            _logger.LogDebug(ex, "热键辅助进程连接结束");
         }
         finally
         {
@@ -225,7 +233,7 @@ public sealed class HotkeyService : IHotkeyService
                     {
                         _pipe = null;
                         UnavailableReason = "热键监听已断开。请重启应用。";
-                        _logger.LogWarning("热键辅助进程已断开。");
+                        _logger.LogWarning("热键监听已断开，快捷键不可用，重启应用后恢复");
                     }
                 }
                 pipe.Dispose();

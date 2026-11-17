@@ -1,6 +1,9 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Input;
 
@@ -12,8 +15,11 @@ using InterceptionKeyState = InputInterceptorNS.KeyState;
 
 namespace RocoPilot.Services;
 
-public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
+public sealed class KeyboardInputService(ILogger<KeyboardInputService>? logger = null)
+    : IKeyboardInputService, IDisposable
 {
+    private readonly ILogger _logger = logger ?? NullLogger<KeyboardInputService>.Instance;
+
     private const uint InputKeyboard = 1;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
@@ -142,7 +148,10 @@ public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
             throw new ArgumentException(error, nameof(sequence));
         }
 
-        return SendSequenceAsync(hwnd, keyStrokes, options, cancellationToken);
+        // 各任务直接发按键时走这里，是排查“按了什么”的统一记录；自动战斗另有按回合的记录。
+        var normalizedOptions = options ?? new KeyboardInputOptions();
+        _logger.LogDebug("发送按键 {Sequence}（{Method}）", sequence, normalizedOptions.Method);
+        return SendSequenceAsync(hwnd, keyStrokes, normalizedOptions, cancellationToken);
     }
 
     public async Task SendSequenceAsync(

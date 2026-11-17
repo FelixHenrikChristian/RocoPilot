@@ -54,8 +54,9 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         if (!TryResolveConfigResolution(width, height, out var configWidth, out var configHeight))
         {
             var unsupportedPath = GetConfigPath(width, height);
-            _logger.LogWarning(
-                "不支持的游戏客户区分辨率：{Width}x{Height}，宽高比 {AspectRatio:F6}。当前仅支持 16:9 和 4:3。",
+            // 调用方据返回的空配置决定这是不是错误并记录，这里只留细节。
+            _logger.LogDebug(
+                "没有适用的识别配置：客户区 {Width}x{Height}，宽高比 {AspectRatio:F6}，仅支持 16:9 和 4:3",
                 width,
                 height,
                 GetAspectRatio(width, height));
@@ -65,8 +66,8 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         var path = GetConfigPath(configWidth, configHeight);
         if (!File.Exists(path))
         {
-            _logger.LogWarning(
-                "未找到游戏分辨率配置：Detected={Width}x{Height}, Config={ConfigWidth}x{ConfigHeight}, Path={ConfigPath}",
+            _logger.LogDebug(
+                "识别配置文件不存在：Detected={Width}x{Height}, Config={ConfigWidth}x{ConfigHeight}, Path={ConfigPath}",
                 width,
                 height,
                 configWidth,
@@ -149,12 +150,12 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "识别区域配置 JSON 无效：{ConfigPath}", path);
+            _logger.LogWarning(ex, "识别区域配置文件内容无效，已按空配置处理：{ConfigPath}", path);
             return RecognitionRegionConfig.Empty(expectedWidth, expectedHeight, path);
         }
         catch (IOException ex)
         {
-            _logger.LogError(ex, "读取识别区域配置失败：{ConfigPath}", path);
+            _logger.LogWarning(ex, "读取识别区域配置失败，已按空配置处理：{ConfigPath}", path);
             return RecognitionRegionConfig.Empty(expectedWidth, expectedHeight, path);
         }
     }
@@ -183,9 +184,9 @@ public sealed class RecognitionRegionConfigService : IRecognitionRegionConfigSer
         File.WriteAllText(path, json);
 
         _logger.LogInformation(
-            "已保存识别区域配置 {ConfigPath}，启用 {RegionCount} 个区域",
-            path,
-            config.Regions.Count(region => region.Enabled));
+            "已保存识别区域配置：启用 {RegionCount} 个区域，{ConfigPath}",
+            config.Regions.Count(region => region.Enabled),
+            path);
     }
 
     public string GetConfigPath(int width, int height)

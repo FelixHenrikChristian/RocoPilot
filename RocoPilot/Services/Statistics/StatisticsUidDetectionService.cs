@@ -136,7 +136,7 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
                             captureMethod);
                         if (count >= RequiredMatchingResults)
                         {
-                            _logger.LogInformation("首页启动时已识别统计账号 UID：{Uid}", uid);
+                            _logger.LogInformation("奇遇统计：已识别账号 UID {Uid}", uid);
                             return StatisticsUidDetectionResult.Detected(uid);
                         }
                     }
@@ -161,7 +161,7 @@ public sealed class StatisticsUidDetectionService : IStatisticsUidDetectionServi
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "使用 {CaptureMethod} 识别首页启动 UID 失败。", captureMethod);
+                _logger.LogWarning(ex, "奇遇统计：用 {CaptureMethod} 截图识别账号 UID 时出错", captureMethod);
             }
             finally
             {

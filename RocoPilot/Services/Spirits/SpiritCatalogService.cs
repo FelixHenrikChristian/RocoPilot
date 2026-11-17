@@ -14,6 +14,7 @@ using RocoPilot.Contracts.Services;
 using RocoPilot.Helpers;
 using RocoPilot.Models;
 using RocoPilot.Models.Spirits;
+using RocoPilot.Services.Logging;
 
 using Windows.Storage;
 
@@ -47,6 +48,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
     private readonly HttpClient _httpClient;
     private readonly string _bundledDataRoot;
     private readonly ILogger<SpiritCatalogService> _logger;
+    private readonly RepeatedFailureGate _avatarFailures = new(TimeSpan.FromSeconds(30));
     private readonly ILocalSettingsService _localSettingsService;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly string _localDataRoot;
@@ -162,7 +164,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "同步精灵图鉴失败：{Source}", sourceId);
+            _logger.LogError(ex, "图鉴同步失败：{Source}", sourceId);
             throw;
         }
         finally
@@ -239,7 +241,7 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取精灵图鉴来源设置失败，已使用默认图鉴源。");
+            _logger.LogWarning(ex, "读取图鉴来源设置失败，已使用默认图鉴源");
             return BiligameSourceId;
         }
     }
@@ -390,9 +392,9 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
         await WriteDocumentAsync(GetLocalDataPath(source), document, cancellationToken);
         // 文档提交后，标记和旧头像清理失败不应阻止新快照发布。
         try { await UpdateBundledCatalogMarkerAsync(source, CancellationToken.None); }
-        catch (Exception ex) { _logger.LogWarning(ex, "更新图鉴版本标记失败。"); }
+        catch (Exception ex) { _logger.LogWarning(ex, "更新图鉴版本标记失败"); }
         try { PruneUnreferencedAvatarFiles(document, avatarDirectory); }
-        catch (Exception ex) { _logger.LogWarning(ex, "清理旧图鉴头像失败。"); }
+        catch (Exception ex) { _logger.LogWarning(ex, "清理旧图鉴头像失败"); }
     }
 
     private async Task UpdateBundledCatalogMarkerAsync(
@@ -672,7 +674,13 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (attempt == 1) continue;
-                _logger.LogWarning(ex, "同步精灵头像失败：{SpiritName} {AvatarUrl}", item.Name, avatarUrl);
+                // 断网时几百个头像会连续失败，同一种故障不逐个记录。
+                if (_avatarFailures.TryEnter(out var skipped))
+                {
+                    _logger.LogWarning(ex, "精灵头像下载失败，图鉴里先不显示头像：{SpiritName}（{AvatarUrl}）{Repeat}",
+                        item.Name, avatarUrl, RepeatedFailureGate.Describe(skipped));
+                }
+
                 return string.Empty;
             }
         }
@@ -763,7 +771,8 @@ public sealed class SpiritCatalogService : ISpiritCatalogService, IDisposable
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                _logger.LogWarning(ex, "清理未引用精灵头像失败：{AvatarPath}", file);
+                // 多留一个没人引用的旧头像不影响使用。
+                _logger.LogDebug(ex, "没能删除不再使用的精灵头像：{AvatarPath}", file);
             }
         }
     }

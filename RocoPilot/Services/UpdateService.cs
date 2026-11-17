@@ -33,19 +33,22 @@ public sealed class UpdateService : IUpdateService
 
     public async Task<UpdateCheckResult> CheckUpdateAsync(UpdateOption option)
     {
-        _logger.LogDebug("开始检查更新 (触发方式: {Trigger})", option.Trigger);
+        _logger.LogDebug("开始检查更新（触发方式：{Trigger}）", option.Trigger);
+        // 手动检查是用户要做的事，失败算错误；启动时的自动检查失败不影响使用，只算警告。
+        var failureLevel = option.Trigger == UpdateTrigger.Manual ? LogLevel.Error : LogLevel.Warning;
 
         try
         {
             var latestRelease = await GetLatestReleaseAsync();
             if (latestRelease == null)
             {
+                _logger.Log(failureLevel, "检查更新失败：GitHub 和备用更新源都没有返回版本信息");
                 return UpdateCheckResult.Failed("无法获取最新版本信息，请稍后再试。");
             }
 
             if (!TryParseReleaseVersion(latestRelease.TagName, out var latestVersion))
             {
-                _logger.LogWarning("Release 标签版本号无法解析: {TagName}", latestRelease.TagName);
+                _logger.Log(failureLevel, "检查更新失败：最新版本号 {TagName} 的格式无法识别", latestRelease.TagName);
                 return UpdateCheckResult.Failed($"最新版本号格式无法识别：{latestRelease.TagName}");
             }
 
@@ -54,16 +57,16 @@ public sealed class UpdateService : IUpdateService
             if (latestVersion <= currentVersion)
             {
                 if (option.Trigger == UpdateTrigger.Manual)
-                    _logger.LogInformation("手动检查更新完成，当前已是最新版本 {Version}", currentVersion);
+                    _logger.LogInformation("检查更新：当前已是最新版本 {Version}", currentVersion);
                 return UpdateCheckResult.UpToDate("当前已安装最新版本。");
             }
 
-            _logger.LogInformation("发现新版本：{Current} → {Latest}", currentVersion, latestVersion);
+            _logger.LogInformation("检查更新：发现新版本 {Latest}（当前 {Current}）", latestVersion, currentVersion);
             return await HandleUpdateDialogResultAsync(latestRelease);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "检查更新时发生错误");
+            _logger.Log(failureLevel, ex, "检查更新失败");
             return UpdateCheckResult.Failed("检查更新失败，请检查网络连接后重试。");
         }
     }
@@ -135,7 +138,7 @@ public sealed class UpdateService : IUpdateService
 
         var fallbackRelease = await GetLatestReleaseFromFallbackAsync();
         if (fallbackRelease is not null)
-            _logger.LogInformation("已从备用更新源获取版本 {Version}", fallbackRelease.TagName);
+            _logger.LogDebug("已从备用更新源获取版本 {Version}", fallbackRelease.TagName);
         return fallbackRelease;
     }
 
@@ -147,7 +150,7 @@ public sealed class UpdateService : IUpdateService
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "GitHub API 请求失败: {StatusCode} {Reason}",
+                    "检查更新：GitHub 请求失败（{StatusCode} {Reason}）",
                     (int)response.StatusCode,
                     response.ReasonPhrase);
                 return null;
@@ -157,17 +160,17 @@ public sealed class UpdateService : IUpdateService
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "请求 GitHub API 失败");
+            _logger.LogWarning(ex, "检查更新：GitHub 请求失败");
             return null;
         }
         catch (TaskCanceledException ex)
         {
-            _logger.LogWarning(ex, "请求 GitHub API 超时");
+            _logger.LogWarning(ex, "检查更新：GitHub 请求超时");
             return null;
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "解析 GitHub API 返回的 JSON 失败");
+            _logger.LogWarning(ex, "检查更新：GitHub 返回的内容无法解析");
             return null;
         }
     }
@@ -177,18 +180,18 @@ public sealed class UpdateService : IUpdateService
         var metadataUrl = _sourceOptions.ReleaseMetadataUrl;
         if (string.IsNullOrWhiteSpace(metadataUrl))
         {
-            _logger.LogDebug("未配置备用更新元数据源，跳过备用源检查。");
+            _logger.LogDebug("没有配置备用更新源，跳过");
             return null;
         }
 
         try
         {
-            _logger.LogDebug("GitHub API 不可用，尝试从备用源获取更新元数据: {Url}", metadataUrl);
+            _logger.LogDebug("从备用更新源获取版本信息：{Url}", metadataUrl);
             using var response = await HttpClient.GetAsync(metadataUrl);
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning(
-                    "备用更新元数据请求失败: {StatusCode} {Reason}",
+                    "检查更新：备用更新源请求失败（{StatusCode} {Reason}）",
                     (int)response.StatusCode,
                     response.ReasonPhrase);
                 return null;
@@ -198,17 +201,17 @@ public sealed class UpdateService : IUpdateService
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "请求备用更新元数据失败");
+            _logger.LogWarning(ex, "检查更新：备用更新源请求失败");
             return null;
         }
         catch (TaskCanceledException ex)
         {
-            _logger.LogWarning(ex, "请求备用更新元数据超时");
+            _logger.LogWarning(ex, "检查更新：备用更新源请求超时");
             return null;
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "解析备用更新元数据 JSON 失败");
+            _logger.LogWarning(ex, "检查更新：备用更新源返回的内容无法解析");
             return null;
         }
     }
@@ -248,7 +251,7 @@ public sealed class UpdateService : IUpdateService
             var updaterExePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RocoPilot.update.exe");
             if (!File.Exists(updaterExePath))
             {
-                _logger.LogWarning("更新程序不存在: {Path}", updaterExePath);
+                _logger.LogWarning("找不到更新程序，改为打开下载页面：{Path}", updaterExePath);
                 OpenDownloadPage();
                 return false;
             }
@@ -263,7 +266,7 @@ public sealed class UpdateService : IUpdateService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "启动更新程序失败");
+            _logger.LogWarning(ex, "更新程序启动失败，改为打开下载页面");
             OpenDownloadPage();
             return false;
         }
@@ -280,7 +283,7 @@ public sealed class UpdateService : IUpdateService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "打开下载页面失败");
+            _logger.LogError(ex, "下载页面打不开，请手动前往发布页下载");
         }
     }
 }

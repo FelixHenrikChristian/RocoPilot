@@ -97,9 +97,9 @@ public sealed class AutoBattleController
                 switch (settings.EncounterRelievedAction)
                 {
                     case AutoBattleEncounterRelievedAction.NoAction:
-                        return new(AutoBattleAction.NoAction, "", "无操作，检测到奇遇效果解除，等待手动释放技能", "-");
+                        return new(AutoBattleAction.NoAction, "", "奇遇效果已解除，不再自动出招，等待手动操作", "-");
                     case AutoBattleEncounterRelievedAction.RecoverEnergy:
-                        return new(AutoBattleAction.EnergyRecovery, "X", "奇遇解除后回能 X", "X");
+                        return new(AutoBattleAction.EnergyRecovery, "X", "奇遇解除后回能", "X");
                     case AutoBattleEncounterRelievedAction.Capture:
                         return PlanCapture(settings, step, bloodlineRecognitionAvailable, now);
                 }
@@ -172,14 +172,16 @@ public sealed class AutoBattleController
         }
     }
 
-    public void ObserveBloodline(long battleId, EncounterBloodlineKind kind)
+    /// <returns>本场战斗第一次确认血脉时返回 true；重复识别、已做出捕捉决定或战斗已结束时返回 false。</returns>
+    public bool ObserveBloodline(long battleId, EncounterBloodlineKind kind)
     {
         lock (_gate)
         {
             if (battleId != _battleId || _bloodline != EncounterBloodlineKind.Unrecognized
-                || _captureDecision is not null || kind == EncounterBloodlineKind.Unrecognized) return;
+                || _captureDecision is not null || kind == EncounterBloodlineKind.Unrecognized) return false;
             _bloodline = kind;
             _bloodlineWaitStartedAt = null;
+            return true;
         }
     }
 
@@ -239,7 +241,7 @@ public sealed class AutoBattleController
     {
         var filter = settings.BloodlineCaptureFilter;
         if (!filter.IsEnabled)
-            return new(AutoBattleAction.Capture, "W, 1, Space", "奇遇解除后捕捉 W, 1, Space", "W, 1, Space");
+            return new(AutoBattleAction.Capture, "W, 1, Space", "发起捕捉", "W, 1, Space");
 
         if (_captureDecision is null)
         {
@@ -261,9 +263,13 @@ public sealed class AutoBattleController
             EncounterBloodlineKind.Normal => "普通",
             _ => "未识别"
         };
-        return capture
-            ? new(AutoBattleAction.Capture, "W, 1, Space", $"奇遇解除后捕捉（血脉：{name}） W, 1, Space", "W, 1, Space")
-            : PlanSkill(settings, step) with { Description = $"奇遇解除后血脉不符（{name}），释放战技" };
+        if (capture)
+        {
+            return new(AutoBattleAction.Capture, "W, 1, Space", $"发起捕捉（{name}血脉）", "W, 1, Space");
+        }
+
+        var skill = PlanSkill(settings, step);
+        return skill with { Description = $"{name}血脉不在捕捉范围内，改为{skill.Description}" };
     }
 
     private static AutoBattlePlan PlanSkill(AutoBattleSettings settings, AutoBattleReleaseStep step)

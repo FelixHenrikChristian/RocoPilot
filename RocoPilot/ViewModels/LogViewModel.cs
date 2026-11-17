@@ -31,6 +31,10 @@ public partial class LogViewModel : ObservableObject
     [ObservableProperty]
     public partial bool ShowError { get; set; } = true;
 
+    // 调试记录是识别结果、匹配分数这类排查用的细节，默认不显示。
+    [ObservableProperty]
+    public partial bool ShowDebug { get; set; }
+
     [ObservableProperty]
     public partial int InformationCount { get; private set; }
 
@@ -39,6 +43,9 @@ public partial class LogViewModel : ObservableObject
 
     [ObservableProperty]
     public partial int ErrorCount { get; private set; }
+
+    [ObservableProperty]
+    public partial int DebugCount { get; private set; }
 
     [ObservableProperty]
     public partial string StatusText { get; private set; } = string.Empty;
@@ -105,6 +112,8 @@ public partial class LogViewModel : ObservableObject
 
     partial void OnShowErrorChanged(bool value) => Rebuild();
 
+    partial void OnShowDebugChanged(bool value) => Rebuild();
+
     private void Store_Changed(object? sender, EventArgs e)
     {
         // 连续写入的日志合并成一次界面更新。
@@ -134,10 +143,7 @@ public partial class LogViewModel : ObservableObject
         var batch = _store.ReadFrom(_nextSequence);
         _nextSequence = batch.NextSequence;
 
-        while (Entries.Count > 0 && Entries[0].Entry.Sequence < batch.FirstSequence)
-        {
-            Entries.RemoveAt(0);
-        }
+        RemoveDroppedEntries(batch);
 
         foreach (var entry in batch.Entries)
         {
@@ -160,10 +166,30 @@ public partial class LogViewModel : ObservableObject
         EntriesReplaced?.Invoke(this, EventArgs.Empty);
     }
 
+    // 调试记录和其余记录各有上限，被移出的不一定排在最前面，逐条按各自的界限判断。
+    private void RemoveDroppedEntries(LogEntryBatch batch)
+    {
+        var limit = Math.Max(batch.FirstSequence, batch.FirstDebugSequence);
+        for (var index = 0; index < Entries.Count && Entries[index].Entry.Sequence < limit;)
+        {
+            var entry = Entries[index].Entry;
+            var first = entry.Severity == LogSeverity.Debug ? batch.FirstDebugSequence : batch.FirstSequence;
+            if (entry.Sequence < first)
+            {
+                Entries.RemoveAt(index);
+            }
+            else
+            {
+                index++;
+            }
+        }
+    }
+
     private bool Matches(LogEntry entry)
     {
         var isLevelShown = entry.Severity switch
         {
+            LogSeverity.Debug => ShowDebug,
             LogSeverity.Information => ShowInformation,
             LogSeverity.Warning => ShowWarning,
             _ => ShowError
@@ -181,10 +207,13 @@ public partial class LogViewModel : ObservableObject
         InformationCount = batch.Counts.Information;
         WarningCount = batch.Counts.Warning;
         ErrorCount = batch.Counts.Error;
+        DebugCount = batch.Counts.Debug;
 
-        var total = batch.Counts.Total;
+        // 调试记录没打开时不算进总数，免得默认就显示“显示 120 / 3000 条”。
+        var total = batch.Counts.Total + (ShowDebug ? batch.Counts.Debug : 0);
         var status = Entries.Count == total ? $"共 {total} 条" : $"显示 {Entries.Count} / {total} 条";
-        StatusText = batch.FirstSequence > 0 ? $"{status}，更早的记录在日志文件中" : status;
+        var hasDropped = batch.FirstSequence > 0 || (ShowDebug && batch.FirstDebugSequence > 0);
+        StatusText = hasDropped ? $"{status}，更早的记录在日志文件中" : status;
         EmptyText = total == 0 ? "本次运行还没有日志" : "没有符合条件的日志";
         HasEntries = Entries.Count > 0;
     }

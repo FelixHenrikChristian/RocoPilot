@@ -35,7 +35,7 @@ public sealed class ShinyEncounterNotification(IAppNotificationService notificat
         catch (Exception ex)
         {
             // Notification errors must never undo shiny protection or stop pending-record persistence.
-            logger.LogWarning(ex, "发送异色截图通知失败。");
+            logger.LogWarning(ex, "异色截图通知没有发出去，异色保护不受影响");
         }
     }
 }

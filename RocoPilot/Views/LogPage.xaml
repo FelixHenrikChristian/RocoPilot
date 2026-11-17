@@ -128,6 +128,18 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Orientation="Horizontal" Spacing="6">
+                <!-- 开关按级别从低到高排列。调试是日志的 Debug 级别，默认不显示，打开后和其余记录按时间混排。 -->
+                <ToggleButton
+                    AutomationProperties.Name="显示调试"
+                    IsChecked="{x:Bind ViewModel.ShowDebug, Mode=TwoWay}"
+                    Style="{StaticResource LogLevelToggleStyle}"
+                    ToolTipService.ToolTip="显示或隐藏调试级别的记录：识别结果变化、匹配分数、实际按键等排查用的细节">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Ellipse Style="{StaticResource LogLevelDotStyle}" Fill="{ThemeResource TextFillColorDisabledBrush}" />
+                        <TextBlock Text="调试" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.DebugCount, Mode=OneWay}" />
+                    </StackPanel>
+                </ToggleButton>
                 <ToggleButton
                     AutomationProperties.Name="显示信息"
                     IsChecked="{x:Bind ViewModel.ShowInformation, Mode=TwoWay}"
@@ -240,6 +252,17 @@
                                             Text="{x:Bind Time}" />
                                     </Grid>
 
+                                    <Border
+                                        Grid.Column="1"
+                                        Style="{StaticResource LogLevelBadgeStyle}"
+                                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        Visibility="{x:Bind IsDebug}">
+                                        <TextBlock
+                                            Style="{StaticResource LogLevelBadgeTextStyle}"
+                                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                            Text="{x:Bind LevelText}" />
+                                    </Border>
                                     <Border
                                         Grid.Column="1"
                                         Style="{StaticResource LogLevelBadgeStyle}"

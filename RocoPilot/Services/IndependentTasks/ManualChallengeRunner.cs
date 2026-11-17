@@ -91,7 +91,7 @@ public sealed class ManualChallengeRunner(
         var minimumFrameAt = DateTimeOffset.UtcNow;
         await using var approachWalk = scanning ? null : new ForwardWalk(keyboard, window.Hwnd, inputMethod, token);
         CapturedFrame? pendingFrame = null;
-        logger.LogInformation("手册挑战启动：{Target}，输入方式：{Method}", atTargetLocation ? "当前位置"
+        logger.LogInformation("手册挑战：开始，目标 {Target}（输入方式 {Method}）", atTargetLocation ? "当前位置"
             : legendaryTarget ?? target?.DisplayName ?? (legendary ? "扫描传说精灵" : "扫描全部花种"), inputMethod);
 
         try
@@ -131,9 +131,9 @@ public sealed class ManualChallengeRunner(
                     || flow.CompletedCount != completedCount || flow.ConsecutiveFailures != failures)
                     lastAdvance = DateTimeOffset.UtcNow;
                 if (flow.CompletedCount > completedCount)
-                    logger.LogInformation("挑战成功，已完成 {Completed}/{Total} 次", flow.CompletedCount, runCount);
+                    logger.LogInformation("手册挑战：挑战成功，已完成 {Completed}/{Total} 次", flow.CompletedCount, runCount);
                 if (flow.ConsecutiveFailures > failures)
-                    logger.LogWarning("挑战失败，原地重试：连续失败 {Failures}/3，已成功 {Completed}/{Total} 次，触发画面 {Scene}",
+                    logger.LogWarning("手册挑战：挑战失败，原地重试（连续失败 {Failures}/3，已成功 {Completed}/{Total} 次，当时画面 {Scene}）",
                         flow.ConsecutiveFailures, flow.CompletedCount, runCount, screen.Scene);
                 if (flow.BattleNumber != battleNumber)
                 {
@@ -242,7 +242,7 @@ public sealed class ManualChallengeRunner(
                                 logger.LogInformation(
                                     myTurn
                                         ? "手册挑战：箭头已顺延，但开头跳过最短等待 {Seconds} 秒未满，继续等待"
-                                        : "手册挑战：跳过回合，等待 AI 出招后箭头顺延（当前未轮到顺延位），期间不发送输入",
+                                        : "手册挑战：跳过回合，等待 AI 出招后箭头顺延（当前未轮到顺延位，至少等待 {Seconds} 秒），期间不发送输入",
                                     HeadSkipMinimumSeconds);
                             }
 
@@ -450,15 +450,16 @@ public sealed class ManualChallengeRunner(
                                         (sequence, completed) =>
                                         {
                                             Publish(lastProgress with { Operation = InfoOverlayIslandPresentation.BattleInputTitle(plan!), IsBattleWaiting = false });
-                                            if (completed) logger.LogInformation("手册挑战：第 {Battle} 场第 {Turn} 回合，{Action}，已发送 {Sequence}",
-                                                battleNumber, battle.TurnNumber, plan!.Description, sequence);
+                                            if (!completed) return;
+                                            logger.LogInformation("手册挑战：第 {Battle} 场第 {Turn} 回合，{Action}",
+                                                battleNumber, battle.TurnNumber, plan!.Description);
+                                            logger.LogDebug("手册挑战：第 {Battle} 场第 {Turn} 回合已发送按键 {Sequence}",
+                                                battleNumber, battle.TurnNumber, sequence);
                                         }))
                                     break;
                                 if (decision.Action == ManualChallengeAction.Battle && battle.CurrentTurn is { } currentTurn)
                                     battle.RecordAction(currentTurn.Id, plan!.Action, DateTimeOffset.UtcNow);
                                 hasReleasedSkillInBattle = true;
-                                logger.LogInformation("手册挑战：第 {Battle} 场，{Action}，序列 {Sequence}",
-                                    battleNumber, plan!.Description, plan.Sequence);
                                 if (decision.Action == ManualChallengeAction.Capture)
                                     await CloseCaptureRewardsAsync();
                                 break;

@@ -50,6 +50,7 @@ public static class LogEntryFormatter
         LogSeverity.Fatal => "FTL",
         LogSeverity.Error => "ERR",
         LogSeverity.Warning => "WRN",
+        LogSeverity.Debug => "DBG",
         _ => "INF"
     };
 }

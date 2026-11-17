@@ -225,7 +225,7 @@ public sealed partial class ShellPage : Page
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "启动时显示热键助手提示失败。");
+            _logger.LogWarning(ex, "启动时没能显示热键助手提示");
         }
     }
 
@@ -253,7 +253,7 @@ public sealed partial class ShellPage : Page
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "启动时处理赛季到期提醒失败。");
+            _logger.LogWarning(ex, "启动时没能处理赛季到期提醒");
         }
     }
 
@@ -281,7 +281,7 @@ public sealed partial class ShellPage : Page
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "启动时自动检查更新失败");
+            _logger.LogWarning(ex, "启动时自动检查更新失败");
             ShowStartupInfoBar(InfoBarSeverity.Warning, "检查更新失败", "请检查网络连接后重试。");
         }
     }

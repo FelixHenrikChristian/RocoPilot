@@ -55,7 +55,7 @@ public partial class NotificationSettingsViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存通知设置失败。");
+            _logger.LogError(ex, "保存通知设置失败，当前设置已生效，但重启后可能恢复原值");
             ShowStatus(InfoBarSeverity.Error, "保存失败，当前设置已生效，但重启后可能恢复原值。");
         }
     }

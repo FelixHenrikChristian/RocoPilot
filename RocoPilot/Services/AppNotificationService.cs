@@ -23,7 +23,7 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "读取通知设置失败，使用当前设置。");
+            logger.LogWarning(ex, "读取通知设置失败，沿用当前设置");
         }
     }
 
@@ -52,7 +52,7 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
                 _manager = null;
             }
             LastError = $"Windows 通知初始化失败：{ex.Message}";
-            logger.LogWarning(ex, "Windows 通知初始化失败。");
+            logger.LogWarning(ex, "Windows 通知初始化失败，任务结果不会弹出系统通知");
         }
     }
 
@@ -97,7 +97,7 @@ public class AppNotificationService(ILocalSettingsService settings, ILogger<AppN
         catch (Exception ex)
         {
             LastError = $"Windows 通知发送失败：{ex.Message}";
-            logger.LogWarning(ex, "发送 Windows 通知失败：{Title}", title);
+            logger.LogWarning(ex, "Windows 通知没有发出去：{Title}", title);
             return Task.FromResult(false);
         }
     }

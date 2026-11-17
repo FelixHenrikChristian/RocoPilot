@@ -9,6 +9,7 @@ using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Services.RuntimeTasks;
 using RocoPilot.Services.Encounters;
+using RocoPilot.Services.Logging;
 using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
 namespace RocoPilot.Services;
@@ -98,7 +99,7 @@ public sealed partial class RuntimeTaskService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存奇遇统计开关状态失败。");
+            _logger.LogError(ex, "保存奇遇统计开关失败，下次启动会恢复为之前的状态");
         }
     }
 
@@ -186,7 +187,12 @@ public sealed partial class RuntimeTaskService
         {
             if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
             {
-                _battle.ObserveBloodline(battleId, kind);
+                if (_battle.ObserveBloodline(battleId, kind))
+                {
+                    _logger.LogInformation("血脉识别：{Bloodline}血脉", EncounterBloodlineRecognition.GetDisplayName(kind));
+                    _logger.LogDebug("血脉提示原文：{TipText}", LoggingHelper.FormatLogText(tipText));
+                }
+
                 return;
             }
 
@@ -308,8 +314,9 @@ public sealed partial class RuntimeTaskService
     {
         if (_encounterCaptureButtonStateTracker.Observe(observation.State))
         {
-            _logger.LogInformation(
-                "奇遇识别：捕捉按钮已由禁用变为可用，判定本场奇遇效果解除。Season={SeasonId}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}",
+            _logger.LogInformation("奇遇效果已解除（捕捉按钮恢复可用）");
+            _logger.LogDebug(
+                "奇遇解除判定：Season={SeasonId}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}",
                 season.Id,
                 observation.Algorithm,
                 observation.EnabledScore,
@@ -355,6 +362,8 @@ public sealed partial class RuntimeTaskService
         {
             return;
         }
+
+        NoteBattleSpirit(battleId, enemyName);
 
         if (pendingRead is { } pending && pending.BattleId == battleId)
         {
@@ -454,8 +463,8 @@ public sealed partial class RuntimeTaskService
                 if (bucketId is null) return;
                 if (string.IsNullOrWhiteSpace(rawText))
                     _temporaryEncounterRead = new(battleId, accountUid, recordId, bucketId, now);
-                _logger.LogInformation("新赛季奇遇已暂存：账号 {Uid}，精灵 {Spirit}", accountUid,
-                    string.IsNullOrWhiteSpace(enemyName) ? "待识别" : enemyName);
+                _logger.LogInformation("奇遇统计：新赛季奇遇已暂存，精灵 {Spirit}，账号 {Uid}",
+                    string.IsNullOrWhiteSpace(enemyName) ? "待识别" : enemyName, accountUid);
                 return;
             }
 
@@ -508,7 +517,8 @@ public sealed partial class RuntimeTaskService
         name = await ResolveEncounterStatisticsRecordNameAsync(name, cancellationToken);
         if (battleId != _battle.BattleId) return;
         await capture.SaveAsync(_statisticsService, rawText, name);
-        _logger.LogInformation("异色识别：{SpiritName} 已暂存，等待统计页面确认。", name);
+        NoteBattleSpirit(battleId, name);
+        _logger.LogInformation("异色识别：{SpiritName} 已暂存，等待在统计页面确认", name);
     }
 
     private bool TryReserveEncounterRecord(string seasonId, DateTimeOffset now, out string recordId)
@@ -562,14 +572,22 @@ public sealed partial class RuntimeTaskService
     {
         try
         {
-            return await _spiritCatalogService.MatchSpiritNameAsync(
+            var name = await _spiritCatalogService.MatchSpiritNameAsync(
                 recognizedText,
                 exactOnly ? 1 : GetSpiritNameMatchThreshold(),
                 cancellationToken);
+            _spiritNameFailures.Reset();
+            return name;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogWarning(ex, "精灵名图鉴匹配失败，本次 OCR 精灵名已跳过。");
+            // 后台 OCR 每秒都会走到这里，同一种故障不逐次记录。
+            if (_spiritNameFailures.TryEnter(out var skipped))
+            {
+                _logger.LogWarning(ex, "精灵名与图鉴匹配时出错，本次识别到的名字已跳过{Repeat}",
+                    RepeatedFailureGate.Describe(skipped));
+            }
+
             return string.Empty;
         }
     }
@@ -602,7 +620,7 @@ public sealed partial class RuntimeTaskService
         {
             _logger.LogWarning(
                 ex,
-                "精灵进化链最低阶统计名解析失败，已使用匹配精灵名。Spirit={SpiritName}",
+                "查找 {SpiritName} 的进化链最低阶名称时出错，统计按识别到的名字记录",
                 normalizedName);
             return normalizedName;
         }

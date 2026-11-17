@@ -145,7 +145,7 @@ public partial class MainViewModel : ObservableRecipient
         var recognitionMethod = _textRecognitionService.GetDefaultMethod();
         if (recognitionMethod is not { IsAvailable: true })
         {
-            _logger.LogWarning("实时任务未启动：OCR 不可用。{Reason}", recognitionMethod?.UnavailableReason);
+            _logger.LogError("实时任务启动失败：文字识别不可用（{Reason}）", recognitionMethod?.UnavailableReason);
             ShowLaunchNotification(
                 InfoBarSeverity.Error,
                 "OCR 不可用",

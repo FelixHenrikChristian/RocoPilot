@@ -2,6 +2,9 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
 using RocoPilot.Contracts.Services;
 
 using InterceptionInput = InputInterceptorNS.InputInterceptor;
@@ -11,8 +14,12 @@ using InterceptionMouseState = InputInterceptorNS.MouseState;
 
 namespace RocoPilot.Services;
 
-public sealed class MouseInputService(IKeyboardInputService keyboardInputService) : IMouseInputService, IDisposable
+public sealed class MouseInputService(
+    IKeyboardInputService keyboardInputService,
+    ILogger<MouseInputService>? logger = null) : IMouseInputService, IDisposable
 {
+    private readonly ILogger _logger = logger ?? NullLogger<MouseInputService>.Instance;
+
     private const uint MouseEventLeftDown = 0x0002;
     private const uint MouseEventLeftUp = 0x0004;
     private const uint MouseEventWheel = 0x0800;
@@ -27,11 +34,17 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
         int y,
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
         CancellationToken cancellationToken = default)
-        => PressAsync(hwnd, new WindowPoint { X = x, Y = y }, null, 50, method, cancellationToken);
+    {
+        _logger.LogDebug("鼠标点击 ({X},{Y})（{Method}）", x, y, method);
+        return PressAsync(hwnd, new WindowPoint { X = x, Y = y }, null, 50, method, cancellationToken);
+    }
 
     public Task DragAsync(IntPtr hwnd, int x, int y, int endX, int endY, KeyboardInputMethod method,
         CancellationToken cancellationToken)
-        => PressAsync(hwnd, new WindowPoint { X = x, Y = y }, new WindowPoint { X = endX, Y = endY }, 50, method, cancellationToken);
+    {
+        _logger.LogDebug("鼠标拖动 ({X},{Y}) → ({EndX},{EndY})（{Method}）", x, y, endX, endY, method);
+        return PressAsync(hwnd, new WindowPoint { X = x, Y = y }, new WindowPoint { X = endX, Y = endY }, 50, method, cancellationToken);
+    }
 
     public void LookDown(IntPtr hwnd, KeyboardInputMethod method)
     {
@@ -56,7 +69,10 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
     }
 
     public Task PressAtCurrentPositionAsync(IntPtr hwnd, int holdMs, KeyboardInputMethod method, CancellationToken token)
-        => PressAsync(hwnd, null, null, holdMs, method, token);
+    {
+        _logger.LogDebug("鼠标在当前位置按住 {HoldMs} ms（{Method}）", holdMs, method);
+        return PressAsync(hwnd, null, null, holdMs, method, token);
+    }
 
     private async Task PressAsync(IntPtr hwnd, WindowPoint? start, WindowPoint? end, int holdMs, KeyboardInputMethod method,
         CancellationToken cancellationToken)
@@ -103,14 +119,20 @@ public sealed class MouseInputService(IKeyboardInputService keyboardInputService
         int delta,
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
         CancellationToken cancellationToken = default)
-        => ScrollCoreAsync(hwnd, delta, method, new WindowPoint { X = x, Y = y }, cancellationToken);
+    {
+        _logger.LogDebug("鼠标滚轮 {Delta}，位置 ({X},{Y})（{Method}）", delta, x, y, method);
+        return ScrollCoreAsync(hwnd, delta, method, new WindowPoint { X = x, Y = y }, cancellationToken);
+    }
 
     public Task ScrollAtCurrentPositionAsync(
         IntPtr hwnd,
         int delta,
         KeyboardInputMethod method = KeyboardInputMethod.SendInput,
         CancellationToken cancellationToken = default)
-        => ScrollCoreAsync(hwnd, delta, method, null, cancellationToken);
+    {
+        _logger.LogDebug("鼠标滚轮 {Delta}，当前位置（{Method}）", delta, method);
+        return ScrollCoreAsync(hwnd, delta, method, null, cancellationToken);
+    }
 
     private async Task ScrollCoreAsync(
         IntPtr hwnd,

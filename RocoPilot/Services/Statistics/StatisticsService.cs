@@ -471,7 +471,7 @@ public sealed class StatisticsService : IStatisticsService
 
         Volatile.Write(ref _activeAccountUid, uid);
         Volatile.Write(ref _isActiveAccountSelectionRequired, false);
-        _logger.LogInformation("本次启动的统计记录账号已设为 {Uid}。", uid);
+        _logger.LogInformation("奇遇统计：本次运行记录到账号 {Uid}", uid);
     }
 
     public void RequireActiveAccountSelection()
@@ -479,7 +479,7 @@ public sealed class StatisticsService : IStatisticsService
         var previousUid = Interlocked.Exchange(ref _activeAccountUid, null);
         Volatile.Write(ref _isActiveAccountSelectionRequired, true);
         if (previousUid is not null)
-            _logger.LogInformation("统计账号 {Uid} 已解除绑定，自动统计等待账号确认", previousUid);
+            _logger.LogInformation("奇遇统计：账号 {Uid} 已解除绑定，确认账号后才会继续记录", previousUid);
     }
 
     public IReadOnlyList<EncounterSpiritRecord> GetActiveAccountSeasonEncounters(string seasonId)
@@ -650,7 +650,7 @@ public sealed class StatisticsService : IStatisticsService
             if (_spiritCatalogService is not null && document.Accounts.Any(x => x.Temporary is not null || x.PendingShinyCaptures.Count > 0))
             {
                 try { MatchPendingNames(document, new SpiritCatalogIndex(await _spiritCatalogService.LoadAsync()), _seasonConfigService?.Load().SpiritNameMatchThreshold ?? 0.55); }
-                catch (Exception ex) { _logger.LogWarning(ex, "暂存名称刷新失败，保留数据等待重试。"); }
+                catch (Exception ex) { _logger.LogWarning(ex, "暂存记录的精灵名没有刷新成功，数据保留，下次再试"); }
             }
             foreach (var account in document.Accounts.Where(x => fingerprints.GetValueOrDefault(x.Uid)
                 != StatisticsDocumentMerger.ComputeAccountFingerprint(x)))
@@ -663,7 +663,7 @@ public sealed class StatisticsService : IStatisticsService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取统计数据失败，保留当前状态并等待重试。");
+            _logger.LogError(ex, "读取统计数据失败，当前内存中的统计保持不变");
             throw;
         }
     }

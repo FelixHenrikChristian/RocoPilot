@@ -110,11 +110,11 @@ public partial class SettingsViewModel : ObservableRecipient
         {
             Directory.CreateDirectory(path);
             if (!await Windows.System.Launcher.LaunchFolderPathAsync(path))
-                _logger.LogWarning("系统未能打开目录：{Path}", path);
+                _logger.LogError("目录打不开：{Path}", path);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "打开目录失败：{Path}", path);
+            _logger.LogError(ex, "目录打不开：{Path}", path);
         }
     }
 

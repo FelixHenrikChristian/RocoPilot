@@ -21,6 +21,7 @@ public partial class LogEntryItemViewModel(LogEntry entry) : ObservableObject
         LogSeverity.Fatal => "致命",
         LogSeverity.Error => "错误",
         LogSeverity.Warning => "警告",
+        LogSeverity.Debug => "调试",
         _ => "信息"
     };
 
@@ -34,6 +35,8 @@ public partial class LogEntryItemViewModel(LogEntry entry) : ObservableObject
             LineBreaks, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     public bool HasException => Entry.Exception is not null;
+
+    public bool IsDebug => Entry.Severity == LogSeverity.Debug;
 
     public bool IsInformation => Entry.Severity == LogSeverity.Information;
 

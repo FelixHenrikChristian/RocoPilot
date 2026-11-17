@@ -228,7 +228,7 @@ public partial class RealtimeViewModel : ObservableRecipient
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "图鉴同步完成，更新暂存统计名称失败");
+                _logger.LogWarning(ex, "图鉴已同步，但暂存记录的精灵名没有更新成功，可重新同步后再试");
                 SpiritCatalogSyncStatus += $" · 暂存记录处理失败，可重新同步后重试：{ex.Message}";
             }
         }
@@ -258,7 +258,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取图鉴摘要失败");
+            _logger.LogWarning(ex, "读取图鉴摘要失败，页面上显示为加载失败");
             SpiritCatalogSummary = "图鉴数据加载失败";
             SpiritCatalogSyncStatus = ex.Message;
         }
@@ -281,7 +281,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "读取图鉴来源失败，使用默认来源");
+            _logger.LogWarning(ex, "读取图鉴来源失败，已使用默认来源");
             ApplySelectedSpiritCatalogSource(SpiritCatalogSources.FirstOrDefault(), reloadSummary: false);
         }
     }
@@ -327,7 +327,7 @@ public partial class RealtimeViewModel : ObservableRecipient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "保存图鉴来源失败：{Source}", sourceId);
+            _logger.LogError(ex, "保存图鉴来源失败：{Source}", sourceId);
         }
     }
 

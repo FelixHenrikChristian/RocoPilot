@@ -175,6 +175,43 @@ public sealed class AutoBattleControllerTests
     }
 
     [TestMethod]
+    public void BloodlineIsAcceptedOncePerBattleAndNamedInThePlanDescription()
+    {
+        var settings = Settings();
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+
+        Assert.IsFalse(battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.Unrecognized));
+        Assert.IsFalse(battle.ObserveBloodline(battle.BattleId - 1, EncounterBloodlineKind.QiYi));
+        Assert.IsTrue(battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.QiYi));
+        // 同一场战斗只采纳第一次识别到的血脉，日志据此只记一次。
+        Assert.IsFalse(battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.Normal));
+        Assert.AreEqual(EncounterBloodlineKind.QiYi, battle.Bloodline);
+
+        // 描述是写给用户看的，不带按键序列。
+        var plan = battle.PlanSkillSelection(settings, true, Now);
+        Assert.AreEqual(AutoBattleAction.Capture, plan.Action);
+        Assert.AreEqual("发起捕捉（奇异血脉）", plan.Description);
+        Assert.AreEqual("W, 1, Space", plan.Sequence);
+    }
+
+    [TestMethod]
+    public void BloodlineOutsideTheFilterFallsBackToTheSkillAndSaysWhy()
+    {
+        var settings = Settings();
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        Assert.IsTrue(battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.HunXue));
+
+        var plan = battle.PlanSkillSelection(settings, true, Now);
+
+        Assert.AreEqual(AutoBattleAction.Skill, plan.Action);
+        StringAssert.StartsWith(plan.Description, "混血血脉不在捕捉范围内，改为");
+    }
+
+    [TestMethod]
     public void SeasonWithoutBloodlineRecognitionUsesUnknownFilterImmediately()
     {
         var settings = Settings();

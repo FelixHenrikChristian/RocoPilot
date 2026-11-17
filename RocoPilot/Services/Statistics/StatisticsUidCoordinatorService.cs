@@ -56,7 +56,7 @@ public sealed class StatisticsUidCoordinatorService :
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "准备首页启动使用的统计账号 UID 失败。");
+            _logger.LogWarning(ex, "奇遇统计：启动前没能识别出账号 UID，需要在统计页确认账号");
             return new StatisticsUidPreparation(
                 StatisticsUidDetectionResult.Failed("UID 识别准备失败。"),
                 new StatisticsUidSelectionDecision(StatisticsUidSelectionAction.RequireConfirmation, null, "UID 识别准备失败。"),
@@ -84,7 +84,7 @@ public sealed class StatisticsUidCoordinatorService :
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "开启统计时准备账号 UID 失败。");
+            _logger.LogWarning(ex, "奇遇统计：开启统计时没能识别出账号 UID，需要在统计页确认账号");
         }
     }
 
@@ -135,7 +135,7 @@ public sealed class StatisticsUidCoordinatorService :
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "重新识别统计账号 UID 失败。");
+            _logger.LogWarning(ex, "奇遇统计：重新识别账号 UID 失败，沿用之前的账号状态");
             result = StatisticsUidDetectionResult.Failed("重新识别 UID 时发生异常。");
         }
 
@@ -206,7 +206,7 @@ public sealed class StatisticsUidCoordinatorService :
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "点击首页启动时识别统计账号 UID 失败。");
+            _logger.LogWarning(ex, "奇遇统计：启动时没能识别出账号 UID，需要在统计页确认账号");
             detectionResult = StatisticsUidDetectionResult.Failed("UID 识别发生异常。");
         }
 
@@ -238,7 +238,7 @@ public sealed class StatisticsUidCoordinatorService :
             preparation.DetectionResult.Success));
         UpdatePendingOverlay(preparation.DetectionResult);
         _logger.LogWarning(
-            "首页启动时统计账号 UID 需要确认：{Message}",
+            "奇遇统计：账号需要确认，确认前暂停记录：{Message}",
             preparation.Decision.Message);
         return $"{preparation.Decision.Message} 请前往统计页确认账号，确认前自动统计暂停。";
     }

@@ -12,6 +12,8 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.Overlay;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.Logging;
+using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
 using static RocoPilot.Services.RuntimeTasks.RuntimeFrameRecognizer;
 
@@ -41,6 +43,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private readonly IInfoOverlayService _infoOverlayService;
     private readonly ShinyEncounterNotification _shinyNotification;
     private readonly ILogger<RuntimeTaskService> _logger;
+    private readonly RecognitionDiagnostics? _recognitionDiagnostics;
+
+    // 循环里的故障每一帧都会重复，同一种只在第一次和之后每隔一段时间记一条。
+    private static readonly TimeSpan RepeatedFailureLogInterval = TimeSpan.FromSeconds(30);
+    private readonly RepeatedFailureGate _captureFailures = new(RepeatedFailureLogInterval);
+    private readonly RepeatedFailureGate _sceneFailures = new(RepeatedFailureLogInterval);
+    private readonly RepeatedFailureGate _battleOcrFailures = new(RepeatedFailureLogInterval);
+    private readonly RepeatedFailureGate _battleInputFailures = new(RepeatedFailureLogInterval);
+    private readonly RepeatedFailureGate _overlayFailures = new(RepeatedFailureLogInterval);
+    private readonly RepeatedFailureGate _spiritNameFailures = new(RepeatedFailureLogInterval);
     private readonly SemaphoreSlim _lifecycleLock = new(1, 1);
     private readonly SemaphoreSlim _settingsLock = new(1, 1);
 
@@ -52,6 +64,12 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     private DateTimeOffset? _unrecognizedStateDetectedAt;
     private volatile bool _isSuspended;
     private string? _suspendedReason;
+
+    // 当前这场战斗的开始时间，只在截图循环里读写；为空表示不在战斗中。
+    private DateTimeOffset? _battleStartedAt;
+    private readonly object _battleSpiritLogLock = new();
+    private long _loggedSpiritBattleId = -1;
+    private string _loggedSpiritName = string.Empty;
     private readonly SemaphoreSlim _runtimeIteration = new(1, 1);
 
     public event EventHandler? SettingsChanged;
@@ -74,7 +92,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _recognitionOverlayService.Hide();
         if (IsRunning)
         {
-            _logger.LogInformation("实时任务：已挂起（{Reason}），截图与识别暂停。", reason);
+            _logger.LogInformation("实时任务：已挂起（{Reason}），截图与识别暂停", reason);
         }
     }
 
@@ -102,7 +120,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _isSuspended = false;
         if (IsRunning)
         {
-            _logger.LogInformation("实时任务：已恢复运行（{Reason}）。", reason);
+            _logger.LogInformation("实时任务：已恢复运行（挂起原因：{Reason}）", reason);
         }
     }
 
@@ -125,7 +143,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         IRecognitionOverlayService recognitionOverlayService,
         IInfoOverlayService infoOverlayService,
         ShinyEncounterNotification shinyNotification,
-        ILogger<RuntimeTaskService> logger)
+        ILogger<RuntimeTaskService> logger,
+        RecognitionDiagnostics? recognitionDiagnostics = null)
     {
         _gameWindowService = gameWindowService;
         _keyboardInputService = keyboardInputService;
@@ -147,6 +166,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         _infoOverlayService = infoOverlayService;
         _shinyNotification = shinyNotification;
         _logger = logger;
+        _recognitionDiagnostics = recognitionDiagnostics;
     }
 
     public async Task LoadSettingsAsync(CancellationToken cancellationToken = default)
@@ -177,7 +197,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         catch (Exception ex)
         {
             _settingsLoaded = true;
-            _logger.LogWarning(ex, "读取实时任务设置失败，已使用默认设置。");
+            _logger.LogWarning(ex, "读取实时任务设置失败，已使用默认设置");
         }
         finally
         {
@@ -206,7 +226,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             if (targetWindow is null)
             {
                 var missingWindowMessage = $"未找到目标游戏窗口：{_gameWindowService.TargetProcessName}";
-                _logger.LogWarning("{Message}", missingWindowMessage);
+                _logger.LogError("实时任务启动失败：未找到游戏窗口（进程 {ProcessName}）",
+                    _gameWindowService.TargetProcessName);
                 return RuntimeTaskStartResult.Failed(missingWindowMessage);
             }
 
@@ -225,17 +246,16 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 broughtGameWindowToForeground = _gameWindowService.TryBringGameWindowToForeground(targetWindow);
                 if (broughtGameWindowToForeground)
                 {
-                    _logger.LogInformation(
-                        "自动战斗启动：已将游戏窗口切换到前台。InputMethod={InputMethod}, Window={Window}",
+                    _logger.LogDebug(
+                        "实时任务启动：已将游戏窗口切换到前台，输入方式 {InputMethod}，窗口 {Window}",
                         autoBattleSettings.KeyboardInputMethod,
                         targetWindow.DisplayName);
                 }
                 else
                 {
                     _logger.LogWarning(
-                        "自动战斗启动：尝试将游戏窗口切换到前台失败，实时任务继续启动。InputMethod={InputMethod}, Window={Window}",
-                        autoBattleSettings.KeyboardInputMethod,
-                        targetWindow.DisplayName);
+                        "实时任务：未能把游戏窗口切换到前台，自动战斗的按键可能发不出去，请手动切到游戏（输入方式 {InputMethod}）",
+                        autoBattleSettings.KeyboardInputMethod);
                 }
             }
 
@@ -245,7 +265,8 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             {
                 _screenCaptureService.Release(targetWindow, options.CaptureMethod);
                 var captureFailedMessage = $"找到窗口，但未能获取画面：{targetWindow.DisplayName}";
-                _logger.LogWarning("{Message}", captureFailedMessage);
+                _logger.LogError("实时任务启动失败：找到了游戏窗口，但获取不到画面（{Window}，截图方式 {CaptureMethod}）",
+                    targetWindow.DisplayName, options.CaptureMethod);
                 return RuntimeTaskStartResult.Failed(captureFailedMessage);
             }
 
@@ -285,7 +306,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 _screenCaptureService.Release(targetWindow, options.CaptureMethod);
                 var unsupportedResolutionMessage =
                     $"不支持的游戏分辨率：{configResolutionWidth}x{configResolutionHeight}（宽高比 {detectedAspectRatio:F4}）。当前仅支持 16:9 和 4:3。";
-                _logger.LogWarning("{Message}", unsupportedResolutionMessage);
+                _logger.LogError(
+                    "实时任务启动失败：不支持的游戏分辨率 {Width}x{Height}，当前仅支持 16:9 和 4:3",
+                    configResolutionWidth, configResolutionHeight);
                 return RuntimeTaskStartResult.Failed(unsupportedResolutionMessage);
             }
 
@@ -298,13 +321,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 _screenCaptureService.Release(targetWindow, options.CaptureMethod);
                 var missingConfigMessage =
                     $"未能加载 {matchedConfigWidth}x{matchedConfigHeight} 识别配置：{recognitionRegionConfig.SourcePath}";
-                _logger.LogWarning("{Message}", missingConfigMessage);
+                _logger.LogError("实时任务启动失败：未能加载 {Width}x{Height} 的识别配置（{ConfigPath}）",
+                    matchedConfigWidth, matchedConfigHeight, recognitionRegionConfig.SourcePath);
                 return RuntimeTaskStartResult.Failed(missingConfigMessage);
             }
 
             var markerTemplate = GetResolutionTemplatePath(recognitionRegionConfig, CaptureButtonDisabledMarkerTemplateName);
             if (!_frameRecognizer.TemplateExists(markerTemplate))
-                _logger.LogWarning("缺少捕捉按钮模板，本次会话无法识别奇遇效果解除：{Template}", markerTemplate);
+                _logger.LogWarning("缺少捕捉按钮模板，本次运行无法识别奇遇效果解除：{Template}", markerTemplate);
 
             options.InfoOverlayEncounterPanelEnabled = InfoOverlayEncounterPanelEnabled;
             var state = new RuntimeTaskState(
@@ -319,6 +343,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             _unrecognizedStateDetectedAt = null;
             _isSuspended = false;
             _suspendedReason = null;
+            _battleStartedAt = null;
+            _captureFailures.Reset();
+            _sceneFailures.Reset();
+            _battleOcrFailures.Reset();
+            _battleInputFailures.Reset();
+            _overlayFailures.Reset();
+            _spiritNameFailures.Reset();
             ResetAutoBattleBattleState();
             _overlayActivities.Clear();
             Volatile.Write(ref _lastInfoOverlayStatus, "状态待识别");
@@ -331,25 +362,23 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             session.Start(CaptureLoopAsync, RuntimeOcrLoopAsync);
 
             _logger.LogInformation(
-                "实时任务已启动：{Window}，客户区 {ClientWidth}×{ClientHeight}，首帧 {FrameWidth}×{FrameHeight}，截图 {CaptureMethod}，OCR {TextRecognitionMethod}，匹配 {ImageMatchAlgorithm}，自动战斗 {AutoBattle}，输入 {InputMethod}，配置 {ConfigPath}",
+                "实时任务已启动：{Window}，{ClientWidth}×{ClientHeight}，自动战斗{AutoBattle}，奇遇统计{Statistics}",
                 targetWindow.DisplayName,
                 configResolutionWidth,
                 configResolutionHeight,
-                firstFrame.Width,
-                firstFrame.Height,
+                autoBattleSettings.IsEnabled ? "已开启" : "未开启",
+                options.EncounterStatisticsEnabled ? "已开启" : "未开启");
+
+            _logger.LogDebug(
+                "实时任务参数：截图 {CaptureMethod}，OCR {TextRecognitionMethod}，匹配 {ImageMatchAlgorithm}，输入 {InputMethod}，首帧 {FrameWidth}x{FrameHeight}，启用识别区域 {EnabledRegionCount} 个，配置 {ConfigPath}",
                 options.CaptureMethod,
                 options.TextRecognitionMethod,
                 _imageMatchingService.DefaultAlgorithm,
-                autoBattleSettings.IsEnabled,
                 autoBattleSettings.KeyboardInputMethod,
-                recognitionRegionConfig.SourcePath);
-
-            _logger.LogDebug(
-                "识别区域配置状态：Loaded={Loaded}, EnabledRegions={EnabledRegionCount}, Resolution={ResolutionWidth}x{ResolutionHeight}",
-                recognitionRegionConfig.LoadedFromFile,
+                firstFrame.Width,
+                firstFrame.Height,
                 recognitionRegionConfig.Regions.Count(region => region.Enabled),
-                configResolutionWidth,
-                configResolutionHeight);
+                recognitionRegionConfig.SourcePath);
 
             var message = shouldBringGameWindowToForeground
                 ? broughtGameWindowToForeground
@@ -369,7 +398,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         {
             if (preparingWindow is not null) _screenCaptureService.Release(preparingWindow, options.CaptureMethod);
             await StopSessionCoreAsync();
-            _logger.LogError(ex, "启动运行任务失败");
+            _logger.LogError(ex, "实时任务启动失败");
             return RuntimeTaskStartResult.Failed($"启动失败：{ex.Message}");
         }
         finally
@@ -415,6 +444,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             _statisticsUidCoordinator.Clear();
             ResetAutoBattleBattleState();
             _overlayActivities.Clear();
+            _battleStartedAt = null;
+            // 写出最后一段识别汇总，下次启动时各识别目标从头记录。
+            _recognitionDiagnostics?.Reset();
             _logger.LogInformation("实时任务：已停止");
         }
     }
@@ -456,10 +488,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                     try
                     {
                         frame = _screenCaptureService.Capture(state.TargetWindow, state.Options.CaptureMethod);
+                        NoteCaptureResult(state, frame is not null, null);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        _logger.LogWarning(ex, "捕获游戏画面失败：{Window}，截图方式 {Method}", state.TargetWindow.DisplayName, state.Options.CaptureMethod);
+                        NoteCaptureResult(state, false, ex);
                         await DelayAsync(500, cancellationToken);
                     }
 
@@ -475,13 +508,18 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                                 try
                                 {
                                     await ProcessFrameAsync(state, frame, cancellationToken);
+                                    _sceneFailures.Reset();
                                 }
                                 catch (Exception ex) when (ex is not OperationCanceledException)
                                 {
                                     _scene = GameScene.Unknown;
                                     CompleteAutoBattleSkillSelectionState();
                                     TryUpdateUnrecognizedInfoOverlaySnapshot(now);
-                                    _logger.LogWarning(ex, "状态图像匹配失败");
+                                    if (_sceneFailures.TryEnter(out var skipped))
+                                    {
+                                        _logger.LogWarning(ex, "实时任务：画面识别出错，本帧按未识别处理{Repeat}",
+                                            RepeatedFailureGate.Describe(skipped));
+                                    }
                                 }
 
                                 if (_scene == GameScene.World)
@@ -520,12 +558,14 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
     {
         _scene = GameScene.Unknown;
         _unrecognizedStateDetectedAt = null;
+        _battleStartedAt = null;
         ResetAutoBattleBattleState();
         ResetEncounterRecordSuppression();
         session.ClearFrame();
         _overlayActivities.Clear();
         _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("已挂起", DateTimeOffset.Now));
-        _logger.LogDebug("实时任务：截图循环进入挂起状态。");
+        _recognitionDiagnostics?.Flush();
+        _logger.LogDebug("实时任务：截图循环进入挂起状态");
     }
 
     private void ExitCaptureLoopSuspension(RuntimeTaskState state)
@@ -535,7 +575,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             _recognitionOverlayService.Show(state);
         }
 
-        _logger.LogDebug("实时任务：截图循环退出挂起状态，重新开始识别。");
+        _logger.LogDebug("实时任务：截图循环退出挂起状态，重新开始识别");
         _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("状态待识别", DateTimeOffset.Now));
     }
 
@@ -608,13 +648,19 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                     await TryUpdateRuntimeShinyTipSignalAsync(state, frame, _encounterSeasonConfigService.GetCurrentSeason(), battleId, cancellationToken);
                 else
                     await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, battleId, cancellationToken);
+                _battleOcrFailures.Reset();
             }
             catch (OperationCanceledException)
             {
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "后台战斗 OCR 失败：战斗 {BattleId}，OCR {Method}", battleId, state.Options.TextRecognitionMethod);
+                // 这里每秒执行数次，同一种故障不逐次记录。
+                if (_battleOcrFailures.TryEnter(out var skipped))
+                {
+                    _logger.LogWarning(ex, "实时任务：战斗画面的文字识别出错，稍后重试（OCR {Method}）{Repeat}",
+                        state.Options.TextRecognitionMethod, RepeatedFailureGate.Describe(skipped));
+                }
             }
         }
     }
@@ -630,11 +676,13 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         switch (match.Scene)
         {
             case GameScene.World:
+                NoteBattleEnded();
                 ResetAutoBattleBattleState();
                 UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                     "大世界", DateTimeOffset.Now, match.MagicPointCount));
                 break;
             case GameScene.Battle:
+                NoteBattleStarted();
                 await ProcessBattleFrameAsync(state, frame, match.BattleScreen!.Value, cancellationToken);
                 break;
             default:
@@ -643,6 +691,73 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 _battle.ObservePetSwitching(false);
                 TryUpdateUnrecognizedInfoOverlaySnapshot(DateTimeOffset.Now);
                 break;
+        }
+    }
+
+    // 战斗的开始和结束只在这两处记录。战斗中途识别不到画面（动画、过场）不算结束，回到大世界才算。
+    private void NoteBattleStarted()
+    {
+        if (_battleStartedAt is not null)
+        {
+            return;
+        }
+
+        _battleStartedAt = DateTimeOffset.Now;
+        _logger.LogInformation("进入战斗");
+    }
+
+    private void NoteBattleEnded()
+    {
+        if (_battleStartedAt is not { } startedAt)
+        {
+            return;
+        }
+
+        _battleStartedAt = null;
+        _logger.LogInformation("战斗结束，回到大世界：共 {Turns} 回合，用时 {Seconds:F0} 秒",
+            _battle.TurnNumber, (DateTimeOffset.Now - startedAt).TotalSeconds);
+    }
+
+    // 同一场战斗里同一只精灵只记一次；后台 OCR 每秒都会识别到名字。
+    private void NoteBattleSpirit(long battleId, string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || battleId != _battle.BattleId)
+        {
+            return;
+        }
+
+        lock (_battleSpiritLogLock)
+        {
+            if (_loggedSpiritBattleId == battleId && string.Equals(_loggedSpiritName, name, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _loggedSpiritBattleId = battleId;
+            _loggedSpiritName = name;
+        }
+
+        _logger.LogInformation("遇到精灵：{SpiritName}", name);
+    }
+
+    private void NoteCaptureResult(RuntimeTaskState state, bool succeeded, Exception? exception)
+    {
+        if (succeeded)
+        {
+            var failures = _captureFailures.Reset();
+            if (failures > 0)
+            {
+                _logger.LogInformation("实时任务：已重新获取到游戏画面（此前失败 {Count} 次）", failures);
+            }
+
+            return;
+        }
+
+        if (_captureFailures.TryEnter(out var skipped))
+        {
+            _logger.LogWarning(exception,
+                "实时任务：获取不到游戏画面，识别暂停并持续重试（{Window}，截图方式 {Method}）{Repeat}",
+                state.TargetWindow.DisplayName, state.Options.CaptureMethod, RepeatedFailureGate.Describe(skipped));
         }
     }
 

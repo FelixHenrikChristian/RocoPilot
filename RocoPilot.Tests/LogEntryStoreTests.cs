@@ -31,6 +31,35 @@ public sealed class LogEntryStoreTests
     }
 
     [TestMethod]
+    public void DebugEntriesHaveTheirOwnLimitAndNeverPushOutOtherEntries()
+    {
+        var store = new LogEntryStore(capacity: 2, debugCapacity: 2);
+        store.Add(Now, LogSeverity.Information, "A", "进入战斗");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 1");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 2");
+        store.Add(Now, LogSeverity.Warning, "A", "截图失败");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 3");
+        store.Add(Now, LogSeverity.Debug, "A", "识别变化 4");
+
+        var batch = store.ReadFrom(0);
+
+        // 按写入顺序合并；调试记录只挤掉更早的调试记录。
+        CollectionAssert.AreEqual(
+            new[] { "进入战斗", "截图失败", "识别变化 3", "识别变化 4" },
+            batch.Entries.Select(entry => entry.Message).ToArray());
+        CollectionAssert.AreEqual(new long[] { 0, 3, 4, 5 }, batch.Entries.Select(entry => entry.Sequence).ToArray());
+        Assert.AreEqual(0, batch.FirstSequence);
+        Assert.AreEqual(3, batch.FirstDebugSequence);
+        Assert.AreEqual(6, batch.NextSequence);
+        Assert.AreEqual(new LogEntryCounts(Information: 1, Warning: 1, Error: 0, Debug: 2), batch.Counts);
+        Assert.AreEqual(2, batch.Counts.Total);
+
+        CollectionAssert.AreEqual(
+            new[] { "识别变化 3", "识别变化 4" },
+            store.ReadFrom(4).Entries.Select(entry => entry.Message).ToArray());
+    }
+
+    [TestMethod]
     public void ReaderContinuesFromItsLastPosition()
     {
         var store = new LogEntryStore();
@@ -83,12 +112,14 @@ public sealed class LogEntryStoreTests
     {
         var store = new LogEntryStore();
         store.Add(Now, LogSeverity.Information, "RocoPilot.Services.RuntimeTaskService", "实时任务已停止");
+        store.Add(Now, LogSeverity.Debug, "RocoPilot.Services.Recognition.RecognitionDiagnostics", "匹配变化 battle-chat：命中");
         store.Add(Now, LogSeverity.Error, "RocoPilot.App", "任务异常退出", "System.IO.IOException: 窗口不可用");
 
         var text = LogEntryFormatter.Format(store.ReadFrom(0).Entries);
 
         Assert.AreEqual(
             "[2026-11-16 21:04:12.381] [INF] [RocoPilot.Services.RuntimeTaskService] 实时任务已停止" + Environment.NewLine
+            + "[2026-11-16 21:04:12.381] [DBG] [RocoPilot.Services.Recognition.RecognitionDiagnostics] 匹配变化 battle-chat：命中" + Environment.NewLine
             + "[2026-11-16 21:04:12.381] [ERR] [RocoPilot.App] 任务异常退出" + Environment.NewLine
             + "System.IO.IOException: 窗口不可用" + Environment.NewLine,
             text);

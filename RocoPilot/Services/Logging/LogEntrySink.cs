@@ -34,6 +34,7 @@ internal sealed class LogEntrySink(LogEntryStore entries) : ILogEventSink
         LogEventLevel.Fatal => LogSeverity.Fatal,
         LogEventLevel.Error => LogSeverity.Error,
         LogEventLevel.Warning => LogSeverity.Warning,
-        _ => LogSeverity.Information
+        LogEventLevel.Information => LogSeverity.Information,
+        _ => LogSeverity.Debug
     };
 }

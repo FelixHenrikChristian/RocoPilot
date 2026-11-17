@@ -26,9 +26,9 @@ public sealed partial class RuntimeTaskService
 
         if (!_battle.ObserveEncounterRelieved(settings)) return _battle.IsEncounterRelieved;
         _logger.LogInformation(
-            "自动战斗：{Source}检测到奇遇效果解除，解除操作：{Action}。",
-            source,
+            "自动战斗：奇遇解除后的操作为“{Action}”",
             AutoBattleSettingsRules.GetRelievedActionDisplay(encounterRelievedAction));
+        _logger.LogDebug("奇遇解除信号来源：{Source}", source);
         return true;
     }
 
@@ -37,10 +37,8 @@ public sealed partial class RuntimeTaskService
         if (!_battle.ObserveShiny(battleId)) return false;
         if (CurrentState is not null && _scene == GameScene.Battle)
             _infoOverlayService.UpdateSnapshot(CreateInfoOverlaySnapshot("战斗中 - 异色保护", DateTimeOffset.Now));
-        _logger.LogInformation(
-            "自动战斗：{Source}检测到异色精灵提示，本场战斗暂停所有自动操作，退出战斗后恢复。TipText={TipText}",
-            source,
-            LoggingHelper.FormatLogText(tipText));
+        _logger.LogInformation("发现异色精灵：本场战斗已暂停所有自动操作，退出战斗后恢复");
+        _logger.LogDebug("异色提示来源：{Source}，原文：{TipText}", source, LoggingHelper.FormatLogText(tipText));
         return true;
     }
 }

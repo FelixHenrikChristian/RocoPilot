@@ -166,6 +166,22 @@ public sealed partial class RuntimeTaskService
         await UpdateRuntimeSpiritNameAsync(state, frame, battleId, cancellationToken);
     }
 
+    /// <summary>
+    /// 状态未识别（战斗入场过渡）期间，横幅可能早于战斗场景确认出现：
+    /// 只识别血脉与异色两个横幅，不跑名单、统计与精灵名的完整 OCR。
+    /// </summary>
+    private async Task UpdateUnrecognizedBannerSignalsAsync(
+        RuntimeTaskState state,
+        CapturedFrame frame,
+        long battleId,
+        CancellationToken cancellationToken)
+    {
+        var season = _encounterSeasonConfigService.GetCurrentSeason();
+        await Task.WhenAll(
+            RecognizeAndApplyBloodlineTipAsync(state, frame, battleId, cancellationToken),
+            TryUpdateRuntimeShinyTipSignalAsync(state, frame, season, battleId, cancellationToken));
+    }
+
     private async Task RecognizeAndApplyBloodlineTipAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
@@ -203,7 +219,8 @@ public sealed partial class RuntimeTaskService
 
             await Task.Delay(RuntimeRecognitionDefaults.FrameCaptureIntervalMs, cancellationToken);
             using var next = _session?.RentFrame(battleId);
-            if (next is null || _isSuspended || _scene != GameScene.Battle || battleId != _battle.BattleId) return;
+            // 未识别（战斗入场过渡）期间横幅可能正在显示，允许复查；回到大世界才视为战斗结束。
+            if (next is null || _isSuspended || _scene == GameScene.World || battleId != _battle.BattleId) return;
             if (next.CapturedAt <= capturedAt) continue;
             capturedAt = next.CapturedAt;
             tipText = await _frameRecognizer.RecognizeRegionTextAsync(

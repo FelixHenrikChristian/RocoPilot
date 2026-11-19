@@ -54,7 +54,11 @@ public sealed record InfoOverlayIslandPresentation(string Category, string Title
             or InfoOverlayActivityKind.Capture ? activity.ExpiresAt.HasValue ? "已发送" : "执行中" : string.Empty;
         // 对手名称与己方换宠、报错原因无关，不放进这两类的结果行。
         var creatureName = isError || isSwitch ? string.Empty : activity.CreatureName;
-        return new(step, activity.Title, Join(creatureName, activity.Description, result), creatureName, IsError: isError);
+        // 战斗中的动作行附带已识别的血脉；未识别（入场过渡）时快照不填血脉，不占位。
+        var bloodline = snapshot.Scene == InfoOverlayScene.Battle && !string.IsNullOrWhiteSpace(snapshot.BattleBloodline)
+            ? $"血脉：{snapshot.BattleBloodline}"
+            : string.Empty;
+        return new(step, activity.Title, Join(creatureName, bloodline, activity.Description, result), creatureName, IsError: isError);
     }
 
     private static string Join(params string?[] parts) => string.Join(" · ", parts.Where(text => !string.IsNullOrWhiteSpace(text)));

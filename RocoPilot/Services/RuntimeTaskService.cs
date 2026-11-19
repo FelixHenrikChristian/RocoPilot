@@ -527,8 +527,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                                     ResetEncounterRecordSuppression();
                                 }
 
-                                // 后台战斗 OCR 只接收本轮已确认的战斗画面。
-                                if (_scene == GameScene.Battle)
+                                // 后台战斗 OCR 接收战斗与未识别画面：战斗入场即解除的奇遇，
+                                // 血脉/异色横幅出现早于战斗场景确认，未识别帧也要供给横幅扫描。
+                                if (_scene is GameScene.Battle or GameScene.Unknown)
                                     session.PublishFrame(frame, _battle.BattleId);
                                 else
                                     session.ClearFrame();
@@ -599,8 +600,11 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 if (activeScanTask is not null) await activeScanTask;
                 activeScanTask = null;
 
-                if (_isSuspended || _scene != GameScene.Battle
-                    || (shinyOnly && _battle.IsSuspendedForShiny))
+                // 异色扫描只在战斗中运行；完整扫描在战斗或入场未识别窗口（只扫横幅）运行。
+                var canScan = shinyOnly
+                    ? _scene == GameScene.Battle
+                    : _scene == GameScene.Battle || IsUnrecognizedSceneBannerScanActive();
+                if (_isSuspended || !canScan || (shinyOnly && _battle.IsSuspendedForShiny))
                 {
                     continue;
                 }
@@ -633,6 +637,19 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         }
     }
 
+    /// <summary>
+    /// 状态未识别（战斗入场过渡等）期间，血脉/异色横幅可能早于战斗场景确认出现，
+    /// 按横幅节奏只扫两个横幅区域；超过时限的长期未识别（菜单等）不空转。
+    /// </summary>
+    private bool IsUnrecognizedSceneBannerScanActive()
+    {
+        return !_isSuspended
+            && _scene == GameScene.Unknown
+            && _unrecognizedStateDetectedAt is { } detectedAt
+            && DateTimeOffset.Now - detectedAt
+                < TimeSpan.FromMilliseconds(RuntimeRecognitionDefaults.UnrecognizedBannerScanWindowMs);
+    }
+
     private async Task RunRuntimeOcrScanAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
@@ -646,6 +663,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             {
                 if (shinyOnly)
                     await TryUpdateRuntimeShinyTipSignalAsync(state, frame, _encounterSeasonConfigService.GetCurrentSeason(), battleId, cancellationToken);
+                else if (_scene != GameScene.Battle)
+                    // 状态未识别（战斗入场过渡）：只扫血脉/异色两个横幅，不跑完整 OCR。
+                    await UpdateUnrecognizedBannerSignalsAsync(state, frame, battleId, cancellationToken);
                 else
                     await UpdateRuntimeEncounterOcrSignalsAsync(state, frame, battleId, cancellationToken);
                 _battleOcrFailures.Reset();
@@ -855,6 +875,9 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             },
             _autoBattleSettings.IsEnabled,
             _overlayActivities.CreatureName,
+            _battle.Bloodline == Core.Battle.EncounterBloodlineKind.Unrecognized
+                ? string.Empty
+                : EncounterBloodlineRecognition.GetDisplayName(_battle.Bloodline),
             independentTask?.Name ?? string.Empty,
             independentTask?.Progress);
     }

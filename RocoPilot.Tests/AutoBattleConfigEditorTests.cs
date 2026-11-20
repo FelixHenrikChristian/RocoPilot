@@ -64,6 +64,41 @@ public sealed class AutoBattleConfigEditorTests
     }
 
     [TestMethod]
+    public void ClickReorderMovesSourceStepToTargetPosition()
+    {
+        // 提权时拖拽不可用，改由点击选中 + 点击目标完成移动；这里直接验证移动与序号刷新。
+        var sequence = new AutoBattleReleaseSequenceEditor(supportsSkipTurn: false);
+        sequence.AppendSkill("1");
+        sequence.AppendSkill("3");
+        sequence.AppendSkill("4");
+        var first = sequence.Items[0];
+        var last = sequence.Items[2];
+
+        Assert.IsTrue(AutoBattleReleaseSequenceEditor.TryMove(sequence.Items, first, last));
+
+        CollectionAssert.AreEqual(new[] { "3", "4", "1" }, sequence.Items.Select(item => item.SkillKey).ToArray());
+        CollectionAssert.AreEqual(new[] { 1, 2, 3 }, sequence.Items.Select(item => item.Position).ToArray());
+        Assert.AreSame(last, sequence.Items[1]);
+        Assert.IsTrue(first.IsMoveSource == false);
+    }
+
+    [TestMethod]
+    public void ClickReorderIgnoresSameOrForeignItems()
+    {
+        var sequence = new AutoBattleReleaseSequenceEditor(supportsSkipTurn: true);
+        sequence.AppendSkill("1");
+        sequence.AppendSkill("3");
+        var step = sequence.Items[0];
+
+        Assert.IsFalse(AutoBattleReleaseSequenceEditor.TryMove(sequence.Items, step, step));
+        Assert.IsFalse(AutoBattleReleaseSequenceEditor.TryMove(
+            sequence.Items,
+            step,
+            AutoBattleReleaseEditorItem.CreateSkill("4")));
+        CollectionAssert.AreEqual(new[] { "1", "3" }, sequence.Items.Select(item => item.SkillKey).ToArray());
+    }
+
+    [TestMethod]
     public void SharesPresetAcrossPages()
     {
         var settings = AutoBattleSettings.CreateDefault();

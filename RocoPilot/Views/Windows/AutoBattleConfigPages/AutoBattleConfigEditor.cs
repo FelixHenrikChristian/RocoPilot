@@ -667,6 +667,26 @@ internal sealed class AutoBattleReleaseSequenceEditor : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 点击排序：把 <paramref name="source"/> 移动到 <paramref name="target"/> 当前占据的位置。
+    /// 提权后 WinUI 拖放不可用时的替代交互，序号与摘要随集合变更自动刷新。
+    /// </summary>
+    public static bool TryMove(
+        ObservableCollection<AutoBattleReleaseEditorItem> items,
+        AutoBattleReleaseEditorItem source,
+        AutoBattleReleaseEditorItem target)
+    {
+        var sourceIndex = items.IndexOf(source);
+        var targetIndex = items.IndexOf(target);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
+        {
+            return false;
+        }
+
+        items.Move(sourceIndex, targetIndex);
+        return true;
+    }
+
     public void UpdatePreset(AutoBattlePresetEditorItem preset)
     {
         foreach (var item in Items.Where(item => item.PresetId == preset.Id))
@@ -706,6 +726,7 @@ internal readonly record struct AutoBattleConfigValidationError(
 internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 {
     private int _position;
+    private bool _isMoveSource;
     private string _name = string.Empty;
     private string _sequence = string.Empty;
 
@@ -785,6 +806,21 @@ internal sealed class AutoBattleReleaseEditorItem : ObservableObject
 
     /// <summary>普通战斗中被忽略的跳过步骤整卡置灰。</summary>
     public double CardOpacity => SkipIgnored ? 0.45 : 1.0;
+
+    /// <summary>点击排序时被选中、等待移动的目标卡片，用强调色边框标出。</summary>
+    public bool IsMoveSource
+    {
+        get => _isMoveSource;
+        set
+        {
+            if (SetProperty(ref _isMoveSource, value))
+            {
+                OnPropertyChanged(nameof(CardBorderThickness));
+            }
+        }
+    }
+
+    public Thickness CardBorderThickness => _isMoveSource ? new Thickness(1.5) : new Thickness(0);
 
     public Visibility SequenceVisibility => IsCustom ? Visibility.Visible : Visibility.Collapsed;
 

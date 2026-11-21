@@ -68,10 +68,10 @@
     },
     {
       "id": "battle-tip-shiny",
-      "x": 1485,
+      "x": 1270,
       "y": 149,
-      "width": 435,
-      "height": 52,
+      "width": 650,
+      "height": 54,
       "enabled": true
     },
     {

@@ -478,13 +478,15 @@ public sealed class RuntimeTaskStartupTests
     }
 
     [TestMethod]
-    public async Task ShinyTipStopsBattleEvenWhileNameOcrIsPending()
+    [DataRow("发现异色精灵")]
+    [DataRow("随掷：稀有的异色精灵就藏在这局棋里～")]
+    public async Task ShinyTipStopsBattleEvenWhileNameOcrIsPending(string shinyText)
     {
         using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true);
         await fixture.Notifications.SetEnabledAsync(false);
         var name = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         fixture.Ocr.ReadName = () => name.Task;
-        fixture.Ocr.ShinyText = "发现异色精灵";
+        fixture.Ocr.ShinyText = shinyText;
         Task? scan = null;
         try
         {

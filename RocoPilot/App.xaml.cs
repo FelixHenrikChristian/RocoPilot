@@ -115,6 +115,7 @@ public partial class App : Application
             services.AddSingleton<OnnxTextLocator>();
             services.AddSingleton<GardeningRunner>();
             services.AddSingleton<CropSaleRunner>();
+            services.AddSingleton<ThrowBallRunner>();
             services.AddSingleton<IManualChallengeRunner, ManualChallengeRunner>();
             services.AddSingleton<IInterceptionDriverService, InterceptionDriverService>();
             services.AddSingleton<RuntimeTaskService>();

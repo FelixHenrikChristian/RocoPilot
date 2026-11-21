@@ -28,6 +28,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly EveningRestRunner _eveningRest;
     private readonly StaminaCraftingRunner _staminaCrafting;
     private readonly IManualChallengeRunner _challengeRunner;
+    private readonly ThrowBallRunner _throwBall;
     private readonly IAppNotificationService _notifications;
     private readonly IGameWindowService _gameWindowService;
     private readonly ILogger<IndependentTaskService> _logger;
@@ -70,6 +71,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         IAppNotificationService notifications,
         IGameWindowService gameWindowService,
         StaminaCraftingRunner staminaCrafting, EveningRestRunner eveningRest, MailRunner mail, GardeningRunner gardening, CropSaleRunner cropSale, BattlePassRunner battlePass,
+        ThrowBallRunner throwBall,
         ILogger<IndependentTaskService> logger,
         RecognitionDiagnostics? recognitionDiagnostics = null,
         IScreenCaptureService? screenCapture = null,
@@ -83,6 +85,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
         _runtimeTaskService = runtimeTaskService;
         _localSettingsService = localSettingsService;
         _challengeRunner = challengeRunner;
+        _throwBall = throwBall;
         _notifications = notifications;
         _gameWindowService = gameWindowService;
         _staminaCrafting = staminaCrafting;
@@ -455,6 +458,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
                 case IndependentTaskKind.StaminaCrafting:
                     outcome = await _staminaCrafting.RunAsync(state, UpdateProgress, taskCts.Token);
                     break;
+                case IndependentTaskKind.ThrowBall:
+                    // 循环丢球直到手动停止，正常情况下不会返回。
+                    outcome = await _throwBall.RunAsync(state, settings, UpdateProgress, taskCts.Token);
+                    break;
                 case IndependentTaskKind.LegendaryScan:
                     var names = await _challengeRunner.ScanLegendaryAsync(state, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
@@ -641,6 +648,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
             IndependentTaskKind.EveningRest => "晚风小憩",
             IndependentTaskKind.StaminaCrafting => "体力合成",
             IndependentTaskKind.LegendaryScan => "扫描传说精灵",
+            IndependentTaskKind.ThrowBall => "自动丢球",
             _ => "独立"
         };
     }

@@ -767,7 +767,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         BattleScreen screen,
         CancellationToken cancellationToken)
     {
-        await UpdateEncounterCaptureButtonStateAsync(state, frame, cancellationToken);
+        await UpdateEncounterCaptureButtonStateAsync(state, frame, screen, cancellationToken);
         // 先更新当前状态，长按键序列执行期间也能显示正确的状态和动作。
         Volatile.Write(ref _lastInfoOverlayStatus, screen switch
         {

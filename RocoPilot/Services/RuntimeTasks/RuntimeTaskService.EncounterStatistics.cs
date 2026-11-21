@@ -214,6 +214,7 @@ public sealed partial class RuntimeTaskService
     private async Task UpdateEncounterCaptureButtonStateAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
+        BattleScreen screen,
         CancellationToken cancellationToken)
     {
         var season = _encounterSeasonConfigService.GetCurrentSeason();
@@ -226,7 +227,8 @@ public sealed partial class RuntimeTaskService
             state,
             frame,
             cancellationToken);
-        ApplyEncounterCaptureButtonState(season, observation);
+        var openingEvidence = await MatchS5OpeningHealthAsync(state, frame, season, screen, observation.State, cancellationToken);
+        ApplyEncounterCaptureButtonState(season, observation, openingEvidence);
     }
 
     private async Task<EncounterCaptureButtonObservation> RecognizeEncounterCaptureButtonStateAsync(
@@ -310,11 +312,12 @@ public sealed partial class RuntimeTaskService
 
     private void ApplyEncounterCaptureButtonState(
         EncounterSeasonDefinition season,
-        EncounterCaptureButtonObservation observation)
+        EncounterCaptureButtonObservation observation, bool openingEvidence)
     {
-        if (_encounterCaptureButtonStateTracker.Observe(observation.State))
+        if (_encounterCaptureButtonStateTracker.Observe(observation.State, openingEvidence))
         {
-            _logger.LogInformation("奇遇效果已解除（捕捉按钮恢复可用）");
+            var source = openingEvidence ? S5OpeningHealthSource : "捕捉按钮状态";
+            _logger.LogInformation("奇遇效果已解除（{Source}）", source);
             _logger.LogDebug(
                 "奇遇解除判定：Season={SeasonId}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}",
                 season.Id,
@@ -324,7 +327,7 @@ public sealed partial class RuntimeTaskService
                 observation.DisabledMarkerScore,
                 _encounterCaptureButtonStateTracker.EnabledConfirmationCount,
                 EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount);
-            ApplyAutoBattleEncounterRelievedDetection("捕捉按钮状态");
+            ApplyAutoBattleEncounterRelievedDetection(source);
         }
     }
 
@@ -564,6 +567,8 @@ public sealed partial class RuntimeTaskService
         }
 
         _encounterCaptureButtonStateTracker.Reset();
+        _s5OpeningChecksRemaining = _scene == GameScene.World
+            ? EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount : 0;
     }
 
     private async Task<string> MatchRecognizedSpiritNameAsync(

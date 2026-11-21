@@ -95,14 +95,15 @@ internal sealed class EncounterCaptureButtonStateTracker
         {
             lock (_syncRoot)
             {
-                return _hasSeenDisabled
+                return (_hasSeenDisabled || _consecutiveEnabledCount > 0)
                     && !_isRelieved
                     && _currentState != EncounterCaptureButtonState.Disabled;
             }
         }
     }
 
-    public bool Observe(EncounterCaptureButtonState state)
+    // S5Opening 提供当前帧的开场证据；仍须连续两帧确认，且不改变 HasSeenDisabled。
+    public bool Observe(EncounterCaptureButtonState state, bool openingEvidence = false)
     {
         lock (_syncRoot)
         {
@@ -119,7 +120,7 @@ internal sealed class EncounterCaptureButtonStateTracker
                 return false;
             }
 
-            if (state != EncounterCaptureButtonState.Enabled || !_hasSeenDisabled)
+            if (state != EncounterCaptureButtonState.Enabled || !(_hasSeenDisabled || openingEvidence))
             {
                 _consecutiveEnabledCount = 0;
                 return false;

@@ -11,6 +11,14 @@
       "enabled": true
     },
     {
+      "id": "s5-opening-ten-percent",
+      "x": 1655,
+      "y": 85,
+      "width": 230,
+      "height": 53,
+      "enabled": true
+    },
+    {
       "id": "battle-enemy-name",
       "x": 1679,
       "y": 66,

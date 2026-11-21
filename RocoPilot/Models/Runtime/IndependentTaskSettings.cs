@@ -29,9 +29,9 @@ public sealed class IndependentTaskSettings
     public const int MaximumThrowBallHoldMs = 10000;
     public const int MaximumThrowBallIntervalMs = 600000;
     public const int DefaultThrowBallHoldMinMs = 800;
-    public const int DefaultThrowBallHoldMaxMs = 1500;
-    public const int DefaultThrowBallIntervalMinMs = 1000;
-    public const int DefaultThrowBallIntervalMaxMs = 1500;
+    public const int DefaultThrowBallHoldMaxMs = 1300;
+    public const int DefaultThrowBallIntervalMinMs = 700;
+    public const int DefaultThrowBallIntervalMaxMs = 900;
     public const int MaximumThrowBallDurationMinutes = 480;
     public const int DefaultThrowBallDurationMinutes = 0;
 

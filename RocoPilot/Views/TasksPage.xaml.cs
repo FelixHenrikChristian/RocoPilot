@@ -127,15 +127,17 @@ public sealed partial class TasksPage : Page
                 new TextBlock { Text = "按住左键时长（毫秒）", FontWeight = FontWeights.SemiBold },
                 RangeRow(holdMin, holdMax),
                 new TextBlock { Text = "丢球间隔（毫秒）", FontWeight = FontWeights.SemiBold },
-                RangeRow(intervalMin, intervalMax),
-                new TextBlock
-                {
-                    Opacity = 0.75,
-                    FontSize = 12,
-                    Text = "按住时长与间隔的每次取值在“最短~最长”之间随机，默认按住 800~1500 毫秒、间隔 1000~1500 毫秒。",
-                    TextWrapping = TextWrapping.Wrap
-                }
+                RangeRow(intervalMin, intervalMax)
             }
+        };
+
+        // 与主页面同构：内容外包一层可聚焦容器充当“页面”，
+        // 让空白点击的焦点落到它上面而不是被弹窗转交给首个 NumberBox，
+        // NumberBox 失去焦点后箭头浮层随之收起。
+        var focusSink = new ContentControl
+        {
+            IsTabStop = true,
+            Content = content
         };
 
         var dialog = new AppContentDialog
@@ -143,10 +145,22 @@ public sealed partial class TasksPage : Page
             XamlRoot = XamlRoot,
             Title = "自动丢球配置",
             TitleGlyph = DialogGlyphs.Edit,
-            Content = content,
+            Content = focusSink,
             PrimaryButtonText = "确定",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary
+        };
+
+        // 点击 NumberBox 以外的区域时把焦点移到 focusSink，收起 Compact 步进按钮浮层；
+        // 可聚焦控件（按钮等）随后会自行接管焦点。
+        dialog.PointerPressed += (sender, e) =>
+        {
+            if (e.OriginalSource is DependencyObject source && IsInsideNumberBox(source))
+            {
+                return;
+            }
+
+            focusSink.Focus(FocusState.Programmatic);
         };
 
         if (await dialog.ShowAsync() != ContentDialogResult.Primary)

@@ -40,7 +40,8 @@ public sealed class IndependentTaskServiceTests
         await WaitStoppedAsync(fixture.Service);
         var expected = outcome switch
         {
-            "failure" => "花种挑战：失败：扫描结果过期；传说精灵挑战：未执行",
+            // 一项失败不终止清单：后面的任务照常执行（这里同一个桩，同样失败）。
+            "failure" => "花种挑战：失败：扫描结果过期；传说精灵挑战：失败：扫描结果过期",
             "cancel" => "花种挑战：已取消；传说精灵挑战：未执行",
             _ => "花种挑战：成功：花种 1，2 次；传说精灵挑战：成功：圣羽翼王，3 次"
         };
@@ -50,8 +51,42 @@ public sealed class IndependentTaskServiceTests
         var notifications = fixture.Notifications.Payloads.ToArray();
         if (outcome == "cancel") Assert.HasCount(0, notifications);
         else Assert.AreEqual(outcome == "failure"
-            ? ("每日清单未完成", "花种挑战：扫描结果过期。\n未执行 1 项。")
+            ? ("每日清单未完成", "花种挑战：扫描结果过期。\n共失败 2 项。")
             : ("每日清单完成", "共 2 项，全部完成。"), notifications.Single());
+    }
+
+    [TestMethod]
+    [DataRow(1, true)]
+    [DataRow(2, false)]
+    public async Task StalledChallengeIsRetriedOnceForTheRemainingRuns(int stalls, bool succeeds)
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        // 每次卡住前已经成功 2 次；默认共 6 次。
+        fixture.Runner.Stalls = stalls;
+        Assert.IsTrue((await fixture.Service.StartAsync(IndependentTaskKind.FlowerSeedChallenge)).Success);
+        await WaitStoppedAsync(fixture.Service);
+
+        CollectionAssert.AreEqual(new[] { 6, 4 }, fixture.Runner.RunCounts.ToArray());
+        Assert.AreEqual(succeeds ? "花种挑战完成" : "花种挑战未完成", fixture.Notifications.Payloads.Single().Title);
+        Assert.AreEqual(1, fixture.Runtime.Resumes);
+    }
+
+    [TestMethod]
+    public async Task DailyListContinuesAfterOneTaskStallsTwice()
+    {
+        var fixture = new Fixture();
+        await fixture.Service.LoadSettingsAsync();
+        fixture.Runner.Stalls = 2;
+        var options = new IndependentTaskSettings { FlowerSeedTargetNumber = 1, FlowerSeedRunCount = 6 };
+        Assert.IsTrue((await fixture.Service.StartDailyAsync(
+            [IndependentTaskKind.FlowerSeedChallenge, IndependentTaskKind.LegendaryChallenge], options)).Success);
+        await WaitStoppedAsync(fixture.Service);
+
+        // 花种挑战重试一次后仍卡住，记为失败；传说挑战照常执行。
+        StringAssert.Contains(fixture.Runtime.Results.Last().Description, "花种挑战：失败：测试卡住");
+        StringAssert.Contains(fixture.Runtime.Results.Last().Description, "传说精灵挑战：成功");
+        Assert.AreEqual("每日清单未完成", fixture.Notifications.Payloads.Single().Title);
     }
 
     [TestMethod]
@@ -901,6 +936,8 @@ public sealed class IndependentTaskServiceTests
         public string? Failure;
         public FlowerSeedOption? Target;
         public int RunCount;
+        public int Stalls;
+        public List<int> RunCounts { get; } = [];
         public AutoBattleSettings? BattleSettings;
         public TaskCompletionSource ScanStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ChallengeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -918,6 +955,9 @@ public sealed class IndependentTaskServiceTests
             PreferCondensedMark = preferCondensedMark;
             progress(new("魔法师手册", "点击挑战页", "学院作业"));
             ChallengeStarted.TrySetResult();
+            RunCounts.Add(runCount);
+            if (Stalls-- > 0)
+                throw new RocoPilot.Services.IndependentTasks.Engine.TaskStalledException("测试卡住") { CompletedRuns = 2 };
             if (Failure is not null) throw new InvalidOperationException(Failure);
             if (Hold) await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
         }

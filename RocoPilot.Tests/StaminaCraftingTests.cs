@@ -41,7 +41,8 @@ public class StaminaCraftingTests
 
         public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method)
         {
-            Assert.IsTrue(++_frames < (Stage is "skip-craft" or "craft-result" or "exit-recipe" ? 45 : 8), $"流程停在 {Stage}");
+            // 识别间隔约 0.12 秒：普通界面 5 秒、等结算的界面 20 秒内没有推进视为停滞。
+            Assert.IsTrue(++_frames < (Stage is "skip-craft" or "craft-result" or "exit-recipe" ? 160 : 40), $"流程停在 {Stage}");
             if (Stage == "craft-result" && _staticResult is not null) return _staticResult.AddReference();
             var name = Stage switch
             {

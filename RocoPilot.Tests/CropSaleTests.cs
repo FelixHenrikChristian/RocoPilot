@@ -105,7 +105,8 @@ public sealed class CropSaleTests
         public List<long> FlowerClickIntervals { get; } = [];
         private readonly Stopwatch _sinceLastInput = new();
 
-        private void CheckInputInterval(int minimumMs = 1000)
+        // 输入之间至少隔着“等画面更新 + 反应时间”，不再要求固定的 1 秒。
+        private void CheckInputInterval(int minimumMs = 400)
         {
             if (_sinceLastInput.IsRunning)
                 Assert.IsTrue(_sinceLastInput.ElapsedMilliseconds >= minimumMs, $"{Scene} 操作间隔只有 {_sinceLastInput.ElapsedMilliseconds} ms");
@@ -153,7 +154,7 @@ public sealed class CropSaleTests
 
         public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token)
         {
-            CheckInputInterval();
+            CheckInputInterval(200);
             Check(x, y, 417, 568);
             Assert.AreEqual(-6 * 120, delta);
             Assert.AreEqual("top", Scene);
@@ -177,7 +178,7 @@ public sealed class CropSaleTests
             Check(x, y, px, py);
             var repeat = Scene == "selected" && next == "selected";
             if (repeat) FlowerClickIntervals.Add(_sinceLastInput.ElapsedMilliseconds);
-            CheckInputInterval(repeat ? 145 : Scene == "middle" ? 195 : 1000);
+            CheckInputInterval(repeat ? 145 : Scene == "middle" ? 195 : 400);
             if (next == "selected") FlowerClicks++;
             Scene = next;
             // 与实际鼠标输入一样，定位等待和按压各占 50 ms。

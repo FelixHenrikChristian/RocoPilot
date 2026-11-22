@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.ImageMatching;
@@ -6,47 +6,32 @@ using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.IndependentTasks.Engine;
 
 namespace RocoPilot.Services.IndependentTasks;
 
 public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatchingService images,
-    IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr)
+    IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr,
+    ILogger<EveningRestRunner>? logger = null)
 {
     private enum Step { Open, Explore, CheckEvent, Teleport, Arrival, Monitor, Exit }
 
     public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
-        var input = state.Options.AutoBattleSettings;
-        keyboard.EnsureReady(input.KeyboardInputMethod);
-        var step = Step.Open;
         var arrived = false;
-        var freshAfter = DateTimeOffset.MinValue;
-        var timer = Stopwatch.StartNew();
         var exitReason = "";
         string? starlight = null;
-        progress(new("晚风小憩", "打开活动"));
+        var loop = new TaskLoop<Step>("晚风小憩", state, capture, keyboard, mouse, progress,
+            step => Describe(step, null), Step.Open, token, logger)
+        {
+            Timeout = _ => TimeSpan.FromSeconds(60),
+            Poll = step => step == Step.Monitor ? 5000 : TaskPacing.PollMs
+        };
         while (true)
         {
-            await Task.Delay(step == Step.Monitor ? 5000 : 400, token);
-            if (!keyboard.IsWindowAvailable(window.Hwnd)) throw new InvalidOperationException("游戏窗口已关闭。");
-            if (!keyboard.IsWindowForeground(window.Hwnd))
-            {
-                if (timer.IsRunning) progress(new("晚风小憩", "已暂停，等待切回游戏"));
-                timer.Stop();
-                freshAfter = DateTimeOffset.UtcNow;
-                continue;
-            }
-            if (!timer.IsRunning)
-            {
-                timer.Start();
-                progress(new("晚风小憩", Describe(step, starlight)));
-            }
-            if (timer.Elapsed.TotalSeconds > 60)
-                throw new TimeoutException($"晚风小憩等待超时：{Describe(step, starlight)}。");
-
-            using var frame = await Task.Run(() => capture.Capture(window, state.Options.CaptureMethod), token);
-            if (frame is null || frame.CapturedAt <= freshAfter) continue;
+            using var frame = await loop.NextFrameAsync();
+            if (frame is null) continue;
             var screen = new DailyTaskScreen(frame, window, images);
             Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom) =>
                 screen.Find($"evening-rest/{name}", left, top, right, bottom, token);
@@ -76,98 +61,81 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                     value is >= 0 and <= 1200 && text == $"{value}/1200" ? text : null;
             }
 
-            async Task<bool> Key(string key)
+            void Leave(string reason)
             {
-                if (!keyboard.IsWindowForeground(window.Hwnd)) return false;
-                await keyboard.SendSequenceAsync(window.Hwnd, key,
-                    new() { Method = input.KeyboardInputMethod, HoldDurationMs = input.KeyboardHoldDurationMs }, token);
-                freshAfter = DateTimeOffset.UtcNow;
-                await Task.Delay(1000, token);
-                return true;
+                exitReason = reason;
+                loop.Advance(Step.Exit, reason);
             }
 
-            async Task Click(ImageMatchResult match)
+            var result = await loop.RunStepAsync(async () =>
             {
-                await mouse.ClickAsync(window.Hwnd, screen.ClientX(match.X + match.Width / 2d),
-                    screen.ClientY(match.Y + match.Height / 2d), input.KeyboardInputMethod, token);
-                freshAfter = DateTimeOffset.UtcNow;
-                await Task.Delay(1000, token);
-            }
-
-            var previous = step;
-            var previousStarlight = starlight;
-            switch (step)
-            {
-                case Step.Open:
-                case Step.Arrival:
-                    if (await screen.World(token) is not null)
-                    {
-                        arrived = step == Step.Arrival;
-                        if (await Key("F2")) step = Step.Explore;
-                    }
-                    else if (step == Step.Open && (await Explore() is not null ||
-                        await Find("tab", 300, 1025, 470, 1140) is not null)) step = Step.Explore;
-                    break;
-                case Step.Explore:
-                    if (await Explore() is not null) step = Step.CheckEvent;
-                    else if (await Find("tab", 300, 1025, 470, 1140) is { } tab) await Click(tab);
-                    break;
-                case Step.CheckEvent:
-                case Step.Monitor:
-                    if (await Explore() is null) break;
-                    if (await Event() is null)
-                    {
-                        if (await Find("event-unselected", 85, 118, 200, 1000) is { } activity)
+                switch (loop.Step)
+                {
+                    case Step.Open:
+                    case Step.Arrival:
+                        if (await screen.World(token) is not null)
                         {
-                            await Click(activity);
+                            var arriving = loop.Step == Step.Arrival;
+                            if (!await loop.KeyAsync("F2")) break;
+                            arrived |= arriving;
+                            loop.Advance(Step.Explore);
+                        }
+                        else if (loop.Step == Step.Open && (await Explore() is not null ||
+                            await Find("tab", 300, 1025, 470, 1140) is not null)) loop.Advance(Step.Explore);
+                        break;
+                    case Step.Explore:
+                        if (await Explore() is not null) loop.Advance(Step.CheckEvent);
+                        else if (await Find("tab", 300, 1025, 470, 1140) is { } tab && loop.InputIdleFor(TaskPacing.RepeatKeyMs))
+                            await loop.ClickAsync(screen, tab);
+                        break;
+                    case Step.CheckEvent:
+                    case Step.Monitor:
+                        if (await Explore() is null) break;
+                        if (await Event() is null)
+                        {
+                            if (await Find("event-unselected", 85, 118, 200, 1000) is { } activity)
+                            {
+                                if (loop.InputIdleFor(TaskPacing.RepeatKeyMs)) await loop.ClickAsync(screen, activity);
+                                break;
+                            }
+                            if (arrived || loop.StepElapsed.TotalSeconds < 3) break;
+                            Leave("跳过：未找到晚间休憩活动");
                             break;
                         }
-                        if (arrived || timer.Elapsed.TotalSeconds < 3) break;
-                        exitReason = "跳过：未找到晚间休憩活动";
-                        step = Step.Exit;
+                        var previousStarlight = starlight;
+                        starlight = await ReadStarlight() ?? starlight;
+                        if (starlight == "1200/1200") Leave("成功：本日星光已达 1200/1200");
+                        else if (arrived)
+                        {
+                            // 有效活动页可以长时间停留；只对界面丢失使用导航超时。
+                            if (loop.Step != Step.Monitor) loop.Advance(Step.Monitor, Describe(Step.Monitor, starlight));
+                            else
+                            {
+                                loop.KeepAlive();
+                                if (starlight != previousStarlight) loop.Report(Describe(Step.Monitor, starlight));
+                            }
+                        }
+                        else if (await Find("go", 1470, 995, 1620, 1130) is { } go)
+                        {
+                            if (await loop.ClickAsync(screen, go)) loop.Advance(Step.Teleport);
+                        }
+                        else if (loop.StepElapsed.TotalSeconds >= 5) Leave("跳过：未找到前往按钮");
                         break;
-                    }
-                    starlight = await ReadStarlight() ?? starlight;
-                    if (starlight == "1200/1200")
-                    {
-                        exitReason = "成功：本日星光已达 1200/1200";
-                        step = Step.Exit;
-                    }
-                    else if (arrived)
-                    {
-                        // 有效活动页可以长时间停留；只对界面丢失使用导航超时。
-                        timer.Restart();
-                        step = Step.Monitor;
-                    }
-                    else if (await Find("go", 1470, 995, 1620, 1130) is { } go)
-                    {
-                        await Click(go);
-                        step = Step.Teleport;
-                    }
-                    else if (timer.Elapsed.TotalSeconds >= 5)
-                    {
-                        exitReason = "跳过：未找到前往按钮";
-                        step = Step.Exit;
-                    }
-                    break;
-                case Step.Teleport:
-                    if (await screen.Map(token) is not null &&
-                        await screen.Teleport(token) is { } teleport)
-                    {
-                        await Click(teleport);
-                        step = Step.Arrival;
-                    }
-                    break;
-                case Step.Exit:
-                    if (await screen.World(token) is not null) return exitReason;
-                    if (await Explore() is not null) await Key("Esc");
-                    break;
-            }
-            if (step != previous) timer.Restart();
-            if (step != previous || (step == Step.Monitor && starlight != previousStarlight))
-            {
-                progress(new("晚风小憩", step == Step.Exit ? exitReason : Describe(step, starlight)));
-            }
+                    case Step.Teleport:
+                        if (await screen.Map(token) is not null &&
+                            await screen.Teleport(token) is { } teleport &&
+                            await loop.ClickAsync(screen, teleport))
+                            loop.Advance(Step.Arrival);
+                        break;
+                    case Step.Exit:
+                        if (await screen.World(token) is not null) return exitReason;
+                        if (await Explore() is not null) await loop.RepeatKeyAsync("Esc");
+                        break;
+                }
+
+                return null;
+            });
+            if (result is not null) return result;
         }
     }
 

@@ -29,8 +29,10 @@ internal static partial class TaskNotificationText
         var skipped = items.Count(item => IsSkipped(item.Outcome));
         var pending = items.Count(item => item.Outcome is null);
         var done = items.Count(item => item.Outcome is not null && !IsSkipped(item.Outcome) && !item.Outcome.StartsWith("失败"));
+        var failed = items.Count(item => item.Outcome?.StartsWith("失败") == true);
         var counts = new[]
         {
+            failed > 1 ? $"共失败 {failed} 项" : null,
             done > 0 ? $"已完成 {done} 项" : null,
             skipped > 0 ? $"跳过 {skipped} 项" : null,
             pending > 0 ? $"未执行 {pending} 项" : null

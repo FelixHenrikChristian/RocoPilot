@@ -1,56 +1,33 @@
-using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Services.IndependentTasks.Engine;
 
 namespace RocoPilot.Services.IndependentTasks;
 
 public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageMatchingService images,
-    IKeyboardInputService keyboard, IMouseInputService mouse)
+    IKeyboardInputService keyboard, IMouseInputService mouse, ILogger<StaminaCraftingRunner>? logger = null)
 {
-    private const int FramePollMs = 350;
-    private const int ActionPauseMs = 900;
+    // 结算动画期间 Esc 不起作用；制造按钮消失后及每次 Esc 之后都等这么久再按。
     private static readonly TimeSpan ResultPause = TimeSpan.FromSeconds(3);
 
     public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
-        var input = state.Options.AutoBattleSettings;
-        keyboard.EnsureReady(input.KeyboardInputMethod);
-        var step = Step.OpenMap;
+        var loop = new TaskLoop<Step>("体力合成", state, capture, keyboard, mouse, progress, Describe, Step.OpenMap, token, logger)
+        {
+            Timeout = _ => TimeSpan.FromSeconds(45)
+        };
         var outcome = "成功：已制造赛季球";
-        var timer = Stopwatch.StartNew();
         var nextResultEscape = ResultPause;
-        DateTimeOffset? lastResultFrame = null;
-        var freshAfter = DateTimeOffset.UtcNow;
-        progress(new("体力合成", "打开地图"));
 
         while (true)
         {
-            await Task.Delay(FramePollMs, token);
-            if (!keyboard.IsWindowAvailable(window.Hwnd)) throw new InvalidOperationException("游戏窗口已关闭。");
-            if (!keyboard.IsWindowForeground(window.Hwnd))
-            {
-                if (timer.IsRunning) progress(new("体力合成", "已暂停，等待切回游戏"));
-                timer.Stop();
-                lastResultFrame = null;
-                freshAfter = DateTimeOffset.UtcNow;
-                continue;
-            }
-            if (!timer.IsRunning)
-            {
-                timer.Start();
-                progress(new("体力合成", Describe(step)));
-            }
-            if (timer.Elapsed > TimeSpan.FromSeconds(45))
-                throw new TimeoutException($"体力合成等待超时：{Describe(step)}。");
-
-            using var frame = await Task.Run(() => capture.Capture(window, state.Options.CaptureMethod), token);
-            // 静止的结算画面可能只返回上一帧；允许在同一帧上按间隔重试 ESC。
-            if (frame is null || (frame.CapturedAt <= freshAfter &&
-                !(step == Step.ExitRecipe && frame.CapturedAt == lastResultFrame && timer.Elapsed >= nextResultEscape))) continue;
+            using var frame = await loop.NextFrameAsync();
+            if (frame is null) continue;
             var screen = new DailyTaskScreen(frame, window, images);
             Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom, double threshold = .94) =>
                 screen.Find($"stamina-crafting/{name}", left, top, right, bottom, token, threshold);
@@ -59,146 +36,112 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             Task<ImageMatchResult?> Choices() => Find("choices", 1420, 620, 1950, 735, .90);
             Task<ImageMatchResult?> SeasonTimer() => Find("timer", 550, 870, 1020, 971);
             Task<ImageMatchResult?> Maximum() => Find("max", 1460, 975, 1560, 1060);
-            async Task AfterInput()
-            {
-                freshAfter = DateTimeOffset.UtcNow;
-                await Task.Delay(ActionPauseMs, token);
-            }
 
-            async Task Click(ImageMatchResult target, int dx = 0, int dy = 0)
+            var result = await loop.RunStepAsync(async () =>
             {
-                await mouse.ClickAsync(window.Hwnd, screen.ClientX(target.X + target.Width / 2d + dx * screen.Scale),
-                    screen.ClientY(target.Y + target.Height / 2d + dy * screen.Scale), input.KeyboardInputMethod, token);
-                await AfterInput();
-            }
-
-            async Task Key(string key, int? hold = null)
-            {
-                if (!keyboard.IsWindowForeground(window.Hwnd))
-                    throw new InvalidOperationException("游戏窗口已离开前台。");
-                await keyboard.SendSequenceAsync(window.Hwnd, key,
-                    new() { Method = input.KeyboardInputMethod, HoldDurationMs = hold ?? input.KeyboardHoldDurationMs }, token);
-                await AfterInput();
-            }
-
-            var previous = step;
-            switch (step)
-            {
-                case Step.OpenMap:
-                    if (await screen.Map(token) is not null) step = Step.SelectMap;
-                    else if (await screen.World(token) is not null)
-                    {
-                        await Key("M");
-                        step = Step.SelectMap;
-                    }
-                    break;
-                case Step.SelectMap:
-                    var (selected, target) = await screen.SelectGarden(token);
-                    if (target != null) await Click(target);
-                    if (selected) step = Step.Cauldron;
-                    break;
-                case Step.Cauldron:
-                    if (await screen.Garden(token) is not null &&
-                        await Find("cauldron", 350, 210, 1530, 960) is { } marker)
-                    {
-                        await Click(marker);
-                        step = Step.Teleport;
-                    }
-                    break;
-                case Step.Teleport:
-                    if (await Find("teleport-title", 1280, 0, 1790, 118) is not null &&
-                        await screen.Teleport(token) is { } teleport)
-                    {
-                        await Click(teleport);
-                        step = Step.Approach;
-                    }
-                    break;
-                case Step.Approach:
-                    if (await Find("interact", 1100, 420, 1610, 800) is not null)
-                    {
-                        await Key("F");
-                        step = Step.Dialogue;
-                    }
-                    else if (await screen.World(token) is not null) await Key("W", 300);
-                    break;
-                case Step.Dialogue:
-                    if (await Choices() is not null)
-                    {
-                        await Key("1");
-                        step = Step.SelectRecipe;
-                    }
-                    else if (await screen.Find("flower-seed/animation-skip", 80, 10, 240, 146, token) is not null)
-                        await Key("Esc");
-                    else if (await Find("playing", 1700, 0, 1980, 102) is not null)
-                        await Key("Space");
-                    break;
-                case Step.SelectRecipe:
-                    if (await Recipe() is not null && await Find("badge", 250, 110, 1100, 906, .87) is { } badge)
-                    {
-                        await Click(badge, -45, 45);
-                        step = Step.SetAmount;
-                    }
-                    break;
-                case Step.SetAmount:
-                case Step.Make:
-                    if (await SeasonTimer() is null) break;
-                    if (await Find("make-disabled", 1640, 1010, 1960, 1140) is not null)
-                    {
-                        outcome = "跳过：体力不足";
-                        await Key("Esc");
-                        step = Step.ExitDialogue;
+                switch (loop.Step)
+                {
+                    case Step.OpenMap:
+                        if (await screen.Map(token) is not null) loop.Advance(Step.SelectMap);
+                        else if (await screen.World(token) is not null && await loop.KeyAsync("M")) loop.Advance(Step.SelectMap);
                         break;
-                    }
-                    if (await Maximum() is not null)
-                    {
-                        if (await MakeButton() is { } make)
+                    case Step.SelectMap:
+                        var (selected, target) = await screen.SelectGarden(token);
+                        if (selected)
                         {
-                            await Click(make);
-                            step = Step.ConfirmMake;
+                            if (target is null || await loop.ClickAsync(screen, target)) loop.Advance(Step.Cauldron);
+                        }
+                        // 展开地图列表的三角是开关，等列表展开后再判断，不连点。
+                        else if (target is not null && loop.InputIdleFor(TaskPacing.RepeatKeyMs))
+                            await loop.ClickAsync(screen, target);
+                        break;
+                    case Step.Cauldron:
+                        if (await screen.Garden(token) is not null &&
+                            await Find("cauldron", 350, 210, 1530, 960) is { } marker &&
+                            await loop.ClickAsync(screen, marker))
+                            loop.Advance(Step.Teleport);
+                        break;
+                    case Step.Teleport:
+                        if (await Find("teleport-title", 1280, 0, 1790, 118) is not null &&
+                            await screen.Teleport(token) is { } teleport &&
+                            await loop.ClickAsync(screen, teleport))
+                            loop.Advance(Step.Approach);
+                        break;
+                    case Step.Approach:
+                        if (await Find("interact", 1100, 420, 1610, 800) is not null)
+                        {
+                            if (await loop.KeyAsync("F")) loop.Advance(Step.Dialogue);
+                        }
+                        else if (await screen.World(token) is not null) await loop.KeyAsync("W", 300);
+                        break;
+                    case Step.Dialogue:
+                        if (await Choices() is not null)
+                        {
+                            if (await loop.KeyAsync("1")) loop.Advance(Step.SelectRecipe);
+                        }
+                        else if (await screen.Find("flower-seed/animation-skip", 80, 10, 240, 146, token) is not null)
+                            await loop.RepeatKeyAsync("Esc");
+                        else if (await Find("playing", 1700, 0, 1980, 102) is not null)
+                            await loop.RepeatKeyAsync("Space");
+                        break;
+                    case Step.SelectRecipe:
+                        if (await Recipe() is not null && await Find("badge", 250, 110, 1100, 906, .87) is { } badge &&
+                            await loop.ClickAsync(screen, badge, -45, 45))
+                            loop.Advance(Step.SetAmount);
+                        break;
+                    case Step.SetAmount:
+                    case Step.Make:
+                        if (await SeasonTimer() is null) break;
+                        if (await Find("make-disabled", 1640, 1010, 1960, 1140) is not null)
+                        {
+                            outcome = "跳过：体力不足";
+                            if (await loop.KeyAsync("Esc")) loop.Advance(Step.ExitDialogue);
+                            break;
+                        }
+                        if (await Maximum() is not null)
+                        {
+                            if (await MakeButton() is { } make && await loop.ClickAsync(screen, make))
+                                loop.Advance(Step.ConfirmMake);
+                            break;
+                        }
+                        if (loop.Step == Step.SetAmount && await Find("handle", 1180, 970, 1305, 1070) is { } handle)
+                        {
+                            var px = handle.X + handle.Width / 2d;
+                            var py = screen.ClientY(handle.Y + handle.Height / 2d);
+                            if (await loop.DragAsync(screen.ClientX(px), py, screen.ClientX(px + 276 * screen.Scale), py))
+                                loop.Advance(Step.Make);
                         }
                         break;
-                    }
-                    if (step == Step.SetAmount && await Find("handle", 1180, 970, 1305, 1070) is { } handle)
-                    {
-                        var px = handle.X + handle.Width / 2d;
-                        var py = screen.ClientY(handle.Y + handle.Height / 2d);
-                        await mouse.DragAsync(window.Hwnd, screen.ClientX(px), py, screen.ClientX(px + 276 * screen.Scale), py,
-                            input.KeyboardInputMethod, token);
-                        await AfterInput();
-                        step = Step.Make;
-                    }
-                    break;
-                case Step.ConfirmMake:
-                    // 制造会消耗体力。复查同一按钮，确认消失后再开始计时。
-                    if (await MakeButton() is null) step = Step.ExitRecipe;
-                    break;
-                case Step.ExitRecipe:
-                    if (timer.Elapsed < nextResultEscape) break;
-                    var returnedToRecipe = await Recipe() is not null;
-                    lastResultFrame = frame.CapturedAt;
-                    await Key("Esc");
-                    if (returnedToRecipe) step = Step.ExitDialogue;
-                    else nextResultEscape = timer.Elapsed + ResultPause;
-                    break;
-                case Step.ExitDialogue:
-                    if (await Choices() is not null)
-                    {
-                        await Key("Esc");
-                        step = Step.ReturnWorld;
-                    }
-                    else if (await Recipe() is not null) await Key("Esc");
-                    break;
-                case Step.ReturnWorld:
-                    if (await screen.World(token) is not null) return outcome;
-                    if (await Choices() is not null) await Key("Esc");
-                    break;
-            }
+                    case Step.ConfirmMake:
+                        // 制造会消耗体力。按钮还在说明点击没生效，循环会回到上一步重新点击；消失后才开始等结算。
+                        if (await MakeButton() is not null) break;
+                        loop.CommittedOutcome = outcome;
+                        nextResultEscape = ResultPause;
+                        loop.Advance(Step.ExitRecipe);
+                        break;
+                    case Step.ExitRecipe:
+                        if (loop.StepElapsed < nextResultEscape) break;
+                        var returnedToRecipe = await Recipe() is not null;
+                        if (!await loop.KeyAsync("Esc", react: false)) break;
+                        if (returnedToRecipe) loop.Advance(Step.ExitDialogue);
+                        else nextResultEscape = loop.StepElapsed + ResultPause;
+                        break;
+                    case Step.ExitDialogue:
+                        if (await Choices() is not null)
+                        {
+                            if (await loop.RepeatKeyAsync("Esc")) loop.Advance(Step.ReturnWorld);
+                        }
+                        else if (await Recipe() is not null) await loop.RepeatKeyAsync("Esc");
+                        break;
+                    case Step.ReturnWorld:
+                        if (await screen.World(token) is not null) return outcome;
+                        if (await Choices() is not null) await loop.RepeatKeyAsync("Esc");
+                        break;
+                }
 
-            if (previous != step)
-            {
-                timer.Restart();
-                progress(new("体力合成", Describe(step)));
-            }
+                return null;
+            });
+            if (result is not null) return result;
         }
     }
 

@@ -492,6 +492,11 @@ public sealed class ManualChallengeRunner(
                 if (!previewEnabled) await Task.Delay(180, token);
             }
         }
+        catch (TimeoutException ex) when (ex is not Engine.TaskStalledException)
+        {
+            // 点击、等待画面超时属于“卡住”：带上已经成功的次数，调度层退回大世界后只补剩下的。
+            throw new Engine.TaskStalledException(ex.Message, ex) { CompletedRuns = flow.CompletedCount };
+        }
         finally
         {
             pendingFrame?.Dispose();

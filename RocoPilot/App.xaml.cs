@@ -23,6 +23,7 @@ using RocoPilot.Services.Capture.Backends;
 using RocoPilot.Services.Encounters;
 using RocoPilot.Services.ImageMatching;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.IndependentTasks.Engine;
 using RocoPilot.Services.Logging;
 using RocoPilot.Services.Recognition;
 using RocoPilot.Services.RuntimeTasks;
@@ -106,6 +107,7 @@ public partial class App : Application
             services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
             services.AddSingleton<IMouseInputService, MouseInputService>();
             services.AddSingleton<ManualChallengeScreenRecognizer>();
+            services.AddSingleton<WorldRecovery>();
             services.AddSingleton<StaminaCraftingRunner>();
             services.AddSingleton<EveningRestRunner>();
             services.AddSingleton<MailRunner>();

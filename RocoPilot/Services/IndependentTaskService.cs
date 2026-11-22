@@ -7,6 +7,7 @@ using RocoPilot.Models.Capture;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Notifications;
 using RocoPilot.Services.IndependentTasks;
+using RocoPilot.Services.IndependentTasks.Engine;
 using RocoPilot.Services.Recognition;
 
 namespace RocoPilot.Services;
@@ -33,6 +34,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
     private readonly RecognitionDiagnostics? _recognitionDiagnostics;
     private readonly IScreenCaptureService? _screenCapture;
     private readonly NotificationScreenshotStore? _screenshots;
+    private readonly WorldRecovery? _worldRecovery;
+
+    /// <summary>任务卡住后，退回大世界重跑的次数。</summary>
+    private const int MaximumTaskRetries = 1;
 
     private readonly SemaphoreSlim _stateLock = new(1, 1);
     private readonly SemaphoreSlim _settingsSaveLock = new(1, 1);
@@ -68,8 +73,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
         ILogger<IndependentTaskService> logger,
         RecognitionDiagnostics? recognitionDiagnostics = null,
         IScreenCaptureService? screenCapture = null,
-        NotificationScreenshotStore? screenshots = null)
+        NotificationScreenshotStore? screenshots = null,
+        WorldRecovery? worldRecovery = null)
     {
+        _worldRecovery = worldRecovery;
         _recognitionDiagnostics = recognitionDiagnostics;
         _screenCapture = screenCapture;
         _screenshots = screenshots;
@@ -260,6 +267,9 @@ public sealed class IndependentTaskService : IIndependentTaskService
         var taskName = GetTaskDisplayName(kind);
         string? lastProgress = null;
         RuntimeTaskState? session = null;
+        (string Task, string Reason)? firstFailure = null;
+        CapturedFrame? failureFrame = null;
+        var abortRemaining = false;
         try
         {
             UpdateProgress(new("准备任务", "等待实时任务暂停"));
@@ -287,8 +297,141 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     _logger.LogInformation("每日任务 {Index}/{Total}：开始执行{Task}", index + 1, tasks.Count, taskName);
                 else
                     _logger.LogInformation("{Task}：开始执行", taskName);
-                switch (kind)
+                // 卡住（超时）时退回大世界重跑一次；清单里的任务互不拖累，失败了记下来继续跑后面的。
+                var doneRuns = 0;
+                Exception? failure = null;
+                for (var attempt = 0; ; attempt++)
+                {
+                    try
+                    {
+                        outcome = await RunKindAsync(state, kind, doneRuns);
+                        failure = null;
+                        break;
+                    }
+                    catch (Exception ex) when (!taskCts.IsCancellationRequested)
+                    {
+                        failure = ex;
+                        var stalled = ex is TimeoutException;
+                        var committed = (ex as TaskStalledException)?.CommittedOutcome;
+                        doneRuns += (ex as TaskStalledException)?.CompletedRuns ?? 0;
+                        var retry = stalled && committed is null && attempt < MaximumTaskRetries;
+                        // 单独运行且不再重试：保持原样，让画面停在出错的界面，方便看卡在哪。
+                        if (!isDaily && !retry && committed is null) break;
+                        if (retry)
+                            _logger.LogWarning(ex, "{Task}卡住了，退回大世界后重试（第 {Attempt} 次）", taskName, attempt + 1);
+                        else if (committed is null)
+                            _logger.LogError(ex, "{Task}失败，继续执行清单里的下一项", taskName);
+                        if (isDaily && committed is null && !retry && _notifications.IsEnabled)
+                            failureFrame ??= await CaptureFailureFrameAsync();
+                        UpdateProgress(new("恢复", retry ? "退回大世界后重试" : "退回大世界"));
+                        var recovered = _worldRecovery is null || await _worldRecovery.ReturnToWorldAsync(state, taskCts.Token);
+                        if (recovered && committed is not null)
+                        {
+                            _logger.LogWarning(ex, "{Task}的操作已完成，但没能正常退出界面，已退回大世界", taskName);
+                            outcome = committed;
+                            failure = null;
+                            break;
+                        }
+                        if (!recovered)
+                        {
+                            // 回不到大世界，后面的任务无从开始。
+                            failure = new InvalidOperationException($"{ex.Message.TrimEnd('。')}，且未能退回大世界。", ex);
+                            abortRemaining = true;
+                            break;
+                        }
+                        if (!retry) break;
+                        lastProgress = null;
+                    }
+                }
+                if (failure is not null)
+                {
+                    if (!isDaily || abortRemaining) throw failure;
+                    outcomes[index] = $"失败：{failure.Message}";
+                    firstFailure ??= (taskName, failure.Message);
+                    activeIndex = -1;
+                    continue;
+                }
+                outcomes[index] = outcome;
+                activeIndex = -1;
+                // 挑战和扫描在上面各自记过结果，这里只补日常任务的结束。
+                if (!HasOwnLog(kind)) _logger.LogInformation("{Task}结束：{Outcome}", taskName, outcome);
+            }
+
+            var failed = outcomes.Count(item => item?.StartsWith("失败") == true);
+            StatusMessage = !isDaily ? $"{taskName}：{outcomes[0]}"
+                : failed == 0 ? $"每日清单结束，共 {tasks.Count} 项" : $"每日清单结束，{failed} 项失败";
+            if (isDaily)
             {
+                // 每日清单只通知最终结果，各子任务的完成信息仍显示在灵动岛。
+                _runtimeTaskService.ShowIndependentTaskResult(StatusMessage, Summary());
+                if (firstFailure is { } first)
+                    await NotifyAsync(TaskNotificationText.DailyFailed(first.Task, first.Reason, Outcomes()), failureFrame, openGame: true);
+                else
+                    await NotifyAsync(TaskNotificationText.DailyCompleted(Outcomes()));
+            }
+        }
+        catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
+        {
+            if (activeIndex >= 0) outcomes[activeIndex] = "已取消";
+            _logger.LogInformation("{Task}：已取消", taskName);
+            StatusMessage = isDaily ? "每日任务已停止" : $"{taskName}已停止";
+        }
+        catch (Exception ex)
+        {
+            if (activeIndex >= 0) outcomes[activeIndex] = $"失败：{ex.Message}";
+            _logger.LogError(ex, "{Task}失败，任务已停止", GetTaskDisplayName(kind));
+            StatusMessage = $"{(isDaily ? "每日任务" : taskName)}已停止：{ex.Message}";
+            // 失败原因上一行已经记过，这里只更新遮罩。
+            _runtimeTaskService.UpdateIndependentTaskStatus(taskName, new("任务失败", ex.Message));
+            _runtimeTaskService.ShowIndependentTaskResult($"{(isDaily ? "每日任务" : taskName)}已停止",
+                isDaily ? $"{ex.Message.TrimEnd('。')}。{Summary()}" : ex.Message);
+            // 出错时附上当前游戏画面，不在电脑前也能看出卡在哪个界面；点击通知直接回到游戏。
+            if (_notifications.IsEnabled) failureFrame ??= await CaptureFailureFrameAsync();
+            await NotifyAsync(isDaily ? TaskNotificationText.DailyFailed(taskName, ex.Message, Outcomes())
+                : TaskNotificationText.TaskFailed(taskName, ex.Message), failureFrame, openGame: true);
+        }
+        finally
+        {
+            if (isDaily) _logger.LogInformation("每日任务汇总：{Summary}", Summary());
+            _recognitionDiagnostics?.Flush();
+            (_challengeRunner as IChallengeResultFrameSource)?.TakeResultFrame()?.Dispose();
+            failureFrame?.Dispose();
+            var stateCleared = false;
+            await _stateLock.WaitAsync();
+            try
+            {
+                if (ReferenceEquals(_taskCts, taskCts))
+                {
+                    _runtimeTaskService.UpdateIndependentTaskStatus(null);
+                    if (ownsSuspension)
+                    {
+                        _runtimeTaskService.Resume();
+                    }
+
+                    _taskCts = null;
+                    _taskLoop = null;
+                    _runningTaskKind = null;
+                    IsDailyRunning = false;
+                    stateCleared = true;
+                }
+            }
+            finally
+            {
+                _stateLock.Release();
+            }
+
+            taskCts.Dispose();
+            if (stateCleared)
+            {
+                NotifyStateChanged();
+            }
+        }
+
+        async Task<string> RunKindAsync(RuntimeTaskState state, IndependentTaskKind kind, int doneRuns)
+        {
+            var outcome = "成功";
+                switch (kind)
+                {
                 case IndependentTaskKind.BattlePassRewards:
                     outcome = await _battlePass.RunAsync(state, UpdateProgress, taskCts.Token);
                     break;
@@ -329,8 +472,10 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {names.Count} 个传说精灵", "名单仅本次启动有效");
                     break;
                 case IndependentTaskKind.LegendaryChallenge:
-                    await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
-                        settings.LegendaryChallengeRunCount, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient,
+                    // 重试时只补剩下的次数，已经捉到的不重打。
+                    if (settings.LegendaryChallengeRunCount > doneRuns)
+                        await _challengeRunner.RunLegendaryAsync(state, settings.LegendaryTargetName,
+                        settings.LegendaryChallengeRunCount - doneRuns, settings.LegendaryDifficulty, settings.UseLegendaryMarkWhenInsufficient,
                         settings.LegendaryAtTargetLocation, battleSettings, UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
                     var legendaryTarget = settings.LegendaryAtTargetLocation ? "当前位置" : settings.LegendaryTargetName;
@@ -341,10 +486,11 @@ public sealed class IndependentTaskService : IIndependentTaskService
                         settings.LegendaryChallengeRunCount);
                     break;
                 case IndependentTaskKind.FlowerSeedChallenge:
-                    await _challengeRunner.RunAsync(state,
+                    if (settings.FlowerSeedRunCount > doneRuns)
+                        await _challengeRunner.RunAsync(state,
                         settings.FlowerSeedAtTargetLocation ? null
                             : settings.FlowerSeedOptions.Single(option => option.Number == settings.FlowerSeedTargetNumber),
-                        settings.FlowerSeedRunCount, settings.FlowerSeedAtTargetLocation,
+                        settings.FlowerSeedRunCount - doneRuns, settings.FlowerSeedAtTargetLocation,
                         settings.FlowerSeedPreferCondensedMark, battleSettings,
                         UpdateProgress, taskCts.Token);
                     taskCts.Token.ThrowIfCancellationRequested();
@@ -376,74 +522,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     _runtimeTaskService.ShowIndependentTaskResult($"扫描完成，共识别 {_settings.FlowerSeedOptions.Count} 个花种", "花种选项已更新");
                     break;
                 }
-                outcomes[index] = outcome;
-                activeIndex = -1;
-                // 挑战和扫描在上面各自记过结果，这里只补日常任务的结束。
-                if (!HasOwnLog(kind)) _logger.LogInformation("{Task}结束：{Outcome}", taskName, outcome);
-            }
-
-            StatusMessage = isDaily ? $"每日清单结束，共 {tasks.Count} 项" : $"{taskName}：{outcomes[0]}";
-            if (isDaily)
-            {
-                // 每日清单只通知最终结果，各子任务的完成信息仍显示在灵动岛。
-                _runtimeTaskService.ShowIndependentTaskResult(StatusMessage, Summary());
-                await NotifyAsync(TaskNotificationText.DailyCompleted(Outcomes()));
-            }
-        }
-        catch (OperationCanceledException) when (taskCts.IsCancellationRequested)
-        {
-            if (activeIndex >= 0) outcomes[activeIndex] = "已取消";
-            _logger.LogInformation("{Task}：已取消", taskName);
-            StatusMessage = isDaily ? "每日任务已停止" : $"{taskName}已停止";
-        }
-        catch (Exception ex)
-        {
-            if (activeIndex >= 0) outcomes[activeIndex] = $"失败：{ex.Message}";
-            _logger.LogError(ex, "{Task}失败，任务已停止", GetTaskDisplayName(kind));
-            StatusMessage = $"{(isDaily ? "每日任务" : taskName)}已停止：{ex.Message}";
-            // 失败原因上一行已经记过，这里只更新遮罩。
-            _runtimeTaskService.UpdateIndependentTaskStatus(taskName, new("任务失败", ex.Message));
-            _runtimeTaskService.ShowIndependentTaskResult($"{(isDaily ? "每日任务" : taskName)}已停止",
-                isDaily ? $"{ex.Message.TrimEnd('。')}。{Summary()}" : ex.Message);
-            // 出错时附上当前游戏画面，不在电脑前也能看出卡在哪个界面；点击通知直接回到游戏。
-            using var failureFrame = _notifications.IsEnabled ? await CaptureFailureFrameAsync() : null;
-            await NotifyAsync(isDaily ? TaskNotificationText.DailyFailed(taskName, ex.Message, Outcomes())
-                : TaskNotificationText.TaskFailed(taskName, ex.Message), failureFrame, openGame: true);
-        }
-        finally
-        {
-            if (isDaily) _logger.LogInformation("每日任务汇总：{Summary}", Summary());
-            _recognitionDiagnostics?.Flush();
-            (_challengeRunner as IChallengeResultFrameSource)?.TakeResultFrame()?.Dispose();
-            var stateCleared = false;
-            await _stateLock.WaitAsync();
-            try
-            {
-                if (ReferenceEquals(_taskCts, taskCts))
-                {
-                    _runtimeTaskService.UpdateIndependentTaskStatus(null);
-                    if (ownsSuspension)
-                    {
-                        _runtimeTaskService.Resume();
-                    }
-
-                    _taskCts = null;
-                    _taskLoop = null;
-                    _runningTaskKind = null;
-                    IsDailyRunning = false;
-                    stateCleared = true;
-                }
-            }
-            finally
-            {
-                _stateLock.Release();
-            }
-
-            taskCts.Dispose();
-            if (stateCleared)
-            {
-                NotifyStateChanged();
-            }
+            return outcome;
         }
 
         string Summary() => string.Join("；", tasks.Select((task, i) =>

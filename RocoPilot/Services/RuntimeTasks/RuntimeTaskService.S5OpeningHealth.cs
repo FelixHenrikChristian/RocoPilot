@@ -13,7 +13,8 @@ public sealed partial class RuntimeTaskService
     // 仅从大世界进入战斗时开启；启动、恢复采集或中途接入一场残血战斗均不启用。
     private const string S5OpeningHealthSource = "S5 开场敌方 10% 血条及可用捕捉按钮";
     private static readonly string[] S5OpeningHealthRegion = ["s5-opening-ten-percent"];
-    internal static readonly ImageMatchOptions S5OpeningHealthOptions = new() { MinimumScore = 0.96 };
+    // 缩放后舍弃遮罩边缘的半透明像素，避免圆角外的场景颜色参与评分。
+    internal static readonly ImageMatchOptions S5OpeningHealthOptions = new() { MinimumScore = 0.90, AlphaThreshold = 220 };
     private int _s5OpeningChecksRemaining;
 
     private async Task<bool> MatchS5OpeningHealthAsync(

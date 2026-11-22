@@ -33,9 +33,15 @@ public sealed class S5OpeningHealthTests
     [DataRow("opening-3", true)]
     [DataRow("low", false)]
     [DataRow("full-synthetic", false)]
-    public async Task MatchesOnlyOpeningTenPercent(string file, bool expected)
+    [DataRow("native-roll", false)]
+    [DataRow("native-before-menu", true)]
+    [DataRow("native-skill-menu", true)]
+    [DataRow("native-after-skill", true)]
+    [DataRow("native-1600-skill-menu", true, 1600)]
+    // 此处只测血条外观；运行时另由首回合技能菜单限定触发时机。
+    public async Task MatchesTenPercentHealthBar(string file, bool expected, int nativeWidth = 0)
     {
-        foreach (var width in new[] { 960, 1024, 1280, 1536, 1600, 1920, 2048, 2560 })
+        foreach (var width in nativeWidth > 0 ? [nativeWidth] : new[] { 854, 960, 1024, 1152, 1280, 1366, 1440, 1536, 1600, 1920, 2048, 2560 })
         {
             var height = width * 9 / 16;
             using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(FixtureFolder(), file + ".png"),
@@ -48,6 +54,7 @@ public sealed class S5OpeningHealthTests
                 RecognitionRegionImageHelper.ToFrameRegion(region, frame, window, config),
                 RuntimeFrameRecognizer.GetResolutionTemplatePath(config, "s5-opening-ten-percent.png"),
                 RuntimeFrameRecognizer.CreateScaledImageMatchOptions(RuntimeTaskService.S5OpeningHealthOptions, frame, window, config));
+            Console.WriteLine($"{file} {width}px: {result.Score:F4}");
             Assert.AreEqual(expected, result.IsMatch, $"{file} {width}px: {result.Score:F4}");
         }
     }

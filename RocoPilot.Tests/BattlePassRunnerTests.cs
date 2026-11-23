@@ -21,13 +21,16 @@ public sealed class BattlePassRunnerTests
     [DataRow(960, false, false, 4, true, false)]
     [DataRow(1280, false, false, 4, false, false)]
     [DataRow(2048, false, false, 4, true, true)]
+    [DataRow(2048, false, false, 2, false, true)]
+    [DataRow(960, false, false, 2, false, false)]
+    [DataRow(1280, false, true, 1, false, false)]
     public async Task ClaimsAndReturnsThroughSeasonMenu(int width, bool levelUp, bool enabled, int completed, bool initialRewards, bool rewardsEnabled)
     {
         var game = new Replay(width, levelUp, enabled, completed, initialRewards, rewardsEnabled);
         using var backend = new RocoPilot.Services.TextRecognition.Backends.OnnxOcrV5SingleLineTextRecognitionBackend();
         var ocr = new RocoPilot.Services.TextRecognition.TextRecognitionService([new RocoPilot.Services.TextRecognition.Backends.OnnxOcrV5TextRecognitionBackend(backend)]);
         using var locator = new RocoPilot.Services.TextRecognition.OnnxTextLocator(ocr);
-        var runner = new BattlePassRunner(game, new ImageMatchingService(), game, game, ocr, locator);
+        var runner = new BattlePassRunner(game, new ImageMatchingService(), game, game, locator);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16,
             ClientOffsetX = 12, ClientOffsetY = 30 };
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
@@ -36,7 +39,7 @@ public sealed class BattlePassRunnerTests
         Assert.AreEqual(1, game.GiftClicks);
         Assert.AreEqual(initialRewards ? 1 : 0, game.TaskClicks);
         Assert.AreEqual(rewardsEnabled ? 1 : 0, game.LevelClaims);
-        Assert.AreEqual($"通行证任务领取了{completed}/4", result);
+        Assert.AreEqual($"通行证任务领取了{(enabled ? completed : 0)}/4", result);
     }
 
     private sealed class Replay(int width, bool levelUp, bool enabled, int completed, bool initialRewards, bool rewardsEnabled) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
@@ -61,11 +64,24 @@ public sealed class BattlePassRunnerTests
                 "level" => "level-popup",
                 "initial-rewards" or "rewards" or "reward-pending" or "rewards-claimed" => "level-rewards-window-client",
                 "reward-items" => "level-rewards-popup-window-client",
+                "tasks" when completed == 2 => "../../2026-11-24/battle-pass/tasks-two-complete-no-claim",
                 "tasks" or "pending" when enabled => completed == 3 ? "tasks-three-ready" : "tasks-four-ready",
                 _ => "tasks-claimed"
             };
             return FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(BattlePassTests.Folder(), file + ".png"), width, width * 9 / 16, 12, 30, image =>
             {
+                // 合成只剩第二张卡可领、没有“全部领取”的任务页。
+                if (file == "tasks-four-ready" && completed == 1)
+                {
+                    using var claimed = OpenCvSharp.Cv2.ImRead(Path.Combine(BattlePassTests.Folder(), "tasks-claimed.png"));
+                    foreach (var areaToReplace in new[] { new OpenCvSharp.Rect(640, 335, 321, 540),
+                        new OpenCvSharp.Rect(1284, 335, 640, 540), new OpenCvSharp.Rect(1408, 1040, 250, 83) })
+                    {
+                        using var fromClaimed = new OpenCvSharp.Mat(claimed, areaToReplace);
+                        using var target = new OpenCvSharp.Mat(image, areaToReplace);
+                        fromClaimed.CopyTo(target);
+                    }
+                }
                 if (file == "level-rewards-window-client" && (!rewardsEnabled || Scene == "rewards-claimed"))
                     OpenCvSharp.Cv2.Rectangle(image, new OpenCvSharp.Rect(1410, 1040, 245, 83), new OpenCvSharp.Scalar(150, 130, 110), -1);
                 // 缺少部分领取后的实拍：合成最后一项仍为 0/5 的对照，不覆盖原图。
@@ -104,6 +120,7 @@ public sealed class BattlePassRunnerTests
                 "claimed" => ("rewards", 166, 192),
                 "tasks" when !enabled => ("rewards", 166, 192),
                 "rewards" when rewardsEnabled => ("reward-pending", 1535, 1083),
+                "tasks" when enabled && completed == 1 => ("pending", 1125, 828),
                 "tasks" when enabled => ("pending", 1535, 1083),
                 _ => throw new AssertFailedException($"{Scene} 意外点击")
             };

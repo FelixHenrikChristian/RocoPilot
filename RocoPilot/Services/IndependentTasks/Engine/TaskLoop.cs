@@ -41,6 +41,7 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
     private int _inputs;
     private int _inputsAtStepStart;
     private int _inputFailures;
+    private string? _stageLabel;
     private bool _paused;
     private bool _retrying;
     // 当前步骤是由哪一步的输入带过来的；没有输入就推进的步骤无可补发。
@@ -101,7 +102,7 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
     /// <param name="retryable">
     /// 本次输入没生效时能否照原样再发一次。再发会重复计数或重复消耗的输入传 false，由任务自己处理。
     /// </param>
-    public void Advance(TStep next, string? status = null, bool retryable = true)
+    public void Advance(TStep next, string? status = null, bool retryable = true, string? stageLabel = null)
     {
         if (_retrying)
         {
@@ -113,13 +114,14 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
         _origin = retryable && _inputs != _inputsAtStepStart ? (Step, 0) : null;
         Step = next;
         _stepTimer.Restart();
+        _stageLabel = stageLabel;
         Report(status ?? _describe(next));
     }
 
     public void Report(string status)
     {
         Status = status;
-        _progress(new(_task, status));
+        _progress(new(_stageLabel ?? _task, status));
     }
 
     /// <summary>步骤内有实际进展（又种了一格、又点了一朵）时调用，重新计超时。</summary>
@@ -152,7 +154,7 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
             _stepTimer.Start();
             // 切回来的过程中画面会变，重新等一帧；补发的等待也从现在算起。
             RequireFreshFrame();
-            _progress(new(_task, Status));
+            Report(Status);
         }
 
         if (_stepTimer.Elapsed > Timeout(Step))

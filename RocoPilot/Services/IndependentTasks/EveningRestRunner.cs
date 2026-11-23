@@ -108,7 +108,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                         else if (arrived)
                         {
                             // 有效活动页可以长时间停留；只对界面丢失使用导航超时。
-                            if (loop.Step != Step.Monitor) loop.Advance(Step.Monitor, Describe(Step.Monitor, starlight));
+                            if (loop.Step != Step.Monitor) loop.Advance(Step.Monitor, Describe(Step.Monitor, starlight), stageLabel: "收集星光");
                             else
                             {
                                 loop.KeepAlive();
@@ -145,7 +145,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
         Step.CheckEvent => "选择晚间休憩活动",
         Step.Teleport => "传送到活动地点",
         Step.Arrival => "等待传送完成",
-        Step.Monitor => starlight ?? "等待识别本日星光",
+        Step.Monitor => starlight is null ? "等待识别本日星光" : $"本日星光 {starlight}",
         _ => "返回大世界"
     };
 }

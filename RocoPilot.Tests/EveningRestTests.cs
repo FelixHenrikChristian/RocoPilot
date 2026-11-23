@@ -40,14 +40,17 @@ public sealed class EveningRestTests
         var readings = new List<string>();
         var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), progress =>
         {
-            if (progress.Operation.EndsWith("/1200") && !progress.Operation.Contains("成功"))
+            if (progress.Stage == "收集星光")
+            {
+                Assert.AreEqual(string.Empty, progress.Recognition);
                 readings.Add(progress.Operation);
+            }
             if (game.Scene == "waiting" && progress.Operation.Contains("成功"))
                 Assert.AreEqual("event-full", game.LastSample);
         }, timeout.Token);
         Assert.AreEqual(scenario == "unavailable" ? "跳过：未找到晚间休憩活动" : "成功：本日星光已达 1200/1200", result);
-        if (scenario == "collect") CollectionAssert.AreEqual(new[] { "0/1200", "48/1200", "1100/1200", "1182/1200" }, readings);
-        if (scenario == "renamed") CollectionAssert.AreEqual(new[] { "864/1200" }, readings);
+        if (scenario == "collect") CollectionAssert.AreEqual(new[] { "本日星光 0/1200", "本日星光 48/1200", "本日星光 1100/1200", "本日星光 1182/1200" }, readings);
+        if (scenario == "renamed") CollectionAssert.AreEqual(new[] { "本日星光 864/1200" }, readings);
         Assert.AreEqual("done", game.Scene);
         Assert.AreEqual(scenario is "full" or "unavailable" ? 0 : 1, game.Teleports);
         if (scenario is "unselected" or "shifted") Assert.AreEqual(3, game.ActivityClicks);

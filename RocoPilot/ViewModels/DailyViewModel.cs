@@ -52,8 +52,17 @@ public partial class DailyViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StartButtonText))]
+    [NotifyPropertyChangedFor(nameof(StartButtonLabel))]
     [NotifyPropertyChangedFor(nameof(StartButtonGlyph))]
     public partial bool IsRunning { get; set; }
+
+    /// <summary>清单标题下的一行说明：启用了几项，或正在执行第几项。</summary>
+    [ObservableProperty]
+    public partial string ListSummary { get; set; } = string.Empty;
+
+    /// <summary>已启用的任务都没有可配置的参数，右侧显示空状态。</summary>
+    [ObservableProperty]
+    public partial bool IsConfigurationEmpty { get; set; }
 
     [ObservableProperty]
     public partial bool CanStartOrStop { get; set; }
@@ -80,6 +89,7 @@ public partial class DailyViewModel : ObservableObject
     public event EventHandler<string>? NoticeRequested;
 
     public string StartButtonText => IsRunning ? "停止任务" : "开始每日";
+    public string StartButtonLabel => IsRunning ? "停止" : "启动";
     public string StartButtonGlyph => IsRunning ? "\uF2D9" : "\uE768";
 
     public DailyViewModel(IIndependentTaskService tasks, ILocalSettingsService settings, ILogger<DailyViewModel> logger)
@@ -242,14 +252,25 @@ public partial class DailyViewModel : ObservableObject
     {
         ResetCommand.NotifyCanExecuteChanged();
         IsRunning = _tasks.IsDailyRunning;
-        var enabled = Items.Count(item => item.IsEnabled && item.IsAvailable);
+        var enabledItems = Items.Where(item => item.IsEnabled && item.IsAvailable).ToList();
+        var enabled = enabledItems.Count;
         CanStartOrStop = _loaded && (IsRunning || !_tasks.IsRunning && enabled > 0);
         CanReorder = _loaded && !_tasks.IsRunning;
+        var runningKind = IsRunning ? _tasks.RunningTaskKind : null;
         foreach (var item in Items)
         {
             item.CanToggle = item.IsAvailable && !_tasks.IsRunning;
-            var isExecuting = IsRunning && _tasks.RunningTaskKind == item.TaskKind;
-            item.Status = !item.IsAvailable ? "待接入" : isExecuting ? "执行中" : item.IsEnabled ? "已启用" : "未启用";
+            item.IsRunning = runningKind is not null && item.IsEnabled && item.TaskKind == runningKind;
         }
+
+        // 运行期间不能改顺序和开关，已启用的项就是本轮要执行的清单。
+        var runningIndex = enabledItems.FindIndex(item => item.IsRunning);
+        ListSummary = !_loaded ? string.Empty
+            : IsRunning ? runningIndex >= 0 ? $"正在执行第 {runningIndex + 1} / {enabled} 项" : "正在执行"
+            : _tasks.IsRunning ? "其他任务运行中"
+            : enabled == 0 ? "未启用任务"
+            : $"已启用 {enabled} 项";
+        IsConfigurationEmpty = _loaded && !enabledItems.Any(item => item.Kind is DailyTaskKind.FlowerSeedChallenge
+            or DailyTaskKind.LegendaryChallenge or DailyTaskKind.Gardening or DailyTaskKind.Sell);
     }
 }

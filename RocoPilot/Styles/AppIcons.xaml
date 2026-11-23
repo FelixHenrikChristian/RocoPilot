@@ -31,4 +31,10 @@
     <x:String x:Key="SpiritCatalogGlyph">&#xE178;</x:String>
     <x:String x:Key="CatalogSyncGlyph">&#xF190;</x:String>
     <x:String x:Key="EncounterActionGlyph">&#xE1DE;</x:String>
+    <x:String x:Key="DragHandleGlyph">&#xE9F8;</x:String>
+    <x:String x:Key="ReuseLastGlyph">&#xF47E;</x:String>
+    <x:String x:Key="GardenSeedGlyph">&#xE75A;</x:String>
+    <x:String x:Key="GardenPlotGlyph">&#xF462;</x:String>
+    <x:String x:Key="SaleItemGlyph">&#xF76F;</x:String>
+    <x:String x:Key="NoOptionsGlyph">&#xF587;</x:String>
 </ResourceDictionary>

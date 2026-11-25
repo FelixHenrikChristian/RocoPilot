@@ -160,7 +160,7 @@ public class StaminaCraftingTests
             Assert.AreEqual("season-selected", Stage);
             Assert.IsTrue(_frames > 1);
             CheckPoint(x, y, 1239, 1021);
-            CheckPoint(endX, endY, 1510, 1021);
+            CheckPoint(endX, endY, 1579, 1021);
             Advance("slider-maximum");
             return Task.CompletedTask;
         }

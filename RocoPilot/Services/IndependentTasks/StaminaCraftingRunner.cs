@@ -108,7 +108,8 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                         {
                             var px = handle.X + handle.Width / 2d;
                             var py = screen.ClientY(handle.Y + handle.Height / 2d);
-                            if (await loop.DragAsync(screen.ClientX(px), py, screen.ClientX(px + 276 * screen.Scale), py))
+                            // 略过滑轨右端再松手，避免数量差一档。
+                            if (await loop.DragAsync(screen.ClientX(px), py, screen.ClientX(px + 340 * screen.Scale), py))
                                 loop.Advance(Step.Make);
                         }
                         break;

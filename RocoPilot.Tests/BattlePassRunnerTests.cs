@@ -45,6 +45,7 @@ public sealed class BattlePassRunnerTests
     private sealed class Replay(int width, bool levelUp, bool enabled, int completed, bool initialRewards, bool rewardsEnabled) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
     {
         public string Scene = "world";
+        private readonly System.Diagnostics.Stopwatch taskCardsAppearing = new();
         private int pendingFrames;
         private int rewardPendingFrames;
         private int rewardEscapes;
@@ -57,6 +58,7 @@ public sealed class BattlePassRunnerTests
 
             if (Scene == "pending" && ++pendingFrames >= 3) Scene = "reward";
             if (Scene == "reward-pending" && ++rewardPendingFrames >= 3) Scene = "reward-items";
+            if (Scene == "tasks" && !taskCardsAppearing.IsRunning) taskCardsAppearing.Start();
             var file = Scene switch
             {
                 "menu" or "exit" => "season-menu",
@@ -64,6 +66,8 @@ public sealed class BattlePassRunnerTests
                 "level" => "level-popup",
                 "initial-rewards" or "rewards" or "reward-pending" or "rewards-claimed" => "level-rewards-window-client",
                 "reward-items" => "level-rewards-popup-window-client",
+                // 入场动画前 0.6 秒已经能点全部领取，但只能认出前两张卡。
+                "tasks" when completed == 3 && taskCardsAppearing.ElapsedMilliseconds < 600 => "../../2026-11-25/battle-pass/tasks-two-ready",
                 "tasks" when completed == 2 => "../../2026-11-24/battle-pass/tasks-two-complete-no-claim",
                 "tasks" or "pending" when enabled => completed == 3 ? "tasks-three-ready" : "tasks-four-ready",
                 _ => "tasks-claimed"

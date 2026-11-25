@@ -50,6 +50,7 @@ public sealed class BattlePassTests
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16,
             ClientOffsetX = 12, ClientOffsetY = 30 };
         foreach (var (name, expected) in new (string, int?)[] { ("tasks-three-ready", 3), ("tasks-four-ready", 4),
+            ("../../2026-11-25/battle-pass/tasks-two-ready", 2), ("../../2026-11-25/battle-pass/tasks-three-ready", 3),
             ("tasks-claimed", 0), ("reward-popup", null), ("level-popup", null), ("season-menu", null) })
         {
             using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(Folder(), name + ".png"), width, width * 9 / 16, 12, 30);

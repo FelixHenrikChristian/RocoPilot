@@ -32,7 +32,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom, double threshold = .94) =>
                 screen.Find($"stamina-crafting/{name}", left, top, right, bottom, token, threshold);
             Task<ImageMatchResult?> MakeButton() => Find("make", 1640, 1010, 1960, 1140);
-            Task<ImageMatchResult?> Recipe() => Find("recipe", 40, 0, 370, 115);
+            Task<ImageMatchResult?> BasicTitle() => Find("basic-title", 150, 0, 375, 115);
             Task<ImageMatchResult?> Choices() => Find("choices", 1420, 620, 1950, 735, .90);
             Task<ImageMatchResult?> SeasonTimer() => Find("timer", 550, 870, 1020, 971);
             Task<ImageMatchResult?> Maximum() => Find("max", 1460, 975, 1560, 1060);
@@ -85,7 +85,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                             await loop.RepeatKeyAsync("Space");
                         break;
                     case Step.SelectRecipe:
-                        if (await Recipe() is not null && await Find("badge", 250, 110, 1100, 906, .87) is { } badge &&
+                        if (await Find("recipe", 40, 0, 370, 115) is not null && await Find("badge", 250, 110, 1100, 906, .87) is { } badge &&
                             await loop.ClickAsync(screen, badge, -45, 45))
                             loop.Advance(Step.SetAmount);
                         break;
@@ -95,7 +95,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                         if (await Find("make-disabled", 1640, 1010, 1960, 1140) is not null)
                         {
                             outcome = "跳过：体力不足";
-                            if (await loop.KeyAsync("Esc")) loop.Advance(Step.ExitDialogue);
+                            loop.Advance(Step.CloseRecipe);
                             break;
                         }
                         if (await Maximum() is not null)
@@ -121,17 +121,20 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                         break;
                     case Step.ExitRecipe:
                         if (loop.StepElapsed < nextResultEscape) break;
-                        var returnedToRecipe = await Recipe() is not null;
-                        if (!await loop.KeyAsync("Esc", react: false)) break;
-                        if (returnedToRecipe) loop.Advance(Step.ExitDialogue);
-                        else nextResultEscape = loop.StepElapsed + ResultPause;
+                        if (await BasicTitle() is not null) loop.Advance(Step.CloseRecipe);
+                        else if (await loop.KeyAsync("Esc", react: false)) nextResultEscape = loop.StepElapsed + ResultPause;
+                        break;
+                    case Step.CloseRecipe:
+                        if (await BasicTitle() is not null && await Find("basic-close", 1830, 12, 1960, 108) is { } close &&
+                            await loop.ClickAsync(screen, close))
+                            loop.Advance(Step.ExitDialogue);
                         break;
                     case Step.ExitDialogue:
                         if (await Choices() is not null)
                         {
                             if (await loop.RepeatKeyAsync("Esc")) loop.Advance(Step.ReturnWorld);
                         }
-                        else if (await Recipe() is not null) await loop.RepeatKeyAsync("Esc");
+                        else if (await screen.World(token) is not null) return outcome;
                         break;
                     case Step.ReturnWorld:
                         if (await screen.World(token) is not null) return outcome;
@@ -146,7 +149,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
     }
 
     private enum Step { OpenMap, SelectMap, Cauldron, Teleport, Approach, Dialogue, SelectRecipe,
-        SetAmount, Make, ConfirmMake, ExitRecipe, ExitDialogue, ReturnWorld }
+        SetAmount, Make, ConfirmMake, ExitRecipe, CloseRecipe, ExitDialogue, ReturnWorld }
 
     private static string Describe(Step step) => step switch
     {

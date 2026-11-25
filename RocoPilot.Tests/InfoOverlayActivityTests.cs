@@ -322,11 +322,12 @@ public sealed class InfoOverlayActivityTests
         var snapshot = new InfoOverlaySnapshot("战斗中 - 技能选择", [], Now, Activity: recognized,
             Scene: InfoOverlayScene.Battle, BattleCreatureName: tracker.CreatureName);
         Assert.IsNull(InfoOverlayIslandPresentation.Resolve(snapshot, null, Now));
-        var capture = tracker.Publish(1, 1, "input", InfoOverlayActivityKind.Capture, "捕捉", "奇异血脉", Now, true);
-        var presentation = InfoOverlayIslandPresentation.Resolve(snapshot with { Activity = capture }, null, Now)!;
+        var capture = tracker.Publish(1, 1, "input", InfoOverlayActivityKind.Capture, "捕捉", "", Now, true);
+        var presentation = InfoOverlayIslandPresentation.Resolve(
+            snapshot with { Activity = capture, BattleBloodline = "奇异" }, null, Now)!;
         Assert.AreEqual("战斗操作", presentation.Category);
         Assert.AreEqual("捕捉", presentation.Title);
-        Assert.AreEqual("栗鼠 · 奇异血脉 · 已发送", presentation.Description);
+        Assert.AreEqual("栗鼠 · 血脉：奇异 · 已发送", presentation.Description);
     }
 
     [TestMethod]

@@ -92,11 +92,8 @@ public sealed partial class RuntimeTaskService
             : plan.Action == AutoBattleAction.EnergyRecovery || title == "回能" ? InfoOverlayActivityKind.EnergyRecovery
             : InfoOverlayActivityKind.Skill;
         var isCustomSequence = plan.Action == AutoBattleAction.Skill && plan.FallbackSequence is null;
-        var bloodline = _battle.Bloodline;
-        var description = plan.Action == AutoBattleAction.Capture
-            ? bloodline == EncounterBloodlineKind.Unrecognized ? string.Empty
-                : $"{EncounterBloodlineRecognition.GetDisplayName(bloodline)}血脉"
-            : isCustomSequence && plan.DisplayKey != plan.Sequence ? plan.DisplayKey : string.Empty;
+        // 血脉统一由动作行的「血脉：X」展示，捕捉动作不再重复拼「X血脉」。
+        var description = isCustomSequence && plan.DisplayKey != plan.Sequence ? plan.DisplayKey : string.Empty;
         RefreshOverlayActivity(state, _overlayActivities.Publish(battleId, turn.Id,
             $"input:{turn.Id}:{plan.Action}:{sequence}", kind, title,
             description,

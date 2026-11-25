@@ -9,24 +9,33 @@
 
     <Grid>
     <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
-        <StackPanel Padding="{StaticResource NavigationViewPageContentPadding}">
+        <StackPanel Padding="{StaticResource NavigationViewPageContentPadding}" Spacing="16">
 
-            <!-- 通知设置 -->
-            <StackPanel Margin="0,0,0,12" Orientation="Horizontal">
-                <FontIcon
-                    Margin="0,0,8,0"
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                    FontSize="18"
-                    Glyph="&#xEA8F;" />
-                <TextBlock
-                    VerticalAlignment="Center"
-                    FontSize="16"
-                    FontWeight="SemiBold"
-                    Text="通知设置" />
-            </StackPanel>
+            <!-- 页面标题：与热键、设置页同一种样式 -->
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource PageHeaderIconTileStyle}">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="20"
+                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                        Glyph="&#xEA8F;" />
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Style="{StaticResource PageHeaderTitleStyle}" Text="通知" />
+                    <TextBlock
+                        Style="{StaticResource PageHeaderDescriptionStyle}"
+                        Text="任务完成、出错或识别到异色时提醒你。" />
+                </StackPanel>
+            </Grid>
 
             <!-- Windows 通知 Expander -->
-            <Expander Margin="0,0,0,8" Style="{StaticResource CardExpanderStyle}">
+            <Expander Style="{StaticResource CardExpanderStyle}">
                 <Expander.Header>
                     <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
@@ -35,19 +44,15 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource WindowsNotificationGlyph}" />
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock FontWeight="SemiBold" Text="Windows 通知" TextWrapping="Wrap" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="Windows 通知" />
                             <TextBlock
-                                Margin="0,4,0,0"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="通过 Windows 通知接收任务结果与重要提醒。"
-                                TextWrapping="Wrap" />
+                                Style="{StaticResource CardDescriptionTextStyle}"
+                                Text="通过 Windows 通知接收任务结果与重要提醒。" />
                         </StackPanel>
                         <ToggleSwitch
                             Grid.Column="2"
-                            Width="44" MinWidth="44" Padding="0"
-                            Margin="0,0,12,0"
-                            HorizontalAlignment="Right"
+                            MinWidth="0"
                             VerticalAlignment="Center"
                             AutomationProperties.Name="启用 Windows 通知"
                             IsOn="{x:Bind ViewModel.NotificationEnabled, Mode=TwoWay}"
@@ -60,7 +65,7 @@
                     <!-- 提示音 -->
                     <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -71,7 +76,7 @@
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE995;" />
-                        <StackPanel Grid.Column="1">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="通知提示音" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
@@ -97,7 +102,7 @@
                     <!-- 测试通知 -->
                     <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -108,7 +113,7 @@
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE7C1;" />
-                        <StackPanel Grid.Column="1">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="测试通知" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
@@ -122,8 +127,15 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Command="{x:Bind ViewModel.TestNotificationCommand}"
-                            Content="发送"
-                            IsEnabled="{x:Bind ViewModel.NotificationEnabled, Mode=OneWay}" />
+                            IsEnabled="{x:Bind ViewModel.NotificationEnabled, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE724;" />
+                                <TextBlock Text="发送" />
+                            </StackPanel>
+                        </Button>
                     </Grid>
                 </StackPanel>
             </Expander>

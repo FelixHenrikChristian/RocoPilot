@@ -85,6 +85,8 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
 
     public int TotalSelectedShiny => SelectedShinyCounts.Sum(item => item.Count);
 
+    public Visibility ShinyEmptyVisibility => SelectedShinyCounts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public string SelectedShinyDateDisplay => SelectedShinyScopeIndex == 0
         ? StatisticsProjection.BuildAllSeasonDateDisplay(Seasons)
         : Seasons.ElementAtOrDefault(SelectedShinyScopeIndex - 1)?.SeasonDateDisplay ?? "无记录";
@@ -197,6 +199,7 @@ public sealed class StatisticsOverviewViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SelectedShinyCounts));
         OnPropertyChanged(nameof(TotalSelectedShiny));
+        OnPropertyChanged(nameof(ShinyEmptyVisibility));
         OnPropertyChanged(nameof(SelectedShinyDateDisplay));
     }
 

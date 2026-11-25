@@ -48,13 +48,9 @@
                 </Expander.Header>
 
                 <StackPanel Spacing="0">
-                    <Border
-                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0" />
-
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -87,9 +83,9 @@
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                         BorderThickness="0,1,0,0" />
 
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -128,9 +124,9 @@
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                         BorderThickness="0,1,0,0" />
 
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -215,13 +211,9 @@
                 </Expander.Header>
 
                 <StackPanel Spacing="0">
-                    <Border
-                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                        BorderThickness="0,1,0,0" />
-
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -254,9 +246,9 @@
                         BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                         BorderThickness="0,1,0,0" />
 
-                    <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                    <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>

@@ -382,6 +382,8 @@ public sealed class SeasonStatisticsGroup
 
     public int PollutionTotal => PollutionCounts.Sum(item => item.Count);
 
+    public Visibility PollutionEmptyVisibility => PollutionCounts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+
     public int ShinyTotal => ShinyCounts.Sum(item => item.Count);
 
     public DateTimeOffset LatestCapturedAt

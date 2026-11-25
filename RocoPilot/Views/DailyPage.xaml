@@ -15,9 +15,11 @@
             <Setter Property="BorderThickness" Value="0,1,0,0" />
         </Style>
 
+        <!-- 图标占 24 宽，标题与下方各行的文字左对齐（和折叠面板的标题一致）。 -->
         <Style x:Key="DailyGroupIconStyle" TargetType="FontIcon">
             <Setter Property="FontFamily" Value="{StaticResource AppIconFont}" />
             <Setter Property="FontSize" Value="20" />
+            <Setter Property="Width" Value="24" />
             <Setter Property="Foreground" Value="{ThemeResource AccentFillColorDefaultBrush}" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
@@ -227,9 +229,9 @@
                                 <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="花种挑战" />
                             </StackPanel>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -250,9 +252,9 @@
                                     SelectedItem="{x:Bind ViewModel.SelectedFlowerSeed, Mode=TwoWay}" />
                             </Grid>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -288,9 +290,9 @@
                                 <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="传说精灵挑战" />
                             </StackPanel>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -310,9 +312,9 @@
                                     SelectedItem="{x:Bind ViewModel.SelectedLegendaryTarget, Mode=TwoWay}" />
                             </Grid>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -331,9 +333,9 @@
                                     SelectedIndex="{x:Bind ViewModel.SelectedLegendaryDifficultyIndex, Mode=TwoWay}" />
                             </Grid>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -369,9 +371,9 @@
                                 <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="自动种菜" />
                             </StackPanel>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -394,9 +396,9 @@
                                     OnContent="" />
                             </Grid>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -415,9 +417,9 @@
                                     SelectedItem="{x:Bind ViewModel.GardenSeed, Mode=TwoWay}" />
                             </Grid>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -451,9 +453,9 @@
                                 <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="自动出售" />
                             </StackPanel>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
@@ -472,9 +474,9 @@
                                     SelectedItem="{x:Bind ViewModel.SelectedSaleFlower, Mode=TwoWay}" />
                             </Grid>
                             <Border Style="{StaticResource DailyDividerStyle}" />
-                            <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="24" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>

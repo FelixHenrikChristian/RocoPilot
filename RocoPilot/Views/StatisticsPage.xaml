@@ -271,7 +271,7 @@
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
                                         FontSize="13"
-                                        Foreground="#C42B1C"
+                                        Foreground="{ThemeResource SystemFillColorCriticalBrush}"
                                         Glyph="&#xE74D;" />
                                 </Button>
                             </Border>
@@ -503,7 +503,7 @@
                 <FontIcon
                     FontFamily="{StaticResource SymbolThemeFontFamily}"
                     FontSize="17"
-                    Foreground="#FFE6A700"
+                    Foreground="{ThemeResource SystemFillColorCautionBrush}"
                     Glyph="&#xE7BA;" />
                 <Button.Flyout>
                     <MenuFlyout x:Name="UidWarningFlyout">
@@ -718,6 +718,32 @@
                             ItemsSource="{x:Bind ViewModel.Overview.SelectedShinyCounts, Mode=OneWay}" />
                     </ScrollViewer>
 
+                    <!-- 没有记录时的占位；不拦截指针，空白处右键新增条目照常可用。 -->
+                    <StackPanel
+                        Grid.Row="2"
+                        MaxWidth="220"
+                        Margin="12,0,12,0"
+                        IsHitTestVisible="False"
+                        Style="{StaticResource EmptyStatePanelStyle}"
+                        Visibility="{x:Bind ViewModel.Overview.ShinyEmptyVisibility, Mode=OneWay}">
+                        <FontIcon
+                            HorizontalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="28"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            Glyph="&#xE794;" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="还没有异色记录" />
+                        <TextBlock
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                            HorizontalTextAlignment="Center"
+                            Text="识别到异色并确认后记录在这里。"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
                     <ComboBox
                         Grid.Row="3"
                         Width="120"
@@ -835,6 +861,31 @@
                                         ItemTemplate="{StaticResource PollutionCountRowTemplate}"
                                         ItemsSource="{Binding PollutionCounts}" />
                                 </ScrollViewer>
+
+                                <StackPanel
+                                    Grid.Row="2"
+                                    MaxWidth="280"
+                                    Margin="12,0,12,0"
+                                    IsHitTestVisible="False"
+                                    Style="{StaticResource EmptyStatePanelStyle}"
+                                    Visibility="{Binding PollutionEmptyVisibility}">
+                                    <FontIcon
+                                        HorizontalAlignment="Center"
+                                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                        FontSize="28"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Glyph="&#xE728;" />
+                                    <TextBlock
+                                        HorizontalAlignment="Center"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="还没有奇遇记录" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        HorizontalTextAlignment="Center"
+                                        Text="在「实时」页开启奇遇计数并启动后自动记录。"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
                             </Grid>
                         </Border>
                     </DataTemplate>

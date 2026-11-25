@@ -34,7 +34,8 @@
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
                                 Click="ToggleFlowerSeedChallengeButton_Click"
-                                IsEnabled="{x:Bind ViewModel.IsFlowerSeedChallengeButtonEnabled, Mode=OneWay}">
+                                IsEnabled="{x:Bind ViewModel.IsFlowerSeedChallengeButtonEnabled, Mode=OneWay}"
+                                Style="{StaticResource AccentButtonStyle}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon
                                         FontFamily="{StaticResource SymbolThemeFontFamily}"
@@ -46,12 +47,9 @@
                         </Grid>
                     </Expander.Header>
                     <StackPanel Spacing="0">
-                        <Border
-                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -96,9 +94,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -131,9 +129,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -164,9 +162,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -201,9 +199,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -269,6 +267,7 @@
                                 VerticalAlignment="Center"
                                 Command="{x:Bind ViewModel.ToggleLegendaryChallengeCommand}"
                                 IsEnabled="{x:Bind ViewModel.IsLegendaryChallengeButtonEnabled, Mode=OneWay}"
+                                Style="{StaticResource AccentButtonStyle}"
                                 ToolTipService.ToolTip="按设定次数挑战并捕捉目标精灵。">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <FontIcon
@@ -282,13 +281,9 @@
                     </Expander.Header>
 
                     <StackPanel Spacing="0">
-                        <Border
-                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-                            BorderThickness="0,1,0,0" />
-
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -331,9 +326,9 @@
                         </Grid>
 
                         <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -352,9 +347,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -395,9 +390,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -430,9 +425,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
@@ -463,9 +458,9 @@
                         <Border
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                             BorderThickness="0,1,0,0" />
-                        <Grid ColumnSpacing="16" Style="{StaticResource CardRowStyle}">
+                        <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="24" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>

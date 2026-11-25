@@ -29,9 +29,19 @@
         <Setter Property="MinHeight" Value="64" />
     </Style>
 
+    <!-- 行内第一列放图标，固定 24 宽、列间距 12，文字与折叠面板标题左对齐。 -->
     <Style x:Key="CardRowStyle" TargetType="Grid">
         <Setter Property="Padding" Value="16,12" />
         <Setter Property="MinHeight" Value="56" />
+    </Style>
+
+    <!-- 页面标题左侧的图标方块。 -->
+    <Style x:Key="PageHeaderIconTileStyle" TargetType="Border">
+        <Setter Property="Width" Value="40" />
+        <Setter Property="Height" Value="40" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
     </Style>
 
     <Style x:Key="EmptyStatePanelStyle" TargetType="StackPanel">

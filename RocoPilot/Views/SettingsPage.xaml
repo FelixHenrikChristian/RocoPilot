@@ -11,23 +11,33 @@
     <Grid>
     <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalScrollMode="Auto">
         <StackPanel x:Name="ContentArea" Padding="{StaticResource NavigationViewPageContentPadding}">
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                <FontIcon
-                    Margin="0,0,8,0"
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                    FontSize="18"
-                    Glyph="&#xE713;" />
-                <TextBlock
-                    VerticalAlignment="Center"
-                    FontSize="16"
-                    FontWeight="SemiBold"
-                    Text="应用设置" />
-            </StackPanel>
+            <!-- 页面标题：与热键、通知页同一种样式 -->
+            <Grid Margin="0,0,0,16" ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Style="{StaticResource PageHeaderIconTileStyle}">
+                    <FontIcon
+                        FontFamily="{StaticResource SymbolThemeFontFamily}"
+                        FontSize="20"
+                        Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                        Glyph="&#xE713;" />
+                </Border>
+
+                <StackPanel Grid.Column="1" Spacing="4">
+                    <TextBlock Style="{StaticResource PageHeaderTitleStyle}" Text="设置" />
+                    <TextBlock
+                        Style="{StaticResource PageHeaderDescriptionStyle}"
+                        Text="外观主题、文件目录与应用信息。" />
+                </StackPanel>
+            </Grid>
 
             <Border Margin="0,0,0,8" Style="{StaticResource CardStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="24" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="160" />
                     </Grid.ColumnDefinitions>
@@ -38,13 +48,11 @@
                         FontSize="20"
                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                         Glyph="&#xE771;" />
-                    <StackPanel Grid.Column="1">
-                        <TextBlock FontWeight="SemiBold" Text="切换主题" TextWrapping="Wrap" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="切换主题" />
                         <TextBlock
-                            Margin="0,4,0,0"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="在浅色与暗色主题间进行切换，默认为系统主题"
-                            TextWrapping="Wrap" />
+                            Style="{StaticResource CardDescriptionTextStyle}"
+                            Text="在浅色与暗色主题间进行切换，默认为系统主题" />
                     </StackPanel>
                     <ComboBox
                         Grid.Column="2"
@@ -65,20 +73,18 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <FontIcon Style="{StaticResource ExpanderHeaderIconStyle}" Glyph="{StaticResource FileFolderGlyph}" />
-                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock FontWeight="SemiBold" Text="文件目录" TextWrapping="Wrap" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                            <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="文件目录" />
                             <TextBlock
-                                Margin="0,4,0,0"
-                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="打开日志和截图的保存位置"
-                                TextWrapping="Wrap" />
+                                Style="{StaticResource CardDescriptionTextStyle}"
+                                Text="打开日志和截图的保存位置" />
                         </StackPanel>
                     </Grid>
                 </Expander.Header>
                 <StackPanel Spacing="0">
                     <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -88,8 +94,8 @@
                             FontFamily="{StaticResource SymbolThemeFontFamily}"
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Glyph="&#xE838;" />
-                        <StackPanel Grid.Column="1">
+                            Glyph="&#xE9F9;" />
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="日志目录" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
@@ -106,16 +112,19 @@
                             CommandParameter="{x:Bind ViewModel.LogDirectory}"
                             AutomationProperties.Name="打开日志目录"
                             ToolTipService.ToolTip="打开日志目录">
-                            <FontIcon
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                FontSize="16"
-                                Glyph="&#xE838;" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE838;" />
+                                <TextBlock Text="打开" />
+                            </StackPanel>
                         </Button>
                     </Grid>
                     <Border BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" />
                     <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="24" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
@@ -126,7 +135,7 @@
                             FontSize="18"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Glyph="&#xE722;" />
-                        <StackPanel Grid.Column="1">
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock Text="截图目录" TextWrapping="Wrap" />
                             <TextBlock
                                 Margin="0,2,0,0"
@@ -143,10 +152,13 @@
                             CommandParameter="{x:Bind ViewModel.ScreenshotDirectory}"
                             AutomationProperties.Name="打开截图目录"
                             ToolTipService.ToolTip="打开截图目录">
-                            <FontIcon
-                                FontFamily="{StaticResource SymbolThemeFontFamily}"
-                                FontSize="16"
-                                Glyph="&#xE838;" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon
+                                    FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="14"
+                                    Glyph="&#xE838;" />
+                                <TextBlock Text="打开" />
+                            </StackPanel>
                         </Button>
                     </Grid>
                 </StackPanel>
@@ -155,9 +167,9 @@
             <Border Margin="0,0,0,8" Style="{StaticResource CardStyle}">
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="24" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <FontIcon
                         Grid.Column="0"
@@ -166,13 +178,11 @@
                         FontSize="20"
                         Foreground="{ThemeResource AccentFillColorDefaultBrush}"
                         Glyph="&#xE777;" />
-                    <StackPanel Grid.Column="1">
-                        <TextBlock FontWeight="SemiBold" Text="恢复设置" TextWrapping="Wrap" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                        <TextBlock Style="{StaticResource CardTitleTextStyle}" Text="恢复设置" />
                         <TextBlock
-                            Margin="0,4,0,0"
-                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="清除用户偏好、统计记录和云同步配置，随后退出应用"
-                            TextWrapping="Wrap" />
+                            Style="{StaticResource CardDescriptionTextStyle}"
+                            Text="清除用户偏好、统计记录和云同步配置，随后退出应用" />
                     </StackPanel>
                     <Button
                         Grid.Column="2"
@@ -180,26 +190,21 @@
                         VerticalAlignment="Center"
                         Command="{x:Bind ViewModel.ResetSettingsCommand}"
                         ToolTipService.ToolTip="重置本地设置和统计记录，并退出应用">
-                        <FontIcon
-                            FontFamily="{StaticResource SymbolThemeFontFamily}"
-                            FontSize="16"
-                            Glyph="&#xE777;" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon
+                                FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                FontSize="14"
+                                Glyph="&#xE777;" />
+                            <TextBlock Text="重置" />
+                        </StackPanel>
                     </Button>
                 </Grid>
             </Border>
 
-            <StackPanel Orientation="Horizontal" Margin="0,20,0,12">
-                <FontIcon
-                    Margin="0,0,8,0"
-                    FontFamily="{StaticResource SymbolThemeFontFamily}"
-                    FontSize="18"
-                    Glyph="&#xE946;" />
-                <TextBlock
-                    VerticalAlignment="Center"
-                    FontSize="16"
-                    FontWeight="SemiBold"
-                    Text="关于" />
-            </StackPanel>
+            <TextBlock
+                Margin="2,16,0,8"
+                Style="{StaticResource SectionHeaderTextStyle}"
+                Text="关于" />
 
             <Border
                 Margin="0,0,0,8"
@@ -256,7 +261,7 @@
                                         CornerRadius="{StaticResource ControlCornerRadius}">
                                         <TextBlock
                                             FontSize="12"
-                                            Foreground="White"
+                                            Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}"
                                             Text="{x:Bind ViewModel.AppVersion, Mode=OneWay}" />
                                     </Border>
                                     <TextBlock
@@ -296,6 +301,7 @@
                                     Margin="0,0,12,0"
                                     VerticalAlignment="Center"
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="18"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Glyph="&#xE77B;" />
                                 <TextBlock
@@ -326,6 +332,7 @@
                                     Margin="0,0,12,0"
                                     VerticalAlignment="Center"
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="18"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Glyph="&#xE943;" />
                                 <TextBlock
@@ -356,6 +363,7 @@
                                     Margin="0,0,12,0"
                                     VerticalAlignment="Center"
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="18"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Glyph="&#xE8A1;" />
                                 <TextBlock
@@ -386,6 +394,7 @@
                                     Margin="0,0,12,0"
                                     VerticalAlignment="Center"
                                     FontFamily="{StaticResource SymbolThemeFontFamily}"
+                                    FontSize="18"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                     Glyph="&#xE8F2;" />
                                 <TextBlock

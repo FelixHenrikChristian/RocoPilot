@@ -182,6 +182,9 @@ public sealed partial class RuntimeTaskService
             TryUpdateRuntimeShinyTipSignalAsync(state, frame, season, battleId, cancellationToken));
     }
 
+    // 解除后血脉区域出现文字却无法归类时记录原文，便于核对是否被无关文字干扰。
+    private string _lastUnparsedBloodlineTip = string.Empty;
+
     private async Task RecognizeAndApplyBloodlineTipAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
@@ -201,6 +204,11 @@ public sealed partial class RuntimeTaskService
         var capturedAt = frame.CapturedAt;
         for (var attempt = 0; ; attempt++)
         {
+            var chineseCount = TextMatchingHelper.CountChineseCharacters(tipText);
+            // 记录提示区域是否出现过文字：等待超时后用于区分「没有提示」与「有提示但无法归类」。
+            // 不超过 4 个汉字的多半是场景被误识别成文字，按没有文字处理。
+            _battle.ObserveBloodlineTipText(battleId,
+                chineseCount > EncounterBloodlineRecognition.MaxNoiseChineseCharacters);
             if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
             {
                 if (_battle.ObserveBloodline(battleId, kind))
@@ -212,8 +220,21 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            // 解除后区域里出现较长文字却对不上任何血脉关键词：记录原文，便于排查误判来源。
+            if (_battle.IsEncounterRelieved
+                && chineseCount > EncounterBloodlineRecognition.MaxNoiseChineseCharacters)
+            {
+                var unparsed = LoggingHelper.FormatLogText(tipText);
+                if (unparsed != _lastUnparsedBloodlineTip)
+                {
+                    _lastUnparsedBloodlineTip = unparsed;
+                    _logger.LogInformation("奇遇识别：解除后血脉区域有文字但无法归类（{Count} 字，OCR：{Raw}）",
+                        chineseCount, unparsed);
+                }
+            }
+
             // 长提示可能只识别到一部分，趁台词仍在画面上复查新帧。
-            if (attempt >= 2 || TextMatchingHelper.CountChineseCharacters(tipText) < 8
+            if (attempt >= 2 || chineseCount < 8
                 || _battle.Bloodline != EncounterBloodlineKind.Unrecognized || _battle.IsSuspendedForShiny)
                 return;
 

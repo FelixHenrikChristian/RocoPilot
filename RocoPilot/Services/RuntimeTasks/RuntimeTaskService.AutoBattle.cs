@@ -75,13 +75,19 @@ public sealed partial class RuntimeTaskService
         {
             var turn = _battle.CurrentTurn;
             if (turn is null || _isSuspended || _battle.IsSuspendedForShiny) return;
+            var bloodlineBeforePlan = _battle.Bloodline;
             var plan = _battle.PlanSkillSelection(
                 settings, EncounterBloodlineRecognition.IsAvailable(state.RecognitionRegionConfig), now);
+            if (bloodlineBeforePlan == EncounterBloodlineKind.Unrecognized
+                && _battle.Bloodline == EncounterBloodlineKind.Normal)
+            {
+                _logger.LogInformation("奇遇识别：等待血脉提示超时且无文字，按 普通 血脉处理");
+            }
             if (plan.Action == AutoBattleAction.Skill && ShouldHoldAutoBattleAttackForUnconfirmedEncounterRelief())
             {
                 return;
             }
-            // 等待血脉识别、等待手动操作都没有实际动作，灵动岛保持收起，也不打断上一条提示。
+            // 等待血脉识别没有实际动作，灵动岛保持收起，也不打断上一条提示。
             if (plan.Action == AutoBattleAction.None) return;
             if (plan.ShouldSendKeys
                 && !await ExecuteBattleInputWithOverlayAsync(state, settings, plan, turn, cancellationToken)) return;

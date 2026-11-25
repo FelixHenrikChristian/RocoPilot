@@ -41,6 +41,7 @@ public sealed class AutoBattleController
     private bool _encounterRelieved;
     private EncounterBloodlineKind _bloodline = EncounterBloodlineKind.Unrecognized;
     private DateTimeOffset? _bloodlineWaitStartedAt;
+    private bool _bloodlineTipHasText;
     private (EncounterBloodlineKind Kind, bool Capture)? _captureDecision;
 
     public long BattleId { get { lock (_gate) return _battleId; } }
@@ -185,6 +186,19 @@ public sealed class AutoBattleController
         }
     }
 
+    /// <summary>
+    /// 血脉提示区域是否识别到过足够长的文字（不足 5 个汉字视为场景被误识别成文字）。
+    /// 等待超时后用于区分「区域没有提示」与「有提示但无法归类」：前者按普通血脉处理，后者仍按未识别处理。
+    /// </summary>
+    public void ObserveBloodlineTipText(long battleId, bool hasText)
+    {
+        lock (_gate)
+        {
+            if (battleId != _battleId || !hasText) return;
+            _bloodlineTipHasText = true;
+        }
+    }
+
     public void ResetEncounterRelief()
     {
         lock (_gate)
@@ -192,6 +206,7 @@ public sealed class AutoBattleController
             _encounterRelieved = false;
             _bloodline = EncounterBloodlineKind.Unrecognized;
             _bloodlineWaitStartedAt = null;
+            _bloodlineTipHasText = false;
             _captureDecision = null;
         }
     }
@@ -247,9 +262,20 @@ public sealed class AutoBattleController
         {
             if (_bloodline == EncounterBloodlineKind.Unrecognized && available)
             {
-                _bloodlineWaitStartedAt ??= now;
+                if (_bloodlineWaitStartedAt is null)
+                {
+                    _bloodlineWaitStartedAt = now;
+                    // 只统计等待期内的提示文字：入场横幅、战斗消息等解除前的文字不算。
+                    _bloodlineTipHasText = false;
+                }
+
                 if (now - _bloodlineWaitStartedAt.Value < BloodlineWaitTimeout)
                     return new(AutoBattleAction.None, "", "等待血脉提示识别", "-");
+
+                // 等待期内提示区域没有有效文字（不足 5 个汉字视为场景误识别）：按普通血脉处理。
+                // 有文字但无法归类说明提示存在，保持未识别，交给停止开关决定。
+                if (!_bloodlineTipHasText)
+                    _bloodline = EncounterBloodlineKind.Normal;
             }
             _captureDecision = (_bloodline, filter.ShouldCapture(_bloodline));
         }

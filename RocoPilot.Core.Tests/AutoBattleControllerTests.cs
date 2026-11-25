@@ -152,6 +152,7 @@ public sealed class AutoBattleControllerTests
         var battle = new AutoBattleController();
         battle.BeginSkillSelection(settings, Now);
         battle.ObserveEncounterRelieved(settings);
+        battle.ObserveBloodlineTipText(battle.BattleId, true);
         Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
         Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now.AddMilliseconds(3999)).Action);
         Assert.AreEqual(AutoBattleAction.Skill, battle.PlanSkillSelection(settings, true, Now.AddSeconds(4)).Action);
@@ -219,6 +220,22 @@ public sealed class AutoBattleControllerTests
         battle.BeginSkillSelection(settings, Now);
         battle.ObserveEncounterRelieved(settings);
         Assert.AreEqual(AutoBattleAction.Capture, battle.PlanSkillSelection(settings, false, Now).Action);
+    }
+
+    [TestMethod]
+    public void MissingBloodlineTipTextFallsBackToNormalAfterWait()
+    {
+        var settings = Settings();
+        settings.BloodlineCaptureFilter.CaptureNormal = true;
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveEncounterRelieved(settings);
+        // 等待期内提示区域始终没有文字：超时后按普通血脉处理。
+        Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
+        var plan = battle.PlanSkillSelection(settings, true, Now.AddSeconds(4));
+        Assert.AreEqual(EncounterBloodlineKind.Normal, battle.Bloodline);
+        Assert.AreEqual(AutoBattleAction.Capture, plan.Action);
+        Assert.IsTrue(plan.Description.Contains("普通", StringComparison.Ordinal));
     }
 
     [TestMethod]

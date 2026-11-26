@@ -38,15 +38,24 @@ public sealed class IndependentTaskServiceTests
             await fixture.Service.StopAsync();
         }
         await WaitStoppedAsync(fixture.Service);
-        var expected = outcome switch
+        string[] expected = outcome switch
         {
             // 一项失败不终止清单：后面的任务照常执行（这里同一个桩，同样失败）。
-            "failure" => "花种挑战：失败：扫描结果过期；传说精灵挑战：失败：扫描结果过期",
-            "cancel" => "花种挑战：已取消；传说精灵挑战：未执行",
-            _ => "花种挑战：成功：花种 1，2 次；传说精灵挑战：成功：圣羽翼王，3 次"
+            "failure" => ["花种挑战：失败：扫描结果过期", "传说精灵挑战：失败：扫描结果过期"],
+            "cancel" => ["花种挑战：已取消", "传说精灵挑战：未执行"],
+            _ => ["花种挑战：成功：花种 1，2 次", "传说精灵挑战：成功：圣羽翼王，3 次"]
         };
-        CollectionAssert.Contains(log.Messages.ToArray(), "每日任务汇总：" + expected);
-        if (outcome != "cancel") StringAssert.Contains(fixture.Runtime.Results.Last().Description, expected);
+        var summary = log.Messages.Single(message => message.StartsWith("每日任务汇总：", StringComparison.Ordinal));
+        var expectedIcon = outcome switch
+        {
+            "failure" => "❌",
+            "cancel" => "⚪",
+            _ => "✅"
+        };
+        CollectionAssert.AreEqual(
+            new[] { "每日任务汇总：", $"{expectedIcon} {expected[0]}", $"{expectedIcon} {expected[1]}" },
+            summary.Split(Environment.NewLine));
+        if (outcome != "cancel") StringAssert.Contains(fixture.Runtime.Results.Last().Description, string.Join("；", expected));
         // 通知不照搬灵动岛的逐项汇总：标题说成没成，正文只留原因和计数。
         var notifications = fixture.Notifications.Payloads.ToArray();
         if (outcome == "cancel") Assert.HasCount(0, notifications);

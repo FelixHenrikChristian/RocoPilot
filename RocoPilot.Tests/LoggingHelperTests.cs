@@ -97,6 +97,7 @@ public sealed class LoggingHelperTests
     public void LogPageKeepsDebugRecordsAndItsOtherRecordsMatchTheFile()
     {
         var directory = Directory.CreateTempSubdirectory();
+        var summary = string.Join(Environment.NewLine, "", "✅ 邮件领取：成功：已领取邮件附件", "⚪ 自动出售：未执行");
         try
         {
             var entries = new LogEntryStore();
@@ -107,10 +108,11 @@ public sealed class LoggingHelperTests
                 task.Debug("识别变化 {Target}", "battle-chat");
                 task.Information("实时任务：已挂起（{Reason}），第 {Turn} 回合", "窗口最小化", 3);
                 task.Warning(new IOException("窗口不可用"), "截图失败");
+                task.Information("每日任务汇总：{Summary}", summary);
             }
 
             var records = entries.ReadFrom(0).Entries;
-            Assert.AreEqual(3, records.Count);
+            Assert.AreEqual(4, records.Count);
             Assert.AreEqual(LogSeverity.Debug, records[0].Severity);
             Assert.AreEqual("识别变化 battle-chat", records[0].Message);
             Assert.AreEqual(LogSeverity.Information, records[1].Severity);
@@ -119,6 +121,7 @@ public sealed class LoggingHelperTests
             Assert.IsNull(records[1].Exception);
             Assert.AreEqual(LogSeverity.Warning, records[2].Severity);
             StringAssert.StartsWith(records[2].Exception, "System.IO.IOException: 窗口不可用");
+            Assert.AreEqual("每日任务汇总：" + summary, records[3].Message);
 
             // 日志页默认显示的记录与 app 日志文件逐字一致。
             var path = directory.GetFiles(LogPipeline.AppFilePattern).Single();

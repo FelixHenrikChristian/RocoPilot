@@ -313,6 +313,7 @@
                                         Grid.Column="3"
                                         Margin="0,1,0,0"
                                         FontSize="13"
+                                        IsColorFontEnabled="True"
                                         IsTextSelectionEnabled="True"
                                         Text="{x:Bind Entry.Message}"
                                         TextWrapping="Wrap"

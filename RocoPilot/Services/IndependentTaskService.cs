@@ -392,7 +392,12 @@ public sealed class IndependentTaskService : IIndependentTaskService
         }
         finally
         {
-            if (isDaily) _logger.LogInformation("每日任务汇总：{Summary}", Summary());
+            if (isDaily)
+            {
+                var summary = string.Join(Environment.NewLine, Outcomes().Select(item =>
+                    $"{GetOutcomeIcon(item.Outcome)} {item.Name}：{item.Outcome ?? "未执行"}"));
+                _logger.LogInformation("每日任务汇总：{Summary}", Environment.NewLine + summary);
+            }
             _recognitionDiagnostics?.Flush();
             (_challengeRunner as IChallengeResultFrameSource)?.TakeResultFrame()?.Dispose();
             failureFrame?.Dispose();
@@ -527,6 +532,14 @@ public sealed class IndependentTaskService : IIndependentTaskService
 
         string Summary() => string.Join("；", tasks.Select((task, i) =>
             $"{GetTaskDisplayName(task)}：{outcomes[i] ?? "未执行"}"));
+
+        static string GetOutcomeIcon(string? outcome) => outcome switch
+        {
+            null or "已取消" => "⚪",
+            _ when outcome.StartsWith("跳过", StringComparison.Ordinal) => "⚪",
+            _ when outcome.StartsWith("失败", StringComparison.Ordinal) => "❌",
+            _ => "✅"
+        };
 
         void UpdateProgress(IndependentTaskProgress progress)
         {

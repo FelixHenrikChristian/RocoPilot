@@ -41,18 +41,18 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="InputInterceptor" Version="2.2.1" />
-    <PackageReference Include="Markdig" Version="1.2.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
-    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.21.0" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.1.3" />
+    <PackageReference Include="Markdig" Version="1.6.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.32.0" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
     <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" Version="3.0.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260602" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260602" />
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20261107" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20261107" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="11.0.0" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
-    <PackageReference Include="WinUIEx" Version="2.9.1" />
+    <PackageReference Include="WinUIEx" Version="2.9.3" />
   </ItemGroup>
 
   <!-- Alternate OCR engines are only used by the Debug comparison page. -->
@@ -76,41 +76,31 @@
   </ItemGroup>
 
   <!-- AppNotificationManager.Register needs this framework resource, omitted by the 2.1.3 self-contained payload. -->
-  <Target Name="IncludeAppNotificationRuntimeResource" BeforeTargets="AssignTargetPaths"
-          DependsOnTargets="GetWindowsAppSDKNativePlatform" Condition="'$(WindowsAppSDKSelfContained)' == 'true'">
+  <Target Name="IncludeAppNotificationRuntimeResource" BeforeTargets="AssignTargetPaths" DependsOnTargets="GetWindowsAppSDKNativePlatform" Condition="'$(WindowsAppSDKSelfContained)' == 'true'">
     <PropertyGroup>
       <NotificationResourceDll>Microsoft.WindowsAppRuntime.Insights.Resource.dll</NotificationResourceDll>
     </PropertyGroup>
-    <Unzip SourceFiles="$(PkgMicrosoft_WindowsAppSDK_Runtime)\tools\MSIX\win10-$(NativePlatform)\Microsoft.WindowsAppRuntime.2.msix"
-           DestinationFolder="$(IntermediateOutputPath)NotificationRuntime" Include="$(NotificationResourceDll)" />
+    <Unzip SourceFiles="$(PkgMicrosoft_WindowsAppSDK_Runtime)\tools\MSIX\win10-$(NativePlatform)\Microsoft.WindowsAppRuntime.2.msix" DestinationFolder="$(IntermediateOutputPath)NotificationRuntime" Include="$(NotificationResourceDll)" />
     <ItemGroup>
-      <Content Include="$(IntermediateOutputPath)NotificationRuntime\$(NotificationResourceDll)"
-               Link="$(NotificationResourceDll)" CopyToOutputDirectory="PreserveNewest" />
+      <Content Include="$(IntermediateOutputPath)NotificationRuntime\$(NotificationResourceDll)" Link="$(NotificationResourceDll)" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
   </Target>
 
   <!-- WindowsAppSDK self-contained payload includes WinUI MUI files for every supported language. -->
-  <Target Name="ExcludeWinUIMuiFilesFromWindowsAppSDKPayload"
-          BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents"
-          DependsOnTargets="GetWindowsAppSDKNativePlatform">
+  <Target Name="ExcludeWinUIMuiFilesFromWindowsAppSDKPayload" BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromComponents" DependsOnTargets="GetWindowsAppSDKNativePlatform">
     <ItemGroup>
-      <MicrosoftWindowsAppSDKFilesExcluded Include="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\**\*.mui"
-                                           Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
-      <MicrosoftWindowsAppSDKFilesExcluded Remove="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\zh-CN\*.mui"
-                                           Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
-      <MicrosoftWindowsAppSDKFilesExcluded Remove="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\en-us\*.mui"
-                                           Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
+      <MicrosoftWindowsAppSDKFilesExcluded Include="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\**\*.mui" Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
+      <MicrosoftWindowsAppSDKFilesExcluded Remove="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\zh-CN\*.mui" Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
+      <MicrosoftWindowsAppSDKFilesExcluded Remove="%(WindowsAppSdkComponentPackages.Identity)runtimes-framework\win-$(NativePlatform)\native\en-us\*.mui" Condition="$([System.String]::Copy('%(WindowsAppSdkComponentPackages.Identity)').Contains('microsoft.windowsappsdk.winui'))" />
     </ItemGroup>
   </Target>
 
-  <Target Name="ExcludeWindowsAiMachineLearningOnnxRuntimeFromMsix"
-          BeforeTargets="_ComputeAppxPackagePayload">
+  <Target Name="ExcludeWindowsAiMachineLearningOnnxRuntimeFromMsix" BeforeTargets="_ComputeAppxPackagePayload">
     <PropertyGroup>
       <WindowsAiMachineLearningOnnxRuntimePath>$(NuGetPackageRoot)microsoft.windows.ai.machinelearning\2.1.1\runtimes\win-$([System.String]::Copy('$(Platform)').ToLowerInvariant())\native\onnxruntime.dll</WindowsAiMachineLearningOnnxRuntimePath>
     </PropertyGroup>
     <ItemGroup>
-      <PackagingOutputs Remove="@(PackagingOutputs)"
-                        Condition="$([System.String]::Copy('%(PackagingOutputs.FullPath)').ToLowerInvariant()) == $([System.String]::Copy('$(WindowsAiMachineLearningOnnxRuntimePath)').ToLowerInvariant())" />
+      <PackagingOutputs Remove="@(PackagingOutputs)" Condition="$([System.String]::Copy('%(PackagingOutputs.FullPath)').ToLowerInvariant()) == $([System.String]::Copy('$(WindowsAiMachineLearningOnnxRuntimePath)').ToLowerInvariant())" />
     </ItemGroup>
   </Target>
 

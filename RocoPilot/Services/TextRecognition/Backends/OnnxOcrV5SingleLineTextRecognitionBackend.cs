@@ -6,6 +6,7 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
 using OpenCvSharp.Dnn;
 
+using RocoPilot.Configuration;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
 using RocoPilot.Models.TextRecognition;
@@ -18,7 +19,8 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
     private const string LanguageName = "Chinese/English";
     private const TextRecognitionMethod ResultMethod = TextRecognitionMethod.OnnxOcrV5;
     private const int ModelHeight = 48;
-    private const int MaximumWidth = 320;
+    private const int DefaultMaximumWidth = 320;
+    private const int BattleBannerMaximumWidth = 640;
 
     private readonly Lazy<OnnxOcrV5Recognizer?> _recognizer = new(CreateRecognizer);
     private readonly SemaphoreSlim _recognitionLock = new(1, 1);
@@ -63,6 +65,13 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
         var recognizer = _recognizer.Value
             ?? throw new InvalidOperationException("The ONNX OCR recognizer is unavailable.");
 
+        // 内置异色和血脉横幅缩到 48 像素高后，等比宽度约为 580–601 像素。
+        var regionId = region.Id?.Trim();
+        var maximumWidth = string.Equals(regionId, RecognitionRegionIds.BattleShinyTip, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(regionId, RecognitionRegionIds.BattleBloodlineTip, StringComparison.OrdinalIgnoreCase)
+            ? BattleBannerMaximumWidth
+            : DefaultMaximumWidth;
+
         GCHandle pixelHandle = default;
         try
         {
@@ -75,7 +84,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
             using var sourceRegion = new Mat(source, new Rect(region.X, region.Y, region.Width, region.Height));
             using var image = new Mat();
             Cv2.CvtColor(sourceRegion, image, ColorConversionCodes.BGRA2BGR);
-            return await RecognizeImageAsync(image, recognizer, cancellationToken);
+            return await RecognizeImageAsync(image, recognizer, maximumWidth, cancellationToken);
         }
         finally
         {
@@ -106,7 +115,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
             throw new InvalidDataException("OCR input image could not be decoded.");
         }
 
-        return await RecognizeImageAsync(image, recognizer, cancellationToken);
+        return await RecognizeImageAsync(image, recognizer, DefaultMaximumWidth, cancellationToken);
     }
 
     public void Dispose()
@@ -170,12 +179,13 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
     private async Task<TextRecognitionResult> RecognizeImageAsync(
         Mat image,
         OnnxOcrV5Recognizer recognizer,
+        int maximumWidth,
         CancellationToken cancellationToken)
     {
         await _recognitionLock.WaitAsync(cancellationToken);
         try
         {
-            var text = await Task.Run(() => recognizer.Recognize(image), cancellationToken);
+            var text = await Task.Run(() => recognizer.Recognize(image, maximumWidth), cancellationToken);
             return TextRecognitionResultFactory.Create(ResultMethod, MethodName, LanguageName, text);
         }
         finally
@@ -199,17 +209,17 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
             _session = new InferenceSession(modelPath, options);
         }
 
-        public string Recognize(Mat source)
+        public string Recognize(Mat source, int maximumWidth)
         {
             if (source.Empty())
             {
                 throw new ArgumentException("OCR input image is empty.", nameof(source));
             }
 
-            var resizedWidth = Math.Clamp(
-                (int)Math.Ceiling(source.Width * ModelHeight / (double)source.Height),
+            var resizedWidth = (int)Math.Clamp(
+                Math.Ceiling(source.Width * (double)ModelHeight / source.Height),
                 1,
-                MaximumWidth);
+                maximumWidth);
             using var resized = new Mat();
             Cv2.Resize(source, resized, new Size(resizedWidth, ModelHeight), 0, 0, InterpolationFlags.Linear);
             using var blob = CvDnn.BlobFromImage(

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using RocoPilot.Configuration;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.Recognition;
@@ -15,15 +16,17 @@ using RocoPilot.Services.TextRecognition.Backends;
 namespace RocoPilot.Tests;
 
 [TestClass]
+[TestCategory("LocalScreenshots")]
 public sealed class ShinyReplayTests
 {
     public TestContext TestContext { get; set; } = null!;
 
     [TestMethod]
-    [DataRow("battle-transform", false)]
-    [DataRow("battle-discovery", false)]
-    [DataRow("video-chess", true)]
-    public async Task ReplaysActualRegion(string name, bool video)
+    [DataRow("battle-transform", false, RecognitionRegionIds.BattleShinyTip)]
+    [DataRow("battle-transform", false, RecognitionRegionIds.BattleBloodlineTip)]
+    [DataRow("battle-discovery", false, RecognitionRegionIds.BattleShinyTip)]
+    [DataRow("video-chess", true, RecognitionRegionIds.BattleShinyTip)]
+    public async Task ReplaysActualRegion(string name, bool video, string regionId)
     {
         var root = Root();
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(root, "RocoPilot.Tests", "LocalScreenshots", "2026-11-16", "shiny", name + ".png"));
@@ -45,18 +48,26 @@ public sealed class ShinyReplayTests
         for (var i = 0; i < 25; i++)
         {
             var start = Stopwatch.GetTimestamp();
-            text = await recognizer.RecognizeRegionTextAsync(state, frame, ["battle-tip-shiny"], default);
+            text = await recognizer.RecognizeRegionTextAsync(state, frame, [regionId], default);
             times.Add(Stopwatch.GetElapsedTime(start).TotalMilliseconds);
             if ((bool)parse.Invoke(null, [text])!) hits++;
         }
         times.Sort();
-        TestContext.WriteLine($"{name}: hits={hits}/25; median={times[12]:F2} ms; p95={times[23]:F2} ms; text={text}");
-        if (!video) Assert.AreEqual(25, hits);
+        TestContext.WriteLine($"{name}/{regionId}: hits={hits}/25; median={times[12]:F2} ms; p95={times[23]:F2} ms; text={text}");
+        if (!video)
+        {
+            Assert.AreEqual(25, hits, $"OCR 结果：{text}");
+            if (name == "battle-transform")
+            {
+                StringAssert.Contains(text, "对面");
+                StringAssert.Contains(text, "异色精灵");
+            }
+        }
         // 第三方视频只能记录映射结果，无法推断原生游戏窗口尺寸。
         // 对照仅定位视频截图中的文字，生产配置不变。
         if (video)
         {
-            var region = config.Regions.Single(r => r.Id == "battle-tip-shiny");
+            var region = config.Regions.Single(r => r.Id == regionId);
             config.ResolutionWidth = frame.Width;
             config.ResolutionHeight = frame.Height;
             region.X = 895;
@@ -70,7 +81,7 @@ public sealed class ShinyReplayTests
             for (var i = 0; i < 25; i++)
             {
                 var start = Stopwatch.GetTimestamp();
-                text = await recognizer.RecognizeRegionTextAsync(state, frame, ["battle-tip-shiny"], default);
+                text = await recognizer.RecognizeRegionTextAsync(state, frame, [regionId], default);
                 times.Add(Stopwatch.GetElapsedTime(start).TotalMilliseconds);
                 if ((bool)parse.Invoke(null, [text])!) hits++;
             }

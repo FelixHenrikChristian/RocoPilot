@@ -2,6 +2,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json;
 
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.Spirits;
 using RocoPilot.Services;
 using RocoPilot.Views.Windows.AutoBattleConfigPages;
 
@@ -201,6 +202,67 @@ public sealed class AutoBattleConfigEditorTests
         Assert.IsFalse(editor.TryBuildSettings(settings, out _, out var error));
         Assert.AreEqual(AutoBattleConfigSection.SharedSequences, error.Section);
         Assert.AreEqual("1", settings.TurnSequencePresets.Single().Sequence);
+    }
+
+    [TestMethod]
+    public void SelectingAnyCatalogFormPersistsWholeChainsSeparatelyAndRemovesThemTogether()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", "Sources", "biligame", "spirits.json");
+        var catalog = JsonConvert.DeserializeObject<SpiritCatalogDocument>(File.ReadAllText(path))!.Spirits;
+        var settings = JsonConvert.DeserializeObject<AutoBattleSettings>("{}")!;
+        var editor = new AutoBattleConfigEditor(settings, new KeyboardInputService());
+        Assert.AreEqual(SpiritCaptureListMode.Off, editor.SpiritCaptureFilter.Mode);
+        editor.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Blacklist;
+        foreach (var name in new[] { "熔岩布丁", "果冻" })
+            editor.AddSpiritChain(catalog.Single(item => item.Name == name), catalog);
+        var jellyNames = new[] { "果冻", "抹茶布丁", "椰浆布丁", "熔岩布丁" };
+        CollectionAssert.AreEquivalent(jellyNames, editor.SpiritCaptureFilter.Blacklist.Single().Names);
+        editor.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Whitelist;
+        editor.AddSpiritChain(catalog.Single(item => item.Name == "雪绒鸟（夏天的样子）"), catalog);
+        editor.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Off;
+        Assert.IsTrue(editor.TryBuildSettings(settings, out var edited, out _));
+        var saved = JsonConvert.DeserializeObject<AutoBattleSettings>(JsonConvert.SerializeObject(edited))!;
+        var reopened = new AutoBattleConfigEditor(saved, new KeyboardInputService());
+        var filter = reopened.SpiritCaptureFilter;
+        Assert.IsEmpty(filter.ActiveChains);
+        filter.Mode = SpiritCaptureListMode.Whitelist;
+        CollectionAssert.Contains(filter.ActiveChains.Single().Names, "霜翼领主（秋天的样子）");
+        Assert.AreEqual(string.Empty, filter.GetExclusionReason("霜翼领主"));
+        reopened.RemoveSpiritChain(filter.ActiveChains.Single());
+        Assert.IsEmpty(filter.Whitelist);
+        CollectionAssert.AreEquivalent(jellyNames, filter.Blacklist.Single().Names);
+        Assert.HasCount(1, saved.SpiritCaptureFilter.Whitelist);
+    }
+
+    [TestMethod]
+    public void ChainCardListsSavedFormsBaseFirstWithSameNamedVariantsMerged()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "Configuration", "Spirits", "Sources", "biligame", "spirits.json");
+        var catalog = JsonConvert.DeserializeObject<SpiritCatalogDocument>(File.ReadAllText(path))!.Spirits;
+        var editor = new AutoBattleConfigEditor(AutoBattleSettings.CreateDefault(), new KeyboardInputService());
+        editor.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Whitelist;
+        // 季节形态同名只显示一个；图鉴里圣光迪莫排在迪莫前面，卡片仍以初始形态开头。
+        editor.AddSpiritChain(catalog.Single(item => item.Name == "雪绒鸟（夏天的样子）"), catalog);
+        editor.AddSpiritChain(catalog.Single(item => item.Name == "圣火迪莫"), catalog);
+        var bird = editor.SpiritCaptureFilter.Whitelist[0];
+        var expected = new[] { "雪绒鸟", "冬羽雀", "岚鸟", "霜翼领主" };
+
+        var forms = SpiritChainForms.Resolve(bird, catalog);
+        CollectionAssert.AreEqual(expected, forms.Select(form => form.Name).ToArray());
+        Assert.IsTrue(forms.All(form => form.AvatarPath.Length > 0));
+        Assert.AreEqual("雪绒鸟", SpiritChainForms.Title(forms));
+        Assert.AreEqual("冬羽雀、岚鸟、霜翼领主", SpiritChainForms.Detail(forms));
+        Assert.AreEqual("迪莫", SpiritChainForms.Title(SpiritChainForms.Resolve(editor.SpiritCaptureFilter.Whitelist[1], catalog)));
+
+        // 图鉴还没加载完时先按名单里存的名字显示，同样不重复、没有头像。
+        var offline = SpiritChainForms.Resolve(bird, null);
+        CollectionAssert.AreEqual(expected, offline.Select(form => form.Name).ToArray());
+        Assert.IsTrue(offline.All(form => form.AvatarPath.Length == 0));
+
+        // 卡片只列名单里实际存着的名字：图鉴里同一条链后来多出的形态不会冒出来。
+        bird.Names.RemoveAll(name => name.StartsWith("霜翼领主", StringComparison.Ordinal));
+        CollectionAssert.AreEqual(expected[..3], SpiritChainForms.Resolve(bird, catalog).Select(form => form.Name).ToArray());
+        Assert.AreEqual("无其他形态", SpiritChainForms.Detail(SpiritChainForms.Resolve(new() { Names = ["果冻"] }, catalog)));
     }
 
     [TestMethod]

@@ -244,6 +244,66 @@ public sealed class AutoBattleControllerTests
     }
 
     [TestMethod]
+    [DataRow(SpiritCaptureListMode.Blacklist, "熔岩布丁", false, AutoBattleAction.Skill)]
+    [DataRow(SpiritCaptureListMode.Blacklist, "小火苗", true, AutoBattleAction.Capture)]
+    [DataRow(SpiritCaptureListMode.Whitelist, "熔岩布丁", true, AutoBattleAction.Capture)]
+    [DataRow(SpiritCaptureListMode.Whitelist, "小火苗", true, AutoBattleAction.Skill)]
+    [DataRow(SpiritCaptureListMode.Off, "熔岩布丁", true, AutoBattleAction.Capture)]
+    public void SpiritListFiltersKnownNamesIndependentlyOfBloodlineSwitch(
+        SpiritCaptureListMode mode, string name, bool bloodlineEnabled, AutoBattleAction expected)
+    {
+        var settings = Settings();
+        settings.BloodlineCaptureFilter.IsEnabled = bloodlineEnabled;
+        settings.SpiritCaptureFilter.Mode = mode;
+        settings.SpiritCaptureFilter.Blacklist = [new() { Names = ["果冻", "熔岩布丁"] }];
+        settings.SpiritCaptureFilter.Whitelist = [new() { Names = ["果冻", "熔岩布丁"] }];
+        var battle = new AutoBattleController();
+        battle.ObserveEncounterRelieved(settings);
+        battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.QiYi);
+        battle.ObserveEnemyName(battle.BattleId, name);
+        Assert.AreEqual(expected, battle.PlanSkillSelection(settings, true, Now).Action);
+    }
+
+    [TestMethod]
+    [DataRow(true, AutoBattleAction.Capture)]
+    [DataRow(false, AutoBattleAction.Skill)]
+    public void NameAndBloodlineShareDeadlineAndLateOcrCannotChangeDecision(bool allowUnknown, AutoBattleAction expected)
+    {
+        var settings = Settings();
+        settings.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Blacklist;
+        settings.SpiritCaptureFilter.Blacklist = [new() { Names = ["果冻"] }];
+        settings.SpiritCaptureFilter.AllowUnrecognizedName = allowUnknown;
+        var battle = new AutoBattleController();
+        var previousBattle = battle.BattleId;
+        battle.ObserveEnemyName(previousBattle, "果冻");
+        battle.ResetBattle();
+        battle.ObserveEnemyName(previousBattle, "果冻");
+        battle.ObserveEncounterRelieved(settings);
+        Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
+        battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.QiYi);
+        Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now.AddSeconds(3)).Action);
+        Assert.AreEqual(expected, battle.PlanSkillSelection(settings, true, Now.AddSeconds(4)).Action);
+        battle.ObserveEnemyName(battle.BattleId, allowUnknown ? "果冻" : "小火苗");
+        Assert.AreEqual(expected, battle.PlanSkillSelection(settings, true, Now.AddSeconds(5)).Action);
+    }
+
+    [TestMethod]
+    public void EmptyWhitelistAndExcludedBloodlineSkipWithoutWaitingForName()
+    {
+        var settings = Settings();
+        settings.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Whitelist;
+        var battle = new AutoBattleController();
+        battle.ObserveEncounterRelieved(settings);
+        Assert.AreEqual(AutoBattleAction.Skill, battle.PlanSkillSelection(settings, true, Now).Action);
+
+        battle.ResetBattle();
+        settings.SpiritCaptureFilter.Whitelist.Add(new() { Names = ["果冻"] });
+        battle.ObserveEncounterRelieved(settings);
+        battle.ObserveBloodline(battle.BattleId, EncounterBloodlineKind.Normal);
+        Assert.AreEqual(AutoBattleAction.Skill, battle.PlanSkillSelection(settings, true, Now).Action);
+    }
+
+    [TestMethod]
     public void DisabledBattleCannotActOrRecover()
     {
         var settings = Settings();

@@ -375,6 +375,7 @@ public sealed partial class RuntimeTaskService
         }
 
         NoteBattleSpirit(battleId, enemyName);
+        _battle.ObserveEnemyName(battleId, enemyName);
 
         if (pendingRead is { } pending && pending.BattleId == battleId)
         {

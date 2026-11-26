@@ -8,6 +8,8 @@ using Microsoft.UI.Xaml;
 
 using RocoPilot.Contracts.Services;
 using RocoPilot.Models.Runtime;
+using RocoPilot.Models.Spirits;
+using RocoPilot.Services.Spirits;
 
 namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
 
@@ -19,6 +21,41 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
     private readonly HashSet<AutoBattlePresetEditorItem> _observedPresets = [];
 
     internal IKeyboardInputService KeyboardInputService => _keyboardInputService;
+
+    public SpiritCaptureFilterSettings SpiritCaptureFilter { get; private set; } = new();
+
+    public void AddSpiritChain(SpiritCatalogItem selected, IReadOnlyList<SpiritCatalogItem> catalog)
+    {
+        var chains = EditableSpiritChains();
+        if (chains is null) return;
+
+        var id = GetSpiritChainId(selected);
+        var members = string.IsNullOrEmpty(selected.ChainId)
+            ? catalog.Where(item => item.Name == selected.Name || selected.EvolutionChainNames.Contains(item.Name))
+            : catalog.Where(item => item.ChainId == selected.ChainId);
+        // 保留各形态原名，同时收录名称识别实际返回的图鉴显示名。
+        var names = selected.EvolutionChainNames.Concat(members.SelectMany(item =>
+                new[] { item.Name, SpiritCatalogIndex.BuildDisplayName(item) }))
+            .Append(selected.Name).Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var existing = chains.FindIndex(chain => chain.Id == id);
+        var chain = new SpiritCaptureChain { Id = id, Names = names };
+        if (existing < 0) chains.Add(chain);
+        else chains[existing] = chain;
+    }
+
+    /// <summary>名单按进化链去重用的标识；图鉴缺链编号时退回到链上第一个名字。</summary>
+    internal static string GetSpiritChainId(SpiritCatalogItem item) => string.IsNullOrEmpty(item.ChainId)
+        ? item.EvolutionChainNames?.FirstOrDefault() ?? item.Name : item.ChainId;
+
+    public void RemoveSpiritChain(SpiritCaptureChain chain) => EditableSpiritChains()?.Remove(chain);
+
+    private List<SpiritCaptureChain>? EditableSpiritChains() => SpiritCaptureFilter.Mode switch
+    {
+        SpiritCaptureListMode.Blacklist => SpiritCaptureFilter.Blacklist,
+        SpiritCaptureListMode.Whitelist => SpiritCaptureFilter.Whitelist,
+        _ => null
+    };
 
     /// <summary>三种战斗类型各管各的配置，互不干扰。普通战斗无出招队列，跳过步骤仅展示不执行。</summary>
     public AutoBattleReleaseConfigSet NormalConfigs { get; } = new(supportsSkipTurn: false);
@@ -315,6 +352,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
         settings.LegendaryReleaseConfigs = legendaryConfigs;
         settings.SelectedLegendaryReleaseConfigId = legendarySelectedId;
         settings.TurnSequencePresets = presets;
+        settings.SpiritCaptureFilter = SpiritCaptureFilter.Clone();
         settings.BloodlineCaptureFilter = new BloodlineCaptureFilterSettings
         {
             IsEnabled = BloodlineCaptureFilterEnabled,
@@ -330,6 +368,7 @@ internal sealed class AutoBattleConfigEditor : ObservableObject
 
     private void LoadSettings(AutoBattleSettings settings)
     {
+        SpiritCaptureFilter = settings.SpiritCaptureFilter;
         LoadReleaseConfigs(
             settings.NormalReleaseConfigs,
             settings.SelectedNormalReleaseConfigId,

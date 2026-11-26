@@ -14,17 +14,24 @@ public sealed partial class RuntimeTaskService
     private sealed record IndependentTaskOverlay(string Name, IndependentTaskProgress Progress);
     private IndependentTaskOverlay? _independentTaskOverlay;
 
-    // 名称只补充展示，在现有后台 OCR 循环中执行，不参与战斗放行。
+    // 名单和灵动岛共享后台读名，不在发送按键的线程执行 OCR。
     private async Task UpdateRuntimeSpiritNameAsync(RuntimeTaskState state, CapturedFrame frame,
         long battleId, CancellationToken cancellationToken)
     {
-        if (!state.Options.InfoOverlayEnabled) return;
+        var settings = _autoBattleSettings;
+        var needsCaptureName = settings.IsEnabled
+            && settings.EncounterRelievedAction == AutoBattleEncounterRelievedAction.Capture
+            && settings.SpiritCaptureFilter.ActiveChains.Count > 0
+            && _battle.NeedsEnemyNameForCapture;
+        if (!state.Options.InfoOverlayEnabled && !needsCaptureName) return;
         var turnId = _battle.CurrentTurn?.Id;
         var rawText = await _frameRecognizer.RecognizeRegionTextAsync(
             state, frame, BattleEnemyNameRegionIds, cancellationToken);
         var name = await MatchRecognizedSpiritNameAsync(rawText, cancellationToken);
         if (battleId != _battle.BattleId) return;
+        _battle.ObserveEnemyName(battleId, name);
         NoteBattleSpirit(battleId, name);
+        if (!state.Options.InfoOverlayEnabled) return;
         RefreshOverlayActivity(state, _overlayActivities.RecognizeSpirit(battleId, turnId, name, DateTimeOffset.Now));
     }
 

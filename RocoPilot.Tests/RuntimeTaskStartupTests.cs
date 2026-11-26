@@ -546,6 +546,35 @@ public sealed class RuntimeTaskStartupTests
     }
 
     [TestMethod]
+    public async Task BlacklistedEvolutionUsesSkillWithOverlayAndStatisticsOff()
+    {
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true);
+        fixture.Catalog.Document.Spirits.Add(new() { Id = "316", Name = "熔岩布丁" });
+        fixture.Ocr.ReadName = () => Task.FromResult("熔岩布丁");
+        fixture.Ocr.BloodlineText = "奇异血脉";
+        var options = Options();
+        options.AutoBattleSettings.SkillSelectionActionDelayMs = 0;
+        options.AutoBattleSettings.EncounterRelievedAction = AutoBattleEncounterRelievedAction.Capture;
+        options.AutoBattleSettings.SpiritCaptureFilter.Mode = SpiritCaptureListMode.Blacklist;
+        options.AutoBattleSettings.SpiritCaptureFilter.Blacklist = [new() { Names = ["果冻", "熔岩布丁"] }];
+        try
+        {
+            Assert.IsTrue((await fixture.Runtime.StartAsync(options)).Success);
+            fixture.Matching.MatchedTemplate = "battle-button-skill.png";
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Disabled;
+            await fixture.ProcessFrameAsync();
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Enabled;
+            await fixture.ProcessFrameAsync();
+            await fixture.ProcessFrameAsync();
+            Assert.AreEqual(0, fixture.Keyboard.Sends);
+            await fixture.ScanOcrAsync();
+            await fixture.ProcessFrameAsync();
+            CollectionAssert.AreEqual(new[] { "1" }, fixture.Keyboard.Sequences);
+        }
+        finally { await fixture.Runtime.StopAsync(); }
+    }
+
+    [TestMethod]
     [DataRow(AutoBattleEncounterRelievedAction.NoAction, true, "")]
     [DataRow(AutoBattleEncounterRelievedAction.RecoverEnergy, true, "X")]
     [DataRow(AutoBattleEncounterRelievedAction.ReleaseSkill, true, "1")]

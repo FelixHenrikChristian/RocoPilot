@@ -158,6 +158,8 @@ public sealed class AutoBattleSettings
         set;
     } = BloodlineCaptureFilterSettings.CreateDefault();
 
+    public SpiritCaptureFilterSettings SpiritCaptureFilter { get; set; } = new();
+
     public static AutoBattleSettings CreateDefault()
     {
         return new AutoBattleSettings
@@ -221,7 +223,8 @@ public sealed class AutoBattleSettings
             KeyboardHoldDurationMs = KeyboardHoldDurationMs,
             KeyboardIntervalMs = KeyboardIntervalMs,
             CaptureKeyboardIntervalMs = CaptureKeyboardIntervalMs,
-            BloodlineCaptureFilter = (BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone()
+            BloodlineCaptureFilter = (BloodlineCaptureFilter ?? BloodlineCaptureFilterSettings.CreateDefault()).Clone(),
+            SpiritCaptureFilter = (SpiritCaptureFilter ?? new SpiritCaptureFilterSettings()).Clone()
         };
     }
 

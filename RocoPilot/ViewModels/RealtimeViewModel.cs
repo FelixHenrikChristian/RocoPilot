@@ -420,7 +420,7 @@ public sealed record AutoBattleEncounterRelievedActionOption(
             new(
                 AutoBattleEncounterRelievedAction.Capture,
                 "捕捉",
-                "识别到奇遇解除后进入技能选择界面会依次按 W、1、Space。可在战斗配置「捕捉血脉」中按血脉筛选是否捕捉。")
+                "奇遇解除后按 W、1、Space 捕捉。可在战斗配置「捕捉筛选」中选择血脉和精灵名单。")
         ];
     }
 }

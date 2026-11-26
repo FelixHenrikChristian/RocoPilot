@@ -87,7 +87,7 @@ internal sealed class SpiritCatalogIndex
             .ToList();
     }
 
-    private static string BuildDisplayName(SpiritCatalogItem item)
+    internal static string BuildDisplayName(SpiritCatalogItem item)
     {
         var wikiName = TextMatchingHelper.NormalizeSpiritNameForDisplay(item.WikiName);
         return wikiName.Length == 0

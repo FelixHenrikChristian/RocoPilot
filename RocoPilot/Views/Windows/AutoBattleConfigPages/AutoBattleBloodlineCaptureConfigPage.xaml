@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:RocoPilot.Views.Windows.AutoBattleConfigPages"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
     <Page.Resources>
@@ -42,7 +43,14 @@
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.24" />
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.3" />
             <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="{ThemeResource SystemAccentColor}" />
-
+            <!-- 精灵头像格：立绘是透明底的整幅图，留一圈边距完整显示；读不到图时露出占位图标。 -->
+            <Style x:Key="SpiritAvatarStyle" TargetType="Border">
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="Padding" Value="2" />
+                <Setter Property="CornerRadius" Value="{StaticResource ControlCornerRadius}" />
+                <Setter Property="Background" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+            </Style>
         </ResourceDictionary>
     </Page.Resources>
     <ScrollViewer
@@ -58,11 +66,11 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Border Width="40" Height="40" CornerRadius="{StaticResource ControlCornerRadius}" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                    <FontIcon Glyph="&#xE8D7;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                    <FontIcon Glyph="&#xE71C;" FontSize="20" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="捕捉血脉" />
-                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="仅用于普通战斗，且「奇遇解除操作」选择捕捉时生效。" />
+                    <TextBlock Style="{StaticResource DialogTitleTextStyle}" Text="捕捉筛选" />
+                    <TextBlock Style="{StaticResource DialogDescriptionTextStyle}" Text="仅用于普通战斗，且「奇遇解除操作」选择捕捉时生效。血脉和名单都通过才会捕捉。" />
                 </StackPanel>
             </Grid>
 
@@ -102,7 +110,7 @@
                         <TextBlock
                             FontSize="12"
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                            Text="选中的血脉尝试捕捉，其余按普通战斗配置释放战技。"
+                            Text="只有选中的血脉可以捕捉，其余按普通战斗配置释放战技。"
                             TextWrapping="Wrap" />
 
                         <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="92" ItemHeight="46">
@@ -143,6 +151,267 @@
                                     TextWrapping="Wrap" />
                             </Grid>
                         </Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource DialogSectionCardStyle}">
+                <StackPanel>
+                    <Grid Style="{StaticResource DialogSectionHeaderStyle}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon
+                            VerticalAlignment="Center"
+                            FontFamily="{StaticResource SymbolThemeFontFamily}"
+                            FontSize="18"
+                            Foreground="{ThemeResource AccentFillColorDefaultBrush}"
+                            Glyph="&#xE8FD;" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Style="{StaticResource DialogSectionTitleStyle}" Text="精灵名单" />
+                            <TextBlock x:Name="ListSummary" Style="{StaticResource DialogDescriptionTextStyle}" />
+                        </StackPanel>
+                        <ComboBox
+                            x:Name="ListModeBox"
+                            Grid.Column="2"
+                            Width="132"
+                            VerticalAlignment="Center"
+                            AutomationProperties.Name="精灵名单模式"
+                            SelectionChanged="ListModeBox_SelectionChanged">
+                            <ComboBoxItem Content="不使用名单" />
+                            <ComboBoxItem Content="黑名单" />
+                            <ComboBoxItem Content="白名单" />
+                        </ComboBox>
+                    </Grid>
+
+                    <StackPanel x:Name="ListOffHint" Style="{StaticResource DialogSectionBodyStyle}">
+                        <TextBlock
+                            Style="{StaticResource DialogCaptionTextStyle}"
+                            Text="黑名单：名单内的精灵不捕捉。白名单：只捕捉名单内的精灵。两份名单分开保存，来回切换不会丢。" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="ListOptions" Style="{StaticResource DialogSectionBodyStyle}" Visibility="Collapsed">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                x:Name="ListRule"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource DialogCaptionTextStyle}" />
+                            <Button
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="添加精灵"
+                                ToolTipService.ToolTip="从图鉴里选，整条进化链一起加入">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon FontSize="14" Glyph="&#xE710;" />
+                                    <TextBlock Text="添加精灵" />
+                                </StackPanel>
+                                <Button.Flyout>
+                                    <Flyout Opened="CatalogFlyout_Opened" Placement="BottomEdgeAlignedRight">
+                                        <StackPanel Width="360" Spacing="8">
+                                            <TextBox
+                                                x:Name="CatalogSearch"
+                                                AutomationProperties.Name="搜索图鉴"
+                                                PlaceholderText="搜索精灵名，任意形态都可以"
+                                                Style="{StaticResource DialogTextBoxStyle}"
+                                                TextChanged="CatalogSearch_TextChanged" />
+                                            <TextBlock x:Name="CatalogStatus" Style="{StaticResource DialogDescriptionTextStyle}" />
+                                            <ListView
+                                                x:Name="CatalogResults"
+                                                Height="320"
+                                                IsItemClickEnabled="True"
+                                                ItemClick="CatalogResults_ItemClick"
+                                                SelectionMode="None">
+                                                <ListView.ItemContainerStyle>
+                                                    <Style TargetType="ListViewItem">
+                                                        <Setter Property="Padding" Value="8,0" />
+                                                        <Setter Property="MinHeight" Value="48" />
+                                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    </Style>
+                                                </ListView.ItemContainerStyle>
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:SpiritChainOption">
+                                                        <Grid Padding="0,6" ColumnSpacing="10">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Style="{StaticResource SpiritAvatarStyle}">
+                                                                <Grid>
+                                                                    <FontIcon
+                                                                        FontSize="16"
+                                                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                                        Glyph="&#xE77B;"
+                                                                        Visibility="{x:Bind PlaceholderVisibility}" />
+                                                                    <Image Source="{x:Bind Avatar}" Stretch="Uniform" />
+                                                                </Grid>
+                                                            </Border>
+                                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                                <TextBlock
+                                                                    FontSize="13"
+                                                                    Text="{x:Bind Title}"
+                                                                    TextTrimming="CharacterEllipsis"
+                                                                    TextWrapping="NoWrap" />
+                                                                <TextBlock
+                                                                    Style="{StaticResource DialogDescriptionTextStyle}"
+                                                                    Text="{x:Bind Detail}"
+                                                                    TextTrimming="CharacterEllipsis"
+                                                                    TextWrapping="NoWrap"
+                                                                    ToolTipService.ToolTip="{x:Bind Detail}" />
+                                                            </StackPanel>
+                                                            <FontIcon
+                                                                Grid.Column="2"
+                                                                VerticalAlignment="Center"
+                                                                FontSize="14"
+                                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                                                Glyph="&#xE73E;"
+                                                                Visibility="{x:Bind ListedVisibility, Mode=OneWay}" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                        </Grid>
+
+                        <ItemsRepeater x:Name="SelectedChains">
+                            <ItemsRepeater.Layout>
+                                <UniformGridLayout
+                                    ItemsStretch="Fill"
+                                    MinColumnSpacing="8"
+                                    MinItemWidth="292"
+                                    MinRowSpacing="8" />
+                            </ItemsRepeater.Layout>
+                            <ItemsRepeater.ItemTemplate>
+                                <DataTemplate x:DataType="local:SpiritChainTile">
+                                    <Border Padding="12,10,6,10" Style="{StaticResource PresetRowStyle}">
+                                        <Grid ColumnSpacing="8" RowSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <ItemsControl IsTabStop="False" ItemsSource="{x:Bind Forms}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" Spacing="4" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="local:SpiritFormAvatar">
+                                                        <Border Style="{StaticResource SpiritAvatarStyle}" ToolTipService.ToolTip="{x:Bind Name}">
+                                                            <Grid>
+                                                                <FontIcon
+                                                                    FontSize="14"
+                                                                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                                    Glyph="&#xE77B;"
+                                                                    Visibility="{x:Bind PlaceholderVisibility}" />
+                                                                <TextBlock
+                                                                    HorizontalAlignment="Center"
+                                                                    VerticalAlignment="Center"
+                                                                    Style="{StaticResource DialogDescriptionTextStyle}"
+                                                                    Text="{x:Bind OverflowText}" />
+                                                                <Image Source="{x:Bind Image}" Stretch="Uniform" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button
+                                                Grid.Column="1"
+                                                Width="28"
+                                                Height="28"
+                                                MinHeight="0"
+                                                Padding="0"
+                                                VerticalAlignment="Top"
+                                                AutomationProperties.Name="{x:Bind RemoveLabel}"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Click="RemoveChain_Click"
+                                                Tag="{x:Bind Chain}"
+                                                ToolTipService.ToolTip="移出名单">
+                                                <FontIcon
+                                                    FontSize="10"
+                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                    Glyph="&#xE711;" />
+                                            </Button>
+                                            <StackPanel
+                                                Grid.Row="1"
+                                                Grid.ColumnSpan="2"
+                                                Margin="0,0,6,0"
+                                                Spacing="1">
+                                                <TextBlock
+                                                    Style="{StaticResource DialogFieldTitleStyle}"
+                                                    Text="{x:Bind Title}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="NoWrap" />
+                                                <TextBlock
+                                                    Style="{StaticResource DialogDescriptionTextStyle}"
+                                                    Text="{x:Bind Detail}"
+                                                    TextTrimming="CharacterEllipsis"
+                                                    TextWrapping="NoWrap"
+                                                    ToolTipService.ToolTip="{x:Bind Detail}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsRepeater.ItemTemplate>
+                        </ItemsRepeater>
+
+                        <StackPanel
+                            x:Name="ListEmpty"
+                            Padding="0,10"
+                            HorizontalAlignment="Center"
+                            Spacing="6"
+                            Visibility="Collapsed">
+                            <FontIcon
+                                HorizontalAlignment="Center"
+                                FontSize="24"
+                                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                Glyph="&#xE8FD;" />
+                            <TextBlock
+                                x:Name="ListEmptyText"
+                                HorizontalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel x:Name="UnknownNameText" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="读不出精灵名时，按血脉设置处理" />
+                                <TextBlock
+                                    Style="{StaticResource DialogDescriptionTextStyle}"
+                                    Text="最多等 4 秒。关闭后，读不出名字的精灵一律不捕捉。" />
+                            </StackPanel>
+                            <ToggleSwitch
+                                x:Name="UnknownNameOption"
+                                Grid.Column="1"
+                                Width="44"
+                                MinWidth="44"
+                                Padding="0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                AutomationProperties.Name="读不出精灵名时按血脉设置处理"
+                                IsOn="{x:Bind Editor.SpiritCaptureFilter.AllowUnrecognizedName, Mode=TwoWay}"
+                                OffContent=""
+                                OnContent="" />
+                        </Grid>
                     </StackPanel>
                 </StackPanel>
             </Border>

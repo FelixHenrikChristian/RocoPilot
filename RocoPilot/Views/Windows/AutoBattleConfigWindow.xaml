@@ -49,10 +49,10 @@
                 </NavigationViewItem>
                 <NavigationViewItem
                     x:Name="BloodlineCaptureNavigationItem"
-                    Content="捕捉血脉"
+                    Content="捕捉筛选"
                     Tag="BloodlineCapture">
                     <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE8D7;" />
+                        <FontIcon Glyph="&#xE71C;" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItemHeader Content="战斗类型" />

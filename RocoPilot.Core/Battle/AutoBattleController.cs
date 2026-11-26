@@ -29,7 +29,7 @@ public sealed record AutoBattlePlan(
 /// </summary>
 public sealed class AutoBattleController
 {
-    private static readonly TimeSpan BloodlineWaitTimeout = TimeSpan.FromSeconds(4);
+    private static readonly TimeSpan CaptureRecognitionTimeout = TimeSpan.FromSeconds(4);
     private readonly object _gate = new();
     private long _battleId;
     private long _nextTurnId;
@@ -40,10 +40,11 @@ public sealed class AutoBattleController
     private bool _suspendedForShiny;
     private bool _encounterRelieved;
     private EncounterBloodlineKind _bloodline = EncounterBloodlineKind.Unrecognized;
-    private DateTimeOffset? _bloodlineWaitStartedAt;
+    private DateTimeOffset? _captureWaitStartedAt;
+    private string _enemyName = string.Empty;
     // null 表示尚无有效 OCR 采样；只要出现过文字，后续空帧就不能覆盖它。
     private bool? _bloodlineTipHadText;
-    private (EncounterBloodlineKind Kind, bool Capture)? _captureDecision;
+    private (bool Capture, string Description)? _captureDecision;
 
     public long BattleId { get { lock (_gate) return _battleId; } }
     public int RoundIndex { get { lock (_gate) return _roundIndex; } }
@@ -52,6 +53,10 @@ public sealed class AutoBattleController
     public bool IsSuspendedForShiny { get { lock (_gate) return _suspendedForShiny; } }
     public bool IsEncounterRelieved { get { lock (_gate) return _encounterRelieved; } }
     public EncounterBloodlineKind Bloodline { get { lock (_gate) return _bloodline; } }
+    public bool NeedsEnemyNameForCapture
+    {
+        get { lock (_gate) return !_suspendedForShiny && _captureDecision is null && _enemyName.Length == 0; }
+    }
     public AutoBattleTurn? CurrentTurn
     {
         get
@@ -182,8 +187,16 @@ public sealed class AutoBattleController
             if (battleId != _battleId || _bloodline != EncounterBloodlineKind.Unrecognized
                 || _captureDecision is not null || kind == EncounterBloodlineKind.Unrecognized) return false;
             _bloodline = kind;
-            _bloodlineWaitStartedAt = null;
             return true;
+        }
+    }
+
+    public void ObserveEnemyName(long battleId, string name)
+    {
+        lock (_gate)
+        {
+            if (battleId == _battleId && _captureDecision is null && !string.IsNullOrWhiteSpace(name))
+                _enemyName = name;
         }
     }
 
@@ -203,7 +216,7 @@ public sealed class AutoBattleController
             _encounterRelieved = false;
             _bloodlineTipHadText = null;
             _bloodline = EncounterBloodlineKind.Unrecognized;
-            _bloodlineWaitStartedAt = null;
+            _captureWaitStartedAt = null;
             _captureDecision = null;
         }
     }
@@ -213,6 +226,7 @@ public sealed class AutoBattleController
         lock (_gate)
         {
             _battleId++;
+            _enemyName = string.Empty;
             _roundIndex = 0;
             _turnNumber = 0;
             _turn = null;
@@ -252,37 +266,44 @@ public sealed class AutoBattleController
     private AutoBattlePlan PlanCapture(AutoBattleSettings settings, AutoBattleReleaseStep step, bool available, DateTimeOffset now)
     {
         var filter = settings.BloodlineCaptureFilter;
-        if (!filter.IsEnabled)
+        var spiritFilter = settings.SpiritCaptureFilter;
+        if (!filter.IsEnabled && spiritFilter.Mode == SpiritCaptureListMode.Off)
             return new(AutoBattleAction.Capture, "W, 1, Space", "发起捕捉", "W, 1, Space");
 
         if (_captureDecision is null)
         {
-            if (_bloodline == EncounterBloodlineKind.Unrecognized && available)
+            _captureWaitStartedAt ??= now;
+            var canWait = now - _captureWaitStartedAt.Value < CaptureRecognitionTimeout;
+            var missingBloodline = filter.IsEnabled && available && _bloodline == EncounterBloodlineKind.Unrecognized;
+            var waitForBloodline = canWait && missingBloodline;
+            var waitForName = canWait && _enemyName.Length == 0 && spiritFilter.ActiveChains.Count > 0;
+            if (!canWait && missingBloodline && _bloodlineTipHadText == false)
+                _bloodline = EncounterBloodlineKind.Normal;
+
+            var bloodlineName = _bloodline switch
             {
-                _bloodlineWaitStartedAt ??= now;
-                if (now - _bloodlineWaitStartedAt.Value < BloodlineWaitTimeout)
-                    return new(AutoBattleAction.None, "", "等待血脉提示识别", "-");
-                if (_bloodlineTipHadText == false) _bloodline = EncounterBloodlineKind.Normal;
-            }
-            _captureDecision = (_bloodline, filter.ShouldCapture(_bloodline));
+                EncounterBloodlineKind.QiYi => "奇异",
+                EncounterBloodlineKind.HunXue => "混血",
+                EncounterBloodlineKind.WuRan => "污染",
+                EncounterBloodlineKind.Normal => "普通",
+                _ => "未识别"
+            };
+            var exclusion = waitForName ? string.Empty : spiritFilter.GetExclusionReason(_enemyName);
+            if (exclusion.Length == 0 && filter.IsEnabled && !waitForBloodline && !filter.ShouldCapture(_bloodline))
+                exclusion = $"{bloodlineName}血脉不在捕捉范围内";
+
+            if (exclusion.Length > 0)
+                _captureDecision = (false, exclusion);
+            else if (waitForBloodline || waitForName)
+                return new(AutoBattleAction.None, "", waitForBloodline ? "等待血脉提示识别" : "等待精灵名识别", "-");
+            else
+                _captureDecision = (true, filter.IsEnabled ? $"发起捕捉（{bloodlineName}血脉）" : "发起捕捉");
         }
 
-        var (kind, capture) = _captureDecision.Value;
-        var name = kind switch
-        {
-            EncounterBloodlineKind.QiYi => "奇异",
-            EncounterBloodlineKind.HunXue => "混血",
-            EncounterBloodlineKind.WuRan => "污染",
-            EncounterBloodlineKind.Normal => "普通",
-            _ => "未识别"
-        };
-        if (capture)
-        {
-            return new(AutoBattleAction.Capture, "W, 1, Space", $"发起捕捉（{name}血脉）", "W, 1, Space");
-        }
-
+        var (capture, description) = _captureDecision.Value;
+        if (capture) return new(AutoBattleAction.Capture, "W, 1, Space", description, "W, 1, Space");
         var skill = PlanSkill(settings, step);
-        return skill with { Description = $"{name}血脉不在捕捉范围内，改为{skill.Description}" };
+        return skill with { Description = $"{description}，改为{skill.Description}" };
     }
 
     private static AutoBattlePlan PlanSkill(AutoBattleSettings settings, AutoBattleReleaseStep step)

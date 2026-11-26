@@ -5,7 +5,7 @@ using RocoPilot.Services.TextRecognition.Backends;
 namespace RocoPilot.Tests;
 
 [TestClass]
-public sealed class OnnxOcrV5LabelDictionaryTests
+public sealed class OnnxOcrLabelDictionaryTests
 {
     [TestMethod]
     public void LoadsQuotedYamlDigitsWithoutQuoteCharacters()
@@ -16,11 +16,12 @@ public sealed class OnnxOcrV5LabelDictionaryTests
             "Models",
             "OCR",
             "Onnx",
-            "PaddleOcrV5",
+            "PaddleOcrV6",
             "inference.yml");
 
-        var labels = OnnxOcrV5LabelDictionary.Load(configurationPath);
+        var labels = OnnxOcrLabelDictionary.Load(configurationPath);
 
+        Assert.AreEqual("!", labels[0]);
         CollectionAssert.IsSubsetOf(
             Enumerable.Range(0, 10).Select(number => number.ToString()).ToArray(),
             labels.ToArray());

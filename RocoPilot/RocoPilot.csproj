@@ -118,9 +118,7 @@
     <Content Include="Configuration\RecognitionAssets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Assets\Models\OCR\Onnx\PaddleOcrV5\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <Content Update="Assets\Models\OCR\Onnx\**\*" CopyToOutputDirectory="PreserveNewest" />
     <Content Update="Assets\LaunchPageCover.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

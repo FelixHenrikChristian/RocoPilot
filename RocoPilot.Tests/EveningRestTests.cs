@@ -32,8 +32,8 @@ public sealed class EveningRestTests
     public async Task ReturnsToWorldAfterFullOrUnavailable(int width, string scenario)
     {
         var game = new Replay(width, scenario);
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         var runner = new EveningRestRunner(game, new ImageMatchingService(), game, game, ocr);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16,
             ClientOffsetX = 12, ClientOffsetY = 30 };

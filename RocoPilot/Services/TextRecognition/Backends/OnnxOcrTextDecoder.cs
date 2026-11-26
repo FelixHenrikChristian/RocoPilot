@@ -2,7 +2,7 @@ using System.Text;
 
 namespace RocoPilot.Services.TextRecognition.Backends;
 
-internal static class OnnxOcrV5TextDecoder
+internal static class OnnxOcrTextDecoder
 {
     public static string Decode(
         IReadOnlyList<string> labels,

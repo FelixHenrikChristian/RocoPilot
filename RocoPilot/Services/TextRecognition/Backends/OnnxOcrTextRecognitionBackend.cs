@@ -4,27 +4,27 @@ using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.Services.TextRecognition.Backends;
 
-public sealed class OnnxOcrV5TextRecognitionBackend : ITextRecognitionBackend, IFrameTextRecognitionBackend
+public sealed class OnnxOcrTextRecognitionBackend : ITextRecognitionBackend, IFrameTextRecognitionBackend
 {
-    private const string MethodName = "ONNX Runtime PP-OCRv5";
-    private const string Description = "使用 ONNX Runtime PP-OCRv5 直接识别游戏 OCR 区域。";
+    private const string DisplayName = "ONNX OCR v6 small";
+    private const string Description = "使用 PP-OCRv6 small 识别游戏画面中的文字。";
 
-    private readonly OnnxOcrV5SingleLineTextRecognitionBackend _recognizer;
+    private readonly OnnxOcrSingleLineTextRecognitionBackend _recognizer;
 
-    public OnnxOcrV5TextRecognitionBackend(OnnxOcrV5SingleLineTextRecognitionBackend recognizer)
+    public OnnxOcrTextRecognitionBackend(OnnxOcrSingleLineTextRecognitionBackend recognizer)
     {
         _recognizer = recognizer;
     }
 
-    public TextRecognitionMethod Method => TextRecognitionMethod.OnnxOcrV5;
+    public TextRecognitionMethod Method => TextRecognitionMethod.OnnxOcr;
 
     public TextRecognitionMethodOption GetOption()
     {
         return _recognizer.IsAvailable
-            ? new TextRecognitionMethodOption(Method, "ONNX OCR v5", Description, true)
+            ? new TextRecognitionMethodOption(Method, DisplayName, Description, true)
             : new TextRecognitionMethodOption(
                 Method,
-                "ONNX OCR v5",
+                DisplayName,
                 Description,
                 false,
                 "ONNX OCR 模型或运行时不可用，请检查应用文件是否完整，或重新安装 RocoPilot。");

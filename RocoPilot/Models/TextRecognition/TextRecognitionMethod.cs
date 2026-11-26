@@ -5,5 +5,5 @@ public enum TextRecognitionMethod
     WindowsOcr,
     PaddleOcrV5,
     TesseractOcr,
-    OnnxOcrV5
+    OnnxOcr
 }

@@ -69,9 +69,9 @@ public sealed class FlowerSeedScreenRecognizerTests
     [TestMethod]
     public async Task WolfTeleportScreenshotRecognizesSelectedChallengeInteraction()
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Catalog(), new Seasons(.55));
+            new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]), new Catalog(), new Seasons(.55));
         using var frame = LoadFixture("legendary-wolf-interaction.png");
         var screen = await recognizer.ReadAsync(frame, 1, 44, 2048, 1152, CancellationToken.None, legendary: true);
         Assert.AreEqual(ManualChallengeScene.Interaction, screen.Scene);
@@ -82,9 +82,9 @@ public sealed class FlowerSeedScreenRecognizerTests
     [TestMethod]
     public async Task CurrentSeasonScreenshotRecognizesAllThreeLegendarySpirits()
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Catalog(), new Seasons(.55));
+            new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]), new Catalog(), new Seasons(.55));
         using var frame = LoadFixture("legendary-list-season4.png");
         List<string> texts = [];
         var screen = await recognizer.ReadAsync(frame, 1, 44, 2048, 1152, CancellationToken.None,
@@ -141,8 +141,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow("result", nameof(ManualChallengeScene.Result))]
     public async Task LegendaryScreensUseRealTemplatesAndOcr(string fixture, string expected)
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.55));
         foreach (var (width, height) in new[] { (2048, 1152), (1280, 720) })
         {
@@ -259,9 +259,9 @@ public sealed class FlowerSeedScreenRecognizerTests
     public async Task ChallengeInAnotherInteractionRowIsRecognizedWithoutSelectingTheMessage(
         string color, int offsetY, int width, int height)
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), null!, null!);
+            new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]), null!, null!);
         using var frame = LoadFixture("legendary-message.png", width, height, 12, 30);
         using var challenge = LoadFixture($"legendary-interaction-{color}.png", width, height, 12, 30);
         var scale = height / 1152d;
@@ -604,8 +604,8 @@ public sealed class FlowerSeedScreenRecognizerTests
     [DataRow(true)]
     public async Task SnowBattleBackgroundCannotBecomeRewardsWhenBattleControlsDisappear(bool hideBattleControls)
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(), ocr, new Catalog(), new Seasons(.70));
         using var frame = LoadFixture("flower-seed-battle-snow.png");
         if (hideBattleControls)

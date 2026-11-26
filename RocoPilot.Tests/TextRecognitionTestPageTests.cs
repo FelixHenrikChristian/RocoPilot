@@ -14,8 +14,8 @@ public sealed class TextRecognitionTestPageTests
     public void IncludesRecognitionElapsedTimeInFinishedStatus()
     {
         var result = new TextRecognitionResult(
-            TextRecognitionMethod.OnnxOcrV5,
-            "ONNX Runtime PP-OCRv5（单行）",
+            TextRecognitionMethod.OnnxOcr,
+            "ONNX Runtime PP-OCRv6 small",
             "Chinese/English",
             ["Test"],
             1);
@@ -29,7 +29,7 @@ public sealed class TextRecognitionTestPageTests
         Assert.IsNotNull(formatter, "识别完成状态应包含 OCR 耗时。");
         var status = (string)formatter.Invoke(null, ["识别完成", result, TimeSpan.FromMilliseconds(12.34)])!;
 
-        Assert.AreEqual("识别完成 · ONNX Runtime PP-OCRv5（单行） · 识别语言：Chinese/English · 耗时 12.3 ms", status);
+        Assert.AreEqual("识别完成 · ONNX Runtime PP-OCRv6 small · 识别语言：Chinese/English · 耗时 12.3 ms", status);
     }
 
 }

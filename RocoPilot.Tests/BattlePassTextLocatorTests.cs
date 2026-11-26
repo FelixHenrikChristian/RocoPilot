@@ -21,8 +21,8 @@ public sealed class BattlePassTextLocatorTests
     [DataRow(1280, 2)]
     public async Task FindsMovedTextAndRejectsMissingOrAmbiguousText(int width, int mode)
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         using var locator = new OnnxTextLocator(ocr);
         using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(Path.Combine(BattlePassTests.Folder(), "season-menu.png"),
             width, width * 9 / 16, transform: image =>
@@ -45,8 +45,8 @@ public sealed class BattlePassTextLocatorTests
     [TestMethod]
     public async Task DoesNotTreatTaskPageTitleAsAnEntry()
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         using var locator = new OnnxTextLocator(ocr);
         foreach (var name in new[] { "tasks-three-ready", "tasks-claimed", "reward-popup", "level-popup" })
         {
@@ -59,8 +59,8 @@ public sealed class BattlePassTextLocatorTests
     [TestMethod]
     public async Task FindsExactTextAcrossSeasonsAndResolutions()
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         using var locator = new OnnxTextLocator(ocr);
         var rows = new List<object>();
         var misses = new List<string>();

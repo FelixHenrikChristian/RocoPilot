@@ -24,7 +24,7 @@ public sealed class StatisticsUidDetectionServiceTests
         var service = new StatisticsUidDetectionService(new WindowStub(), capture, new ConfigStub(), ocr,
             NullLogger<StatisticsUidDetectionService>.Instance);
 
-        var result = await service.DetectAsync(CaptureMethod.BitBlt, TextRecognitionMethod.OnnxOcrV5);
+        var result = await service.DetectAsync(CaptureMethod.BitBlt, TextRecognitionMethod.OnnxOcr);
 
         Assert.IsTrue(result.Success, result.Message);
         Assert.AreEqual("1234567", result.Uid);
@@ -43,7 +43,7 @@ public sealed class StatisticsUidDetectionServiceTests
             NullLogger<StatisticsUidDetectionService>.Instance);
 
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            service.DetectAsync(CaptureMethod.BitBlt, TextRecognitionMethod.OnnxOcrV5));
+            service.DetectAsync(CaptureMethod.BitBlt, TextRecognitionMethod.OnnxOcr));
 
         Assert.AreEqual(1, capture.Releases);
         Assert.ThrowsExactly<ObjectDisposedException>(() => capture.Frames.Single().AddReference());
@@ -78,7 +78,7 @@ public sealed class StatisticsUidDetectionServiceTests
         public int Calls;
         public bool Cancel;
         public IReadOnlyList<TextRecognitionMethodOption> GetMethods() =>
-            [new(TextRecognitionMethod.OnnxOcrV5, "test", "test", true)];
+            [new(TextRecognitionMethod.OnnxOcr, "test", "test", true)];
         public TextRecognitionMethodOption GetDefaultMethod() => GetMethods().Single();
         public Task<TextRecognitionResult> RecognizeAsync(byte[] bytes, TextRecognitionMethod method,
             CancellationToken cancellationToken = default) => throw new AssertFailedException("UID 不应通过 PNG 中转。");

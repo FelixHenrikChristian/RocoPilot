@@ -1,6 +1,6 @@
 namespace RocoPilot.Services.TextRecognition.Backends;
 
-internal static class OnnxOcrV5LabelDictionary
+internal static class OnnxOcrLabelDictionary
 {
     public static IReadOnlyList<string> Load(string configurationPath)
     {

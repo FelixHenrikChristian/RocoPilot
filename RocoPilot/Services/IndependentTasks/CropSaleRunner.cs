@@ -192,7 +192,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         if (digits.Width <= 0) return null;
         try
         {
-            var result = await ocr.RecognizeAsync(frame, digits, TextRecognitionMethod.OnnxOcrV5, token);
+            var result = await ocr.RecognizeAsync(frame, digits, TextRecognitionMethod.OnnxOcr, token);
             return long.TryParse(result.Text.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var amount) && amount > 0
                 ? amount : null;
         }

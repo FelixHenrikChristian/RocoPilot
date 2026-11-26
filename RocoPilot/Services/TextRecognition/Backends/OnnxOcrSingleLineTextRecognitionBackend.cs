@@ -13,16 +13,16 @@ using RocoPilot.Models.TextRecognition;
 
 namespace RocoPilot.Services.TextRecognition.Backends;
 
-public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
+public sealed class OnnxOcrSingleLineTextRecognitionBackend : IDisposable
 {
-    private const string MethodName = "ONNX Runtime PP-OCRv5";
+    private const string MethodName = "ONNX Runtime PP-OCRv6 small";
     private const string LanguageName = "Chinese/English";
-    private const TextRecognitionMethod ResultMethod = TextRecognitionMethod.OnnxOcrV5;
+    private const TextRecognitionMethod ResultMethod = TextRecognitionMethod.OnnxOcr;
     private const int ModelHeight = 48;
     private const int DefaultMaximumWidth = 320;
     private const int BattleBannerMaximumWidth = 640;
 
-    private readonly Lazy<OnnxOcrV5Recognizer?> _recognizer = new(CreateRecognizer);
+    private readonly Lazy<OnnxOcrRecognizer?> _recognizer = new(CreateRecognizer);
     private readonly SemaphoreSlim _recognitionLock = new(1, 1);
     private bool _isDisposed;
 
@@ -134,9 +134,9 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
         _isDisposed = true;
     }
 
-    private static OnnxOcrV5Recognizer? CreateRecognizer()
+    private static OnnxOcrRecognizer? CreateRecognizer()
     {
-        var modelDirectory = Path.Combine(AppContext.BaseDirectory, "Assets", "Models", "OCR", "Onnx", "PaddleOcrV5");
+        var modelDirectory = Path.Combine(AppContext.BaseDirectory, "Assets", "Models", "OCR", "Onnx", "PaddleOcrV6");
         var modelPath = Path.Combine(modelDirectory, "inference.onnx");
         var configurationPath = Path.Combine(modelDirectory, "inference.yml");
         if (!File.Exists(modelPath) || !File.Exists(configurationPath))
@@ -146,7 +146,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
 
         try
         {
-            return new OnnxOcrV5Recognizer(modelPath, configurationPath);
+            return new OnnxOcrRecognizer(modelPath, configurationPath);
         }
         catch (Exception)
         {
@@ -178,7 +178,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
 
     private async Task<TextRecognitionResult> RecognizeImageAsync(
         Mat image,
-        OnnxOcrV5Recognizer recognizer,
+        OnnxOcrRecognizer recognizer,
         int maximumWidth,
         CancellationToken cancellationToken)
     {
@@ -194,14 +194,14 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
         }
     }
 
-    private sealed class OnnxOcrV5Recognizer : IDisposable
+    private sealed class OnnxOcrRecognizer : IDisposable
     {
         private readonly InferenceSession _session;
         private readonly IReadOnlyList<string> _labels;
 
-        public OnnxOcrV5Recognizer(string modelPath, string configurationPath)
+        public OnnxOcrRecognizer(string modelPath, string configurationPath)
         {
-            _labels = OnnxOcrV5LabelDictionary.Load(configurationPath);
+            _labels = OnnxOcrLabelDictionary.Load(configurationPath);
             using var options = new SessionOptions
             {
                 GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
@@ -244,7 +244,7 @@ public sealed class OnnxOcrV5SingleLineTextRecognitionBackend : IDisposable
                 throw new InvalidDataException("Unexpected ONNX OCR output dimensions.");
             }
 
-            return OnnxOcrV5TextDecoder.Decode(
+            return OnnxOcrTextDecoder.Decode(
                 _labels,
                 output.ToArray(),
                 dimensions[1],

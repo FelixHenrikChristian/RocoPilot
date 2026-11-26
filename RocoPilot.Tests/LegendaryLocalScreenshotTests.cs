@@ -13,7 +13,7 @@ public sealed class LegendaryLocalScreenshotTests
 {
     // 契约印记不足弹窗判定依赖 OCR 正文匹配，全部测试使用真实 OCR 服务。
     private static TextRecognitionService CreateOcr()
-        => new([new OnnxOcrV5TextRecognitionBackend(new OnnxOcrV5SingleLineTextRecognitionBackend())]);
+        => new([new OnnxOcrTextRecognitionBackend(new OnnxOcrSingleLineTextRecognitionBackend())]);
 
     private static ManualChallengeScreenRecognizer CreateRecognizer()
         => new(new ImageMatchingService(), CreateOcr(), null!, null!);

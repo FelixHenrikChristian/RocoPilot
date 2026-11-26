@@ -159,8 +159,8 @@ public partial class App : Application
             services.AddSingleton<ITextRecognitionBackend, WindowsOcrTextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionBackend, TesseractTextRecognitionBackend>();
 #endif
-            services.AddSingleton<OnnxOcrV5SingleLineTextRecognitionBackend>();
-            services.AddSingleton<ITextRecognitionBackend, OnnxOcrV5TextRecognitionBackend>();
+            services.AddSingleton<OnnxOcrSingleLineTextRecognitionBackend>();
+            services.AddSingleton<ITextRecognitionBackend, OnnxOcrTextRecognitionBackend>();
             services.AddSingleton<ITextRecognitionService, TextRecognitionService>();
 
             // Core Services
@@ -198,7 +198,7 @@ public partial class App : Application
         }).
         Build();
 
-        _ = App.GetService<OnnxOcrV5SingleLineTextRecognitionBackend>().PrewarmAsync();
+        _ = App.GetService<OnnxOcrSingleLineTextRecognitionBackend>().PrewarmAsync();
 
         UnhandledException += App_UnhandledException;
         // 界面线程之外的异常不经过上面的事件，另行记录，否则崩溃时日志里什么都没有。

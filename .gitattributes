@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Preserve the upstream checksum of the bundled OCR character table.
+RocoPilot/Assets/Models/OCR/Onnx/PaddleOcrV6/inference.yml text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

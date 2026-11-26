@@ -58,7 +58,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                 var trim = Math.Max(0, margin - (int)Math.Ceiling(6 * screen.Scale));
                 region.X += trim;
                 region.Width -= 2 * trim;
-                var result = await ocr.RecognizeAsync(frame, region, TextRecognitionMethod.OnnxOcrV5, token);
+                var result = await ocr.RecognizeAsync(frame, region, TextRecognitionMethod.OnnxOcr, token);
                 var text = result.Text.Replace(" ", "").Trim();
                 if (!text.EndsWith("/1200", StringComparison.Ordinal)) return null;
                 return int.TryParse(text.AsSpan(0, text.Length - 5), out var value) &&

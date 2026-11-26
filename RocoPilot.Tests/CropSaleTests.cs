@@ -34,8 +34,8 @@ public sealed class CropSaleTests
     [DataRow(960)]
     public async Task ReadsOnlyTheExpectedIncomeAtTheBottom(int width)
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         var images = new ImageMatchingService();
         foreach (var amount in new long[] { 9000, 42000, 132000, 582000, 912000, 1182000, 2052000 })
         {
@@ -84,8 +84,8 @@ public sealed class CropSaleTests
     public async Task SellsOneFlowerWithConfiguredPressesAndReturnsToWorld(int width, int quantity)
     {
         var game = new Replay(width);
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         var runner = new CropSaleRunner(game, new ImageMatchingService(), game, game, ocr);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), "紫晶菇", quantity, progress => Console.WriteLine(progress), timeout.Token);

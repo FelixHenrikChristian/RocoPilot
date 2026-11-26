@@ -29,7 +29,7 @@ public sealed class OnnxTextLocator(ITextRecognitionService ocr) : IDisposable
         foreach (var region in regions)
         {
             token.ThrowIfCancellationRequested();
-            var result = await ocr.RecognizeAsync(frame, region, TextRecognitionMethod.OnnxOcrV5, token);
+            var result = await ocr.RecognizeAsync(frame, region, TextRecognitionMethod.OnnxOcr, token);
             if (Regex.Replace(result.Text, @"\s", "") != text) continue;
             if (found is not null) return null; // 多个同名文字时不猜点击目标。
             found = region;

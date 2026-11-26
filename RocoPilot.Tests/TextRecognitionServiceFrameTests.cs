@@ -13,12 +13,12 @@ namespace RocoPilot.Tests;
 public sealed class TextRecognitionServiceFrameTests
 {
     [TestMethod]
-    [DataRow(TextRecognitionMethod.OnnxOcrV5, "onnx-frame")]
+    [DataRow(TextRecognitionMethod.OnnxOcr, "onnx-frame")]
     [DataRow(TextRecognitionMethod.PaddleOcrV5, "paddle-frame")]
     public async Task SendsFrameDirectlyToBackendSelectedByMethod(TextRecognitionMethod method, string expectedText)
     {
         var paddleBackend = new FrameCapableBackend(TextRecognitionMethod.PaddleOcrV5, "paddle-frame");
-        var onnxBackend = new FrameCapableBackend(TextRecognitionMethod.OnnxOcrV5, "onnx-frame");
+        var onnxBackend = new FrameCapableBackend(TextRecognitionMethod.OnnxOcr, "onnx-frame");
         var service = new TextRecognitionService([paddleBackend, onnxBackend]);
         using var frame = new CapturedFrame(2, 2, new byte[16]);
         var region = new RecognitionRegion { Id = "single-line", Width = 2, Height = 2 };
@@ -38,7 +38,7 @@ public sealed class TextRecognitionServiceFrameTests
         var result = await recognitionTask;
 
         Assert.AreEqual(expectedText, result.Text);
-        Assert.AreEqual(method == TextRecognitionMethod.OnnxOcrV5, onnxBackend.ReceivedFrame);
+        Assert.AreEqual(method == TextRecognitionMethod.OnnxOcr, onnxBackend.ReceivedFrame);
         Assert.AreEqual(method == TextRecognitionMethod.PaddleOcrV5, paddleBackend.ReceivedFrame);
     }
 

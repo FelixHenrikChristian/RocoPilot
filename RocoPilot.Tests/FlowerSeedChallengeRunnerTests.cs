@@ -24,18 +24,18 @@ public sealed class FlowerSeedChallengeRunnerTests
     [TestMethod]
     public async Task LegendaryScanReadsListWithoutStartingAChallenge()
     {
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var capture = new LegendaryReplay();
         var keyboard = new Keyboard();
         var scrolls = 0;
         var mouse = new Mouse { DuringScroll = () => scrolls++ };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
+            new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]),
             new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
-                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay())),
+                new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]), new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
         var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },
@@ -70,7 +70,7 @@ public sealed class FlowerSeedChallengeRunnerTests
         var firstImage = directTeleport ? "legendary-list-season4.png" : "legendary-list.png";
         if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "Fixtures", firstImage)))
             Assert.Inconclusive("缺少本地截图素材，请按 SCREENSHOT_TESTING.md 放置素材后重新构建。");
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
         var underfilled = shortage.StartsWith("underfilled-", StringComparison.Ordinal);
         if (underfilled) shortage = shortage["underfilled-".Length..];
@@ -84,11 +84,11 @@ public sealed class FlowerSeedChallengeRunnerTests
             capture.OnClick(x, y);
         } };
         var recognizer = new ManualChallengeScreenRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]),
+            new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]),
             new FlowerSeedScreenRecognizerTests.Catalog(), new FlowerSeedScreenRecognizerTests.Seasons(.55));
         var runner = new ManualChallengeRunner(capture, keyboard, mouse, recognizer,
             new BattleScreenRecognizer(new RuntimeFrameRecognizer(new ImageMatchingService(),
-                new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay())),
+                new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]), new Overlay())),
             new AutoBattleInputExecutor(keyboard, NullLogger<AutoBattleInputExecutor>.Instance), new Overlay(),
             NullLogger<ManualChallengeRunner>.Instance);
         var state = new RuntimeTaskState(new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720 },

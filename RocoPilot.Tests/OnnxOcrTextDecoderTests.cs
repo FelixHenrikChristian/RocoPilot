@@ -5,7 +5,7 @@ using RocoPilot.Services.TextRecognition.Backends;
 namespace RocoPilot.Tests;
 
 [TestClass]
-public sealed class OnnxOcrV5TextDecoderTests
+public sealed class OnnxOcrTextDecoderTests
 {
     [TestMethod]
     public void DecodesCtcOutputAndCollapsesRepeatedCharacters()
@@ -20,7 +20,7 @@ public sealed class OnnxOcrV5TextDecoderTests
             0f, 0f, 6f, 0f
         };
 
-        var text = OnnxOcrV5TextDecoder.Decode(labels, scores, timeStepCount: 5, labelCount: 4);
+        var text = OnnxOcrTextDecoder.Decode(labels, scores, timeStepCount: 5, labelCount: 4);
 
         Assert.AreEqual("AB", text);
     }

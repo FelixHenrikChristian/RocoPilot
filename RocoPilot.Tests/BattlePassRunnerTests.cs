@@ -27,8 +27,8 @@ public sealed class BattlePassRunnerTests
     public async Task ClaimsAndReturnsThroughSeasonMenu(int width, bool levelUp, bool enabled, int completed, bool initialRewards, bool rewardsEnabled)
     {
         var game = new Replay(width, levelUp, enabled, completed, initialRewards, rewardsEnabled);
-        using var backend = new RocoPilot.Services.TextRecognition.Backends.OnnxOcrV5SingleLineTextRecognitionBackend();
-        var ocr = new RocoPilot.Services.TextRecognition.TextRecognitionService([new RocoPilot.Services.TextRecognition.Backends.OnnxOcrV5TextRecognitionBackend(backend)]);
+        using var backend = new RocoPilot.Services.TextRecognition.Backends.OnnxOcrSingleLineTextRecognitionBackend();
+        var ocr = new RocoPilot.Services.TextRecognition.TextRecognitionService([new RocoPilot.Services.TextRecognition.Backends.OnnxOcrTextRecognitionBackend(backend)]);
         using var locator = new RocoPilot.Services.TextRecognition.OnnxTextLocator(ocr);
         var runner = new BattlePassRunner(game, new ImageMatchingService(), game, game, locator);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16,

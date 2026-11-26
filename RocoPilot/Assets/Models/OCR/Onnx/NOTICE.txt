@@ -1,10 +1,11 @@
-PP-OCRv5 mobile recognition ONNX model
+PP-OCRv6 small text recognition ONNX model (PaddleOcrV6/inference.onnx)
 
-Source: https://huggingface.co/itextresearch/itext-PP-OCRv5_mobile_rec_infer
-Upstream PaddleOCR model: PP-OCRv5_mobile_rec_infer
+Source: https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec_onnx/tree/b8f84f0b80c529de40b4fbb3544b84fa7233a513
 License: Apache License 2.0
+SHA256 (inference.onnx): 5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634
+SHA256 (inference.yml): ab078671bb49f06228eadccd34f1bb501e157f7a047095ffb943ba81512c77d1
 
-PP-OCRv5 mobile text detection ONNX model (detection.onnx)
+PP-OCRv5 mobile text detection ONNX model (PaddleOcrV5/detection.onnx)
 Source: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/det/ch_PP-OCRv5_det_mobile.onnx
 Upstream: PaddleOCR PP-OCRv5_mobile_det, Apache License 2.0
 SHA256: 4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae

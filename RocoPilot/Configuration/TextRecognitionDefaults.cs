@@ -4,5 +4,5 @@ namespace RocoPilot.Configuration;
 
 internal static class TextRecognitionDefaults
 {
-    public const TextRecognitionMethod Method = TextRecognitionMethod.OnnxOcrV5;
+    public const TextRecognitionMethod Method = TextRecognitionMethod.OnnxOcr;
 }

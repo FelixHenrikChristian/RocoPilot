@@ -37,9 +37,9 @@ public sealed class ShinyReplayTests
             ? new CaptureTargetWindow { ClientWidth = 1206, ClientHeight = 539, ClientOffsetY = 739 }
             : new CaptureTargetWindow { ClientWidth = 2048, ClientHeight = 1152, ClientOffsetX = 1, ClientOffsetY = 31 };
         var state = new RuntimeTaskState(window, config, new RuntimeTaskStartOptions(), DateTimeOffset.Now);
-        using var backend = new OnnxOcrV5SingleLineTextRecognitionBackend();
+        using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         var recognizer = new RuntimeFrameRecognizer(new ImageMatchingService(),
-            new TextRecognitionService([new OnnxOcrV5TextRecognitionBackend(backend)]), new Overlay());
+            new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]), new Overlay());
         var parse = typeof(RuntimeTaskService).GetMethod("IsShinyTip", BindingFlags.Static | BindingFlags.NonPublic)!;
         await backend.PrewarmAsync();
         var times = new List<double>();

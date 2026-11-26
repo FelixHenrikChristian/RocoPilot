@@ -25,14 +25,11 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
-        var method = state.Options.AutoBattleSettings.KeyboardInputMethod;
-        keyboard.EnsureReady(method);
-        await using var walk = new ForwardWalk(keyboard, window.Hwnd, method, token);
         var loop = new TaskLoop<Step>("自动出售", state, capture, keyboard, mouse, progress, _ => "打开家园地图", Step.Map, token, logger)
         {
-            Timeout = _ => TimeSpan.FromSeconds(45),
-            Paused = walk.StopAsync
+            Timeout = _ => TimeSpan.FromSeconds(45)
         };
+        var lastWalkEnded = DateTimeOffset.MinValue;
         var sinceFlowerClick = new Stopwatch();
         var remaining = quantity;
         var outcome = string.Empty;
@@ -90,27 +87,19 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                             loop.Advance(Step.Approach, "向前走到老山姆");
                         break;
                     case Step.Approach:
+                        // 卡顿时可能反复取到迈步前的画面；等松开 W 后的新画面再决定。
+                        if (frame.CapturedAt <= lastWalkEnded) break;
                         // 看到对话选项才算交互成功；F 没有生效时提示仍在，按间隔再按。
                         if (await Dialogue() != null)
                         {
-                            await walk.StopAsync();
                             loop.Advance(Step.Dialogue, "进入农作物出售站");
                             break;
                         }
-                        if (await screen.World(token) == null) { await walk.StopAsync(); break; }
-                        if (await Find("interact", 1205, 578, 1520, 638, .953) == null)
-                        {
-                            await walk.AdvanceAsync(frame.CapturedAt);
-                            break;
-                        }
-                        if (walk.Active)
-                        {
-                            // 停稳后用新画面确认提示仍在，再交互。
-                            await walk.StopAsync();
-                            loop.RequireFreshFrame();
-                            break;
-                        }
-                        await loop.RepeatKeyAsync("F");
+                        if (await screen.World(token) == null) break;
+                        if (await Find("interact", 1205, 578, 1520, 638, .953) != null)
+                            await loop.RepeatKeyAsync("F");
+                        else if (await loop.KeyAsync("W", 300))
+                            lastWalkEnded = DateTimeOffset.UtcNow;
                         break;
                     case Step.Dialogue:
                         if (await Dialogue() != null && await loop.KeyAsync("1"))

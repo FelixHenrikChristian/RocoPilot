@@ -3,6 +3,8 @@ using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.TextRecognition;
+using RocoPilot.Models.Capture;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.ImageMatching;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Models.Runtime;
@@ -14,12 +16,14 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
     IKeyboardInputService keyboard, IMouseInputService mouse, ITextRecognitionService ocr,
     ILogger<EveningRestRunner>? logger = null)
 {
-    private enum Step { Open, Explore, CheckEvent, Teleport, Arrival, Monitor, Exit }
+    private enum Step { Open, Explore, CheckEvent, Teleport, Arrival, Monitor, Exit, WishMenu, ReturnToWorld }
 
     public async Task<string> RunAsync(RuntimeTaskState state, Action<IndependentTaskProgress> progress, CancellationToken token)
     {
         var window = state.TargetWindow;
         var arrived = false;
+        var wishClicks = 0;
+        var lastWishInput = DateTimeOffset.MinValue;
         var exitReason = "";
         string? starlight = null;
         var loop = new TaskLoop<Step>("晚风小憩", state, capture, keyboard, mouse, progress,
@@ -128,8 +132,41 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                             loop.Advance(Step.Arrival);
                         break;
                     case Step.Exit:
-                        if (await screen.World(token) is not null) return exitReason;
+                        if (await screen.World(token) is not null)
+                        {
+                            if (starlight != "1200/1200") return exitReason;
+                            if (await loop.RepeatKeyAsync("Esc")) loop.Advance(Step.WishMenu);
+                            break;
+                        }
                         if (await Explore() is not null) await loop.RepeatKeyAsync("Esc");
+                        break;
+                    case Step.WishMenu:
+                        if (!loop.InputIdleFor(500)) break;
+                        if (frame.CapturedAt <= lastWishInput)
+                        {
+                            // 静止界面可能持续返回点击前的旧帧；没有新画面就结束补点。
+                            if (loop.InputIdleFor(TaskPacing.RepeatKeyMs))
+                                loop.Advance(Step.ReturnToWorld, retryable: false);
+                            break;
+                        }
+                        var point = await LocateWishAsync(screen, frame, token);
+                        if (point is null)
+                        {
+                            if (wishClicks > 0) loop.Advance(Step.ReturnToWorld, retryable: false);
+                            break;
+                        }
+                        if (await loop.ClickAsync(point.Value.X, point.Value.Y))
+                        {
+                            wishClicks++;
+                            lastWishInput = DateTimeOffset.UtcNow;
+                            loop.CommittedOutcome = exitReason + "，已尝试领取许愿星";
+                            // 首次点击后解除开菜单按键的自动补发，避免点击后又打开菜单。
+                            loop.Advance(wishClicks == 3 ? Step.ReturnToWorld : Step.WishMenu, retryable: false);
+                        }
+                        break;
+                    case Step.ReturnToWorld:
+                        if (await screen.World(token) is not null) return loop.CommittedOutcome;
+                        await loop.RepeatKeyAsync("Esc");
                         break;
                 }
 
@@ -139,6 +176,30 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
         }
     }
 
+    internal static async Task<(int X, int Y)?> LocateWishAsync(DailyTaskScreen screen, CapturedFrame frame, CancellationToken token)
+    {
+        var quest = await screen.Find("evening-rest/menu-quest", 985, 155, 1180, 305, token, .90, anchor: RecognitionAnchor.Center);
+        if (quest is null) return null;
+        var bag = await screen.Find("evening-rest/menu-bag", 985, 770, 1180, 940, token, .90, anchor: RecognitionAnchor.Center);
+        if (bag is null) return null;
+        var x = (int)Math.Round((quest.X + bag.X + (quest.Width + bag.Width) / 2d) / 2);
+        var y = (int)Math.Round((quest.Y + bag.Y + (quest.Height + bag.Height) / 2d) / 2);
+
+        // 弹窗可能只挡住中央。检查中点附近是否仍有一小片浅金色，容许星核浮动。
+        var radius = Math.Max(1, (int)Math.Round(12 * screen.Scale));
+        var gold = 0;
+        for (var row = Math.Max(0, y - radius); row <= Math.Min(frame.Height - 1, y + radius); row++)
+        {
+            for (var col = Math.Max(0, x - radius); col <= Math.Min(frame.Width - 1, x + radius); col++)
+            {
+                var i = (row * frame.Width + col) * 4;
+                var red = frame.Pixels[i + 2];
+                if (red > 235 && frame.Pixels[i + 1] > 210 && red - frame.Pixels[i] > 20) gold++;
+            }
+        }
+        return gold >= radius * radius / 4 + 1 ? (screen.ClientX(x), screen.ClientY(y)) : null;
+    }
+
     private static string Describe(Step step, string? starlight) => step switch
     {
         Step.Open or Step.Explore => "打开活动探索页",
@@ -146,6 +207,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
         Step.Teleport => "传送到活动地点",
         Step.Arrival => "等待传送完成",
         Step.Monitor => starlight is null ? "等待识别本日星光" : $"本日星光 {starlight}",
+        Step.WishMenu => "定位并尝试领取许愿星",
         _ => "返回大世界"
     };
 }

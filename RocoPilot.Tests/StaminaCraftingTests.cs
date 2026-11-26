@@ -56,7 +56,7 @@ public class StaminaCraftingTests
                 "slider-maximum" when _frames == 1 => "season-selected",
                 "skip-craft" when _frames <= 2 => "slider-maximum",
                 "skip-craft" => "legendary-skip",
-                "exit-recipe" => "season-selected",
+                "exit-recipe" => "basic-alchemy",
                 "exit-dialogue" => "choices",
                 _ => Stage
             };
@@ -68,6 +68,8 @@ public class StaminaCraftingTests
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "stamina-crafting", "season-insufficient-stamina.png");
             if (name == "craft-result" && initialMap != "map-continent")
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "stamina-crafting", "craft-result-bonus-61.png");
+            if (name == "basic-alchemy")
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-25", "stamina-crafting", name + ".png");
             if (name == "legendary-skip") path = Path.Combine(SourceDirectory(), "Fixtures", name + ".png");
             if (!File.Exists(path)) Assert.Inconclusive($"缺少本地回放图：{path}");
             var frame = FlowerSeedScreenRecognizerTests.LoadFixture(path, width, width * 9 / 16, 12, 30, transform: mat =>
@@ -122,8 +124,6 @@ public class StaminaCraftingTests
                 ("skip-craft", "Esc") => "craft-result",
                 ("choices", "1") => "recipe-list-marked",
                 ("craft-result", "Esc") => "exit-recipe",
-                ("season-selected", "Esc") when insufficient => "exit-dialogue",
-                ("exit-recipe", "Esc") => "exit-dialogue",
                 ("exit-dialogue", "Esc") => "done",
                 _ => throw new AssertFailedException($"{Stage} 意外按键 {key}")
             });
@@ -143,6 +143,8 @@ public class StaminaCraftingTests
                 "recipe-list-marked" when initialMap == "map-academy" => ("season-selected", 345, 219),
                 "recipe-list-marked" => ("season-selected", 658, 528),
                 "slider-maximum" => ("skip-craft", 1800, 1080),
+                "season-selected" when insufficient => ("exit-dialogue", 1900, 59),
+                "exit-recipe" => ("exit-dialogue", 1900, 59),
                 _ => throw new AssertFailedException($"{Stage} 意外点击")
             };
             CheckPoint(x, y, cx, cy);
@@ -158,7 +160,7 @@ public class StaminaCraftingTests
             Assert.AreEqual("season-selected", Stage);
             Assert.IsTrue(_frames > 1);
             CheckPoint(x, y, 1239, 1021);
-            CheckPoint(endX, endY, 1510, 1021);
+            CheckPoint(endX, endY, 1579, 1021);
             Advance("slider-maximum");
             return Task.CompletedTask;
         }

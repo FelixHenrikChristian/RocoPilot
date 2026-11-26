@@ -104,6 +104,8 @@ public sealed class CropSaleTests
         public int SelectedFrames { get; private set; }
         public List<long> FlowerClickIntervals { get; } = [];
         private readonly Stopwatch _sinceLastInput = new();
+        private CapturedFrame? _arrivalFrame;
+        private int _staleWalkFrames;
 
         // 输入之间至少隔着“等画面更新 + 反应时间”，不再要求固定的 1 秒。
         private void CheckInputInterval(int minimumMs = 400)
@@ -115,6 +117,15 @@ public sealed class CropSaleTests
 
         public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method)
         {
+            if (Scene == "arrival")
+            {
+                _arrivalFrame ??= Load("arrival-other-prompt", width);
+                return _arrivalFrame.AddReference();
+            }
+            if (Scene == "walking" && _staleWalkFrames++ < 8)
+                return _arrivalFrame!.AddReference();
+            _arrivalFrame?.Dispose();
+            _arrivalFrame = null;
             if (Scene == "selected") SelectedFrames++;
             if (Scene == "middle")
             {
@@ -124,7 +135,7 @@ public sealed class CropSaleTests
             }
             return Load(Scene switch
             {
-                "start" or "arrival" or "done" => "arrival-other-prompt",
+                "start" or "walking" or "done" => "arrival-other-prompt",
                 "map" or "marker" => "map-sam",
                 "interact" => "sam-prompt",
                 "dialogue" => "sam-dialogue",
@@ -139,17 +150,23 @@ public sealed class CropSaleTests
         public Task SendSequenceAsync(nint hwnd, string key, KeyboardInputOptions? options, CancellationToken token)
         {
             CheckInputInterval();
+            if (key == "W")
+            {
+                Assert.AreEqual(300, options?.HoldDurationMs);
+                if (Scene == "walking") Assert.IsNull(_arrivalFrame, "停在旧画面时不应继续迈步");
+            }
             Scene = (Scene, key) switch
             {
                 ("start", "M") => "map",
-                ("arrival", "W") => "interact",
+                ("arrival", "W") => "walking",
+                ("walking", "W") => "interact",
                 ("interact", "F") => "dialogue",
                 ("dialogue", "1") => "top",
                 ("reward", "Esc") => "exit",
                 ("exit", "Esc") => "done",
                 _ => throw new AssertFailedException($"{Scene} 意外按键 {key}")
             };
-            return key == "W" ? Task.Delay(Timeout.Infinite, token) : Task.CompletedTask;
+            return key == "W" ? Task.Delay(options!.HoldDurationMs, token) : Task.CompletedTask;
         }
 
         public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token)

@@ -13,7 +13,7 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
     IKeyboardInputService keyboard, IMouseInputService mouse, OnnxTextLocator locator,
     ILogger<BattlePassRunner>? logger = null)
 {
-    private enum Step { World, Menu, Tasks, ClaimTasks, DismissTasks, OpenRewards, Rewards, ClaimRewards, DismissRewards, ExitRewards, ExitMenu, ExitWorld }
+    private enum Step { World, Menu, EnterTasks, Tasks, ClaimTasks, DismissTasks, OpenRewards, Rewards, ClaimRewards, DismissRewards, ExitRewards, ExitMenu, ExitWorld }
 
     internal static async Task<bool> IsTasksPageAsync(DailyTaskScreen screen, CancellationToken token) =>
         await screen.Find("battle-pass/tasks-tab", 125, 257, 209, 350, token) is not null;
@@ -45,7 +45,7 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
         string Describe(Step step) => step switch
         {
             Step.World or Step.Menu => "打开通行证",
-            Step.Tasks => "检查四项日常任务",
+            Step.EnterTasks or Step.Tasks => "检查四项日常任务",
             Step.ClaimTasks or Step.ClaimRewards => "确认领取界面切换",
             Step.DismissTasks or Step.DismissRewards => "关闭弹窗并核对领取结果",
             Step.OpenRewards or Step.Rewards => "领取通行证等级奖励",
@@ -81,8 +81,9 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
                         if (await screen.World(token) is not null && await loop.KeyAsync("F1")) Go(Step.Menu);
                         break;
                     case Step.Menu:
-                        if (await Menu() is { } entry && await ClickRegion(entry)) Go(Step.Tasks);
+                        if (await Menu() is { } entry && await ClickRegion(entry)) Go(Step.EnterTasks);
                         break;
+                    case Step.EnterTasks:
                     case Step.Tasks:
                         if (!await Tasks())
                         {
@@ -90,6 +91,13 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
                             // 打开时停在等级奖励页：切到日常任务页，等页面切换后再判断。
                             if (loop.InputIdleFor(TaskPacing.RepeatKeyMs) && await IsRewardsPageAsync(screen, token))
                                 await ClickPoint(166, 304);
+                            break;
+                        }
+                        if (loop.Step == Step.EnterTasks)
+                        {
+                            // “全部领取”先于四张卡片出现，等入场动画结束后用下一帧计数。
+                            await Task.Delay(TimeSpan.FromSeconds(1), token);
+                            Go(Step.Tasks);
                             break;
                         }
                         var buttons = await FindTaskButtonsAsync(screen, token);

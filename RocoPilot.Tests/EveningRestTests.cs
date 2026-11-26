@@ -27,6 +27,7 @@ public sealed class EveningRestTests
     [DataRow(960, "unselected")]
     [DataRow(960, "shifted")]
     [DataRow(960, "full")]
+    [DataRow(1280, "static-menu")]
     [DataRow(1280, "unavailable")]
     public async Task ReturnsToWorldAfterFullOrUnavailable(int width, string scenario)
     {
@@ -48,26 +49,72 @@ public sealed class EveningRestTests
             if (game.Scene == "waiting" && progress.Operation.Contains("成功"))
                 Assert.AreEqual("event-full", game.LastSample);
         }, timeout.Token);
-        Assert.AreEqual(scenario == "unavailable" ? "跳过：未找到晚间休憩活动" : "成功：本日星光已达 1200/1200", result);
+        Assert.AreEqual(scenario == "unavailable" ? "跳过：未找到晚间休憩活动" : "成功：本日星光已达 1200/1200，已尝试领取许愿星", result);
         if (scenario == "collect") CollectionAssert.AreEqual(new[] { "本日星光 0/1200", "本日星光 48/1200", "本日星光 1100/1200", "本日星光 1182/1200" }, readings);
         if (scenario == "renamed") CollectionAssert.AreEqual(new[] { "本日星光 864/1200" }, readings);
         Assert.AreEqual("done", game.Scene);
-        Assert.AreEqual(scenario is "full" or "unavailable" ? 0 : 1, game.Teleports);
+        Assert.AreEqual(scenario switch { "unavailable" => 0, "full" or "static-menu" => 1, _ => 3 }, game.WishClicks);
+        Assert.AreEqual(scenario is "full" or "static-menu" or "unavailable" ? 0 : 1, game.Teleports);
         if (scenario is "unselected" or "shifted") Assert.AreEqual(3, game.ActivityClicks);
     }
+
+    [TestMethod]
+    [DataRow(false, 4)]
+    [DataRow(true, 3)]
+    public async Task LocatesWishAcrossMenuAnimation(bool classic, int frames)
+    {
+        var width = classic ? 1600 : 2048;
+        var height = classic ? 1200 : 1152;
+        var window = new CaptureTargetWindow { ClientWidth = width, ClientHeight = height, ClientOffsetX = 12, ClientOffsetY = 30 };
+        var images = new ImageMatchingService();
+        for (int i = 1; i <= frames; i++)
+        {
+            using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(WishPath(classic, i), width, height, 12, 30, image =>
+            {
+                // 合成无角标状态。
+                using var badge = new OpenCvSharp.Mat(image, classic ? new OpenCvSharp.Rect(893, 528, 32, 24) : new OpenCvSharp.Rect(1148, 470, 44, 30));
+                badge.SetTo(OpenCvSharp.Scalar.Black);
+            });
+            var point = await EveningRestRunner.LocateWishAsync(new(frame, window, images), frame, default);
+            Assert.IsNotNull(point, $"动画帧{i}");
+            Assert.AreEqual(classic ? 840 : 1082, point.Value.X, 12);
+            Assert.AreEqual(classic ? 571 : 528, point.Value.Y, 15);
+        }
+    }
+
+    private static string WishPath(bool classic, int frame) => Path.Combine(SourceDirectory(), "LocalScreenshots",
+        classic ? "2026-11-25" : "2026-11-24", "许愿星", $"ESC菜单-{(classic ? "4比3-" : "")}许愿星角标12-动画{frame}.png");
+
+    private static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;
 
     private sealed class Replay(int width, string scenario) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
     {
         public string Scene = "start";
         public string? LastSample;
+        public int WishClicks;
         public int Teleports;
         public int ActivityClicks;
         private int _samples;
+        private CapturedFrame? _staticMenu;
         private bool SelectActivity => scenario is "unselected" or "shifted";
 
         public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method)
         {
             var sample = Scene;
+            if (Scene == "wish" && scenario == "static-menu")
+            {
+                _staticMenu ??= FlowerSeedScreenRecognizerTests.LoadFixture(WishPath(false, 1), width, width * 9 / 16, 12, 30);
+                return _staticMenu.AddReference();
+            }
+            if (Scene == "wish")
+                return FlowerSeedScreenRecognizerTests.LoadFixture(WishPath(false, WishClicks + 1), width, width * 9 / 16, 12, 30, image =>
+                {
+                    if (scenario == "full" && WishClicks == 1)
+                    {
+                        using var popup = new OpenCvSharp.Mat(image, new OpenCvSharp.Rect(980, 455, 190, 165));
+                        popup.SetTo(OpenCvSharp.Scalar.Black);
+                    }
+                });
             if (Scene is "start" or "arrival" or "done")
                 return FlowerSeedScreenRecognizerTests.LoadFixture("legendary-world.png", width, width * 9 / 16, 12, 30);
             if (Scene == "waiting")
@@ -134,11 +181,14 @@ public sealed class EveningRestTests
         {
             Scene = (Scene, key) switch
             {
+                ("done", "Esc") when scenario != "unavailable" => "wish",
+                ("wish", "Esc") => "done",
                 ("start" or "arrival", "F2") => "recommended",
                 ("event-full" or "unavailable", "Esc") => "done",
                 ("waiting", "Esc") when _samples >= 3 => "done",
                 _ => throw new AssertFailedException($"{Scene} 意外输入 {key}")
             };
+            if (Scene == "done") _staticMenu?.Dispose();
             return Task.CompletedTask;
         }
 
@@ -146,7 +196,7 @@ public sealed class EveningRestTests
         {
             var (next, px, py) = Scene switch
             {
-                "recommended" when scenario == "full" => ("event-full", 387, 1090),
+                "recommended" when scenario is "full" or "static-menu" => ("event-full", 387, 1090),
                 "recommended" when scenario == "unavailable" => ("unavailable", 387, 1090),
                 "recommended" when SelectActivity => ("unselected", 387, 1090),
                 "recommended" => (Teleports == 0 ? "event-0" : "waiting", 387, 1090),
@@ -154,17 +204,18 @@ public sealed class EveningRestTests
                     165, scenario == "shifted" ? 260 : 168),
                 "event-0" => ("shelter-map", 1553, 1084),
                 "shelter-map" => ("arrival", 1635, 1084),
+                "wish" => ("wish", 1082, 528),
                 _ => throw new AssertFailedException($"{Scene} 意外点击")
             };
             Assert.AreEqual(px, x * 2048d / width, 15, Scene);
             Assert.AreEqual(py, y * 2048d / width, 15, Scene);
+            if (Scene == "wish") WishClicks++;
             if (Scene == "shelter-map") Teleports++;
             if (Scene == "unselected") ActivityClicks++;
             Scene = next;
             return Task.CompletedTask;
         }
 
-        private static string SourceDirectory([System.Runtime.CompilerServices.CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;
         public bool IsWindowAvailable(nint hwnd) => true;
         public bool IsWindowForeground(nint hwnd) => true;
         public bool RequiresForeground(KeyboardInputMethod method) => true;

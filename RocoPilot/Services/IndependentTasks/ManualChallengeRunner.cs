@@ -557,10 +557,11 @@ public sealed class ManualChallengeRunner(
             Publish(lastProgress with { Operation = "等待捕捉结算", IsBattleWaiting = false });
             var watchForShortage = preferCondensedMark && !legendary && !useContractMark;
             var elapsed = Stopwatch.StartNew();
+            var closeAttempts = 0;
             if (!watchForShortage) await Task.Delay(3000, token);
             while (true)
             {
-                // 静止弹窗可能只有一帧。允许复用本次输入之后的画面，才能按时执行兜底。
+                // 静止弹窗可能只有一帧。首次点击无效时，仍可用捕捉开始后的同一帧重试。
                 using var next = await CaptureNextFrameAsync(allowRepeatedFrame: true);
                 _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(next, window,
                     out var x, out var y, out var width, out var height);
@@ -568,19 +569,12 @@ public sealed class ManualChallengeRunner(
                 {
                     pendingFrame = next.AddReference();
                     lastAdvance = DateTimeOffset.UtcNow;
+                    if (closeAttempts > 0)
+                        logger.LogInformation("手册挑战：捕捉结算结束，关闭奖励共点击 {Attempts} 次，耗时 {Seconds:F1} 秒",
+                            closeAttempts, elapsed.Elapsed.TotalSeconds);
                     return;
                 }
-                var rewards = !legendary && await recognizer.FindRewardsHeaderAsync(next, x, y, width, height, token) is not null;
-                if (rewards || legendary || elapsed.Elapsed >= TimeSpan.FromSeconds(30))
-                {
-                    if (keyboard.IsWindowForeground(window.Hwnd))
-                    {
-                        Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
-                        await ClickCaptureRewardsAsync(width, height);
-                        minimumFrameAt = DateTimeOffset.UtcNow;
-                    }
-                }
-                else if (watchForShortage && elapsed.Elapsed < TimeSpan.FromSeconds(3))
+                if (watchForShortage && elapsed.Elapsed < TimeSpan.FromSeconds(3))
                 {
                     var mark = await recognizer.ReadCondensedMarkAsync(next, x, y, width, height, token);
                     if (mark.Insufficient)
@@ -591,6 +585,14 @@ public sealed class ManualChallengeRunner(
                     }
                     await Task.Delay(180, token);
                     continue;
+                }
+                if (keyboard.IsWindowForeground(window.Hwnd))
+                {
+                    closeAttempts++;
+                    Publish(lastProgress with { Operation = "关闭捕捉奖励", IsBattleWaiting = false });
+                    logger.LogInformation("手册挑战：捕捉结算周期点击关闭奖励（第 {Attempts} 次，已耗时 {Seconds:F1} 秒）",
+                        closeAttempts, elapsed.Elapsed.TotalSeconds);
+                    await ClickCaptureRewardsAsync(width, height);
                 }
                 await Task.Delay(700, token);
             }

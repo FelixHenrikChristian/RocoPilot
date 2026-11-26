@@ -337,10 +337,6 @@ public sealed class ManualChallengeScreenRecognizer(IImageMatchingService images
             scene is ManualChallengeScene.FlowerList or ManualChallengeScene.LegendaryList ? rowY : null);
     }
 
-    /// <summary>识别获得奖励弹窗标题。</summary>
-    internal Task<ImageMatchResult?> FindRewardsHeaderAsync(CapturedFrame frame, int clientX, int clientY,
-        int width, int height, CancellationToken token)
-        => MatchButtonAsync(frame, "rewards", clientX, clientY, width, height, token);
 
     private async Task<ImageMatchResult?> ReadLegendaryTabAsync(CapturedFrame frame, int clientX, int clientY,
         int width, int height, CancellationToken token)

@@ -478,6 +478,39 @@ public sealed class RuntimeTaskStartupTests
     }
 
     [TestMethod]
+    [DataRow("S5", true, EncounterBloodlineKind.QiYi)]
+    [DataRow("S5", false, EncounterBloodlineKind.Unrecognized)]
+    [DataRow("S6", true, EncounterBloodlineKind.Unrecognized)]
+    public async Task S5OpeningReadsTransitionTipOnlyAfterConfirmedOpening(string seasonId, bool tenPercent,
+        EncounterBloodlineKind expected)
+    {
+        var season = new TemporarySeasonConfig { Seasons = [new()
+        {
+            Id = seasonId, Name = seasonId, DateRange = $"2020/1/1-{DateTime.Today.AddDays(1):yyyy/M/d}"
+        }] };
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true, seasonConfig: season);
+        try
+        {
+            await fixture.StartBattleAsync(AutoBattleEncounterRelievedAction.Capture);
+            fixture.Matching.MatchedTemplate = null;
+            fixture.Matching.MagicPoints = 4;
+            await fixture.ProcessFrameAsync();
+            fixture.Matching.MagicPoints = 0;
+            await fixture.ProcessFrameAsync();
+            fixture.Matching.MatchedTemplate = "battle-button-skill.png";
+            fixture.Matching.TenPercent = tenPercent;
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Enabled;
+            fixture.Ocr.BloodlineText = "染上了奇异的颜色";
+            await fixture.ProcessFrameAsync();
+            Assert.AreEqual(0, fixture.Ocr.BloodlineCalls);
+            await fixture.ProcessFrameAsync();
+            Assert.AreEqual(expected, fixture.Battle.Bloodline);
+            Assert.AreEqual(expected == EncounterBloodlineKind.QiYi ? 1 : 0, fixture.Ocr.BloodlineCalls);
+        }
+        finally { await fixture.Runtime.StopAsync(); }
+    }
+
+    [TestMethod]
     [DataRow("发现异色精灵")]
     [DataRow("随掷：稀有的异色精灵就藏在这局棋里～")]
     public async Task ShinyTipStopsBattleEvenWhileNameOcrIsPending(string shinyText)
@@ -761,7 +794,7 @@ public sealed class RuntimeTaskStartupTests
             LoadedFromFile = true, ResolutionWidth = width, ResolutionHeight = height,
             Regions = new[] { "magic-point", "battle-button-chat", "battle-button-skill", "battle-button-change", "battle-button-capture" }
                 .Concat(includeOcr ? new[] { RecognitionRegionIds.BattleEnemyName, RecognitionRegionIds.BattleMessageTip,
-                    RecognitionRegionIds.BattleShinyTip, RecognitionRegionIds.BattleBloodlineTip } : [])
+                    RecognitionRegionIds.BattleShinyTip, RecognitionRegionIds.BattleBloodlineTip, "s5-opening-ten-percent" } : [])
                 .Select(id => new RecognitionRegion { Id = id, Width = width, Height = height }).ToList()
         };
         public RecognitionRegionConfig LoadFromPath(string path) => throw new NotSupportedException();
@@ -776,6 +809,7 @@ public sealed class RuntimeTaskStartupTests
         public string TemplateDirectory { get; }
         public volatile string? MatchedTemplate;
         public volatile int MagicPoints;
+        public bool TenPercent;
         public EncounterCaptureButtonState CaptureButtonState;
         public MatchingStub(bool temporaryTemplates = false)
         {
@@ -785,7 +819,7 @@ public sealed class RuntimeTaskStartupTests
             var resolutionDirectory = Path.Combine(TemplateDirectory, "16x9");
             Directory.CreateDirectory(resolutionDirectory);
             foreach (var template in new[] { "magic-point.png", "battle-chat.png", "battle-button-skill.png", "battle-button-change.png",
-                "battle-button-capture.png", "battle-button-capture-disabled.png", "battle-button-capture-disabled-marker.png" })
+                "battle-button-capture.png", "battle-button-capture-disabled.png", "battle-button-capture-disabled-marker.png", "s5-opening-ten-percent.png" })
                 File.WriteAllBytes(Path.Combine(resolutionDirectory, template), []);
         }
         public Task<ImageMatchResult> MatchAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
@@ -798,7 +832,7 @@ public sealed class RuntimeTaskStartupTests
                     : CaptureButtonState != EncounterCaptureButtonState.Unknown) ? 0.99 : 0.1;
                 return Task.FromResult(new ImageMatchResult(score >= 0.85, score, 0, 0, 1, 1, templatePath));
             }
-            var matched = Path.GetFileName(templatePath) == MatchedTemplate;
+            var matched = Path.GetFileName(templatePath) == "s5-opening-ten-percent.png" ? TenPercent : Path.GetFileName(templatePath) == MatchedTemplate;
             return Task.FromResult(new ImageMatchResult(matched, matched ? 0.99 : 0.1, 0, 0, 1, 1, templatePath));
         }
         public Task<ImageMatchCollectionResult> FindMatchesAsync(CapturedFrame frame, RecognitionRegion region, string templatePath,
@@ -817,6 +851,7 @@ public sealed class RuntimeTaskStartupTests
         public Func<Task<string>> ReadName { get; set; } = () => Task.FromResult(string.Empty);
         public string ShinyText { get; set; } = "";
         public string BloodlineText { get; set; } = "";
+        public int BloodlineCalls { get; private set; }
         public int NameCalls { get; private set; }
         public IReadOnlyList<TextRecognitionMethodOption> GetMethods() => [GetDefaultMethod()];
         public TextRecognitionMethodOption GetDefaultMethod() => new(default, "test", "", true);
@@ -832,7 +867,11 @@ public sealed class RuntimeTaskStartupTests
                 text = await ReadName();
             }
             else if (region.Id == RecognitionRegionIds.BattleShinyTip) text = ShinyText;
-            else if (region.Id == RecognitionRegionIds.BattleBloodlineTip) text = BloodlineText;
+            else if (region.Id == RecognitionRegionIds.BattleBloodlineTip)
+            {
+                BloodlineCalls++;
+                text = BloodlineText;
+            }
             return new(method, "test", null, [text], text.Length);
         }
     }

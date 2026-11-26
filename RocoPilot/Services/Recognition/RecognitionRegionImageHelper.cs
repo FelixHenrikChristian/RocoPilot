@@ -139,7 +139,7 @@ internal static class RecognitionRegionImageHelper
                 || clientHeight != frame.Height);
     }
 
-    private static byte[] CropFrame(CapturedFrame frame, RecognitionRegion region)
+    internal static byte[] CropFrame(CapturedFrame frame, RecognitionRegion region)
     {
         var expectedLength = checked(frame.Width * frame.Height * 4);
         if (frame.PixelByteLength < expectedLength)

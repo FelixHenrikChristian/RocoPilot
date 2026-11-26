@@ -145,6 +145,28 @@ public sealed class AutoBattleControllerTests
     }
 
     [TestMethod]
+    [DataRow(false, false, EncounterBloodlineKind.Normal, AutoBattleAction.Skill)]
+    [DataRow(true, false, EncounterBloodlineKind.Unrecognized, AutoBattleAction.Capture)]
+    [DataRow(false, true, EncounterBloodlineKind.Unrecognized, AutoBattleAction.Capture)]
+    public void BloodlineTimeoutUsesOnlySuccessfulPostReliefReads(bool hadText, bool noRead,
+        EncounterBloodlineKind expectedKind, AutoBattleAction expectedAction)
+    {
+        var settings = Settings();
+        settings.BloodlineCaptureFilter.CaptureUnrecognized = true;
+        settings.BloodlineCaptureFilter.CaptureNormal = false;
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveUnparsedBloodlineTip(battle.BattleId, true);
+        battle.ObserveEncounterRelieved(settings);
+        if (!noRead) battle.ObserveUnparsedBloodlineTip(battle.BattleId, hadText);
+        battle.PlanSkillSelection(settings, true, Now);
+        if (!noRead) battle.ObserveUnparsedBloodlineTip(battle.BattleId, false);
+        var plan = battle.PlanSkillSelection(settings, true, Now.AddSeconds(4));
+        Assert.AreEqual(expectedKind, battle.Bloodline);
+        Assert.AreEqual(expectedAction, plan.Action);
+    }
+
+    [TestMethod]
     public void BloodlineWaitTimesOutAtFourSecondsAndLocksTheDecision()
     {
         var settings = Settings();

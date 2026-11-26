@@ -177,7 +177,8 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
+        var afterRelief = _battle.IsEncounterRelieved;
+        var tipText = await _frameRecognizer.TryRecognizeRegionTextAsync(
             state,
             frame,
             EncounterBloodlineRecognition.RegionIds,
@@ -185,6 +186,7 @@ public sealed partial class RuntimeTaskService
         var capturedAt = frame.CapturedAt;
         for (var attempt = 0; ; attempt++)
         {
+            if (tipText is null) return;
             if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
             {
                 if (_battle.ObserveBloodline(battleId, kind))
@@ -196,6 +198,8 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
+            if (afterRelief) _battle.ObserveUnparsedBloodlineTip(battleId, !string.IsNullOrWhiteSpace(tipText));
+
             // 长提示可能只识别到一部分，趁台词仍在画面上复查新帧。
             if (attempt >= 2 || TextMatchingHelper.CountChineseCharacters(tipText) < 8
                 || _battle.Bloodline != EncounterBloodlineKind.Unrecognized || _battle.IsSuspendedForShiny)
@@ -206,7 +210,8 @@ public sealed partial class RuntimeTaskService
             if (next is null || _isSuspended || _scene != GameScene.Battle || battleId != _battle.BattleId) return;
             if (next.CapturedAt <= capturedAt) continue;
             capturedAt = next.CapturedAt;
-            tipText = await _frameRecognizer.RecognizeRegionTextAsync(
+            afterRelief = _battle.IsEncounterRelieved;
+            tipText = await _frameRecognizer.TryRecognizeRegionTextAsync(
                 state, next, EncounterBloodlineRecognition.RegionIds, cancellationToken);
         }
     }
@@ -229,6 +234,9 @@ public sealed partial class RuntimeTaskService
             cancellationToken);
         var openingEvidence = await MatchS5OpeningHealthAsync(state, frame, season, screen, observation.State, cancellationToken);
         ApplyEncounterCaptureButtonState(season, observation, openingEvidence);
+        if (openingEvidence && _encounterCaptureButtonStateTracker.IsRelieved)
+            await ReadS5OpeningBloodlineAsync(frame.CapturedAt, cancellationToken);
+        if (_s5OpeningChecksRemaining == 0) _s5OpeningTips.Clear();
     }
 
     private async Task<EncounterCaptureButtonObservation> RecognizeEncounterCaptureButtonStateAsync(
@@ -567,6 +575,8 @@ public sealed partial class RuntimeTaskService
         }
 
         _encounterCaptureButtonStateTracker.Reset();
+        _s5OpeningTips.Clear();
+        _s5OpeningWorldAt = _scene == GameScene.World ? DateTimeOffset.Now : null;
         _s5OpeningChecksRemaining = _scene == GameScene.World
             ? EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount : 0;
     }

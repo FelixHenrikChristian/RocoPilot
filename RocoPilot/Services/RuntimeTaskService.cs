@@ -522,11 +522,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                                     }
                                 }
 
-                                if (_scene == GameScene.World)
-                                {
-                                    ResetEncounterRecordSuppression();
-                                }
-
                                 // 后台战斗 OCR 只接收本轮已确认的战斗画面。
                                 if (_scene == GameScene.Battle)
                                     session.PublishFrame(frame, _battle.BattleId);
@@ -678,6 +673,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
             case GameScene.World:
                 NoteBattleEnded();
                 ResetAutoBattleBattleState();
+                ResetEncounterRecordSuppression();
                 UpdateRecognizedInfoOverlaySnapshot(CreateInfoOverlaySnapshot(
                     "大世界", DateTimeOffset.Now, match.MagicPointCount));
                 break;
@@ -686,6 +682,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 await ProcessBattleFrameAsync(state, frame, match.BattleScreen!.Value, cancellationToken);
                 break;
             default:
+                CacheS5OpeningTip(state, frame);
                 // 无命中只暂停本帧操作，确认大世界后才结束本场战斗。
                 CompleteAutoBattleSkillSelectionState();
                 _battle.ObservePetSwitching(false);

@@ -41,6 +41,8 @@ public sealed class AutoBattleController
     private bool _encounterRelieved;
     private EncounterBloodlineKind _bloodline = EncounterBloodlineKind.Unrecognized;
     private DateTimeOffset? _bloodlineWaitStartedAt;
+    // null 表示尚无有效 OCR 采样；只要出现过文字，后续空帧就不能覆盖它。
+    private bool? _bloodlineTipHadText;
     private (EncounterBloodlineKind Kind, bool Capture)? _captureDecision;
 
     public long BattleId { get { lock (_gate) return _battleId; } }
@@ -185,11 +187,21 @@ public sealed class AutoBattleController
         }
     }
 
+    public void ObserveUnparsedBloodlineTip(long battleId, bool hasText)
+    {
+        lock (_gate)
+        {
+            if (battleId == _battleId && _encounterRelieved && _captureDecision is null)
+                _bloodlineTipHadText = _bloodlineTipHadText == true || hasText;
+        }
+    }
+
     public void ResetEncounterRelief()
     {
         lock (_gate)
         {
             _encounterRelieved = false;
+            _bloodlineTipHadText = null;
             _bloodline = EncounterBloodlineKind.Unrecognized;
             _bloodlineWaitStartedAt = null;
             _captureDecision = null;
@@ -250,6 +262,7 @@ public sealed class AutoBattleController
                 _bloodlineWaitStartedAt ??= now;
                 if (now - _bloodlineWaitStartedAt.Value < BloodlineWaitTimeout)
                     return new(AutoBattleAction.None, "", "等待血脉提示识别", "-");
+                if (_bloodlineTipHadText == false) _bloodline = EncounterBloodlineKind.Normal;
             }
             _captureDecision = (_bloodline, filter.ShouldCapture(_bloodline));
         }

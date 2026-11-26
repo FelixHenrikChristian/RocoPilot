@@ -875,8 +875,8 @@ public sealed class FlowerSeedChallengeRunnerTests
     [DataRow(false, false)]
     public async Task StaticRewardPopupClosesAfterCapture(bool earlyShortage, bool headerVisible)
     {
-        // WGC 在奖励弹窗静止时反复返回相同时间戳；覆盖提前返回、标题命中和超时兜底。
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(headerVisible ? 18 : 45));
+        // WGC 在奖励弹窗静止时反复返回相同时间戳；标题缺失时模拟首次点击无效。
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var capture = new ChallengeCapture(staticReward: true);
         var state = CreateState();
         state.Options.AutoBattleSettings.FlowerSeedReleaseSequence = [AutoBattleReleaseStep.CreateSkill("4")];
@@ -892,13 +892,23 @@ public sealed class FlowerSeedChallengeRunnerTests
             capture.OnKey(sequence);
             if (sequence == "1, Space") shortage = earlyShortage;
         } };
-        var mouse = new Mouse { DuringClick = capture.OnClick };
+        var rewardClicks = 0;
+        var mouse = new Mouse { DuringClick = (x, y) =>
+        {
+            if (capture.Scene == 16)
+            {
+                rewardClicks++;
+                if (!headerVisible && rewardClicks == 1) return;
+            }
+            capture.OnClick(x, y);
+        } };
         var runner = CreateRunner(capture, images, keyboard, mouse,
             ocr: new InteractionOcr { ReadText = frame => frame.Pixels[0] == 3 ? "挑战" : string.Empty });
 
         await runner.RunAsync(state, new FlowerSeedOption(1, "友爱星飞"), 1, false, true,
             state.Options.AutoBattleSettings, _ => { }, cancellation.Token);
 
+        Assert.AreEqual(headerVisible ? 1 : 2, rewardClicks);
         Assert.AreEqual(1, capture.RewardsClosed);
         Assert.AreEqual(1, capture.Exits);
         Assert.AreEqual(1, keyboard.Keys.Count(key => key.Key == "1, Space"));

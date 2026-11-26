@@ -561,7 +561,7 @@ public sealed class ManualChallengeRunner(
             if (!watchForShortage) await Task.Delay(3000, token);
             while (true)
             {
-                // 静止弹窗可能只有一帧。允许复用本次输入之后的画面，才能按时点击。
+                // 静止弹窗可能只有一帧。首次点击无效时，仍可用捕捉开始后的同一帧重试。
                 using var next = await CaptureNextFrameAsync(allowRepeatedFrame: true);
                 _ = RecognitionRegionImageHelper.TryGetClientAreaInCapturedFrame(next, window,
                     out var x, out var y, out var width, out var height);
@@ -593,7 +593,6 @@ public sealed class ManualChallengeRunner(
                     logger.LogInformation("手册挑战：捕捉结算周期点击关闭奖励（第 {Attempts} 次，已耗时 {Seconds:F1} 秒）",
                         closeAttempts, elapsed.Elapsed.TotalSeconds);
                     await ClickCaptureRewardsAsync(width, height);
-                    minimumFrameAt = DateTimeOffset.UtcNow;
                 }
                 await Task.Delay(700, token);
             }

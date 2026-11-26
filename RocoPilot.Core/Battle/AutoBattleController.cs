@@ -41,7 +41,8 @@ public sealed class AutoBattleController
     private bool _encounterRelieved;
     private EncounterBloodlineKind _bloodline = EncounterBloodlineKind.Unrecognized;
     private DateTimeOffset? _bloodlineWaitStartedAt;
-    private bool _bloodlineTipHasText;
+    // null 表示尚无有效 OCR 采样；只要出现过文字，后续空帧就不能覆盖它。
+    private bool? _bloodlineTipHadText;
     private (EncounterBloodlineKind Kind, bool Capture)? _captureDecision;
 
     public long BattleId { get { lock (_gate) return _battleId; } }
@@ -186,16 +187,12 @@ public sealed class AutoBattleController
         }
     }
 
-    /// <summary>
-    /// 血脉提示区域是否识别到过足够长的文字（不足 5 个汉字视为场景被误识别成文字）。
-    /// 等待超时后用于区分「区域没有提示」与「有提示但无法归类」：前者按普通血脉处理，后者仍按未识别处理。
-    /// </summary>
-    public void ObserveBloodlineTipText(long battleId, bool hasText)
+    public void ObserveUnparsedBloodlineTip(long battleId, bool hasText)
     {
         lock (_gate)
         {
-            if (battleId != _battleId || !hasText) return;
-            _bloodlineTipHasText = true;
+            if (battleId == _battleId && _encounterRelieved && _captureDecision is null)
+                _bloodlineTipHadText = _bloodlineTipHadText == true || hasText;
         }
     }
 
@@ -204,9 +201,9 @@ public sealed class AutoBattleController
         lock (_gate)
         {
             _encounterRelieved = false;
+            _bloodlineTipHadText = null;
             _bloodline = EncounterBloodlineKind.Unrecognized;
             _bloodlineWaitStartedAt = null;
-            _bloodlineTipHasText = false;
             _captureDecision = null;
         }
     }
@@ -262,20 +259,10 @@ public sealed class AutoBattleController
         {
             if (_bloodline == EncounterBloodlineKind.Unrecognized && available)
             {
-                if (_bloodlineWaitStartedAt is null)
-                {
-                    _bloodlineWaitStartedAt = now;
-                    // 只统计等待期内的提示文字：入场横幅、战斗消息等解除前的文字不算。
-                    _bloodlineTipHasText = false;
-                }
-
+                _bloodlineWaitStartedAt ??= now;
                 if (now - _bloodlineWaitStartedAt.Value < BloodlineWaitTimeout)
                     return new(AutoBattleAction.None, "", "等待血脉提示识别", "-");
-
-                // 等待期内提示区域没有有效文字（不足 5 个汉字视为场景误识别）：按普通血脉处理。
-                // 有文字但无法归类说明提示存在，保持未识别，交给停止开关决定。
-                if (!_bloodlineTipHasText)
-                    _bloodline = EncounterBloodlineKind.Normal;
+                if (_bloodlineTipHadText == false) _bloodline = EncounterBloodlineKind.Normal;
             }
             _captureDecision = (_bloodline, filter.ShouldCapture(_bloodline));
         }

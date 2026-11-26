@@ -166,25 +166,6 @@ public sealed partial class RuntimeTaskService
         await UpdateRuntimeSpiritNameAsync(state, frame, battleId, cancellationToken);
     }
 
-    /// <summary>
-    /// 状态未识别（战斗入场过渡）期间，横幅可能早于战斗场景确认出现：
-    /// 只识别血脉与异色两个横幅，不跑名单、统计与精灵名的完整 OCR。
-    /// </summary>
-    private async Task UpdateUnrecognizedBannerSignalsAsync(
-        RuntimeTaskState state,
-        CapturedFrame frame,
-        long battleId,
-        CancellationToken cancellationToken)
-    {
-        var season = _encounterSeasonConfigService.GetCurrentSeason();
-        await Task.WhenAll(
-            RecognizeAndApplyBloodlineTipAsync(state, frame, battleId, cancellationToken),
-            TryUpdateRuntimeShinyTipSignalAsync(state, frame, season, battleId, cancellationToken));
-    }
-
-    // 解除后血脉区域出现文字却无法归类时记录原文，便于核对是否被无关文字干扰。
-    private string _lastUnparsedBloodlineTip = string.Empty;
-
     private async Task RecognizeAndApplyBloodlineTipAsync(
         RuntimeTaskState state,
         CapturedFrame frame,
@@ -196,7 +177,8 @@ public sealed partial class RuntimeTaskService
             return;
         }
 
-        var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
+        var afterRelief = _battle.IsEncounterRelieved;
+        var tipText = await _frameRecognizer.TryRecognizeRegionTextAsync(
             state,
             frame,
             EncounterBloodlineRecognition.RegionIds,
@@ -204,11 +186,7 @@ public sealed partial class RuntimeTaskService
         var capturedAt = frame.CapturedAt;
         for (var attempt = 0; ; attempt++)
         {
-            var chineseCount = TextMatchingHelper.CountChineseCharacters(tipText);
-            // 记录提示区域是否出现过文字：等待超时后用于区分「没有提示」与「有提示但无法归类」。
-            // 不超过 4 个汉字的多半是场景被误识别成文字，按没有文字处理。
-            _battle.ObserveBloodlineTipText(battleId,
-                chineseCount > EncounterBloodlineRecognition.MaxNoiseChineseCharacters);
+            if (tipText is null) return;
             if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
             {
                 if (_battle.ObserveBloodline(battleId, kind))
@@ -220,31 +198,20 @@ public sealed partial class RuntimeTaskService
                 return;
             }
 
-            // 解除后区域里出现较长文字却对不上任何血脉关键词：记录原文，便于排查误判来源。
-            if (_battle.IsEncounterRelieved
-                && chineseCount > EncounterBloodlineRecognition.MaxNoiseChineseCharacters)
-            {
-                var unparsed = LoggingHelper.FormatLogText(tipText);
-                if (unparsed != _lastUnparsedBloodlineTip)
-                {
-                    _lastUnparsedBloodlineTip = unparsed;
-                    _logger.LogInformation("奇遇识别：解除后血脉区域有文字但无法归类（{Count} 字，OCR：{Raw}）",
-                        chineseCount, unparsed);
-                }
-            }
+            if (afterRelief) _battle.ObserveUnparsedBloodlineTip(battleId, !string.IsNullOrWhiteSpace(tipText));
 
             // 长提示可能只识别到一部分，趁台词仍在画面上复查新帧。
-            if (attempt >= 2 || chineseCount < 8
+            if (attempt >= 2 || TextMatchingHelper.CountChineseCharacters(tipText) < 8
                 || _battle.Bloodline != EncounterBloodlineKind.Unrecognized || _battle.IsSuspendedForShiny)
                 return;
 
             await Task.Delay(RuntimeRecognitionDefaults.FrameCaptureIntervalMs, cancellationToken);
             using var next = _session?.RentFrame(battleId);
-            // 未识别（战斗入场过渡）期间横幅可能正在显示，允许复查；回到大世界才视为战斗结束。
-            if (next is null || _isSuspended || _scene == GameScene.World || battleId != _battle.BattleId) return;
+            if (next is null || _isSuspended || _scene != GameScene.Battle || battleId != _battle.BattleId) return;
             if (next.CapturedAt <= capturedAt) continue;
             capturedAt = next.CapturedAt;
-            tipText = await _frameRecognizer.RecognizeRegionTextAsync(
+            afterRelief = _battle.IsEncounterRelieved;
+            tipText = await _frameRecognizer.TryRecognizeRegionTextAsync(
                 state, next, EncounterBloodlineRecognition.RegionIds, cancellationToken);
         }
     }
@@ -267,6 +234,9 @@ public sealed partial class RuntimeTaskService
             cancellationToken);
         var openingEvidence = await MatchS5OpeningHealthAsync(state, frame, season, screen, observation.State, cancellationToken);
         ApplyEncounterCaptureButtonState(season, observation, openingEvidence);
+        if (openingEvidence && _encounterCaptureButtonStateTracker.IsRelieved)
+            await ReadS5OpeningBloodlineAsync(frame.CapturedAt, cancellationToken);
+        if (_s5OpeningChecksRemaining == 0) _s5OpeningTips.Clear();
     }
 
     private async Task<EncounterCaptureButtonObservation> RecognizeEncounterCaptureButtonStateAsync(
@@ -605,6 +575,8 @@ public sealed partial class RuntimeTaskService
         }
 
         _encounterCaptureButtonStateTracker.Reset();
+        _s5OpeningTips.Clear();
+        _s5OpeningWorldAt = _scene == GameScene.World ? DateTimeOffset.Now : null;
         _s5OpeningChecksRemaining = _scene == GameScene.World
             ? EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount : 0;
     }

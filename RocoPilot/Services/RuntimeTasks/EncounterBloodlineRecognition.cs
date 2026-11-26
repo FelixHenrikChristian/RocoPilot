@@ -18,9 +18,6 @@ internal static class EncounterBloodlineRecognition
     public const string WuRanKeyword = "污染";
     public const string NormalTraitKeyword = "特性";
 
-    /// <summary>提示文字不超过该字数视为场景被误识别成文字，等同没有文字信息。</summary>
-    public const int MaxNoiseChineseCharacters = 4;
-
     public static bool IsAvailable(RecognitionRegionConfig config) => config.Regions.FirstOrDefault(region =>
         RuntimeFrameRecognizer.IsRegionMatch(region, RegionIds)) is { Width: > 0, Height: > 0 };
 

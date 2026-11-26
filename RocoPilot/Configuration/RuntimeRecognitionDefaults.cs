@@ -22,9 +22,4 @@ internal static class RuntimeRecognitionDefaults
     // 仅处理已确认的战斗画面；上一轮 OCR 未完成时跳过，避免并发堆积。
     // 此值不控制异色保护和启动 UID 等按需执行的 OCR。
     public const int OcrScanIntervalMs = 1000;
-
-    // 状态未识别（战斗入场过渡等）期间也扫描血脉/异色横幅：入场即解除的奇遇，
-    // 横幅出现早于战斗场景确认。每轮只识别两个横幅区域，间隔复用 OcrScanIntervalMs。
-    // 仅在未识别开始后的一段时间内扫描，避免在菜单等长期未识别画面上空转。
-    public const int UnrecognizedBannerScanWindowMs = 15000;
 }

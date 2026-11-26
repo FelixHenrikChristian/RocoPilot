@@ -18,7 +18,6 @@ public sealed record InfoOverlaySnapshot(
     InfoOverlayScene Scene = InfoOverlayScene.Unknown,
     bool IsAutoBattleEnabled = false,
     string BattleCreatureName = "",
-    string BattleBloodline = "",
     string IndependentTaskName = "",
     IndependentTaskProgress? IndependentTaskProgress = null)
 {

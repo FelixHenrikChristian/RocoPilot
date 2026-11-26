@@ -21,21 +21,34 @@ public sealed class RuntimeFrameRecognizer(
         IReadOnlyList<string> regionAliases,
         CancellationToken cancellationToken)
     {
+        return await TryRecognizeRegionTextAsync(state, frame, regionAliases, cancellationToken) ?? string.Empty;
+    }
+
+    // null 表示没有执行 OCR，空字符串表示成功读取了空白提示区。
+    public Task<string?> TryRecognizeRegionTextAsync(
+        RuntimeTaskState state, CapturedFrame frame, IReadOnlyList<string> regionAliases, CancellationToken cancellationToken)
+    {
         var region = FindRegion(state.RecognitionRegionConfig, regionAliases);
         var frameRegion = RecognitionRegionImageHelper.ToFrameRegion(
             region,
             frame,
             state.TargetWindow,
             state.RecognitionRegionConfig);
+        return TryReadFrameRegionAsync(frame, frameRegion, cancellationToken);
+    }
+
+    public async Task<string?> TryReadFrameRegionAsync(
+        CapturedFrame frame, RecognitionRegion frameRegion, CancellationToken cancellationToken)
+    {
         if (frameRegion.Width <= 0 || frameRegion.Height <= 0)
         {
-            return string.Empty;
+            return null;
         }
 
         var recognitionMethod = textRecognition.GetDefaultMethod();
         if (recognitionMethod is not { IsAvailable: true })
         {
-            return string.Empty;
+            return null;
         }
 
         var result = await textRecognition.RecognizeAsync(
@@ -43,7 +56,7 @@ public sealed class RuntimeFrameRecognizer(
             frameRegion,
             recognitionMethod.Method,
             cancellationToken);
-        overlay.ShowOcrResult(region.Id, result.Text);
+        overlay.ShowOcrResult(frameRegion.Id, result.Text);
         return result.Text;
     }
 

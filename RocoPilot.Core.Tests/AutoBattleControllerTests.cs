@@ -145,6 +145,28 @@ public sealed class AutoBattleControllerTests
     }
 
     [TestMethod]
+    [DataRow(false, false, EncounterBloodlineKind.Normal, AutoBattleAction.Skill)]
+    [DataRow(true, false, EncounterBloodlineKind.Unrecognized, AutoBattleAction.Capture)]
+    [DataRow(false, true, EncounterBloodlineKind.Unrecognized, AutoBattleAction.Capture)]
+    public void BloodlineTimeoutUsesOnlySuccessfulPostReliefReads(bool hadText, bool noRead,
+        EncounterBloodlineKind expectedKind, AutoBattleAction expectedAction)
+    {
+        var settings = Settings();
+        settings.BloodlineCaptureFilter.CaptureUnrecognized = true;
+        settings.BloodlineCaptureFilter.CaptureNormal = false;
+        var battle = new AutoBattleController();
+        battle.BeginSkillSelection(settings, Now);
+        battle.ObserveUnparsedBloodlineTip(battle.BattleId, true);
+        battle.ObserveEncounterRelieved(settings);
+        if (!noRead) battle.ObserveUnparsedBloodlineTip(battle.BattleId, hadText);
+        battle.PlanSkillSelection(settings, true, Now);
+        if (!noRead) battle.ObserveUnparsedBloodlineTip(battle.BattleId, false);
+        var plan = battle.PlanSkillSelection(settings, true, Now.AddSeconds(4));
+        Assert.AreEqual(expectedKind, battle.Bloodline);
+        Assert.AreEqual(expectedAction, plan.Action);
+    }
+
+    [TestMethod]
     public void BloodlineWaitTimesOutAtFourSecondsAndLocksTheDecision()
     {
         var settings = Settings();
@@ -152,7 +174,6 @@ public sealed class AutoBattleControllerTests
         var battle = new AutoBattleController();
         battle.BeginSkillSelection(settings, Now);
         battle.ObserveEncounterRelieved(settings);
-        battle.ObserveBloodlineTipText(battle.BattleId, true);
         Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
         Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now.AddMilliseconds(3999)).Action);
         Assert.AreEqual(AutoBattleAction.Skill, battle.PlanSkillSelection(settings, true, Now.AddSeconds(4)).Action);
@@ -220,22 +241,6 @@ public sealed class AutoBattleControllerTests
         battle.BeginSkillSelection(settings, Now);
         battle.ObserveEncounterRelieved(settings);
         Assert.AreEqual(AutoBattleAction.Capture, battle.PlanSkillSelection(settings, false, Now).Action);
-    }
-
-    [TestMethod]
-    public void MissingBloodlineTipTextFallsBackToNormalAfterWait()
-    {
-        var settings = Settings();
-        settings.BloodlineCaptureFilter.CaptureNormal = true;
-        var battle = new AutoBattleController();
-        battle.BeginSkillSelection(settings, Now);
-        battle.ObserveEncounterRelieved(settings);
-        // 等待期内提示区域始终没有文字：超时后按普通血脉处理。
-        Assert.AreEqual(AutoBattleAction.None, battle.PlanSkillSelection(settings, true, Now).Action);
-        var plan = battle.PlanSkillSelection(settings, true, Now.AddSeconds(4));
-        Assert.AreEqual(EncounterBloodlineKind.Normal, battle.Bloodline);
-        Assert.AreEqual(AutoBattleAction.Capture, plan.Action);
-        Assert.IsTrue(plan.Description.Contains("普通", StringComparison.Ordinal));
     }
 
     [TestMethod]

@@ -20,10 +20,10 @@ public sealed partial class RuntimeTaskService
     internal static readonly ImageMatchOptions S5OpeningHealthOptions = new() { MinimumScore = 0.90, AlphaThreshold = 220 };
     private int _s5OpeningChecksRemaining;
 
-    // S5 换季清理：一并删除 CacheS5OpeningTip、ReadS5OpeningBloodlineAsync 及其调用和重置点。
+    // S5 换季清理：一并删除 血脉与异色入场缓存、CacheS5OpeningTip、ReadS5OpeningTipsAsync 及其调用和重置点。
     // 仅采集最后一次大世界之后短窗口内的提示区；未确认大成功时不运行补读 OCR。
     private static readonly TimeSpan S5OpeningTipWindow = TimeSpan.FromSeconds(15);
-    private readonly List<(DateTimeOffset At, CapturedFrame Crop)> _s5OpeningTips = [];
+    private readonly List<(DateTimeOffset At, CapturedFrame? Bloodline, CapturedFrame? Shiny)> _s5OpeningTips = [];
     private DateTimeOffset? _s5OpeningWorldAt;
 
     private void CacheS5OpeningTip(RuntimeTaskState state, CapturedFrame frame)
@@ -37,25 +37,52 @@ public sealed partial class RuntimeTaskService
         }
 
         var season = _encounterSeasonConfigService.GetCurrentSeason();
-        if (season is null || !IsS5OpeningSeason(season, frame.CapturedAt)
-            || !EncounterBloodlineRecognition.IsAvailable(state.RecognitionRegionConfig)) return;
-        var region = RuntimeFrameRecognizer.FindRegion(state.RecognitionRegionConfig, EncounterBloodlineRecognition.RegionIds);
-        var area = RecognitionRegionImageHelper.ToFrameRegion(region, frame, state.TargetWindow, state.RecognitionRegionConfig);
-        if (area.Width <= 0 || area.Height <= 0) return;
-        var pixels = RecognitionRegionImageHelper.CropFrame(frame, area);
-        _s5OpeningTips.Add((frame.CapturedAt, new CapturedFrame(area.Width, area.Height, pixels)));
+        if (season is null || !IsS5OpeningSeason(season, frame.CapturedAt)) return;
+        var shiny = CropS5OpeningTip(state, frame, BattleShinyTipRegionIds);
+        var bloodline = CropS5OpeningTip(state, frame, EncounterBloodlineRecognition.RegionIds);
+        if (shiny is not null || bloodline is not null)
+            _s5OpeningTips.Add((frame.CapturedAt, bloodline, shiny));
     }
 
-    private async Task ReadS5OpeningBloodlineAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    private static CapturedFrame? CropS5OpeningTip(RuntimeTaskState state, CapturedFrame frame, IReadOnlyList<string> aliases)
+    {
+        var region = state.RecognitionRegionConfig.Regions.FirstOrDefault(r => RuntimeFrameRecognizer.IsRegionMatch(r, aliases));
+        if (region is null) return null;
+        var area = RecognitionRegionImageHelper.ToFrameRegion(region, frame, state.TargetWindow, state.RecognitionRegionConfig);
+        if (area.Width <= 0 || area.Height <= 0) return null;
+        return new CapturedFrame(area.Width, area.Height, RecognitionRegionImageHelper.CropFrame(frame, area));
+    }
+
+    private async Task ReadS5OpeningTipsAsync(CapturedFrame battleFrame, EncounterSeasonDefinition season, CancellationToken cancellationToken)
     {
         var battleId = _battle.BattleId;
+        var accountUid = GetShinyAccountUid();
+        try
+        {
+            // 优先完成异色检查；血脉可能提前确认，两种提示也可能出现在不同帧。
+            for (var i = _s5OpeningTips.Count - 1; i >= 0; i--)
+            {
+                var (at, _, shiny) = _s5OpeningTips[i];
+                if (battleFrame.CapturedAt - at > S5OpeningTipWindow) break;
+                if (shiny is null) continue;
+                var region = new RecognitionRegion { Id = BattleShinyTipRegionIds[0], Width = shiny.Width, Height = shiny.Height };
+                var text = await _frameRecognizer.TryReadFrameRegionAsync(shiny, region, cancellationToken);
+                if (text is null || await ApplyShinyTipAsync(text, battleFrame, season, battleId, at, accountUid)) break;
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "S5 开场异色补读失败");
+        }
+
         try
         {
             // 从最接近技能菜单的帧往前找，空白入场画面不能作为普通血脉的依据。
             for (var i = _s5OpeningTips.Count - 1; i >= 0; i--)
             {
-                var (at, crop) = _s5OpeningTips[i];
-                if (now - at > S5OpeningTipWindow || _battle.Bloodline != EncounterBloodlineKind.Unrecognized) break;
+                var (at, crop, _) = _s5OpeningTips[i];
+                if (battleFrame.CapturedAt - at > S5OpeningTipWindow || _battle.Bloodline != EncounterBloodlineKind.Unrecognized) break;
+                if (crop is null) continue;
                 var region = new RecognitionRegion { Id = EncounterBloodlineRecognition.RegionIds[0], Width = crop.Width, Height = crop.Height };
                 var text = await _frameRecognizer.TryReadFrameRegionAsync(crop, region, cancellationToken);
                 if (text is null) break;

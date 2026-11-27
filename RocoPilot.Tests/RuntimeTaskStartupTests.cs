@@ -491,11 +491,15 @@ public sealed class RuntimeTaskStartupTests
         using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true, seasonConfig: season);
         try
         {
+            await fixture.Notifications.SetEnabledAsync(false);
+            fixture.Ocr.ShinyText = "随掷：稀有的异色精灵就藏在这局棋里～";
+            fixture.Ocr.ShinyPixelMarker = 42;
             await fixture.StartBattleAsync(AutoBattleEncounterRelievedAction.Capture);
             fixture.Matching.MatchedTemplate = null;
             fixture.Matching.MagicPoints = 4;
             await fixture.ProcessFrameAsync();
             fixture.Matching.MagicPoints = 0;
+            await fixture.ProcessFrameAsync(pixel: 42);
             await fixture.ProcessFrameAsync();
             fixture.Matching.MatchedTemplate = "battle-button-skill.png";
             fixture.Matching.TenPercent = tenPercent;
@@ -503,8 +507,15 @@ public sealed class RuntimeTaskStartupTests
             fixture.Ocr.BloodlineText = "染上了奇异的颜色";
             await fixture.ProcessFrameAsync();
             Assert.AreEqual(0, fixture.Ocr.BloodlineCalls);
+            Assert.IsFalse(fixture.Battle.IsSuspendedForShiny);
             await fixture.ProcessFrameAsync();
             Assert.AreEqual(expected, fixture.Battle.Bloodline);
+            Assert.AreEqual(seasonId == "S5" && tenPercent, fixture.Battle.IsSuspendedForShiny);
+            if (fixture.Battle.IsSuspendedForShiny)
+            {
+                await fixture.ProcessFrameAsync();
+                Assert.AreEqual(0, fixture.Keyboard.Sends);
+            }
             Assert.AreEqual(expected == EncounterBloodlineKind.QiYi ? 1 : 0, fixture.Ocr.BloodlineCalls);
         }
         finally { await fixture.Runtime.StopAsync(); }
@@ -720,9 +731,10 @@ public sealed class RuntimeTaskStartupTests
             await (Task)scan.Invoke(Runtime, [Runtime.CurrentState!, frame, Battle.BattleId, CancellationToken.None])!;
         }
 
-        public async Task ProcessFrameAsync()
+        public async Task ProcessFrameAsync(byte pixel = 0)
         {
             using var frame = CapturedFrame.RentBgra32(16, 9);
+            Array.Fill(frame.Pixels, pixel);
             var process = typeof(RuntimeTaskService).GetMethod("ProcessFrameAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
             await (Task)process.Invoke(Runtime, [Runtime.CurrentState!, frame, CancellationToken.None])!;
         }
@@ -878,6 +890,7 @@ public sealed class RuntimeTaskStartupTests
     private sealed class TextRecognitionStub : ITextRecognitionService
     {
         public Func<Task<string>> ReadName { get; set; } = () => Task.FromResult(string.Empty);
+        public byte? ShinyPixelMarker { get; set; }
         public string ShinyText { get; set; } = "";
         public string BloodlineText { get; set; } = "";
         public int BloodlineCalls { get; private set; }
@@ -895,7 +908,8 @@ public sealed class RuntimeTaskStartupTests
                 NameCalls++;
                 text = await ReadName();
             }
-            else if (region.Id == RecognitionRegionIds.BattleShinyTip) text = ShinyText;
+            else if (region.Id == RecognitionRegionIds.BattleShinyTip
+                && (ShinyPixelMarker is null || frame.Pixels[0] == ShinyPixelMarker)) text = ShinyText;
             else if (region.Id == RecognitionRegionIds.BattleBloodlineTip)
             {
                 BloodlineCalls++;

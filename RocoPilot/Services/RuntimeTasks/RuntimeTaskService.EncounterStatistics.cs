@@ -235,7 +235,7 @@ public sealed partial class RuntimeTaskService
         var openingEvidence = await MatchS5OpeningHealthAsync(state, frame, season, screen, observation.State, cancellationToken);
         ApplyEncounterCaptureButtonState(season, observation, openingEvidence);
         if (openingEvidence && _encounterCaptureButtonStateTracker.IsRelieved)
-            await ReadS5OpeningBloodlineAsync(frame.CapturedAt, cancellationToken);
+            await ReadS5OpeningTipsAsync(frame, season, cancellationToken);
         if (_s5OpeningChecksRemaining == 0) _s5OpeningTips.Clear();
     }
 
@@ -408,9 +408,7 @@ public sealed partial class RuntimeTaskService
         long battleId,
         CancellationToken cancellationToken)
     {
-        var accountUid = _statisticsService.IsActiveAccountSelectionRequired ? null
-            : _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
-                ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
+        var accountUid = GetShinyAccountUid();
         var detectedAt = DateTimeOffset.Now;
         var tipText = await _frameRecognizer.RecognizeRegionTextAsync(
             state,
@@ -418,8 +416,17 @@ public sealed partial class RuntimeTaskService
             BattleShinyTipRegionIds,
             cancellationToken);
 
-        var isTipMatch = IsShinyTip(tipText);
-        if (!isTipMatch)
+        return await ApplyShinyTipAsync(tipText, frame, season, battleId, detectedAt, accountUid);
+    }
+
+    private string? GetShinyAccountUid() => _statisticsService.IsActiveAccountSelectionRequired ? null
+            : _statisticsService.ActiveAccountUid ?? _statisticsService.SelectedAccountUid
+                ?? _statisticsService.CurrentDocument.Accounts.FirstOrDefault()?.Uid;
+
+    private async Task<bool> ApplyShinyTipAsync(string tipText, CapturedFrame frame, EncounterSeasonDefinition? season,
+        long battleId, DateTimeOffset detectedAt, string? accountUid)
+    {
+        if (!IsShinyTip(tipText))
         {
             return false;
         }

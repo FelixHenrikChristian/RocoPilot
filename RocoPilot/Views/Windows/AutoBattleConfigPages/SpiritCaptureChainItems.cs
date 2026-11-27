@@ -52,9 +52,10 @@ internal static class SpiritChainForms
 
     public static string Title(IReadOnlyList<SpiritChainForm> forms) => forms.Count == 0 ? "未知精灵" : forms[0].Name;
 
+    /// <summary>第二行列出整条链，标题里的初始形态也写进去；只有一个形态时不把同一个名字再写一遍。</summary>
     public static string Detail(IReadOnlyList<SpiritChainForm> forms) => forms.Count <= 1
         ? "无其他形态"
-        : string.Join("、", forms.Skip(1).Select(form => form.Name));
+        : string.Join("、", forms.Select(form => form.Name));
 }
 
 /// <summary>卡片上的一个头像格。头像放不下时最后一格显示“+N”。</summary>

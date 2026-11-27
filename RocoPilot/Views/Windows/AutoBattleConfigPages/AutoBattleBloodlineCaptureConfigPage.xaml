@@ -394,10 +394,11 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
                             <StackPanel x:Name="UnknownNameText" VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="读不出精灵名时，按血脉设置处理" />
+                                <TextBlock Text="识别不出精灵名时仍然捕捉" />
                                 <TextBlock
                                     Style="{StaticResource DialogDescriptionTextStyle}"
-                                    Text="最多等 4 秒。关闭后，读不出名字的精灵一律不捕捉。" />
+                                    Text="捕捉前最多等 4 秒来识别精灵名。识别不出就没法对照名单：开启时只看血脉设置，关闭时不捕捉。"
+                                    ToolTipService.ToolTip="名字被挡住、识别出错，或者图鉴里还没有这只精灵，都算识别不出。" />
                             </StackPanel>
                             <ToggleSwitch
                                 x:Name="UnknownNameOption"
@@ -407,7 +408,7 @@
                                 Padding="0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Center"
-                                AutomationProperties.Name="读不出精灵名时按血脉设置处理"
+                                AutomationProperties.Name="识别不出精灵名时仍然捕捉"
                                 IsOn="{x:Bind Editor.SpiritCaptureFilter.AllowUnrecognizedName, Mode=TwoWay}"
                                 OffContent=""
                                 OnContent="" />

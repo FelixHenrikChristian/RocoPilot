@@ -251,7 +251,8 @@ public sealed class AutoBattleConfigEditorTests
         CollectionAssert.AreEqual(expected, forms.Select(form => form.Name).ToArray());
         Assert.IsTrue(forms.All(form => form.AvatarPath.Length > 0));
         Assert.AreEqual("雪绒鸟", SpiritChainForms.Title(forms));
-        Assert.AreEqual("冬羽雀、岚鸟、霜翼领主", SpiritChainForms.Detail(forms));
+        // 第二行列出整条链，标题里的初始形态也在内。
+        Assert.AreEqual("雪绒鸟、冬羽雀、岚鸟、霜翼领主", SpiritChainForms.Detail(forms));
         Assert.AreEqual("迪莫", SpiritChainForms.Title(SpiritChainForms.Resolve(editor.SpiritCaptureFilter.Whitelist[1], catalog)));
 
         // 图鉴还没加载完时先按名单里存的名字显示，同样不重复、没有头像。

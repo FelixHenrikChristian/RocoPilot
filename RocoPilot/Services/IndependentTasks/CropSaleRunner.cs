@@ -170,6 +170,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                     case Step.Exit:
                         if (await screen.World(token) != null) return outcome;
                         if (await Station() != null || await Dialogue() != null) await loop.RepeatKeyAsync("Esc");
+                        else await loop.EscapeUnknownAsync();
                         break;
                 }
 

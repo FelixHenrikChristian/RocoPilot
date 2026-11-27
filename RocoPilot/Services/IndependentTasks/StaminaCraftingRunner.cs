@@ -136,10 +136,12 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                             if (await loop.RepeatKeyAsync("Esc")) loop.Advance(Step.ReturnWorld);
                         }
                         else if (await screen.World(token) is not null) return outcome;
+                        else if (await BasicTitle() is null) await loop.EscapeUnknownAsync();
                         break;
                     case Step.ReturnWorld:
                         if (await screen.World(token) is not null) return outcome;
                         if (await Choices() is not null) await loop.RepeatKeyAsync("Esc");
+                        else await loop.EscapeUnknownAsync();
                         break;
                 }
 

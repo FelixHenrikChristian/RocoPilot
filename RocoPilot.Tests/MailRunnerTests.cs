@@ -30,15 +30,37 @@ public sealed class MailRunnerTests
         StringAssert.Contains(result, enabled ? "已领取" : "没有可领取");
     }
 
+    [TestMethod]
+    [DataRow(800)]
+    [DataRow(2500)]
+    public async Task ClosesRewardPopupThatAppearsAfterTheButtonTurnsGrey(int popupDelayMs)
+    {
+        // 卡顿时领取按钮先变灰，奖励弹层过一会儿才出来；出来之前的 Esc 游戏不响应。
+        using var game = new Replay(1280, true, true, false) { RewardDelayMs = popupDelayMs };
+        var runner = new MailRunner(game, new ImageMatchingService(), game, game);
+        var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1280, ClientHeight = 720, ClientOffsetX = 12, ClientOffsetY = 30 };
+        // 步骤超时是 30 秒：必须靠任务自己关掉弹层，而不是等超时后由调度层收场。
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(25));
+        var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), _ => { }, timeout.Token);
+        Assert.AreEqual("done", game.Scene);
+        Assert.IsTrue(game.RewardShown, "回放应当出现过奖励弹层");
+        StringAssert.Contains(result, "已领取");
+    }
+
     private sealed class Replay(int width, bool badge, bool enabled, bool ignoreFirstInput) : IScreenCaptureService, IMouseInputService, IKeyboardInputService, IDisposable
     {
         public string Scene = "world";
+        public int RewardDelayMs;
+        public bool RewardShown;
+        private readonly System.Diagnostics.Stopwatch _sinceClaim = new();
         private readonly HashSet<string> _ignoredInputs = [];
         private string? _frameScene;
         private CapturedFrame? _frame;
 
         public CapturedFrame Capture(CaptureTargetWindow window, CaptureMethod method)
         {
+            if (Scene == "claimed-pending" && _sinceClaim.ElapsedMilliseconds >= RewardDelayMs) Scene = "reward";
+            if (Scene == "reward") RewardShown = true;
             // 模拟 WGC 在界面不变化时返回同一帧，包括相同的抓帧时间。
             if (_frameScene == Scene) return _frame!.AddReference();
             var frame = LoadFrame();
@@ -69,6 +91,7 @@ public sealed class MailRunnerTests
             var next = Scene switch
             {
                 "world" => "menu",
+                "claimed-pending" => "claimed-pending",
                 "reward" => "claimed",
                 "mailbox" when !enabled => "exit",
                 "claimed" => "exit",
@@ -90,6 +113,11 @@ public sealed class MailRunnerTests
             Assert.AreEqual(px, x * 2048d / width, 15, Scene);
             Assert.AreEqual(py, y * 2048d / width, 15, Scene);
             if (!ignoreFirstInput || !_ignoredInputs.Add(Scene)) Scene = next;
+            if (Scene == "reward" && RewardDelayMs > 0)
+            {
+                Scene = "claimed-pending";
+                _sinceClaim.Restart();
+            }
             return Task.CompletedTask;
         }
 

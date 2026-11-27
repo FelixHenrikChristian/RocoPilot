@@ -139,6 +139,7 @@ public sealed class EveningRestRunner(IScreenCaptureService capture, IImageMatch
                             break;
                         }
                         if (await Explore() is not null) await loop.RepeatKeyAsync("Esc");
+                        else await loop.EscapeUnknownAsync();
                         break;
                     case Step.WishMenu:
                         if (!loop.InputIdleFor(500)) break;

@@ -13,7 +13,7 @@ namespace RocoPilot.Services.IndependentTasks.Engine;
 /// 按步骤推进的任务循环，日常任务共用。负责各任务原先各写一遍的部分：
 /// <list type="bullet">
 /// <item>取帧：窗口关闭时报错，失去前台时暂停计时并等待，输入后等画面更新，静止界面按时接受旧帧；</item>
-/// <item>节奏：看到目标后按反应时间出手，之后按轮询间隔复查，不用固定的长等待；</item>
+/// <item>节奏：目标连续可见且位置不动满反应时间才出手（界面刚出来时控件还在动画里，输入不生效），不用固定的长等待；</item>
 /// <item>补发：进入新步骤后迟迟等不到预期画面，就回到上一步用当前画面重新判断，
 /// 目标还在说明输入没生效，再发一次；目标已经不在则只是画面慢，继续等；</item>
 /// <item>超时：一步里的前台时间用完后抛出 <see cref="TaskStalledException"/>，由调度层退回大世界重跑。</item>
@@ -46,6 +46,16 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
     private bool _retrying;
     // 当前步骤是由哪一步的输入带过来的；没有输入就推进的步骤无可补发。
     private (TStep From, int Retries)? _origin;
+    // 各步骤想做、但还在等“看稳了”的输入。
+    private readonly Dictionary<(TStep Step, string Input), Sighting> _sightings = [];
+    private int _round;
+
+    private sealed class Sighting
+    {
+        // FirstSeen：开始连续看到的时刻；Since：位置停住的时刻。
+        public long FirstSeen, Since, LastSeen;
+        public int LastRound, X, Y;
+    }
 
     public TaskLoop(string task, RuntimeTaskState state, IScreenCaptureService capture, IKeyboardInputService keyboard,
         IMouseInputService mouse, Action<IndependentTaskProgress> progress, Func<TStep, string> describe,
@@ -183,6 +193,7 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
     /// </summary>
     public async Task<string?> RunStepAsync(Func<Task<string?>> handle)
     {
+        _round++;
         _inputsAtStepStart = _inputs;
         var step = Step;
         var result = await handle();
@@ -216,20 +227,19 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
         return null;
     }
 
+    /// <param name="react">
+    /// 是否等目标看稳了再发（默认）。连续操作里的后续输入（连点、滚动查找、迈步）传 false，立即发出。
+    /// </param>
     /// <param name="settleMs">这次按键之后等多久再识别；角色移动、动画较长的操作可以指定。</param>
     public async Task<bool> KeyAsync(string key, int? holdMs = null, bool react = true, int? settleMs = null)
     {
-        var sent = await SendAsync(false, react, $"按键 {key}", () => _keyboard.SendSequenceAsync(Hwnd, key, new()
-        {
-            Method = Method,
-            HoldDurationMs = holdMs ?? _state.Options.AutoBattleSettings.KeyboardHoldDurationMs
-        }, _token));
+        var sent = await SendAsync(false, react ? TaskPacing.ReactionMs : 0, $"按键 {key}", null, () => SendKeyAsync(key, holdMs));
         if (sent && settleMs is { } settle) _settleMs = settle;
         return sent;
     }
 
     public Task<bool> ClickAsync(int x, int y, bool react = true)
-        => SendAsync(true, react, $"点击 ({x},{y})", () => _mouse.ClickAsync(Hwnd, x, y, Method, _token));
+        => SendAsync(true, react ? TaskPacing.ReactionMs : 0, "点击", (x, y), () => _mouse.ClickAsync(Hwnd, x, y, Method, _token));
 
     public Task<bool> ClickAsync(DailyTaskScreen screen, ImageMatchResult match, double dx = 0, double dy = 0, bool react = true)
         => ClickAsync(screen.ClientX(match.X + match.Width / 2d + dx * screen.Scale),
@@ -237,23 +247,43 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
 
     /// <summary>
     /// 同一个界面上需要反复按的键（Esc 逐层退出、空格推进对话）：距上一次输入不足间隔时不发，
-    /// 给界面留出响应时间，避免多按一下把刚到的界面又关掉。
+    /// 给界面留出响应时间，避免多按一下把刚到的界面又关掉。节奏由间隔保证，不再另等反应时间
+    /// （对话里的“播放中”标记会闪，等它连续可见反而按不下去）。
     /// </summary>
-    public async Task<bool> RepeatKeyAsync(string key, int intervalMs = TaskPacing.RepeatKeyMs)
-        => InputIdleFor(intervalMs) && await KeyAsync(key, react: false);
+    public Task<bool> RepeatKeyAsync(string key, int intervalMs = TaskPacing.RepeatKeyMs)
+        => SendAsync(false, 0, $"按键 {key}", null, () => SendKeyAsync(key, null), intervalMs);
+
+    /// <summary>
+    /// 退出阶段的兜底：当前画面认不出来（奖励弹层晚出现、被提示挡住），持续一段时间后按一次 Esc。
+    /// 认得出的界面各有各的处理，这里只管认不出的。
+    /// </summary>
+    public async Task<bool> EscapeUnknownAsync()
+    {
+        var sent = await SendAsync(false, TaskPacing.UnknownScreenEscapeMs, "未知界面 Esc", null, () => SendKeyAsync("Esc", null));
+        if (sent) _logger?.LogWarning("{Task}：{Status}时画面一直认不出来，已按 Esc 尝试关闭遮挡", _task, Status);
+        return sent;
+    }
 
     /// <summary>距上一次输入是否已经过了指定时间；用于不换步骤、需要等界面展开的重复点击。</summary>
     public bool InputIdleFor(int ms) => !_sinceInput.IsRunning || _sinceInput.ElapsedMilliseconds >= ms;
 
     public Task<bool> DragAsync(int x, int y, int endX, int endY)
-        => SendAsync(true, true, $"拖动 ({x},{y})", () => _mouse.DragAsync(Hwnd, x, y, endX, endY, Method, _token));
+        => SendAsync(true, TaskPacing.ReactionMs, "拖动", (x, y), () => _mouse.DragAsync(Hwnd, x, y, endX, endY, Method, _token));
 
     public Task<bool> ScrollAsync(int x, int y, int delta)
-        => SendAsync(true, false, $"滚轮 {delta}", () => _mouse.ScrollAsync(Hwnd, x, y, delta, Method, _token));
+        => SendAsync(true, 0, $"滚轮 {delta}", null, () => _mouse.ScrollAsync(Hwnd, x, y, delta, Method, _token));
+
+    private Task SendKeyAsync(string key, int? holdMs) => _keyboard.SendSequenceAsync(Hwnd, key, new()
+    {
+        Method = Method,
+        HoldDurationMs = holdMs ?? _state.Options.AutoBattleSettings.KeyboardHoldDurationMs
+    }, _token);
 
     /// <summary>任务自己发了输入（按住行走、长按鼠标）时调用，让下一帧等画面更新。</summary>
     public void NoteInput(bool pointer = true, int settleMs = TaskPacing.SettleMs)
     {
+        // 画面要变了，之前看到的目标都不算数。
+        _sightings.Clear();
         _settleMs = settleMs;
         _inputs++;
         _inputFailures = 0;
@@ -270,11 +300,46 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
         _freshAfter = DateTimeOffset.UtcNow;
     }
 
-    private async Task<bool> SendAsync(bool pointer, bool react, string input, Func<Task> send)
+    /// <summary>
+    /// 这个输入是否已经“看稳了”：同一步里连续几轮都想发它、点击位置没有动，并且持续满 <paramref name="dwellMs"/>。
+    /// 不满足时只记下来，等后面几轮再确认；这样出手依据的是最新一帧，而不是几百毫秒前的位置。
+    /// </summary>
+    private bool Confirmed(string input, (int X, int Y)? point, int dwellMs)
     {
-        if (react) await Task.Delay(TaskPacing.ReactionMs, _token);
+        var now = Environment.TickCount64;
+        var key = (Step, input);
+        if (!_sightings.TryGetValue(key, out var seen)
+            || (_round - seen.LastRound > 1 && now - seen.LastSeen > TaskPacing.SightingGraceMs))
+        {
+            _sightings[key] = new()
+            {
+                FirstSeen = now, Since = now, LastSeen = now, LastRound = _round, X = point?.X ?? 0, Y = point?.Y ?? 0
+            };
+            return false;
+        }
+
+        seen.LastSeen = now;
+        seen.LastRound = _round;
+        if (point is { } at && (Math.Abs(at.X - seen.X) > TaskPacing.StablePixels || Math.Abs(at.Y - seen.Y) > TaskPacing.StablePixels))
+        {
+            // 还在动：从现在起重新等它停稳；一直不停的目标等够上限后照最新位置出手。
+            seen.X = at.X;
+            seen.Y = at.Y;
+            seen.Since = now;
+            return now - seen.FirstSeen >= Math.Max(dwellMs, TaskPacing.MovingTargetMs);
+        }
+
+        return now - seen.Since >= dwellMs;
+    }
+
+    private async Task<bool> SendAsync(bool pointer, int dwellMs, string input, (int X, int Y)? point, Func<Task> send,
+        int minIdleMs = 0)
+    {
+        if (dwellMs > 0 && !Confirmed(input, point, dwellMs)) return false;
+        if (!InputIdleFor(minIdleMs)) return false;
         // 不在前台时不发；下一轮取帧会进入暂停。
         if (!IsForeground) return false;
+        var description = point is { } at ? $"{input} ({at.X},{at.Y})" : input;
         try
         {
             await send();
@@ -285,7 +350,7 @@ internal sealed class TaskLoop<TStep> where TStep : struct, Enum
             // 鼠标被别的窗口挡住、光标没移到位、驱动一时没响应：画面没变，下一轮会按当前画面重新决定。
             if (++_inputFailures >= TaskPacing.MaxInputFailures)
                 throw new TaskStalledException($"{_task}输入连续失败：{ex.Message}", ex) { CommittedOutcome = CommittedOutcome };
-            _logger?.LogWarning(ex, "{Task}：{Input}没有发出去，稍后重试（连续 {Count} 次）", _task, input, _inputFailures);
+            _logger?.LogWarning(ex, "{Task}：{Input}没有发出去，稍后重试（连续 {Count} 次）", _task, description, _inputFailures);
             await Task.Delay(TaskPacing.SettleMs, _token);
             return false;
         }

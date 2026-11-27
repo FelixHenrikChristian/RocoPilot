@@ -161,6 +161,8 @@ public sealed class BattlePassRunner(IScreenCaptureService capture, IImageMatchi
                         break;
                     case Step.ExitWorld:
                         if (await screen.World(token) is not null) return $"通行证任务领取了{claimed}/4";
+                        // 菜单还在时由循环回到上一步重新按 Esc；这里只管认不出的画面（升级弹窗晚出现）。
+                        if (await Menu() is null) await loop.EscapeUnknownAsync();
                         break;
                 }
 

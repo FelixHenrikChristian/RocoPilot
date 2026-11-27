@@ -91,7 +91,9 @@ public sealed class CropSaleTests
         var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), "紫晶菇", quantity, progress => Console.WriteLine(progress), timeout.Token);
         Assert.AreEqual("done", game.Scene);
         Assert.AreEqual(quantity, game.FlowerClicks);
-        Assert.AreEqual(quantity == 1 ? 1 : 2, game.SelectedFrames, "选中后只需定位连点位置和读取最终收入");
+        // 连点前只定位一次；点完之后要看着出售按钮稳定一会儿才点，这期间会多看几帧。
+        Assert.AreEqual(quantity == 1 ? 0 : 1, game.SelectedFramesAtLastFlowerClick, "选中后只定位一次连点位置，连点中途不重新识别");
+        Assert.IsGreaterThan(game.SelectedFramesAtLastFlowerClick, game.SelectedFrames, "点完后要用新画面读取最终收入");
         if (game.FlowerClickIntervals.Count > 0)
             Console.WriteLine($"连续选花平均间隔 {game.FlowerClickIntervals.Average():F0} ms");
         StringAssert.Contains(outcome, "已领取紫晶菇的出售奖励，预期收入 3000 金币");
@@ -102,6 +104,7 @@ public sealed class CropSaleTests
         public string Scene = "start";
         public int FlowerClicks { get; private set; }
         public int SelectedFrames { get; private set; }
+        public int SelectedFramesAtLastFlowerClick { get; private set; }
         public List<long> FlowerClickIntervals { get; } = [];
         private readonly Stopwatch _sinceLastInput = new();
         private CapturedFrame? _arrivalFrame;
@@ -196,7 +199,11 @@ public sealed class CropSaleTests
             var repeat = Scene == "selected" && next == "selected";
             if (repeat) FlowerClickIntervals.Add(_sinceLastInput.ElapsedMilliseconds);
             CheckInputInterval(repeat ? 145 : Scene == "middle" ? 195 : 400);
-            if (next == "selected") FlowerClicks++;
+            if (next == "selected")
+            {
+                FlowerClicks++;
+                SelectedFramesAtLastFlowerClick = SelectedFrames;
+            }
             Scene = next;
             // 与实际鼠标输入一样，定位等待和按压各占 50 ms。
             return next == "selected" ? Task.Delay(100, token) : Task.CompletedTask;

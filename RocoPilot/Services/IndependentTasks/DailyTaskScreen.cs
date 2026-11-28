@@ -42,12 +42,25 @@ internal sealed class DailyTaskScreen
         RecognitionRegionImageHelper.MapReferenceArea(_x, _y, _width, _height, 2048, 1152,
             left, top, right - left, bottom - top, anchor);
 
-    public async Task<ImageMatchResult?> Find(string template, int left, int top, int right, int bottom,
+    public Task<ImageMatchResult?> Find(string template, int left, int top, int right, int bottom,
         CancellationToken token, double threshold = .94, double templateScale = 1, RecognitionAnchor anchor = RecognitionAnchor.Auto)
+        => Find(template, Region(left, top, right, bottom, anchor), token, threshold, templateScale);
+
+    public async Task<ImageMatchResult?> Find(string template, RecognitionRegion region, CancellationToken token,
+        double threshold = .94, double templateScale = 1)
     {
-        var result = await _images.MatchAsync(_frame, Region(left, top, right, bottom, anchor), $"2048x1152/{template}.png",
+        var result = await _images.MatchAsync(_frame, region, $"2048x1152/{template}.png",
             new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = Scale * templateScale, TemplateScaleY = Scale * templateScale }, token);
         return result.IsMatch ? result : null;
+    }
+
+    public async Task<IReadOnlyList<ImageMatchResult>> FindAll(string template, RecognitionRegion region, int limit,
+        CancellationToken token, double threshold)
+    {
+        var result = await _images.FindMatchesAsync(_frame, region, $"2048x1152/{template}.png", limit,
+            new ImageMatchOptions { MinimumScore = threshold, TemplateScaleX = Scale, TemplateScaleY = Scale },
+            maximumOverlapRatio: .1, cancellationToken: token);
+        return result.Matches;
     }
 
     public Task<ImageMatchResult?> World(CancellationToken token) => Find("magic-point", 155, 20, 410, 104, token);

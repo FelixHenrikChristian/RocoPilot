@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using OpenCvSharp;
 using RocoPilot.Contracts.Services;
 using RocoPilot.Contracts.Services.Capture;
 using RocoPilot.Models.Capture;
@@ -62,29 +63,98 @@ public sealed class CropSaleTests
     [DataRow(1280)]
     [DataRow(960)]
     [DataRow(1600, true)]
-    public async Task LocatesAllFlowersOnlyOnTheirOwnCards(int width, bool useReportedTop = false)
+    public Task LocatesAllFlowersOnlyOnTheirOwnCards(int width, bool useReportedTop = false) =>
+        CheckFlowerCardsAsync(width, useReportedTop, 1, 0, 0);
+
+    [TestMethod]
+    [DataRow(1600, 1d, 4, -4)]
+    [DataRow(1600, 1d, -4, 4)]
+    [DataRow(1600, .97, 0, 0)]
+    [DataRow(1600, 1.03, 0, 0)]
+    [DataRow(1600, 1.03, 4, -4)]
+    public Task FlowerCardsTolerateSmallShiftsAndRescaling(int width, double zoom, int dx, int dy) =>
+        CheckFlowerCardsAsync(width, false, zoom, dx, dy);
+
+    [TestMethod]
+    [DataRow("native-list-top", 0, 12, 95)]
+    [DataRow("native-list-rows-2-to-4", 3, 9, 177)]
+    [DataRow("native-list-rows-3-to-5", 6, 9, 149)]
+    [DataRow("native-list-rows-4-to-6", 9, 9, 144)]
+    [DataRow("native-list-rows-5-to-7", 12, 9, 146)]
+    [DataRow("native-list-bottom", 15, 9, 229)]
+    public async Task Native1600ScrollPositionsOnlyMatchTheirVisibleFlowers(string name, int first, int count, int top)
+    {
+        const int width = 1600;
+        var path = Path.Combine(Folder("2026-11-28"), name + ".png");
+        using var frame = FlowerSeedScreenRecognizerTests.LoadFixture(path, clientX: 12, clientY: 30);
+        Assert.AreEqual((1612, 930), (frame.Width, frame.Height), name);
+        var screen = new DailyTaskScreen(frame, Window(width), new ImageMatchingService());
+        var cards = await CropSaleRunner.FindFlowerCardsAsync(screen, default);
+        Assert.HasCount(count, cards, name);
+        for (var i = 0; i < count; i++)
+        {
+            var x = 93 + i % 3 * 164 + 6 * screen.Scale;
+            var y = top + i / 3 * 191.5 + 3 * screen.Scale;
+            var card = cards.Single(region => Math.Abs(screen.ClientX(region.X) - x) <= 4 &&
+                Math.Abs(screen.ClientY(region.Y) - y) <= 4);
+            await CheckCardContentsAsync(screen, card, first + i, true, name);
+        }
+    }
+
+    private static async Task CheckFlowerCardsAsync(int width, bool useReportedTop, double zoom, int dx, int dy)
     {
         var images = new ImageMatchingService();
         var pages = new[] { "flowers-top", "flowers-middle", "flowers-bottom-selected" };
+        var flowers = IndependentTaskSettings.SaleFlowers;
+        var scale = width / 2048d;
+        var shifted = zoom != 1 || dx != 0 || dy != 0;
         for (var page = 0; page < (useReportedTop ? 1 : pages.Length); page++)
         {
-            using var frame = useReportedTop ? LoadReportedStation() : Load(pages[page], width);
+            using var frame = useReportedTop ? LoadReportedStation() : FlowerSeedScreenRecognizerTests.LoadFixture(
+                Path.Combine(Folder(), pages[page] + ".png"), width, width * 9 / 16, 12, 30, shifted ? Transform : null);
             var screen = new DailyTaskScreen(frame, Window(width), images);
-            for (var i = 0; i < IndependentTaskSettings.SaleFlowers.Count; i++)
+            var cards = await CropSaleRunner.FindFlowerCardsAsync(screen, default);
+            var inspectedCards = 0;
+            var baseline = page switch { 0 => 122, 1 => 185 - 3 * 245, _ => 488 - 6 * 245 };
+            for (var i = 0; i < flowers.Count; i++)
             {
-                var flower = IndependentTaskSettings.SaleFlowers[i];
-                var match = await CropSaleRunner.FindFlowerAsync(screen, flower, default);
-                var baseline = page switch { 0 => 122, 1 => 185 - 3 * 245, _ => 488 - 6 * 245 };
-                var y = baseline + i / 3 * 245 + 77;
-                if (y - 42 < 139 || y + 42 > 1003 || page == 2 && i == 17)
-                {
-                    Assert.IsNull(match, $"{flower} {page} {width}: {match}");
-                    continue;
-                }
-                Assert.IsNotNull(match, $"{flower} {page} {width}");
-                Assert.AreEqual(211 + i % 3 * 210, screen.ClientX(match.X + match.Width / 2d) / screen.Scale, 6, flower);
-                Assert.AreEqual(y, screen.ClientY(match.Y + match.Height / 2d) / screen.Scale, 6, flower);
+                var x = 120 + i % 3 * 210;
+                var y = baseline + i / 3 * 245;
+                if (y < 96 || y + 139 > 1020 || page == 2 && i == 17) continue;
+                var expectedX = (420 + (x - 420) * zoom + 6) * scale + dx;
+                var expectedY = (560 + (y - 560) * zoom + 3) * scale + dy;
+                var located = cards.Where(card => Math.Abs(screen.ClientX(card.X) - expectedX) <= 5 &&
+                    Math.Abs(screen.ClientY(card.Y) - expectedY) <= 5).ToArray();
+                inspectedCards += located.Length;
+                // 列表第四行在原图已贴近裁切边界，放大后可能只剩半张卡。
+                var requireMatch = !shifted || page != 0 || i < 9;
+                if (requireMatch) Assert.HasCount(1, located, $"{flowers[i]} 的卡片位置，页 {page}，宽度 {width}");
+                foreach (var card in located)
+                    await CheckCardContentsAsync(screen, card, i, requireMatch,
+                        $"页 {page}，宽度 {width}，缩放 {zoom}，偏移 ({dx},{dy})");
             }
+            Assert.AreEqual(cards.Count, inspectedCards, $"存在未归入实际卡片的搜索区域，页 {page}，宽度 {width}");
+        }
+
+        void Transform(Mat source)
+        {
+            using var affine = Cv2.GetRotationMatrix2D(new Point2f(420, 560), 0, zoom);
+            affine.Set(0, 2, affine.At<double>(0, 2) + dx / scale);
+            affine.Set(1, 2, affine.At<double>(1, 2) + dy / scale);
+            Cv2.WarpAffine(source, source, affine, source.Size(), InterpolationFlags.Linear);
+        }
+    }
+
+    private static async Task CheckCardContentsAsync(DailyTaskScreen screen, RocoPilot.Models.Recognition.RecognitionRegion card,
+        int expectedFlower, bool requireMatch, string scenario)
+    {
+        var flowers = IndependentTaskSettings.SaleFlowers;
+        for (var candidate = 0; candidate < flowers.Count; candidate++)
+        {
+            var match = await CropSaleRunner.MatchFlowerCardAsync(screen, card, flowers[candidate], default);
+            var context = $"{scenario}，卡片 {flowers[expectedFlower]}，模板 {flowers[candidate]}";
+            if (candidate != expectedFlower) Assert.IsNull(match, context);
+            else if (requireMatch) Assert.IsNotNull(match, context);
         }
     }
 

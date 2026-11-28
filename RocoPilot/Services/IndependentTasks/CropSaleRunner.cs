@@ -7,6 +7,7 @@ using RocoPilot.Contracts.Services.ImageMatching;
 using RocoPilot.Contracts.Services.TextRecognition;
 using RocoPilot.Models.Capture;
 using RocoPilot.Models.ImageMatching;
+using RocoPilot.Models.Recognition;
 using RocoPilot.Models.Runtime;
 using RocoPilot.Models.TextRecognition;
 using RocoPilot.Services.IndependentTasks.Engine;
@@ -181,8 +182,36 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
         }
     }
 
-    internal static Task<ImageMatchResult?> FindFlowerAsync(DailyTaskScreen screen, string flower, CancellationToken token) =>
-        screen.Find($"crop-sale/flowers/{flower}", 110, 139, 734, 1003, token, .98);
+    internal static async Task<ImageMatchResult?> FindFlowerAsync(DailyTaskScreen screen, string flower, CancellationToken token)
+    {
+        ImageMatchResult? best = null;
+        foreach (var card in await FindFlowerCardsAsync(screen, token))
+        {
+            var match = await MatchFlowerCardAsync(screen, card, flower, token);
+            if (match != null && (best == null || match.Score > best.Score)) best = match;
+        }
+        return best;
+    }
+
+    internal static async Task<IReadOnlyList<RecognitionRegion>> FindFlowerCardsAsync(DailyTaskScreen screen, CancellationToken token)
+    {
+        var list = screen.Region(95, 96, 588, 1020);
+        var corners = await screen.FindAll("crop-sale/flower-card-corner", list, 18, token, .96);
+        int Scale(double pixels) => (int)Math.Round(pixels * screen.Scale);
+        var cards = new List<RecognitionRegion>(corners.Count);
+        foreach (var corner in corners)
+        {
+            // 以卡片左上角为基准，给主体留少量平移和缩放空间。
+            var top = corner.Y + Scale(3);
+            var height = Math.Min(Scale(168), list.Y + list.Height - top);
+            if (height < Scale(139)) continue;
+            cards.Add(new RecognitionRegion { X = corner.X + Scale(6), Y = top, Width = Scale(176), Height = height });
+        }
+        return cards;
+    }
+
+    internal static Task<ImageMatchResult?> MatchFlowerCardAsync(DailyTaskScreen screen, RecognitionRegion card,
+        string flower, CancellationToken token) => screen.Find($"crop-sale/flowers/{flower}", card, token, .94);
 
     internal static async Task<long?> ReadIncomeAsync(CapturedFrame frame, DailyTaskScreen screen,
         ITextRecognitionService ocr, CancellationToken token)

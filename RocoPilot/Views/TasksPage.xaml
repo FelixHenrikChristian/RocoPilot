@@ -512,12 +512,13 @@
                                 <TextBlock
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="仅在大世界：在当前鼠标位置按住左键后松开，按住时长与丢球间隔均在配置范围内随机，循环直到停止。"
+                                    Text="在大世界按设定间隔循环丢球，直到手动停止。"
                                     TextWrapping="Wrap" />
                             </StackPanel>
                             <Button
                                 Grid.Column="2"
                                 VerticalAlignment="Center"
+                                Style="{StaticResource AccentButtonStyle}"
                                 Command="{x:Bind ViewModel.ToggleThrowBallCommand}"
                                 IsEnabled="{x:Bind ViewModel.IsThrowBallButtonEnabled, Mode=OneWay}"
                                 ToolTipService.ToolTip="开始后请将鼠标移到游戏中的丢球位置。">

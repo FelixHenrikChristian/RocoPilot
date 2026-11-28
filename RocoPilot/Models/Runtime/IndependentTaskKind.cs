@@ -14,5 +14,6 @@ public enum IndependentTaskKind
     Mail,
     Gardening,
     Sell,
-    BattlePassRewards
+    BattlePassRewards,
+    ThrowBall
 }

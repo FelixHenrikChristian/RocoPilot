@@ -54,6 +54,12 @@ public partial class TasksViewModel : ObservableRecipient
     public partial bool IsLegendaryScanning { get; set; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThrowBallButtonText))]
+    [NotifyPropertyChangedFor(nameof(ThrowBallButtonGlyph))]
+    [NotifyPropertyChangedFor(nameof(IsThrowBallButtonEnabled))]
+    public partial bool IsThrowBallRunning { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedConfigurationEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedTargetSelectionEnabled))]
     [NotifyPropertyChangedFor(nameof(IsFlowerSeedChallengeButtonEnabled))]
@@ -62,6 +68,8 @@ public partial class TasksViewModel : ObservableRecipient
     [NotifyPropertyChangedFor(nameof(IsLegendaryTargetSelectionEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsThrowBallConfigurationEnabled))]
+    [NotifyPropertyChangedFor(nameof(IsThrowBallButtonEnabled))]
     public partial bool IsIndependentTaskRunning { get; set; }
 
     [ObservableProperty]
@@ -99,6 +107,21 @@ public partial class TasksViewModel : ObservableRecipient
     [NotifyPropertyChangedFor(nameof(IsLegendaryTargetSelectionEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
     public partial bool LegendaryAtTargetLocation { get; set; }
+
+    [ObservableProperty]
+    public partial double ThrowBallHoldMinMs { get; set; }
+
+    [ObservableProperty]
+    public partial double ThrowBallHoldMaxMs { get; set; }
+
+    [ObservableProperty]
+    public partial double ThrowBallIntervalMinMs { get; set; }
+
+    [ObservableProperty]
+    public partial double ThrowBallIntervalMaxMs { get; set; }
+
+    [ObservableProperty]
+    public partial double ThrowBallDurationMinutes { get; set; }
 
     [ObservableProperty]
     public partial bool IsTaskNotificationOpen { get; set; }
@@ -145,6 +168,14 @@ public partial class TasksViewModel : ObservableRecipient
 
     public bool IsLegendaryScanButtonEnabled => IsLegendaryScanning || IsLegendaryTargetSelectionEnabled;
 
+    public string ThrowBallButtonText => IsThrowBallRunning ? StopButtonText : StartButtonText;
+
+    public string ThrowBallButtonGlyph => IsThrowBallRunning ? StopButtonGlyph : StartButtonGlyph;
+
+    public bool IsThrowBallConfigurationEnabled => !IsIndependentTaskRunning;
+
+    public bool IsThrowBallButtonEnabled => IsThrowBallRunning || !IsIndependentTaskRunning;
+
     public TasksViewModel(
         IIndependentTaskService independentTaskService,
         ILogger<TasksViewModel> logger)
@@ -160,6 +191,11 @@ public partial class TasksViewModel : ObservableRecipient
         SelectedLegendaryDifficultyIndex = IndependentTaskSettings.DefaultLegendaryDifficulty - 1;
         UseLegendaryMarkWhenInsufficient = true;
         FlowerSeedRunCount = IndependentTaskSettings.DefaultFlowerSeedRunCount;
+        ThrowBallHoldMinMs = IndependentTaskSettings.DefaultThrowBallHoldMinMs;
+        ThrowBallHoldMaxMs = IndependentTaskSettings.DefaultThrowBallHoldMaxMs;
+        ThrowBallIntervalMinMs = IndependentTaskSettings.DefaultThrowBallIntervalMinMs;
+        ThrowBallIntervalMaxMs = IndependentTaskSettings.DefaultThrowBallIntervalMaxMs;
+        ThrowBallDurationMinutes = IndependentTaskSettings.DefaultThrowBallDurationMinutes;
         _independentTaskService.StateChanged += IndependentTaskService_StateChanged;
         SyncRunningState();
     }
@@ -193,6 +229,12 @@ public partial class TasksViewModel : ObservableRecipient
     private Task ToggleLegendaryScanAsync()
     {
         return ToggleTaskAsync(IndependentTaskKind.LegendaryScan);
+    }
+
+    [RelayCommand]
+    private Task ToggleThrowBallAsync()
+    {
+        return ToggleTaskAsync(IndependentTaskKind.ThrowBall);
     }
 
     private async Task ToggleTaskAsync(IndependentTaskKind kind)
@@ -234,6 +276,12 @@ public partial class TasksViewModel : ObservableRecipient
     partial void OnFlowerSeedPreferCondensedMarkChanged(bool value) => SaveSettingsIfLoaded();
     partial void OnLegendaryAtTargetLocationChanged(bool value) => SaveSettingsIfLoaded();
 
+    partial void OnThrowBallHoldMinMsChanged(double value) => SaveSettingsIfLoaded();
+    partial void OnThrowBallHoldMaxMsChanged(double value) => SaveSettingsIfLoaded();
+    partial void OnThrowBallIntervalMinMsChanged(double value) => SaveSettingsIfLoaded();
+    partial void OnThrowBallIntervalMaxMsChanged(double value) => SaveSettingsIfLoaded();
+    partial void OnThrowBallDurationMinutesChanged(double value) => SaveSettingsIfLoaded();
+
     partial void OnFlowerSeedRunCountChanged(double value)
     {
         SaveSettingsIfLoaded();
@@ -274,6 +322,11 @@ public partial class TasksViewModel : ObservableRecipient
             FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
             FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
             LegendaryAtTargetLocation = LegendaryAtTargetLocation,
+            ThrowBallHoldMinMs = ToThrowBallMs(ThrowBallHoldMinMs, IndependentTaskSettings.DefaultThrowBallHoldMinMs),
+            ThrowBallHoldMaxMs = ToThrowBallMs(ThrowBallHoldMaxMs, IndependentTaskSettings.DefaultThrowBallHoldMaxMs),
+            ThrowBallIntervalMinMs = ToThrowBallMs(ThrowBallIntervalMinMs, IndependentTaskSettings.DefaultThrowBallIntervalMinMs),
+            ThrowBallIntervalMaxMs = ToThrowBallMs(ThrowBallIntervalMaxMs, IndependentTaskSettings.DefaultThrowBallIntervalMaxMs),
+            ThrowBallDurationMinutes = ToRunCount(ThrowBallDurationMinutes, IndependentTaskSettings.DefaultThrowBallDurationMinutes),
             FlowerSeedOptions = [.. FlowerSeedOptions]
         };
     }
@@ -296,6 +349,11 @@ public partial class TasksViewModel : ObservableRecipient
             FlowerSeedAtTargetLocation = settings.FlowerSeedAtTargetLocation;
             FlowerSeedPreferCondensedMark = settings.FlowerSeedPreferCondensedMark;
             LegendaryAtTargetLocation = settings.LegendaryAtTargetLocation;
+            ThrowBallHoldMinMs = settings.ThrowBallHoldMinMs;
+            ThrowBallHoldMaxMs = settings.ThrowBallHoldMaxMs;
+            ThrowBallIntervalMinMs = settings.ThrowBallIntervalMinMs;
+            ThrowBallIntervalMaxMs = settings.ThrowBallIntervalMaxMs;
+            ThrowBallDurationMinutes = settings.ThrowBallDurationMinutes;
             if (!FlowerSeedOptions.SequenceEqual(settings.FlowerSeedOptions))
             {
                 FlowerSeedOptions.Clear();
@@ -332,6 +390,7 @@ public partial class TasksViewModel : ObservableRecipient
         IsFlowerSeedChallengeRunning = runningTaskKind == IndependentTaskKind.FlowerSeedChallenge;
         IsFlowerSeedScanning = runningTaskKind == IndependentTaskKind.FlowerSeedScan;
         IsLegendaryScanning = runningTaskKind == IndependentTaskKind.LegendaryScan;
+        IsThrowBallRunning = runningTaskKind == IndependentTaskKind.ThrowBall;
         IsIndependentTaskRunning = _independentTaskService.IsRunning;
         ApplySettings(_independentTaskService.Settings);
     }
@@ -348,5 +407,11 @@ public partial class TasksViewModel : ObservableRecipient
     internal static int ToRunCount(double value, int fallback)
     {
         return double.IsNaN(value) ? fallback : (int)Math.Round(value);
+    }
+
+    private static int ToThrowBallMs(double value, int fallback)
+    {
+        // 数值越界交给 IndependentTaskSettings.Normalize 统一钳制与排序。
+        return double.IsNaN(value) ? fallback : Math.Max(0, (int)Math.Round(value));
     }
 }

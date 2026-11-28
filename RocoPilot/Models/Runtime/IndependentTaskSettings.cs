@@ -25,6 +25,16 @@ public sealed class IndependentTaskSettings
     public const int DefaultLegendaryDifficulty = 3;
     public const int DefaultFlowerSeedRunCount = 6;
 
+    public const int MinimumThrowBallMs = 100;
+    public const int MaximumThrowBallHoldMs = 10000;
+    public const int MaximumThrowBallIntervalMs = 600000;
+    public const int DefaultThrowBallHoldMinMs = 800;
+    public const int DefaultThrowBallHoldMaxMs = 1300;
+    public const int DefaultThrowBallIntervalMinMs = 700;
+    public const int DefaultThrowBallIntervalMaxMs = 900;
+    public const int MaximumThrowBallDurationMinutes = 480;
+    public const int DefaultThrowBallDurationMinutes = 0;
+
     public static IReadOnlyList<string> LegendaryTargets { get; } = Array.AsReadOnly(new[] { "圣羽翼王", "龙息帕尔" });
 
     public string LegendaryTargetName { get; set; } = LegendaryTargets[0];
@@ -49,6 +59,17 @@ public sealed class IndependentTaskSettings
 
     /// <summary>传说精灵挑战：已手动传送到目标场景，跳过列表导航与地图传送。</summary>
     public bool LegendaryAtTargetLocation { get; set; }
+
+    /// <summary>自动丢球：按住左键时长的随机范围（毫秒）。</summary>
+    public int ThrowBallHoldMinMs { get; set; } = DefaultThrowBallHoldMinMs;
+    public int ThrowBallHoldMaxMs { get; set; } = DefaultThrowBallHoldMaxMs;
+
+    /// <summary>自动丢球：两次丢球之间等待时长的随机范围（毫秒）。</summary>
+    public int ThrowBallIntervalMinMs { get; set; } = DefaultThrowBallIntervalMinMs;
+    public int ThrowBallIntervalMaxMs { get; set; } = DefaultThrowBallIntervalMaxMs;
+
+    /// <summary>自动丢球：本轮任务时长（分钟）；0 表示不限时，直到手动停止。</summary>
+    public int ThrowBallDurationMinutes { get; set; } = DefaultThrowBallDurationMinutes;
 
     public List<FlowerSeedOption> FlowerSeedOptions { get; set; } = [];
 
@@ -75,12 +96,23 @@ public sealed class IndependentTaskSettings
             FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
             FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
             LegendaryAtTargetLocation = LegendaryAtTargetLocation,
+            ThrowBallHoldMinMs = ThrowBallHoldMinMs,
+            ThrowBallHoldMaxMs = ThrowBallHoldMaxMs,
+            ThrowBallIntervalMinMs = ThrowBallIntervalMinMs,
+            ThrowBallIntervalMaxMs = ThrowBallIntervalMaxMs,
+            ThrowBallDurationMinutes = ThrowBallDurationMinutes,
             FlowerSeedOptions = [.. FlowerSeedOptions]
         };
     }
 
     public IndependentTaskSettings Normalize(IReadOnlyList<string>? legendaryTargets = null)
     {
+        var holdMin = Math.Clamp(ThrowBallHoldMinMs, MinimumThrowBallMs, MaximumThrowBallHoldMs);
+        var holdMax = Math.Clamp(ThrowBallHoldMaxMs, MinimumThrowBallMs, MaximumThrowBallHoldMs);
+        if (holdMin > holdMax) (holdMin, holdMax) = (holdMax, holdMin);
+        var intervalMin = Math.Clamp(ThrowBallIntervalMinMs, MinimumThrowBallMs, MaximumThrowBallIntervalMs);
+        var intervalMax = Math.Clamp(ThrowBallIntervalMaxMs, MinimumThrowBallMs, MaximumThrowBallIntervalMs);
+        if (intervalMin > intervalMax) (intervalMin, intervalMax) = (intervalMax, intervalMin);
         return new IndependentTaskSettings
         {
             ReuseEquippedSeed = ReuseEquippedSeed,
@@ -98,6 +130,11 @@ public sealed class IndependentTaskSettings
             FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
             FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
             LegendaryAtTargetLocation = LegendaryAtTargetLocation,
+            ThrowBallHoldMinMs = holdMin,
+            ThrowBallHoldMaxMs = holdMax,
+            ThrowBallIntervalMinMs = intervalMin,
+            ThrowBallIntervalMaxMs = intervalMax,
+            ThrowBallDurationMinutes = Math.Clamp(ThrowBallDurationMinutes, 0, MaximumThrowBallDurationMinutes),
             FlowerSeedOptions = [.. FlowerSeedOptions ?? []]
         };
     }

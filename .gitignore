@@ -397,3 +397,6 @@ Agents.md
 /website/public/screenshots/statistics-shiny-detail.png
 .idea/
 build/
+
+# CodeBuddy local project data
+.codebuddy/

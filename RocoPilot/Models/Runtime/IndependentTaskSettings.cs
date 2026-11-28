@@ -1,5 +1,12 @@
 namespace RocoPilot.Models.Runtime;
 
+/// <summary>体力合成：在炼金釜制造赛季球，或转化炼金制造凝练印记。</summary>
+public enum StaminaCraftingProductKind
+{
+    SeasonBall,
+    CondensedMark
+}
+
 /// <summary>
 /// 独立任务配置与本次扫描获得的花种选项。
 /// </summary>
@@ -50,6 +57,9 @@ public sealed class IndependentTaskSettings
     /// <summary>传说精灵挑战：已手动传送到目标场景，跳过列表导航与地图传送。</summary>
     public bool LegendaryAtTargetLocation { get; set; }
 
+    /// <summary>体力合成：制造赛季球，或走转化炼金制造凝练印记。</summary>
+    public StaminaCraftingProductKind StaminaCraftingProduct { get; set; } = StaminaCraftingProductKind.SeasonBall;
+
     public List<FlowerSeedOption> FlowerSeedOptions { get; set; } = [];
 
     public static IndependentTaskSettings CreateDefault()
@@ -75,6 +85,7 @@ public sealed class IndependentTaskSettings
             FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
             FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
             LegendaryAtTargetLocation = LegendaryAtTargetLocation,
+            StaminaCraftingProduct = StaminaCraftingProduct,
             FlowerSeedOptions = [.. FlowerSeedOptions]
         };
     }
@@ -98,6 +109,7 @@ public sealed class IndependentTaskSettings
             FlowerSeedAtTargetLocation = FlowerSeedAtTargetLocation,
             FlowerSeedPreferCondensedMark = FlowerSeedPreferCondensedMark,
             LegendaryAtTargetLocation = LegendaryAtTargetLocation,
+            StaminaCraftingProduct = Enum.IsDefined(StaminaCraftingProduct) ? StaminaCraftingProduct : StaminaCraftingProductKind.SeasonBall,
             FlowerSeedOptions = [.. FlowerSeedOptions ?? []]
         };
     }

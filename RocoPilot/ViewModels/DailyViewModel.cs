@@ -49,6 +49,7 @@ public partial class DailyViewModel : ObservableObject
 
     public DailyTaskItemViewModel? FlowerSeedTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.FlowerSeedChallenge);
     public DailyTaskItemViewModel? LegendaryTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.LegendaryChallenge);
+    public DailyTaskItemViewModel? StaminaCraftingTask => Items.FirstOrDefault(item => item.Kind == DailyTaskKind.StaminaCrafting);
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StartButtonText))]
@@ -85,6 +86,10 @@ public partial class DailyViewModel : ObservableObject
 
     [ObservableProperty]
     public partial double FlowerSeedRunCount { get; set; }
+
+    /// <summary>体力合成目标：0 赛季球，1 凝练印记。</summary>
+    [ObservableProperty]
+    public partial int StaminaCraftingTargetIndex { get; set; }
 
     public event EventHandler<string>? NoticeRequested;
 
@@ -149,8 +154,10 @@ public partial class DailyViewModel : ObservableObject
         LegendaryChallengeRunCount = challenges.LegendaryChallengeRunCount;
         SelectedFlowerSeed = _tasks.Settings.FlowerSeedOptions.FirstOrDefault(o => o.Number == challenges.FlowerSeedTargetNumber);
         FlowerSeedRunCount = challenges.FlowerSeedRunCount;
+        StaminaCraftingTargetIndex = (int)challenges.StaminaCraftingProduct;
         OnPropertyChanged(nameof(FlowerSeedTask));
         OnPropertyChanged(nameof(LegendaryTask));
+        OnPropertyChanged(nameof(StaminaCraftingTask));
         _loaded = true;
     }
 
@@ -176,7 +183,10 @@ public partial class DailyViewModel : ObservableObject
         LegendaryDifficulty = SelectedLegendaryDifficultyIndex + 1,
         LegendaryChallengeRunCount = TasksViewModel.ToRunCount(LegendaryChallengeRunCount, IndependentTaskSettings.DefaultLegendaryChallengeRunCount),
         FlowerSeedTargetNumber = SelectedFlowerSeed?.Number ?? 0,
-        FlowerSeedRunCount = TasksViewModel.ToRunCount(FlowerSeedRunCount, IndependentTaskSettings.DefaultFlowerSeedRunCount)
+        FlowerSeedRunCount = TasksViewModel.ToRunCount(FlowerSeedRunCount, IndependentTaskSettings.DefaultFlowerSeedRunCount),
+        StaminaCraftingProduct = StaminaCraftingTargetIndex == (int)StaminaCraftingProductKind.CondensedMark
+            ? StaminaCraftingProductKind.CondensedMark
+            : StaminaCraftingProductKind.SeasonBall
     };
 
     protected override void OnPropertyChanged(PropertyChangedEventArgs e)
@@ -184,6 +194,7 @@ public partial class DailyViewModel : ObservableObject
         base.OnPropertyChanged(e);
         if (_loaded && e.PropertyName is nameof(SelectedLegendaryTarget) or nameof(SelectedLegendaryDifficultyIndex)
             or nameof(LegendaryChallengeRunCount) or nameof(SelectedFlowerSeed) or nameof(FlowerSeedRunCount)
+            or nameof(StaminaCraftingTargetIndex)
             or nameof(ReuseEquippedSeed) or nameof(GardenSeed) or nameof(SeedCountIndex)
             or nameof(SelectedSaleFlower) or nameof(SaleQuantity))
             _ = SaveAsync();
@@ -270,7 +281,8 @@ public partial class DailyViewModel : ObservableObject
             : _tasks.IsRunning ? "其他任务运行中"
             : enabled == 0 ? "未启用任务"
             : $"已启用 {enabled} 项";
-        IsConfigurationEmpty = _loaded && !enabledItems.Any(item => item.Kind is DailyTaskKind.FlowerSeedChallenge
-            or DailyTaskKind.LegendaryChallenge or DailyTaskKind.Gardening or DailyTaskKind.Sell);
+        IsConfigurationEmpty = _loaded && !enabledItems.Any(item => item.Kind is DailyTaskKind.StaminaCrafting
+            or DailyTaskKind.FlowerSeedChallenge or DailyTaskKind.LegendaryChallenge
+            or DailyTaskKind.Gardening or DailyTaskKind.Sell);
     }
 }

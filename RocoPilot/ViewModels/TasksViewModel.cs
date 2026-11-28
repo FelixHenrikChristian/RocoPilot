@@ -62,7 +62,6 @@ public partial class TasksViewModel : ObservableRecipient
     [NotifyPropertyChangedFor(nameof(IsLegendaryTargetSelectionEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryChallengeButtonEnabled))]
     [NotifyPropertyChangedFor(nameof(IsLegendaryScanButtonEnabled))]
-    [NotifyPropertyChangedFor(nameof(IsStaminaCraftingConfigurationEnabled))]
     public partial bool IsIndependentTaskRunning { get; set; }
 
     [ObservableProperty]
@@ -132,8 +131,6 @@ public partial class TasksViewModel : ObservableRecipient
     public string FlowerSeedScanButtonGlyph => IsFlowerSeedScanning ? StopButtonGlyph : "\uE72C";
 
     public bool IsFlowerSeedConfigurationEnabled => !IsIndependentTaskRunning;
-
-    public bool IsStaminaCraftingConfigurationEnabled => !IsIndependentTaskRunning;
 
     public bool IsFlowerSeedTargetSelectionEnabled => IsFlowerSeedConfigurationEnabled && !FlowerSeedAtTargetLocation;
 

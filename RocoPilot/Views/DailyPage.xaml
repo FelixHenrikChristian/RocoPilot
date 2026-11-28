@@ -245,7 +245,7 @@
                                     Width="{StaticResource DailyOptionWidth}"
                                     VerticalAlignment="Center"
                                     AutomationProperties.Name="体力合成目标"
-                                    IsEnabled="{x:Bind Challenges.IsStaminaCraftingConfigurationEnabled, Mode=OneWay}"
+                                    IsEnabled="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
                                     SelectedIndex="{x:Bind ViewModel.StaminaCraftingTargetIndex, Mode=TwoWay}">
                                     <ComboBoxItem Content="赛季球" />
                                     <ComboBoxItem Content="凝练印记" />

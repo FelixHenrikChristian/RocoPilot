@@ -187,6 +187,7 @@ public sealed partial class RuntimeTaskService
         for (var attempt = 0; ; attempt++)
         {
             if (tipText is null) return;
+            if (EncounterBloodlineRecognition.IsUnrelatedCombatTip(tipText)) tipText = string.Empty;
             if (EncounterBloodlineRecognition.TryParse(tipText, out var kind))
             {
                 if (_battle.ObserveBloodline(battleId, kind))
@@ -232,11 +233,7 @@ public sealed partial class RuntimeTaskService
             state,
             frame,
             cancellationToken);
-        var openingEvidence = await MatchS5OpeningHealthAsync(state, frame, season, screen, observation.State, cancellationToken);
-        ApplyEncounterCaptureButtonState(season, observation, openingEvidence);
-        if (openingEvidence && _encounterCaptureButtonStateTracker.IsRelieved)
-            await ReadS5OpeningTipsAsync(frame, season, cancellationToken);
-        if (_s5OpeningChecksRemaining == 0) _s5OpeningTips.Clear();
+        await ApplyS5OpeningCaptureButtonStateAsync(state, frame, season, screen, observation, cancellationToken);
     }
 
     private async Task<EncounterCaptureButtonObservation> RecognizeEncounterCaptureButtonStateAsync(
@@ -320,11 +317,11 @@ public sealed partial class RuntimeTaskService
 
     private void ApplyEncounterCaptureButtonState(
         EncounterSeasonDefinition season,
-        EncounterCaptureButtonObservation observation, bool openingEvidence)
+        EncounterCaptureButtonObservation observation, string? openingEvidenceSource)
     {
-        if (_encounterCaptureButtonStateTracker.Observe(observation.State, openingEvidence))
+        if (_encounterCaptureButtonStateTracker.Observe(observation.State, openingEvidenceSource is not null))
         {
-            var source = openingEvidence ? S5OpeningHealthSource : "捕捉按钮状态";
+            var source = openingEvidenceSource ?? "捕捉按钮状态";
             _logger.LogInformation("奇遇效果已解除（{Source}）", source);
             _logger.LogDebug(
                 "奇遇解除判定：Season={SeasonId}, Algorithm={Algorithm}, EnabledScore={EnabledScore:F3}, DisabledScore={DisabledScore:F3}, DisabledMarkerScore={DisabledMarkerScore:F3}, EnabledConfirmations={EnabledConfirmationCount}/{RequiredEnabledConfirmationCount}",
@@ -583,10 +580,7 @@ public sealed partial class RuntimeTaskService
         }
 
         _encounterCaptureButtonStateTracker.Reset();
-        _s5OpeningTips.Clear();
-        _s5OpeningWorldAt = _scene == GameScene.World ? DateTimeOffset.Now : null;
-        _s5OpeningChecksRemaining = _scene == GameScene.World
-            ? EncounterCaptureButtonStateTracker.RequiredEnabledConfirmationCount : 0;
+        ResetS5OpeningState();
     }
 
     private async Task<string> MatchRecognizedSpiritNameAsync(

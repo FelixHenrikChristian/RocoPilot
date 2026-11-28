@@ -478,11 +478,12 @@ public sealed class RuntimeTaskStartupTests
     }
 
     [TestMethod]
-    [DataRow("S5", true, EncounterBloodlineKind.QiYi)]
-    [DataRow("S5", false, EncounterBloodlineKind.Unrecognized)]
-    [DataRow("S6", true, EncounterBloodlineKind.Unrecognized)]
+    [DataRow("S5", true, false, EncounterBloodlineKind.QiYi)]
+    [DataRow("S5", true, true, EncounterBloodlineKind.QiYi)]
+    [DataRow("S5", false, false, EncounterBloodlineKind.Unrecognized)]
+    [DataRow("S6", true, false, EncounterBloodlineKind.Unrecognized)]
     public async Task S5OpeningReadsTransitionTipOnlyAfterConfirmedOpening(string seasonId, bool tenPercent,
-        EncounterBloodlineKind expected)
+        bool tipAfterRelief, EncounterBloodlineKind expected)
     {
         var season = new TemporarySeasonConfig { Seasons = [new()
         {
@@ -499,7 +500,7 @@ public sealed class RuntimeTaskStartupTests
             fixture.Matching.MagicPoints = 4;
             await fixture.ProcessFrameAsync();
             fixture.Matching.MagicPoints = 0;
-            await fixture.ProcessFrameAsync(pixel: 42);
+            await fixture.ProcessFrameAsync(pixel: tipAfterRelief ? (byte)0 : (byte)42);
             await fixture.ProcessFrameAsync();
             fixture.Matching.MatchedTemplate = "battle-button-skill.png";
             fixture.Matching.TenPercent = tenPercent;
@@ -509,6 +510,17 @@ public sealed class RuntimeTaskStartupTests
             Assert.AreEqual(0, fixture.Ocr.BloodlineCalls);
             Assert.IsFalse(fixture.Battle.IsSuspendedForShiny);
             await fixture.ProcessFrameAsync();
+            if (seasonId == "S5" && tenPercent)
+            {
+                if (tipAfterRelief) await fixture.ProcessFrameAsync(pixel: 42);
+                await Task.Delay(350);
+                await fixture.ProcessFrameAsync();
+                await fixture.OpeningTipRead!.WaitAsync(TimeSpan.FromSeconds(5));
+            }
+            else
+            {
+                Assert.IsNull(fixture.OpeningTipRead);
+            }
             Assert.AreEqual(expected, fixture.Battle.Bloodline);
             Assert.AreEqual(seasonId == "S5" && tenPercent, fixture.Battle.IsSuspendedForShiny);
             if (fixture.Battle.IsSuspendedForShiny)
@@ -519,6 +531,69 @@ public sealed class RuntimeTaskStartupTests
             Assert.AreEqual(expected == EncounterBloodlineKind.QiYi ? 1 : 0, fixture.Ocr.BloodlineCalls);
         }
         finally { await fixture.Runtime.StopAsync(); }
+    }
+
+    [TestMethod]
+    public async Task S5OpeningKeepsScanningAndCombatTipsAllowOrdinaryCapture()
+    {
+        var season = new TemporarySeasonConfig { Seasons = [new()
+        {
+            Id = "S5", Name = "S5", DateRange = $"2020/1/1-{DateTime.Today.AddDays(1):yyyy/M/d}"
+        }] };
+        using var fixture = new StartupFixture(sceneRecognition: true, battleRecognition: true, seasonConfig: season);
+        var shinyRead = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var shinyReadStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Ocr.ReadShiny = () =>
+        {
+            shinyReadStarted.TrySetResult();
+            return shinyRead.Task;
+        };
+
+        try
+        {
+            await fixture.StartBattleAsync(AutoBattleEncounterRelievedAction.Capture);
+            var settings = fixture.Runtime.CurrentState!.Options.AutoBattleSettings;
+            settings.BloodlineCaptureFilter.IsEnabled = true;
+            settings.BloodlineCaptureFilter.CaptureNormal = true;
+            settings.BloodlineCaptureFilter.CaptureUnrecognized = false;
+            fixture.Matching.MatchedTemplate = null;
+            fixture.Matching.MagicPoints = 4;
+            await fixture.ProcessFrameAsync();
+            fixture.Matching.MagicPoints = 0;
+            fixture.Matching.MatchedTemplate = "battle-button-skill.png";
+            fixture.Matching.TenPercent = true;
+            fixture.Matching.CaptureButtonState = EncounterCaptureButtonState.Enabled;
+            await fixture.ProcessFrameAsync();
+            await fixture.ProcessFrameAsync();
+            Assert.IsTrue(fixture.Battle.IsEncounterRelieved);
+
+            await Task.Delay(350);
+            await fixture.ProcessFrameAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            await shinyReadStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.IsFalse(fixture.OpeningTipRead!.IsCompleted);
+            await fixture.ProcessFrameAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(0, fixture.Keyboard.Sends);
+
+            fixture.Ocr.BloodlineText = "敌方投掷";
+            await fixture.ScanOcrAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(1, fixture.Ocr.BloodlineCalls);
+            fixture.Ocr.BloodlineText = "敌方获得效果：污染";
+            shinyRead.SetResult("");
+            await fixture.OpeningTipRead.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.AreEqual(EncounterBloodlineKind.Unrecognized, fixture.Battle.Bloodline);
+
+            var now = DateTimeOffset.Now;
+            fixture.Battle.BeginSkillSelection(settings, now);
+            fixture.Battle.PlanSkillSelection(settings, true, now);
+            var plan = fixture.Battle.PlanSkillSelection(settings, true, now.AddSeconds(4));
+            Assert.AreEqual(EncounterBloodlineKind.Normal, fixture.Battle.Bloodline);
+            Assert.AreEqual(AutoBattleAction.Capture, plan.Action);
+        }
+        finally
+        {
+            shinyRead.TrySetResult("");
+            await fixture.Runtime.StopAsync();
+        }
     }
 
     [TestMethod]
@@ -680,6 +755,7 @@ public sealed class RuntimeTaskStartupTests
         public StatisticsSpiritCatalogStub Catalog { get; } = new();
         public AppNotificationStub Notifications { get; } = new();
         public AutoBattleController Battle => (AutoBattleController)GetField("_battle")!;
+        public Task? OpeningTipRead => (Task?)GetField("_s5OpeningTipRead");
 
         public StartupFixture(bool sceneRecognition = false, bool battleRecognition = false, RocoPilot.Contracts.Services.Encounters.IEncounterSeasonConfigService? seasonConfig = null, ControlledSettingsStore? settings = null)
         {
@@ -890,6 +966,7 @@ public sealed class RuntimeTaskStartupTests
     private sealed class TextRecognitionStub : ITextRecognitionService
     {
         public Func<Task<string>> ReadName { get; set; } = () => Task.FromResult(string.Empty);
+        public Func<Task<string>>? ReadShiny { get; set; }
         public byte? ShinyPixelMarker { get; set; }
         public string ShinyText { get; set; } = "";
         public string BloodlineText { get; set; } = "";
@@ -909,7 +986,10 @@ public sealed class RuntimeTaskStartupTests
                 text = await ReadName();
             }
             else if (region.Id == RecognitionRegionIds.BattleShinyTip
-                && (ShinyPixelMarker is null || frame.Pixels[0] == ShinyPixelMarker)) text = ShinyText;
+                && (ShinyPixelMarker is null || frame.Pixels[0] == ShinyPixelMarker))
+            {
+                text = ReadShiny is null ? ShinyText : await ReadShiny();
+            }
             else if (region.Id == RecognitionRegionIds.BattleBloodlineTip)
             {
                 BloodlineCalls++;

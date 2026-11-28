@@ -528,6 +528,10 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                                 else
                                     session.ClearFrame();
                             }
+                            else
+                            {
+                                CacheS5OpeningTip(state, frame, sceneScan: false, cancellationToken);
+                            }
                         }
                     }
                     finally
@@ -668,6 +672,7 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
         var match = await _gameScene.RecognizeAsync(state, frame, cancellationToken);
         if (_scene != match.Scene) _logger.LogDebug("游戏场景变化：{Previous} → {Current}", _scene, match.Scene);
         _scene = match.Scene;
+        CacheS5OpeningTip(state, frame, sceneScan: true, cancellationToken);
         switch (match.Scene)
         {
             case GameScene.World:
@@ -682,7 +687,6 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
                 await ProcessBattleFrameAsync(state, frame, match.BattleScreen!.Value, cancellationToken);
                 break;
             default:
-                CacheS5OpeningTip(state, frame);
                 // 无命中只暂停本帧操作，确认大世界后才结束本场战斗。
                 CompleteAutoBattleSkillSelectionState();
                 _battle.ObservePetSwitching(false);
@@ -776,14 +780,15 @@ public sealed partial class RuntimeTaskService : IRuntimeTaskService, IRuntimeSe
 
         switch (screen)
         {
-            case BattleScreen.SkillSelection:
+            case BattleScreen.SkillSelection when !IsS5OpeningTipReadPending:
                 var recovered = !_battle.IsSuspendedForShiny
                     && await TryHandleAutoBattleSkillReleaseFailureAsync(state, frame, cancellationToken);
                 if (!recovered) await HandleAutoBattleSkillSelectionAsync(state, cancellationToken);
                 break;
             case BattleScreen.PetSwitching:
                 CompleteAutoBattleSkillSelectionState();
-                if (!_battle.IsSuspendedForShiny) await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
+                if (!IsS5OpeningTipReadPending && !_battle.IsSuspendedForShiny)
+                    await HandleAutoBattlePetSwitchingAsync(state, cancellationToken);
                 break;
             case BattleScreen.Chat:
                 if (!_battle.IsSuspendedForShiny) CompleteAutoBattleSkillSelectionState();

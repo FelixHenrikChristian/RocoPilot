@@ -21,6 +21,13 @@ internal static class EncounterBloodlineRecognition
     public static bool IsAvailable(RecognitionRegionConfig config) => config.Regions.FirstOrDefault(region =>
         RuntimeFrameRecognizer.IsRegionMatch(region, RegionIds)) is { Width: > 0, Height: > 0 };
 
+    public static bool IsUnrelatedCombatTip(string text)
+    {
+        var cleanedText = TextMatchingHelper.CleanRecognizedText(text);
+        return cleanedText.StartsWith("敌方获得效果", StringComparison.Ordinal)
+            || cleanedText.StartsWith("敌方投掷", StringComparison.Ordinal);
+    }
+
     public static string GetDisplayName(EncounterBloodlineKind kind)
     {
         return kind switch

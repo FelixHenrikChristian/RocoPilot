@@ -1,7 +1,9 @@
+using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Windows.Storage.Pickers;
 using RocoPilot.Controls;
+using RocoPilot.Helpers;
 
 using Serilog;
 
@@ -10,6 +12,11 @@ namespace RocoPilot.Views.Windows.AutoBattleConfigPages;
 public sealed partial class AutoBattleReleaseConfigPage : Page
 {
     private readonly AutoBattleConfigWindow _owner;
+
+    /// <summary>提权进程中 WinUI 不支持拖放，改用点击卡片选中、再点击目标卡片完成移动。</summary>
+    private readonly bool _clickReorderEnabled;
+
+    private AutoBattleReleaseEditorItem? _moveSource;
 
     internal AutoBattleConfigEditor Editor
     {
@@ -25,6 +32,12 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
     /// <summary>普通战斗没有出招队列，不能跳过回合；跳过步骤按钮仅在花种/传说战斗显示。</summary>
     internal Visibility SkipTurnButtonVisibility { get; }
 
+    /// <summary>区块说明：提权时提示拖拽不可用。</summary>
+    internal string SectionDescription { get; }
+
+    /// <summary>点击排序操作提示的可见性，仅提权时显示。</summary>
+    internal Visibility ClickReorderHintVisibility { get; }
+
     internal AutoBattleReleaseConfigPage(
         AutoBattleConfigEditor editor,
         AutoBattleConfigWindow owner,
@@ -32,6 +45,11 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
     {
         Editor = editor;
         _owner = owner;
+        _clickReorderEnabled = AppElevation.IsElevated;
+        SectionDescription = _clickReorderEnabled
+            ? "从左到右、逐行循环执行。当前以管理员权限运行，拖拽排序不可用。"
+            : "从左到右、逐行循环执行。拖动步骤可调整释放顺序。";
+        ClickReorderHintVisibility = _clickReorderEnabled ? Visibility.Visible : Visibility.Collapsed;
         (Set, BattleTypeName) = section switch
         {
             AutoBattleConfigSection.FlowerSeed => (editor.FlowerSeedConfigs, "花种战斗"),
@@ -45,6 +63,74 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
             ? Visibility.Visible
             : Visibility.Collapsed;
         InitializeComponent();
+
+        if (_clickReorderEnabled)
+        {
+            // 提权进程里 WinUI 拖放整体失效，关掉原生拖拽，避免出现“禁止”光标却始终无法重排。
+            StepsGrid.CanDragItems = false;
+            StepsGrid.CanReorderItems = false;
+            StepsGrid.AllowDrop = false;
+        }
+        else
+        {
+            // 普通权限下保留原生拖拽手感，点击不参与排序。
+            StepsGrid.IsItemClickEnabled = false;
+        }
+
+        // 切换配置会换掉整个 Items 集合，旧的待移动选中状态必须清掉。
+        Set.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(AutoBattleReleaseConfigSet.SelectedSequence))
+            {
+                ClearMoveSource();
+            }
+        };
+    }
+
+    /// <summary>提权时的替代交互：第一次点击选中待移动步骤，第二次点击目标步骤把源步骤移到目标位置。</summary>
+    private void StepsGrid_ItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (!_clickReorderEnabled || e.ClickedItem is not AutoBattleReleaseEditorItem clicked)
+        {
+            return;
+        }
+
+        var sequence = Set.SelectedSequence;
+        if (_moveSource is null || !sequence.Items.Contains(_moveSource))
+        {
+            SelectMoveSource(clicked);
+            return;
+        }
+
+        if (ReferenceEquals(_moveSource, clicked))
+        {
+            ClearMoveSource();
+            return;
+        }
+
+        var source = _moveSource;
+        ClearMoveSource();
+        if (AutoBattleReleaseSequenceEditor.TryMove(sequence.Items, source, clicked))
+        {
+            Debug.WriteLine(
+                $"[战斗配置] 点击排序：{BattleTypeName} / {source.DisplayText} 移入第 {clicked.Position} 步");
+        }
+    }
+
+    private void SelectMoveSource(AutoBattleReleaseEditorItem item)
+    {
+        ClearMoveSource();
+        _moveSource = item;
+        item.IsMoveSource = true;
+    }
+
+    private void ClearMoveSource()
+    {
+        if (_moveSource is { } source)
+        {
+            source.IsMoveSource = false;
+            _moveSource = null;
+        }
     }
 
     private void AppendSkillButton_Click(object sender, RoutedEventArgs e)
@@ -57,6 +143,7 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
 
     private void ClearReleaseSequenceButton_Click(object sender, RoutedEventArgs e)
     {
+        ClearMoveSource();
         Set.SelectedSequence.Items.Clear();
     }
 
@@ -64,6 +151,11 @@ public sealed partial class AutoBattleReleaseConfigPage : Page
     {
         if (sender is FrameworkElement { DataContext: AutoBattleReleaseEditorItem item })
         {
+            if (ReferenceEquals(_moveSource, item))
+            {
+                ClearMoveSource();
+            }
+
             Set.SelectedSequence.Items.Remove(item);
         }
     }

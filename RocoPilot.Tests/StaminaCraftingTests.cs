@@ -12,6 +12,44 @@ using RocoPilot.Services.IndependentTasks;
 namespace RocoPilot.Tests;
 
 [TestClass]
+public sealed class DailyTaskScreenPointTests
+{
+    [TestMethod]
+    [DataRow(1080, 608)]
+    [DataRow(1920, 1080)]
+    public void ReferencePointsMapIntoClientArea(int width, int height)
+    {
+        using var frame = new CapturedFrame(width, height, new byte[width * height * 4]);
+        var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = height };
+        var screen = new DailyTaskScreen(frame, window, new ImageMatchingService());
+        var scale = Math.Min(width / 2048d, height / 1152d);
+
+        var tab = screen.ReferenceToClient(173, 516);
+        Assert.AreEqual(173 * scale, (double)tab.X, 1d, "tab");
+        Assert.AreEqual(516 * scale + (height - 1152 * scale) * .5, (double)tab.Y, 1d, "tab");
+
+        var close = screen.ReferenceToClient(1900, 61);
+        Assert.AreEqual(1900 * scale + (width - 2048 * scale), (double)close.X, 1d, "close");
+        Assert.AreEqual(61 * scale, (double)close.Y, 1d, "close");
+
+        Assert.AreEqual(1555 * scale + (width - 2048 * scale),
+            (double)screen.ReferenceToClient(1555, 0).X, 1d, "slider");
+    }
+
+    [TestMethod]
+    public void ConcretePointsStayInsideSmallClientArea()
+    {
+        using var frame = new CapturedFrame(1080, 608, new byte[1080 * 608 * 4]);
+        var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = 1080, ClientHeight = 608 };
+        var screen = new DailyTaskScreen(frame, window, new ImageMatchingService());
+
+        Assert.AreEqual((91, 272), screen.ReferenceToClient(173, 516));
+        Assert.AreEqual((1002, 32), screen.ReferenceToClient(1900, 61));
+        Assert.AreEqual(820, screen.ReferenceToClient(1555, 0).X);
+    }
+}
+
+[TestClass]
 [TestCategory("LocalScreenshots")]
 public class StaminaCraftingTests
 {
@@ -27,12 +65,28 @@ public class StaminaCraftingTests
         var replay = new Replay(initialMap, width, insufficient, useReportedRecipe);
         var runner = new StaminaCraftingRunner(replay, new ImageMatchingService(), replay, replay);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };
-        var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), _ => { }, CancellationToken.None);
+        var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now),
+            IndependentTaskSettings.CreateDefault(), _ => { }, CancellationToken.None);
         Assert.AreEqual("done", replay.Stage);
         Assert.AreEqual(insufficient ? "跳过：体力不足" : "成功：已制造赛季球", result);
     }
 
-    private sealed class Replay(string initialMap, int width, bool insufficient, bool useReportedRecipe) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
+    [TestMethod]
+    [DataRow("convert-purifying-potion", 1600, "跳过：蜂蜜或体力不足")]
+    [DataRow("convert-mark-selected-max-one", 2048, "成功：已制造凝练印记")]
+    [DataRow("convert-bright-mark-dust-selected", 1080, "成功：已制造凝练印记")]
+    public async Task ConvertsOnlySelectedAvailableMark(string firstRecipe, int width, string expected)
+    {
+        var replay = new Replay("map-garden", width, false, false, firstRecipe);
+        var runner = new StaminaCraftingRunner(replay, new ImageMatchingService(), replay, replay);
+        var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };
+        var settings = new IndependentTaskSettings { StaminaCraftingProduct = StaminaCraftingProductKind.CondensedMark };
+        var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), settings, _ => { }, CancellationToken.None);
+        Assert.AreEqual(expected, result);
+        Assert.AreEqual("done", replay.Stage);
+    }
+
+    private sealed class Replay(string initialMap, int width, bool insufficient, bool useReportedRecipe, string? firstMarkRecipe = null) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
     {
         public string Stage = "start";
         private int _frames;
@@ -57,12 +111,15 @@ public class StaminaCraftingTests
                 "slider-maximum" when _frames == 1 => "season-selected",
                 "skip-craft" when _frames <= 2 => "slider-maximum",
                 "skip-craft" => "legendary-skip",
+                "exit-recipe" when firstMarkRecipe != null => "convert-purifying-potion",
                 "exit-recipe" => "basic-alchemy",
                 "exit-dialogue" => "choices",
                 _ => Stage
             };
             if (Stage == "skip-craft" && _frames == 3) _resultWait.Restart();
             var path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-07", "stamina-crafting", name + ".png");
+            if (name.StartsWith("convert-", StringComparison.Ordinal) || name == "basic-ball")
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-29", "stamina-crafting", name + ".png");
             if (name is "world-interaction" or "intro-animation" or "dialogue-before-choices" or "choices")
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-18", "stamina-crafting", name + ".png");
             if (name == "season-selected" && insufficient)
@@ -127,7 +184,7 @@ public class StaminaCraftingTests
                 ("intro-animation", "Esc") when _frames > 1 => "dialogue-before-choices",
                 ("dialogue-before-choices", "Space") => "choices",
                 ("skip-craft", "Esc") => "craft-result",
-                ("choices", "1") => "recipe-list-marked",
+                ("choices", "1") => firstMarkRecipe == null ? "recipe-list-marked" : "basic-ball",
                 ("craft-result", "Esc") => "exit-recipe",
                 ("exit-dialogue", "Esc") => "done",
                 _ => throw new AssertFailedException($"{Stage} 意外按键 {key}")
@@ -140,6 +197,10 @@ public class StaminaCraftingTests
             if (Stage == "slider-maximum") Assert.IsTrue(_frames > 1);
             var (next, cx, cy) = Stage switch
             {
+                "basic-ball" => (firstMarkRecipe!, 173, 516),
+                "convert-bright-mark-dust-selected" => ("convert-mark-selected-max-one", 342, 210),
+                "convert-mark-selected-max-one" => ("skip-craft", 1800, 1080),
+                "convert-gray-mark-potion-selected" => ("exit-dialogue", 1900, 59),
                 "open" when initialMap == "map-continent" => ("options", 333, 1074),
                 "open" when initialMap == "map-academy" => ("options", 300, 1074),
                 "options" => ("garden", 237, 914),
@@ -183,7 +244,14 @@ public class StaminaCraftingTests
         public bool RequiresForeground(KeyboardInputMethod method) => true;
         public void EnsureReady(KeyboardInputMethod method) { }
         public void Release(CaptureTargetWindow window, CaptureMethod method) { }
-        public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
+        public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token)
+        {
+            Assert.AreEqual("convert-purifying-potion", Stage);
+            Assert.IsTrue(delta < 0);
+            CheckPoint(x, y, 650, 500);
+            Advance("convert-gray-mark-potion-selected");
+            return Task.CompletedTask;
+        }
         public Task ScrollAtCurrentPositionAsync(nint hwnd, int delta, KeyboardInputMethod method, CancellationToken token) => throw new NotSupportedException();
         public bool TryParseSequence(string sequence, out IReadOnlyList<KeyStroke> keys, out string error) => throw new NotSupportedException();
         public Task SendSequenceAsync(nint hwnd, IReadOnlyList<KeyStroke> keys, KeyboardInputOptions? options, CancellationToken token) => throw new NotSupportedException();

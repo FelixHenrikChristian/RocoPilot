@@ -453,7 +453,7 @@ public sealed class IndependentTaskService : IIndependentTaskService
                     outcome = await _eveningRest.RunAsync(state, UpdateProgress, taskCts.Token);
                     break;
                 case IndependentTaskKind.StaminaCrafting:
-                    outcome = await _staminaCrafting.RunAsync(state, UpdateProgress, taskCts.Token);
+                    outcome = await _staminaCrafting.RunAsync(state, settings, UpdateProgress, taskCts.Token);
                     break;
                 case IndependentTaskKind.LegendaryScan:
                     var names = await _challengeRunner.ScanLegendaryAsync(state, UpdateProgress, taskCts.Token);

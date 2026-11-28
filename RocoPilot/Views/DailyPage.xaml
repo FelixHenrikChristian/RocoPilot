@@ -222,6 +222,41 @@
                     <Border
                         Padding="0"
                         Style="{StaticResource CardStyle}"
+                        Visibility="{x:Bind ViewModel.StaminaCraftingTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
+                        <StackPanel>
+                            <StackPanel Padding="16,12" Orientation="Horizontal" Spacing="12">
+                                <FontIcon Style="{StaticResource DailyGroupIconStyle}" Glyph="{x:Bind ViewModel.StaminaCraftingTask.Glyph, Mode=OneWay}" />
+                                <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="体力合成" />
+                            </StackPanel>
+                            <Border Style="{StaticResource DailyDividerStyle}" />
+                            <Grid ColumnSpacing="12" Style="{StaticResource CardRowStyle}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Style="{StaticResource DailyRowIconStyle}" Glyph="{StaticResource ChallengeTargetGlyph}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="合成目标" />
+                                    <TextBlock Style="{StaticResource DailyRowHintStyle}" Text="赛季球或者凝练印记" />
+                                </StackPanel>
+                                <ComboBox
+                                    Grid.Column="2"
+                                    Width="{StaticResource DailyOptionWidth}"
+                                    VerticalAlignment="Center"
+                                    AutomationProperties.Name="体力合成目标"
+                                    IsEnabled="{x:Bind ViewModel.CanReorder, Mode=OneWay}"
+                                    SelectedIndex="{x:Bind ViewModel.StaminaCraftingTargetIndex, Mode=TwoWay}">
+                                    <ComboBoxItem Content="赛季球" />
+                                    <ComboBoxItem Content="凝练印记" />
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        Padding="0"
+                        Style="{StaticResource CardStyle}"
                         Visibility="{x:Bind ViewModel.FlowerSeedTask.IsEnabled, Mode=OneWay, FallbackValue=Collapsed}">
                         <StackPanel>
                             <StackPanel Padding="16,12" Orientation="Horizontal" Spacing="12">
@@ -526,7 +561,7 @@
                 FontSize="12"
                 Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                 HorizontalTextAlignment="Center"
-                Text="启用花种挑战、传说精灵挑战、自动种菜或自动出售后，在这里设置。"
+                Text="启用体力合成、花种挑战、传说精灵挑战、自动种菜或自动出售后，在这里设置。"
                 TextWrapping="Wrap" />
         </StackPanel>
 

@@ -41,7 +41,8 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
             var screen = new DailyTaskScreen(frame, window, images);
             Task<ImageMatchResult?> Find(string name, int x, int y, int right, int bottom, double score = .94) =>
                 screen.Find($"crop-sale/{name}", x, y, right, bottom, token, score);
-            Task<ImageMatchResult?> Station() => Find("station", 75, 0, 408, 106);
+            // 原生 1600×900 的标题得分低于默认门槛；找花时还会校验空选提示和目标卡片。
+            Task<ImageMatchResult?> Station() => Find("station", 75, 0, 408, 106, .90);
             Task<ImageMatchResult?> Dialogue() => Find("dialogue", 1440, 710, 1950, 925);
             Task<ImageMatchResult?> Empty() => Find("empty", 1400, 625, 1920, 785);
             async Task<bool> Add(double x, double y)
@@ -108,7 +109,7 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
                     case Step.FindFlower:
                         if (await Station() is not { } header || await Empty() == null) break;
                         // 从空选开始。保留顶部空间让选中后的减号完整可见。
-                        var card = await Find($"flowers/{flower}", 110, 139, 734, 1003, .988);
+                        var card = await FindFlowerAsync(screen, flower, token);
                         if (card != null)
                         {
                             // 这次点击计入数量，不能照原样补发；没选中时由下一步发现并回到这里。
@@ -179,6 +180,9 @@ public sealed class CropSaleRunner(IScreenCaptureService capture, IImageMatching
             if (result is not null) return result;
         }
     }
+
+    internal static Task<ImageMatchResult?> FindFlowerAsync(DailyTaskScreen screen, string flower, CancellationToken token) =>
+        screen.Find($"crop-sale/flowers/{flower}", 110, 139, 734, 1003, token, .98);
 
     internal static async Task<long?> ReadIncomeAsync(CapturedFrame frame, DailyTaskScreen screen,
         ITextRecognitionService ocr, CancellationToken token)

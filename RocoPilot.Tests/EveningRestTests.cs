@@ -17,9 +17,11 @@ public sealed class EveningRestTests
 {
     [TestMethod]
     [DataRow(2048, "collect")]
+    [DataRow(1600, "collect")]
     [DataRow(1280, "collect")]
     [DataRow(960, "collect")]
     [DataRow(2048, "renamed")]
+    [DataRow(1600, "renamed")]
     [DataRow(1280, "renamed")]
     [DataRow(960, "renamed")]
     [DataRow(2048, "unselected")]

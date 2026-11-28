@@ -11,6 +11,7 @@ public sealed class BattlePassTests
 {
     [TestMethod]
     [DataRow(2048)]
+    [DataRow(1600)]
     [DataRow(1280)]
     [DataRow(960)]
     public async Task RecognizesLevelRewardsButNotItsPopup(int width)
@@ -43,6 +44,7 @@ public sealed class BattlePassTests
 
     [TestMethod]
     [DataRow(2048)]
+    [DataRow(1600)]
     [DataRow(1280)]
     [DataRow(960)]
     public async Task CountsClaimButtonsAndRejectsPopups(int width)

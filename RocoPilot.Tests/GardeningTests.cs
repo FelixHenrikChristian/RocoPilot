@@ -26,7 +26,7 @@ public sealed class GardeningTests
     [DataRow("2026-11-14", "planted", 4, 0, false)]
     public async Task LocatesPlotAndRecognizesPlantAction(string date, string name, int column, int row, bool empty)
     {
-        foreach (var width in new[] { 2048, 1280, 960 })
+        foreach (var width in new[] { 2048, 1600, 1280, 960 })
         {
             var (frame, window) = Load(date, name, width);
             using (frame)
@@ -53,7 +53,7 @@ public sealed class GardeningTests
     [DataRow("2026-11-09", "ripe-field", true, true)]
     public async Task ChecksFieldBubbles(string date, string name, bool harvest, bool expected)
     {
-        foreach (var width in new[] { 2048, 1280, 960 })
+        foreach (var width in new[] { 2048, 1600, 1280, 960 })
         {
             var (frame, window) = Load(date, name, width);
             using (frame)
@@ -80,6 +80,7 @@ public sealed class GardeningTests
 
     [TestMethod]
     [DataRow(2048)]
+    [DataRow(1600)]
     [DataRow(1280)]
     [DataRow(960)]
     public async Task PocketIdentifiesVisibleSeedsQuantityAndEquippedState(int width)
@@ -128,6 +129,7 @@ public sealed class GardeningTests
 
     [TestMethod]
     [DataRow(2048)]
+    [DataRow(1600)]
     [DataRow(1280)]
     [DataRow(960)]
     public async Task RestoredTenthPlotCanNavigateToEleventh(int width)
@@ -153,7 +155,7 @@ public sealed class GardeningTests
     [DataRow("success-turn-client", .68, .61)]
     public void VideoTurnPositionsRemainVisibleUnderPlayerMarker(string name, double column, double row)
     {
-        foreach (var width in new[] { 2048, 1280, 960 })
+        foreach (var width in new[] { 2048, 1600, 1280, 960 })
         {
             var (frame, window) = Load("2026-11-17", name, width);
             using (frame)
@@ -173,7 +175,7 @@ public sealed class GardeningTests
     [DataRow("garden-teleport")]
     public async Task MapScreensCannotEnterFieldNavigation(string name)
     {
-        foreach (var width in new[] { 2048, 1280, 960 })
+        foreach (var width in new[] { 2048, 1600, 1280, 960 })
         {
             var (frame, window) = Load("2026-11-09", name, width);
             // Runner 先确认大世界，地图页不能进入小地图导航。

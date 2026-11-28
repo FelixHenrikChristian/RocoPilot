@@ -32,7 +32,7 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
             Task<ImageMatchResult?> Find(string name, int left, int top, int right, int bottom, double threshold = .94) =>
                 screen.Find($"stamina-crafting/{name}", left, top, right, bottom, token, threshold);
             Task<ImageMatchResult?> MakeButton() => Find("make", 1640, 1010, 1960, 1140);
-            Task<ImageMatchResult?> BasicTitle() => Find("basic-title", 150, 0, 375, 115);
+            Task<ImageMatchResult?> BasicTitle() => Find("basic-title", 150, 0, 375, 115, .90);
             Task<ImageMatchResult?> Choices() => Find("choices", 1420, 620, 1950, 735, .90);
             Task<ImageMatchResult?> SeasonTimer() => Find("timer", 550, 870, 1020, 971);
             Task<ImageMatchResult?> Maximum() => Find("max", 1460, 975, 1560, 1060);
@@ -85,7 +85,9 @@ public sealed class StaminaCraftingRunner(IScreenCaptureService capture, IImageM
                             await loop.RepeatKeyAsync("Space");
                         break;
                     case Step.SelectRecipe:
-                        if (await Find("recipe", 40, 0, 370, 115) is not null && await Find("badge", 250, 110, 1100, 906, .87) is { } badge &&
+                        // 1600×900 的标题匹配分数略低，点击仍须同时命中赛季球角标。
+                        if (await Find("recipe", 40, 0, 370, 115, .90) is not null &&
+                            await Find("badge", 250, 110, 1100, 906, .87) is { } badge &&
                             await loop.ClickAsync(screen, badge, -45, 45))
                             loop.Advance(Step.SetAmount);
                         break;

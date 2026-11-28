@@ -17,8 +17,8 @@ namespace RocoPilot.Tests;
 [TestCategory("LocalScreenshots")]
 public sealed class CropSaleTests
 {
-    private static string Folder([CallerFilePath] string file = "") =>
-        Path.Combine(Path.GetDirectoryName(file)!, "LocalScreenshots", "2026-11-15", "crop-sale");
+    private static string Folder(string date = "2026-11-15", [CallerFilePath] string file = "") =>
+        Path.Combine(Path.GetDirectoryName(file)!, "LocalScreenshots", date, "crop-sale");
 
     private static CaptureTargetWindow Window(int width) => new()
     {
@@ -28,8 +28,17 @@ public sealed class CropSaleTests
     private static CapturedFrame Load(string name, int width) => FlowerSeedScreenRecognizerTests.LoadFixture(
         Path.Combine(Folder(), name + ".png"), width, width * 9 / 16, 12, 30);
 
+    private static CapturedFrame LoadReportedStation() => FlowerSeedScreenRecognizerTests.LoadFixture(
+        Path.Combine(Folder("2026-11-28"), "crop-sale-sunflower-stalled.png"), clientX: 12, clientY: 30, transform: mat =>
+        {
+            using var client = new OpenCvSharp.Mat(mat, new OpenCvSharp.Rect(1, 31, 1600, 900));
+            using var copy = client.Clone();
+            copy.CopyTo(mat);
+        });
+
     [TestMethod]
     [DataRow(2048)]
+    [DataRow(1600)]
     [DataRow(1280)]
     [DataRow(960)]
     public async Task ReadsOnlyTheExpectedIncomeAtTheBottom(int width)
@@ -49,20 +58,22 @@ public sealed class CropSaleTests
 
     [TestMethod]
     [DataRow(2048)]
+    [DataRow(1600)]
     [DataRow(1280)]
     [DataRow(960)]
-    public async Task LocatesAllFlowersOnlyOnTheirOwnCards(int width)
+    [DataRow(1600, true)]
+    public async Task LocatesAllFlowersOnlyOnTheirOwnCards(int width, bool useReportedTop = false)
     {
         var images = new ImageMatchingService();
         var pages = new[] { "flowers-top", "flowers-middle", "flowers-bottom-selected" };
-        for (var page = 0; page < pages.Length; page++)
+        for (var page = 0; page < (useReportedTop ? 1 : pages.Length); page++)
         {
-            using var frame = Load(pages[page], width);
+            using var frame = useReportedTop ? LoadReportedStation() : Load(pages[page], width);
             var screen = new DailyTaskScreen(frame, Window(width), images);
             for (var i = 0; i < IndependentTaskSettings.SaleFlowers.Count; i++)
             {
                 var flower = IndependentTaskSettings.SaleFlowers[i];
-                var match = await screen.Find("crop-sale/flowers/" + flower, 110, 139, 734, 1003, default, .988);
+                var match = await CropSaleRunner.FindFlowerAsync(screen, flower, default);
                 var baseline = page switch { 0 => 122, 1 => 185 - 3 * 245, _ => 488 - 6 * 245 };
                 var y = baseline + i / 3 * 245 + 77;
                 if (y - 42 < 139 || y + 42 > 1003 || page == 2 && i == 17)
@@ -81,14 +92,21 @@ public sealed class CropSaleTests
     [DataRow(2048, 36)]
     [DataRow(1280, 10)]
     [DataRow(960, 1)]
-    public async Task SellsOneFlowerWithConfiguredPressesAndReturnsToWorld(int width, int quantity)
+    public Task SellsOneFlowerWithConfiguredPressesAndReturnsToWorld(int width, int quantity) =>
+        AssertSaleAsync(width, quantity, "紫晶菇", 3000, useReportedStation: false);
+
+    [TestMethod]
+    public Task SellsSunflowerFromReported1600By900Station() =>
+        AssertSaleAsync(1600, 3, "向阳花", 9000, useReportedStation: true);
+
+    private static async Task AssertSaleAsync(int width, int quantity, string flower, int income, bool useReportedStation)
     {
-        var game = new Replay(width);
+        var game = new Replay(width, useReportedStation);
         using var backend = new OnnxOcrSingleLineTextRecognitionBackend();
         var ocr = new TextRecognitionService([new OnnxOcrTextRecognitionBackend(backend)]);
         var runner = new CropSaleRunner(game, new ImageMatchingService(), game, game, ocr);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
-        var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), "紫晶菇", quantity, progress => Console.WriteLine(progress), timeout.Token);
+        var outcome = await runner.RunAsync(new(Window(width), new(), new(), DateTimeOffset.Now), flower, quantity, progress => Console.WriteLine(progress), timeout.Token);
         Assert.AreEqual("done", game.Scene);
         Assert.AreEqual(quantity, game.FlowerClicks);
         // 连点前只定位一次；点完之后要看着出售按钮稳定一会儿才点，这期间会多看几帧。
@@ -96,10 +114,10 @@ public sealed class CropSaleTests
         Assert.IsGreaterThan(game.SelectedFramesAtLastFlowerClick, game.SelectedFrames, "点完后要用新画面读取最终收入");
         if (game.FlowerClickIntervals.Count > 0)
             Console.WriteLine($"连续选花平均间隔 {game.FlowerClickIntervals.Average():F0} ms");
-        StringAssert.Contains(outcome, "已领取紫晶菇的出售奖励，预期收入 3000 金币");
+        StringAssert.Contains(outcome, $"已领取{flower}的出售奖励，预期收入 {income} 金币");
     }
 
-    private sealed class Replay(int width) : IScreenCaptureService, IKeyboardInputService, IMouseInputService
+    private sealed class Replay(int width, bool useReportedStation) : IScreenCaptureService, IKeyboardInputService, IMouseInputService
     {
         public string Scene = "start";
         public int FlowerClicks { get; private set; }
@@ -129,6 +147,7 @@ public sealed class CropSaleTests
                 return _arrivalFrame!.AddReference();
             _arrivalFrame?.Dispose();
             _arrivalFrame = null;
+            if (useReportedStation && Scene is "top" or "exit") return LoadReportedStation();
             if (Scene == "selected") SelectedFrames++;
             if (Scene == "middle")
             {
@@ -142,7 +161,7 @@ public sealed class CropSaleTests
                 "map" or "marker" => "map-sam",
                 "interact" => "sam-prompt",
                 "dialogue" => "sam-dialogue",
-                "selected" => "flowers-bottom-selected",
+                "selected" => useReportedStation ? "sunflower-income-9000" : "flowers-bottom-selected",
                 "exit" or "top" => "flowers-top",
                 "middle" => "flowers-middle",
                 "confirm" => "confirm-multiple",
@@ -174,6 +193,7 @@ public sealed class CropSaleTests
 
         public Task ScrollAsync(nint hwnd, int x, int y, int delta, KeyboardInputMethod method, CancellationToken token)
         {
+            Assert.IsFalse(useReportedStation, "向阳花已经可见，应直接点击卡片。");
             CheckInputInterval(200);
             Check(x, y, 417, 568);
             Assert.AreEqual(-6 * 120, delta);
@@ -189,7 +209,9 @@ public sealed class CropSaleTests
                 "map" => ("marker", 237, 914),
                 "marker" => ("teleport-sam", 1075, 406),
                 "teleport-sam" => ("arrival", 1634, 1085),
+                "top" when useReportedStation => ("selected", 211, 202),
                 "middle" => ("selected", 631, 752),
+                "selected" when useReportedStation && y * 2048d / width < 1000 => ("selected", 211, 200),
                 "selected" when y * 2048d / width < 1000 => ("selected", 631, 322),
                 "selected" => ("confirm", 238, 1080),
                 "confirm" => ("reward", 1186, 948),
@@ -198,7 +220,7 @@ public sealed class CropSaleTests
             Check(x, y, px, py);
             var repeat = Scene == "selected" && next == "selected";
             if (repeat) FlowerClickIntervals.Add(_sinceLastInput.ElapsedMilliseconds);
-            CheckInputInterval(repeat ? 145 : Scene == "middle" ? 195 : 400);
+            CheckInputInterval(repeat ? 145 : Scene is "top" or "middle" ? 195 : 400);
             if (next == "selected")
             {
                 FlowerClicks++;

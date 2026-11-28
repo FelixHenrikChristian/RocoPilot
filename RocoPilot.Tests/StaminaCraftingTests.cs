@@ -16,14 +16,15 @@ namespace RocoPilot.Tests;
 public class StaminaCraftingTests
 {
     [TestMethod]
-    [DataRow("map-continent", 2048, false)]
-    [DataRow("map-academy", 1280, false)]
-    [DataRow("map-garden", 960, false)]
-    [DataRow("map-garden", 960, true)]
-    [DataRow("map-academy", 1280, true)]
-    public async Task DailyCraftsOnlyAfterSelectingSeasonAndMaximum(string initialMap, int width, bool insufficient)
+    [DataRow("map-continent", 2048, false, false)]
+    [DataRow("map-academy", 1280, false, false)]
+    [DataRow("map-garden", 960, false, false)]
+    [DataRow("map-garden", 960, true, false)]
+    [DataRow("map-academy", 1280, true, false)]
+    [DataRow("map-continent", 1600, false, true)]
+    public async Task DailyCraftsOnlyAfterSelectingSeasonAndMaximum(string initialMap, int width, bool insufficient, bool useReportedRecipe)
     {
-        var replay = new Replay(initialMap, width, insufficient);
+        var replay = new Replay(initialMap, width, insufficient, useReportedRecipe);
         var runner = new StaminaCraftingRunner(replay, new ImageMatchingService(), replay, replay);
         var window = new CaptureTargetWindow { Hwnd = 1, ClientWidth = width, ClientHeight = width * 9 / 16, ClientOffsetX = 12, ClientOffsetY = 30 };
         var result = await runner.RunAsync(new(window, new(), new(), DateTimeOffset.Now), _ => { }, CancellationToken.None);
@@ -31,7 +32,7 @@ public class StaminaCraftingTests
         Assert.AreEqual(insufficient ? "跳过：体力不足" : "成功：已制造赛季球", result);
     }
 
-    private sealed class Replay(string initialMap, int width, bool insufficient) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
+    private sealed class Replay(string initialMap, int width, bool insufficient, bool useReportedRecipe) : IScreenCaptureService, IMouseInputService, IKeyboardInputService
     {
         public string Stage = "start";
         private int _frames;
@@ -70,13 +71,17 @@ public class StaminaCraftingTests
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-08", "stamina-crafting", "craft-result-bonus-61.png");
             if (name == "basic-alchemy")
                 path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-25", "stamina-crafting", name + ".png");
+            var useReportedFrame = useReportedRecipe && name is "recipe-list-marked" or "basic-alchemy";
+            if (useReportedFrame)
+                path = Path.Combine(SourceDirectory(), "LocalScreenshots", "2026-11-28", "stamina-crafting", "crafting-season-badge-stalled.png");
             if (name == "legendary-skip") path = Path.Combine(SourceDirectory(), "Fixtures", name + ".png");
             if (!File.Exists(path)) Assert.Inconclusive($"缺少本地回放图：{path}");
             var frame = FlowerSeedScreenRecognizerTests.LoadFixture(path, width, width * 9 / 16, 12, 30, transform: mat =>
             {
-                if (name == "recipe-list-marked")
+                if (useReportedFrame || name == "recipe-list-marked")
                 {
-                    using var client = new OpenCvSharp.Mat(mat, new OpenCvSharp.Rect(2, 45, 2048, 1152));
+                    var clientArea = useReportedFrame ? new OpenCvSharp.Rect(1, 31, 1600, 900) : new OpenCvSharp.Rect(2, 45, 2048, 1152);
+                    using var client = new OpenCvSharp.Mat(mat, clientArea);
                     using var copy = client.Clone();
                     copy.CopyTo(mat);
                     if (initialMap == "map-academy")
@@ -140,6 +145,7 @@ public class StaminaCraftingTests
                 "options" => ("garden", 237, 914),
                 "open" or "garden" => ("teleport", 813, 550),
                 "teleport" => ("world-arrival", 1634, 1085),
+                "recipe-list-marked" when useReportedRecipe => ("season-selected", 505, 528),
                 "recipe-list-marked" when initialMap == "map-academy" => ("season-selected", 345, 219),
                 "recipe-list-marked" => ("season-selected", 658, 528),
                 "slider-maximum" => ("skip-craft", 1800, 1080),

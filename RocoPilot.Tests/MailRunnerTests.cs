@@ -15,6 +15,7 @@ public sealed class MailRunnerTests
 {
     [TestMethod]
     [DataRow(2048, true, true, false)]
+    [DataRow(1600, true, true, false)]
     [DataRow(1280, false, true, true)]
     [DataRow(960, true, false, true)]
     [DataRow(960, false, false, false)]

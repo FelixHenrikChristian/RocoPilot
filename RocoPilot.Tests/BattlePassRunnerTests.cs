@@ -15,6 +15,7 @@ public sealed class BattlePassRunnerTests
 {
     [TestMethod]
     [DataRow(2048, true, true, 4, false, true)]
+    [DataRow(1600, true, true, 4, false, true)]
     [DataRow(1280, false, true, 4, true, true)]
     [DataRow(1280, false, true, 3, false, true)]
     [DataRow(960, true, true, 4, false, true)]
